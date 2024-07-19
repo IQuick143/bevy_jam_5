@@ -1,29 +1,10 @@
-_Brought to you by the Bevy Jam working group._
+_Brought to you by a bunch of nerds._
 
-# Bevy Quickstart
+# WIP
 
-This template is a great way to get started on a new [Bevy](https://bevyengine.org/) game—especially for a game jam!
-Start with a [basic project structure](#write-your-game) and [CI / CD](#release-your-game) that can deploy to [itch.io](https://itch.io).
-You can [try this template in your web browser!](https://the-bevy-flock.itch.io/bevy-quickstart)
-
-Don't want to read through the whole README? [@ChristopherBiscardi](https://github.com/ChristopherBiscardi) made a video on how to use the template from start to finish:
-
-[<img src="./docs/thumbnail.png" width=40% height=40% alt="A video tutorial for bevy_quickstart"/>](https://www.youtube.com/watch?v=ESBRyXClaYc)
-
-## Prerequisites
-
-We assume that you know how to use Bevy already and have seen the [official Quick Start Guide](https://bevyengine.org/learn/quick-start/introduction/).
+# [NAMEHOLDER PENDING]
 
 ## Create a new game
-
-Install [`cargo-generate`](https://github.com/cargo-generate/cargo-generate) and run the following commands:
-
-```sh
-cargo generate TheBevyFlock/bevy_quickstart --branch cargo-generate
-git branch --move main
-```
-
-Then [create a GitHub repository](https://github.com/new) and push your local repository to it.
 
 <details>
   <summary>This template can also be set up manually.</summary>
@@ -34,6 +15,7 @@ Navigate to the top of [this GitHub repository](https://github.com/TheBevyFlock/
 
 Clone your new Github repository to a local repository and push a commit with the following changes:
 
+TODO!
 - Delete `LICENSE`, `README`, and `docs/` files.
 - Search for and replace instances of `bevy_quickstart` with the name of your project.
 - Adjust the `env` variables in [`.github/workflows/release.yaml`](./.github/workflows/release.yaml).
@@ -92,22 +74,7 @@ After you've fiddled with it, rename it to `.cargo/config.toml` to enable it.
 This template uses [GitHub workflows](https://docs.github.com/en/actions/using-workflows) to run tests and build releases.
 See [Workflows](./docs/workflows.md) for more information.
 
-## Known Issues
-
-There are some known issues in Bevy that require some arcane workarounds.
-To keep this template simple, we have opted not to include those workarounds.
-You can read about them in the [Known Issues](./docs/known-issues.md) document.
-
-## License
-
-The source code in this repository is licensed under any of the following at your option:
-
-- [CC0-1.0 License](./LICENSE-CC0-1.0.txt)
-- [MIT License](./LICENSE-MIT.txt)
-- [Apache License, Version 2.0](./LICENSE-Apache-2.0.txt)
-
-We hold no patent rights to anything presented in this repository.
-
 ## Credits
 
-The [assets](./assets) in this repository are all 3rd-party. See the [credits screen](./src/screen/credits.rs) for more information.
+The TEMPLATE [assets](./assets) in this repository are all 3rd-party. See the [credits screen](./src/screen/credits.rs) for more information.
+TODO: Remainder
