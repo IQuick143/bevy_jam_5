@@ -830,6 +830,7 @@ dependencies = [
  "bevy",
  "log",
  "rand",
+ "regex",
 ]
 
 [[package]]
