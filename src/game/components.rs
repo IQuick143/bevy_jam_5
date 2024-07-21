@@ -31,3 +31,20 @@ pub struct PlacedObject(Entity);
 /// Component of the Vertex representing a link to a glyph occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct PlacedGlyph(Entity);
+
+/// A list of [`Vertex`] entities that are part of a single cycle
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct CycleVertices(Vec<Entity>);
+
+/// Defines conditions under which a cycle may be turned
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+pub enum CycleTurnability {
+	/// Cycle may be turned anytime
+	Always,
+	/// Cycle may be turned when a [`Player`] entity lies on one of its vertices
+	WithPlayer
+}
+
+/// Determines whether a cycle may be turned at any given moment
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct ComputedCycleTurnability(bool);
