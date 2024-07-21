@@ -5,6 +5,7 @@ pub mod audio;
 pub mod components;
 pub mod events;
 pub mod spawn;
+pub mod level;
 
 pub mod prelude {
 	pub use super::components::*;
