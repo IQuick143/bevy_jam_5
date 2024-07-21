@@ -10,12 +10,34 @@ pub(super) fn plugin(app: &mut App) {
 	// Print state transitions in dev builds
 	app.add_systems(Update, log_transitions::<Screen>);
 	app.add_systems(Update, simulate_vertices);
-	app.add_systems(Update, gizmo_draw);
+	app.add_systems(Update, (gizmo_draw, debug_inputs));
+}
+
+pub fn debug_inputs(
+	input: Res<ButtonInput<MouseButton>>,
+	window_q: Query<&Window>,
+	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
+	camera_q: Query<(&Camera, &GlobalTransform)>,
+	mut commands: Commands
+) {
+	if !input.just_pressed(MouseButton::Left) { return; }
+	let window = window_q.single();
+	let (camera, camera_transform) = camera_q.single();
+	if let Some(cursor_pos) = window.cursor_position()
+		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p)) {
+		if let (Some(target_id), _) = cycles_q.iter()
+			.filter(|(_, _, x)| x.0)
+			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
+			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a }) {
+			commands.trigger_targets(RotateCycle::Nominal, target_id);
+		}
+	}
 }
 
 pub fn gizmo_draw(
 	vertices: Query<&Transform, With<Vertex>>,
 	circles: Query<(&CycleVertices, &Transform)>,
+	objects: Query<&VertexPosition, With<Object>>,
 	mut gizmos: Gizmos,
 ) {
 	for transform in vertices.iter() {
@@ -24,6 +46,15 @@ pub fn gizmo_draw(
 			Quat::IDENTITY,
 			1.0,
 			palettes::tailwind::BLUE_300,
+		);
+	}
+
+	for vertex_id in objects.iter() {
+		gizmos.rect(
+			vertices.get(vertex_id.0).unwrap().translation,
+			Quat::IDENTITY,
+			Vec2::splat(5.0),
+			palettes::tailwind::TEAL_300
 		);
 	}
 
