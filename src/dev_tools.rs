@@ -2,7 +2,6 @@
 
 use crate::game::prelude::*;
 use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
-use rand::{thread_rng, Rng};
 
 use crate::screen::Screen;
 
@@ -20,7 +19,14 @@ pub fn debug_inputs(
 	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut commands: Commands
 ) {
-	if !input.just_pressed(MouseButton::Left) { return; }
+	let lmb = input.just_pressed(MouseButton::Left);
+	let rmb = input.just_pressed(MouseButton::Right);
+	let direction = match (lmb, rmb) {
+		(true, true) => return,
+		(true, false) => RotateCycle::Nominal,
+		(false, true) => RotateCycle::Reverse,
+		(false, false) => return,
+	};
 	let window = window_q.single();
 	let (camera, camera_transform) = camera_q.single();
 	if let Some(cursor_pos) = window.cursor_position()
@@ -29,7 +35,7 @@ pub fn debug_inputs(
 			.filter(|(_, _, x)| x.0)
 			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
 			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a }) {
-			commands.trigger_targets(RotateCycle::Nominal, target_id);
+			commands.trigger_targets(direction, target_id);
 		}
 	}
 }
