@@ -61,3 +61,10 @@ pub enum LinkedCycleDirection {
 /// Describes the linkage of multiple cycles such that they will always turn together
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct LinkedCycles(Vec<(Entity, LinkedCycleDirection)>);
+
+impl std::ops::Mul for LinkedCycleDirection {
+	type Output = Self;
+	fn mul(self, rhs: Self) -> Self::Output {
+		if self == rhs { LinkedCycleDirection::Coincident } else { LinkedCycleDirection::Inverse }
+	}
+}
