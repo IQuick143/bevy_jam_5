@@ -48,3 +48,16 @@ pub enum CycleTurnability {
 /// Determines whether a cycle may be turned at any given moment
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct ComputedCycleTurnability(bool);
+
+/// Relative direction of two cycles that are to turn together
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+pub enum LinkedCycleDirection {
+	/// The cycles will turn in the same direction
+	Coincident,
+	/// The cycles will turn in opposite directions
+	Inverse
+}
+
+/// Describes the linkage of multiple cycles such that they will always turn together
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct LinkedCycles(Vec<(Entity, LinkedCycleDirection)>);
