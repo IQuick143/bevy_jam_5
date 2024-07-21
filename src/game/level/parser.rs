@@ -164,9 +164,9 @@ pub fn parse(level_file: &str) -> Result<LevelData, ParsingError> {
 			let mut last_cycle = None;
 			for cycle_name in linked_cycle_names {
 				if let Some(cycle_id) = cycle_names.get(*cycle_name) {
-					if last_cycle.is_some() {
+					if let Some(previous_cycle_id) = last_cycle {
 						linkages.push(LinkageData {
-							cycle_a_index: last_cycle.unwrap(),
+							cycle_a_index: previous_cycle_id,
 							cycle_b_index: *cycle_id,
 							direction: *flip,
 						});

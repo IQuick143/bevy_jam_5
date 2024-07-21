@@ -67,7 +67,7 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData) -> Entity {
 	vertex_id
 }
 
-fn spawn_cycle(mut commands: Commands, data: &CycleData, vertex_entities: &Vec<Entity>) -> Entity {
+fn spawn_cycle(mut commands: Commands, data: &CycleData, vertex_entities: &[Entity]) -> Entity {
 	let mut rng = thread_rng();
 	commands
 		.spawn((
