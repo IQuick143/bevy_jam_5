@@ -6,6 +6,7 @@ pub mod components;
 pub mod events;
 pub mod level;
 pub mod spawn;
+pub mod logic;
 
 pub mod prelude {
 	pub use super::components::*;
@@ -20,7 +21,7 @@ use spawn::level::SpawnLevel;
 use crate::screen::Screen;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_plugins((audio::plugin, assets::plugin, spawn::plugin));
+	app.add_plugins((audio::plugin, assets::plugin, spawn::plugin, logic::plugin));
 	app.add_systems(OnEnter(Screen::Playing), load_level);
 }
 

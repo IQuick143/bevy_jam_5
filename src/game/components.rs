@@ -26,11 +26,11 @@ pub struct Vertex;
 
 /// Component of the Vertex representing a link to an object occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
-pub struct PlacedObject(pub Entity);
+pub struct PlacedObject(pub Option<Entity>);
 
 /// Component of the Vertex representing a link to a glyph occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
-pub struct PlacedGlyph(pub Entity);
+pub struct PlacedGlyph(pub Option<Entity>);
 
 /// A list of [`Vertex`] entities that are part of a single cycle
 #[derive(Component, Debug, Clone, Reflect)]
