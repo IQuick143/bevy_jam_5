@@ -5,5 +5,5 @@ use bevy::prelude::*;
 use bevy_quickstart::AppPlugin;
 
 fn main() -> AppExit {
-    App::new().add_plugins(AppPlugin).run()
+	App::new().add_plugins(AppPlugin).run()
 }

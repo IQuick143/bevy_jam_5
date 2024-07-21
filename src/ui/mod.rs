@@ -8,15 +8,15 @@ pub mod palette;
 mod widgets;
 
 pub mod prelude {
-    pub use super::{
-        interaction::{InteractionPalette, InteractionQuery},
-        palette as ui_palette,
-        widgets::{Containers as _, Widgets as _},
-    };
+	pub use super::{
+		interaction::{InteractionPalette, InteractionQuery},
+		palette as ui_palette,
+		widgets::{Containers as _, Widgets as _},
+	};
 }
 
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_plugins(interaction::plugin);
+	app.add_plugins(interaction::plugin);
 }
