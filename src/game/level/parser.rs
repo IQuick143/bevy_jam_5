@@ -217,15 +217,30 @@ pub fn parse(level_file: &str) -> Result<LevelData, ParsingError> {
 #[test]
 fn basic_test() {
 	let data = r"
+# Here we declare all the vertex names
+# Just list them after the VERTEX, separating by space
 VERTEX a b c x 1 2 3 k l m
+
+# Here we declare cycles
+# First one declares a cycle, with a modifier specifying whether it needs a player
+# Leaving the modifier out defaults to an automatic playerless cycle
+# Next comes an identifier for the cycle itself and then a list of vertices which lie on the circle
+# in a clockwise order.
 CYCLE[MANUAL] cycle_a a b c x
 CYCLE[ENGINE] cycle_b x 1 2 3
-OBJECT[BOX] x
+
+# To place objects we use OBJECT directives, specifying the desired object in the modifier
+# Then we list the vertices upon which the objects should get placed
+OBJECT[BOX] x a
 OBJECT[FLAG] 2
 OBJECT[PLAYER] b
 OBJECT[BUTTON] b
 
+# Oops, we forgot a cycle, let's add one
+# This defaults to an automatic cycle
 CYCLE cycle_extra k l m
+
+# Cycles can be linked together
 LINK cycle_a cycle_extra
 ";
 	let parsed = parse(data);
