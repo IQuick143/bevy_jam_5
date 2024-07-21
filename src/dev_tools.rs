@@ -2,13 +2,14 @@
 
 use crate::game::prelude::*;
 use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
+use rand::{thread_rng, Rng};
 
 use crate::screen::Screen;
 
 pub(super) fn plugin(app: &mut App) {
 	// Print state transitions in dev builds
 	app.add_systems(Update, log_transitions::<Screen>);
-//	app.add_systems(Update, simulate_vertices);
+	app.add_systems(Update, simulate_vertices);
 	app.add_systems(Update, gizmo_draw);
 }
 
@@ -42,5 +43,111 @@ pub fn gizmo_draw(
 		let spline = CubicCardinalSpline::new(0.5, positions).to_curve();
 		let samples = spline.iter_positions(32);
 		gizmos.linestrip(samples, palettes::tailwind::AMBER_900)
+	}
+}
+
+const TARGET_RADIUS: f32 = 150.0;
+
+pub fn simulate_vertices(
+	mut vertices: Query<&mut Transform, (With<Vertex>, Without<CycleVertices>)>,
+	mut circles: Query<(Entity, &CycleVertices, &mut Transform)>,
+	time: Res<Time<Real>>,
+) {
+	let mut gradients: HashMap<Entity, Vec2> = HashMap::new();
+
+	let mut add_gradient = |e: Entity, grad: Vec2| {
+		gradients.insert(e, gradients.get(&e).copied().unwrap_or_default() + grad);
+	};
+
+	fn spring_force_attractive(a: Vec3, b: Vec3, target_distance: f32) -> Vec3 {
+		let (n, dist) = Dir3::new_and_length(a - b).unwrap(); // TODO: div by 0
+		return n * (target_distance - dist).min(0.0);
+	}
+
+	fn spring_force_repulsive(a: Vec3, b: Vec3, target_distance: f32) -> Vec3 {
+		let (n, dist) = Dir3::new_and_length(a - b).unwrap(); // TODO: div by 0
+		return n * (target_distance - dist).max(0.0);
+	}
+
+	for (circle, vertex_ids, circle_transform) in circles.iter() {
+		let mut r = 0.0;
+		let mut n = 0;
+		for vertex_id in vertex_ids.0.iter() {
+			r += circle_transform
+				.translation
+				.distance(vertices.get(*vertex_id).unwrap().translation);
+			n += 1;
+		}
+		let radius = r / n as f32;
+
+		let positions = vertex_ids
+			.0
+			.iter()
+			.map(|vertex_id| vertices.get(*vertex_id).unwrap().translation)
+			.collect::<Vec<Vec3>>();
+
+		let average_position = positions.iter().sum::<Vec3>() / positions.len() as f32;
+		let central_offset = average_position - circle_transform.translation;
+
+		add_gradient(
+			circle,
+			(central_offset * 0.3 - circle_transform.translation * 0.10).xy(),
+		);
+
+		for (i, vertex_id) in vertex_ids.0.iter().enumerate() {
+			let prev_pos = if i == 0 {
+				*positions.last().unwrap()
+			} else {
+				positions[i - 1]
+			};
+			let position = positions[i];
+			let next_pos = if i + 1 == positions.len() {
+				positions[0]
+			} else {
+				positions[i + 1]
+			};
+			let offset = position - circle_transform.translation;
+			let distance = offset.length();
+			let norm = offset / distance; // TODO: Div by 0
+			let circle_force = -(distance - radius) * 2.9 - (radius - TARGET_RADIUS) * 1.5;
+
+			let neighboor_forces = spring_force_attractive(
+				position,
+				prev_pos,
+				TARGET_RADIUS / vertex_ids.0.len() as f32,
+			) + spring_force_attractive(
+				position,
+				next_pos,
+				TARGET_RADIUS / vertex_ids.0.len() as f32,
+			);
+			let offset_force = -central_offset * 5.2;
+
+			add_gradient(
+				*vertex_id,
+				(circle_force * norm + (neighboor_forces + offset_force).reject_from(norm)).xy(),
+			);
+		}
+	}
+
+	for [(circle_a, _, circle_transform_a), (circle_b, _, circle_transform_b)] in
+		circles.iter_combinations()
+	{
+		let force = spring_force_repulsive(
+			circle_transform_a.translation,
+			circle_transform_b.translation,
+			2.0 * TARGET_RADIUS,
+		);
+		let force = force.xy();
+		add_gradient(circle_a, force);
+		add_gradient(circle_b, -force);
+	}
+
+	for (entity, gradient) in gradients.iter() {
+		if let Ok(mut transform) = vertices.get_mut(*entity) {
+			transform.translation += (*gradient * time.delta_seconds() * 5.0).extend(0.0);
+		}
+		if let Ok((_, _, mut transform)) = circles.get_mut(*entity) {
+			transform.translation += (*gradient * time.delta_seconds()).extend(0.0);
+		}
 	}
 }
