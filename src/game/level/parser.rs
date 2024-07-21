@@ -21,6 +21,7 @@ enum ObjectKind {
 	Glyph(GlyphType),
 }
 
+#[allow(dead_code)]
 pub fn parse(level_file: &str) -> Result<LevelData, ParsingError> {
 	let lines = level_file.split("\n").map(&str::trim).enumerate();
 	let lines = lines.filter(|(_line_index, line)| !(line.starts_with("#") || line.is_empty()));
@@ -249,6 +250,7 @@ LINK cycle_a cycle_extra
 	println!("{:?}", parsed.unwrap());
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ParsingError {
 	InvalidKeyword(String),
@@ -265,6 +267,16 @@ impl std::error::Error for ParsingError {}
 
 impl std::fmt::Display for ParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		todo!();
+		match self {
+			ParsingError::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
+			ParsingError::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
+			ParsingError::UnknownVertexName(name) => write!(f, "A vertex with name {} was referenced, but not defined.", name)?,
+			ParsingError::UnknownCycleName(name) => write!(f, "A cycle with name {} was referenced, but not defined.", name)?,
+			ParsingError::RedefinedCycle(name) => write!(f, "A cycle with name {} was defined multiple times.", name)?,
+			ParsingError::ObjectCollision(vertex) => write!(f, "Too many objects were placed onto vertex with name {}", vertex)?,
+			ParsingError::NonAsciiLine => write!(f, "Non-ASCII characters in input")?,
+			ParsingError::MalformedStatement(line_id) => write!(f, "Line {} contains a malformed statement.", line_id+1)?,
+		}
+		Ok(())
 	}
 }
