@@ -3,9 +3,7 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use super::Screen;
-use crate::game::{
-	assets::SoundtrackKey, audio::soundtrack::PlaySoundtrack, spawn::level::SpawnLevel,
-};
+use crate::game::{assets::SoundtrackKey, audio::soundtrack::PlaySoundtrack};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Playing), enter_playing);
@@ -19,7 +17,7 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn enter_playing(mut commands: Commands) {
-	commands.trigger(SpawnLevel);
+	//	commands.trigger(SpawnLevel);
 	commands.trigger(PlaySoundtrack::Key(SoundtrackKey::Gameplay));
 }
 

@@ -6,40 +6,43 @@ pub mod parser;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
-	Box, Player
+	Box,
+	Player,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlyphType {
-	Button, Flag
+	Button,
+	Flag,
 }
 
 #[derive(Debug, Clone)]
 pub struct CycleData {
-	vertex_indices: Vec<usize>,
-	cycle_turnability: CycleTurnability
+	pub vertex_indices: Vec<usize>,
+	pub cycle_turnability: CycleTurnability,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct LinkageData {
-	cycle_a_index: usize,
-	cycle_b_index: usize,
-	direction: LinkedCycleDirection,
+	pub cycle_a_index: usize,
+	pub cycle_b_index: usize,
+	pub direction: LinkedCycleDirection,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct VertexData {
-	object: Option<ObjectType>,
-	glyph: Option<GlyphType>,
+	pub object: Option<ObjectType>,
+	pub glyph: Option<GlyphType>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LevelData {
-	vertices: Vec<VertexData>,
-	cycles: Vec<CycleData>,
-	linkages: Vec<LinkageData>,
+	pub vertices: Vec<VertexData>,
+	pub cycles: Vec<CycleData>,
+	pub linkages: Vec<LinkageData>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum LevelDataValidationError {
 	VertexIndexOutOfRange(usize),
@@ -48,11 +51,11 @@ pub enum LevelDataValidationError {
 	TooFewVerticesInCycle(usize),
 	RepeatingVertexInCycle(usize),
 	TooManyVerticesInCycleIntersection(usize, usize),
-	OverlappedLinkedCycles(usize, usize)
+	OverlappedLinkedCycles(usize, usize),
 }
 
 #[derive(Debug, Clone)]
-pub struct ValidLevelData(LevelData);
+pub struct ValidLevelData(pub LevelData);
 
 impl TryFrom<LevelData> for ValidLevelData {
 	type Error = LevelDataValidationError;
@@ -66,9 +69,12 @@ impl TryFrom<LevelData> for ValidLevelData {
 			if !cycle.vertex_indices.iter().all_unique() {
 				return Err(LevelDataValidationError::RepeatingVertexInCycle(i));
 			}
-			if let Some(j) = cycle.vertex_indices.iter()
+			if let Some(j) = cycle
+				.vertex_indices
+				.iter()
 				.copied()
-				.find(|&j| j >= value.vertices.len()) {
+				.find(|&j| j >= value.vertices.len())
+			{
 				return Err(LevelDataValidationError::VertexIndexOutOfRange(j));
 			}
 		}
@@ -76,15 +82,23 @@ impl TryFrom<LevelData> for ValidLevelData {
 		// A very, *very* inefficient way of finding conflicts between cycle links
 		// Only reasonably fast (and space-efficient) for 20 cycles or so
 		let mut cycle_links = (0..value.cycles.len())
-			.map(|i| (0..value.cycles.len())
-				.map(|j| if i == j { Some(LinkedCycleDirection::Coincident) } else { None })
-				.collect::<Vec<_>>())
+			.map(|i| {
+				(0..value.cycles.len())
+					.map(|j| {
+						if i == j {
+							Some(LinkedCycleDirection::Coincident)
+						} else {
+							None
+						}
+					})
+					.collect::<Vec<_>>()
+			})
 			.collect::<Vec<_>>();
 		fn set_link(
 			links: &mut Vec<Vec<Option<LinkedCycleDirection>>>,
 			i: usize,
 			j: usize,
-			dir: LinkedCycleDirection
+			dir: LinkedCycleDirection,
 		) -> Result<(), LevelDataValidationError> {
 			if links[i][j].is_some_and(|d| d != dir) {
 				return Err(LevelDataValidationError::CycleLinkageConflict);
@@ -113,7 +127,9 @@ impl TryFrom<LevelData> for ValidLevelData {
 		}
 
 		// Everything about overlapping cycles
-		let vertices_per_cycle = value.cycles.iter()
+		let vertices_per_cycle = value
+			.cycles
+			.iter()
 			.map(|c| std::collections::BTreeSet::from_iter(c.vertex_indices.iter().copied()))
 			.collect::<Vec<_>>();
 		for ((i, a), (j, b)) in vertices_per_cycle.iter().enumerate().tuple_combinations() {
@@ -173,19 +189,64 @@ mod test {
 		assert!(level_data!(6, [[0, 1, 2, 4], [2, 3, 4, 5]], []).is_ok());
 		assert!(level_data!(4, [[0, 1], [2, 3]], [(0, 0, Coincident)]).is_ok());
 		assert!(level_data!(4, [[0, 1], [2, 3]], [(0, 1, Coincident)]).is_ok());
-		assert!(level_data!(4, [[0, 1], [2, 3]], [(0, 1, Coincident), (1, 0, Coincident)]).is_ok());
-		assert!(level_data!(6, [[0, 1], [2, 3], [4, 5]], [(0, 1, Coincident), (1, 2, Inverse)]).is_ok());
-		assert!(level_data!(6, [[0, 1], [2, 3], [4, 5]], [(0, 1, Coincident), (1, 2, Inverse), (0, 2, Inverse)]).is_ok());
-		assert!(level_data!(6, [[0, 1], [2, 3], [4, 5]], [(0, 1, Coincident), (1, 2, Coincident), (0, 2, Coincident)]).is_ok());
+		assert!(level_data!(
+			4,
+			[[0, 1], [2, 3]],
+			[(0, 1, Coincident), (1, 0, Coincident)]
+		)
+		.is_ok());
+		assert!(level_data!(
+			6,
+			[[0, 1], [2, 3], [4, 5]],
+			[(0, 1, Coincident), (1, 2, Inverse)]
+		)
+		.is_ok());
+		assert!(level_data!(
+			6,
+			[[0, 1], [2, 3], [4, 5]],
+			[(0, 1, Coincident), (1, 2, Inverse), (0, 2, Inverse)]
+		)
+		.is_ok());
+		assert!(level_data!(
+			6,
+			[[0, 1], [2, 3], [4, 5]],
+			[(0, 1, Coincident), (1, 2, Coincident), (0, 2, Coincident)]
+		)
+		.is_ok());
 		assert!(level_data!(5, [[0, 1], [2, 3], [4, 2]], [(0, 1, Coincident)]).is_ok());
 
 		assert!(level_data!(6, [[0, 1, 2, 4], [0, 2, 3, 4, 5]], []).is_err());
 		assert!(level_data!(4, [[0, 1], [2, 3]], [(0, 0, Inverse)]).is_err());
 		assert!(level_data!(3, [[0, 1], [1, 2]], [(0, 1, Coincident)]).is_err());
 		assert!(level_data!(4, [[0, 1], [2, 3]], [(0, 1, Coincident), (1, 0, Inverse)]).is_err());
-		assert!(level_data!(6, [[0, 1], [2, 3], [4, 5]], [(0, 1, Coincident), (1, 2, Inverse), (0, 2, Coincident)]).is_err());
-		assert!(level_data!(6, [[0, 1], [2, 3], [4, 5]], [(0, 1, Inverse), (1, 2, Coincident), (0, 2, Coincident)]).is_err());
-		assert!(level_data!(8, [[0, 1], [2, 3], [4, 5], [6, 7]], [(0, 1, Coincident), (1, 2, Coincident), (2, 3, Coincident), (3, 1, Inverse)]).is_err());
-		assert!(level_data!(5, [[0, 1], [2, 3], [4, 2]], [(0, 1, Coincident), (0, 2, Coincident)]).is_err());
+		assert!(level_data!(
+			6,
+			[[0, 1], [2, 3], [4, 5]],
+			[(0, 1, Coincident), (1, 2, Inverse), (0, 2, Coincident)]
+		)
+		.is_err());
+		assert!(level_data!(
+			6,
+			[[0, 1], [2, 3], [4, 5]],
+			[(0, 1, Inverse), (1, 2, Coincident), (0, 2, Coincident)]
+		)
+		.is_err());
+		assert!(level_data!(
+			8,
+			[[0, 1], [2, 3], [4, 5], [6, 7]],
+			[
+				(0, 1, Coincident),
+				(1, 2, Coincident),
+				(2, 3, Coincident),
+				(3, 1, Inverse)
+			]
+		)
+		.is_err());
+		assert!(level_data!(
+			5,
+			[[0, 1], [2, 3], [4, 2]],
+			[(0, 1, Coincident), (0, 2, Coincident)]
+		)
+		.is_err());
 	}
 }

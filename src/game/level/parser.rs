@@ -270,12 +270,28 @@ impl std::fmt::Display for ParsingError {
 		match self {
 			ParsingError::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
 			ParsingError::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
-			ParsingError::UnknownVertexName(name) => write!(f, "A vertex with name {} was referenced, but not defined.", name)?,
-			ParsingError::UnknownCycleName(name) => write!(f, "A cycle with name {} was referenced, but not defined.", name)?,
-			ParsingError::RedefinedCycle(name) => write!(f, "A cycle with name {} was defined multiple times.", name)?,
-			ParsingError::ObjectCollision(vertex) => write!(f, "Too many objects were placed onto vertex with name {}", vertex)?,
+			ParsingError::UnknownVertexName(name) => write!(
+				f,
+				"A vertex with name {} was referenced, but not defined.",
+				name
+			)?,
+			ParsingError::UnknownCycleName(name) => write!(
+				f,
+				"A cycle with name {} was referenced, but not defined.",
+				name
+			)?,
+			ParsingError::RedefinedCycle(name) => {
+				write!(f, "A cycle with name {} was defined multiple times.", name)?
+			}
+			ParsingError::ObjectCollision(vertex) => write!(
+				f,
+				"Too many objects were placed onto vertex with name {}",
+				vertex
+			)?,
 			ParsingError::NonAsciiLine => write!(f, "Non-ASCII characters in input")?,
-			ParsingError::MalformedStatement(line_id) => write!(f, "Line {} contains a malformed statement.", line_id+1)?,
+			ParsingError::MalformedStatement(line_id) => {
+				write!(f, "Line {} contains a malformed statement.", line_id + 1)?
+			}
 		}
 		Ok(())
 	}
