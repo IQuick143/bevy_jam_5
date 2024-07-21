@@ -23,8 +23,8 @@ enum ObjectKind {
 
 #[allow(dead_code)]
 pub fn parse(level_file: &str) -> Result<LevelData, ParsingError> {
-	let lines = level_file.split("\n").map(&str::trim).enumerate();
-	let lines = lines.filter(|(_line_index, line)| !(line.starts_with("#") || line.is_empty()));
+	let lines = level_file.split('\n').map(&str::trim).enumerate();
+	let lines = lines.filter(|(_line_index, line)| !(line.starts_with('#') || line.is_empty()));
 
 	let statement_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>\w+)\])?(?<VALUES>.+)?$")
 		.expect("I expected to be able to write a valid regex.");

@@ -7,8 +7,8 @@ pub struct StartLevel;
 /// entities that lie on the cycle
 #[derive(Event, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RotateCycle {
-    /// Rotate in nominal direction of the cycle
-    Nominal,
-    /// Rotate in reverse direction of the cycle
-    Reverse
+	/// Rotate in nominal direction of the cycle
+	Nominal,
+	/// Rotate in reverse direction of the cycle
+	Reverse,
 }

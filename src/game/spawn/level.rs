@@ -34,30 +34,34 @@ fn spawn_level(trigger: Trigger<SpawnLevel>, mut commands: Commands) {
 			let _cycle = spawn_cycle(commands.reborrow(), data, &vertices);
 		})
 		.collect();
-
-	()
 }
 
 fn spawn_vertex(mut commands: Commands, data: &VertexData) -> Entity {
 	let mut rng = thread_rng();
-	let vertex_id = commands.spawn((
-		Vertex,
-		PlacedGlyph(None),
-		PlacedObject(None),
-		Transform::from_translation(Vec3::new(
-			rng.gen_range(-100.0..100.0),
-			rng.gen_range(-100.0..100.0),
-			0.0,
-		)),
-	)).id();
-	
+	let vertex_id = commands
+		.spawn((
+			Vertex,
+			PlacedGlyph(None),
+			PlacedObject(None),
+			Transform::from_translation(Vec3::new(
+				rng.gen_range(-100.0..100.0),
+				rng.gen_range(-100.0..100.0),
+				0.0,
+			)),
+		))
+		.id();
+
 	if data.object.is_some() {
 		let object_id = commands.spawn((Object, VertexPosition(vertex_id))).id();
-		commands.entity(vertex_id).insert(PlacedObject(Some(object_id)));
+		commands
+			.entity(vertex_id)
+			.insert(PlacedObject(Some(object_id)));
 	}
 	if data.glyph.is_some() {
 		let glyph_id = commands.spawn((Glyph, VertexPosition(vertex_id))).id();
-		commands.entity(vertex_id).insert(PlacedGlyph(Some(glyph_id)));
+		commands
+			.entity(vertex_id)
+			.insert(PlacedGlyph(Some(glyph_id)));
 	}
 
 	vertex_id
