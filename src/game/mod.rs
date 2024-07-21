@@ -1,19 +1,19 @@
 //! Game mechanics and content.
 
-use bevy::prelude::*;
-
-mod animation;
 pub mod assets;
 pub mod audio;
-mod movement;
+pub mod components;
+pub mod events;
 pub mod spawn;
 
+pub mod prelude {
+    pub use super::components::*;
+    pub use super::events::*;
+    pub use bevy::prelude::*;
+}
+
+use bevy::app::App;
+
 pub(super) fn plugin(app: &mut App) {
-    app.add_plugins((
-        animation::plugin,
-        audio::plugin,
-        assets::plugin,
-        movement::plugin,
-        spawn::plugin,
-    ));
+    app.add_plugins((audio::plugin, assets::plugin, spawn::plugin));
 }
