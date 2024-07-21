@@ -831,6 +831,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "rand",
+ "regex",
 ]
 
 [[package]]

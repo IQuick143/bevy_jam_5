@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::game::prelude::*;
 
-// pub mod parser;
+pub mod parser;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
