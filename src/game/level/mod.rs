@@ -54,8 +54,32 @@ pub enum LevelDataValidationError {
 	OverlappedLinkedCycles(usize, usize),
 }
 
+/// A sanitized [`LevelData`] instance.
+/// It is read-only to ensure that it truly remains valid
 #[derive(Debug, Clone)]
-pub struct ValidLevelData(LevelData);
+pub struct ValidLevelData {
+	/// The contained level data. Guaranteed to be sanitized
+	inner: LevelData,
+	/// Computed equivalence closure of links between cycles.
+	/// The sanitizer needs to compute this anyway, so it is
+	/// included here for convenience
+	links: Vec<Vec<Option<LinkedCycleDirection>>>,
+}
+
+impl ValidLevelData {
+	/// Iterates over indices of cycles that are, directly or indirectly,
+	/// linked to a given cycle. The original cycle is not included in the result.
+	pub fn cycles_linked_to<'w>(
+		&'w self,
+		index: usize,
+	) -> impl Iterator<Item = (usize, LinkedCycleDirection)> + 'w {
+		self.links[index]
+			.iter()
+			.enumerate()
+			.filter_map(|(i, x)| x.map(|x| (i, x)))
+			.filter(move |(i, _)| *i != index)
+	}
+}
 
 impl TryFrom<LevelData> for ValidLevelData {
 	type Error = LevelDataValidationError;
@@ -142,20 +166,23 @@ impl TryFrom<LevelData> for ValidLevelData {
 			}
 		}
 
-		Ok(Self(value))
+		Ok(Self {
+			inner: value,
+			links: cycle_links,
+		})
 	}
 }
 
 impl std::ops::Deref for ValidLevelData {
 	type Target = LevelData;
 	fn deref(&self) -> &Self::Target {
-		&self.0
+		&self.inner
 	}
 }
 
 impl std::borrow::Borrow<LevelData> for ValidLevelData {
 	fn borrow(&self) -> &LevelData {
-		&self.0
+		&self.inner
 	}
 }
 
