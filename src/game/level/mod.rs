@@ -55,7 +55,7 @@ pub enum LevelDataValidationError {
 }
 
 #[derive(Debug, Clone)]
-pub struct ValidLevelData(pub LevelData);
+pub struct ValidLevelData(LevelData);
 
 impl TryFrom<LevelData> for ValidLevelData {
 	type Error = LevelDataValidationError;

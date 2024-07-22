@@ -15,7 +15,7 @@ pub struct SpawnLevel(pub ValidLevelData);
 
 fn spawn_level(trigger: Trigger<SpawnLevel>, mut commands: Commands) {
 	println!("Spawning!"); //TODO: debug
-	let data = trigger.event().0 .0.clone();
+	let data = trigger.event().0.clone();
 
 	let vertices: Vec<Entity> = data
 		.vertices
