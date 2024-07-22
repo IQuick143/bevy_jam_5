@@ -44,7 +44,7 @@ pub fn debug_inputs(
 
 pub fn gizmo_draw(
 	vertices: Query<&Transform, With<Vertex>>,
-	circles: Query<(&CycleVertices, &Transform)>,
+	circles: Query<(&CycleVertices, &ComputedCycleTurnability, &Transform)>,
 	players: Query<&VertexPosition, With<Player>>,
 	boxes: Query<&VertexPosition, With<Box>>,
 	buttons: Query<&VertexPosition, With<BoxSlot>>,
@@ -96,12 +96,12 @@ pub fn gizmo_draw(
 		);
 	}
 
-	for (vertex_ids, circle_transform) in circles.iter() {
+	for (vertex_ids, turnability, circle_transform) in circles.iter() {
 		gizmos.sphere(
 			circle_transform.translation,
 			Quat::IDENTITY,
 			1.0,
-			palettes::tailwind::AMBER_100,
+			if turnability.0 { palettes::tailwind::AMBER_100 } else { palettes::tailwind::AMBER_600 },
 		);
 		let mut positions: Vec<Vec3> = vertex_ids
 			.0
