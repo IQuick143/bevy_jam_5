@@ -18,7 +18,7 @@ pub fn debug_inputs(
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
 	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut events: EventWriter<GameLayoutChanged>,
-	mut commands: Commands
+	mut commands: Commands,
 ) {
 	let lmb = input.just_pressed(MouseButton::Left);
 	let rmb = input.just_pressed(MouseButton::Right);
@@ -30,12 +30,16 @@ pub fn debug_inputs(
 	};
 	let window = window_q.single();
 	let (camera, camera_transform) = camera_q.single();
-	if let Some(cursor_pos) = window.cursor_position()
-		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p)) {
-		if let (Some(target_id), _) = cycles_q.iter()
+	if let Some(cursor_pos) = window
+		.cursor_position()
+		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p))
+	{
+		if let (Some(target_id), _) = cycles_q
+			.iter()
 			.filter(|(_, _, x)| x.0)
 			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
-			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a }) {
+			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a })
+		{
 			commands.trigger_targets(direction, target_id);
 			events.send(GameLayoutChanged);
 		}
@@ -65,7 +69,7 @@ pub fn gizmo_draw(
 			vertices.get(vertex_id.0).unwrap().translation,
 			Quat::IDENTITY,
 			Vec2::splat(10.0),
-			palettes::css::MAROON
+			palettes::css::MAROON,
 		);
 	}
 
@@ -74,7 +78,7 @@ pub fn gizmo_draw(
 			vertices.get(vertex_id.0).unwrap().translation,
 			Quat::IDENTITY,
 			Vec2::splat(10.0),
-			palettes::css::TEAL
+			palettes::css::TEAL,
 		);
 	}
 
@@ -83,7 +87,7 @@ pub fn gizmo_draw(
 			vertices.get(vertex_id.0).unwrap().translation,
 			Quat::IDENTITY,
 			Vec2::splat(20.0),
-			palettes::css::MAROON
+			palettes::css::MAROON,
 		);
 	}
 
@@ -92,7 +96,7 @@ pub fn gizmo_draw(
 			vertices.get(vertex_id.0).unwrap().translation,
 			Quat::IDENTITY,
 			Vec2::splat(20.0),
-			palettes::css::TEAL
+			palettes::css::TEAL,
 		);
 	}
 
@@ -101,7 +105,11 @@ pub fn gizmo_draw(
 			circle_transform.translation,
 			Quat::IDENTITY,
 			1.0,
-			if turnability.0 { palettes::tailwind::AMBER_100 } else { palettes::tailwind::AMBER_600 },
+			if turnability.0 {
+				palettes::tailwind::AMBER_100
+			} else {
+				palettes::tailwind::AMBER_600
+			},
 		);
 		let mut positions: Vec<Vec3> = vertex_ids
 			.0
@@ -130,12 +138,12 @@ pub fn simulate_vertices(
 
 	fn spring_force_attractive(a: Vec3, b: Vec3, target_distance: f32) -> Vec3 {
 		let (n, dist) = Dir3::new_and_length(a - b).unwrap(); // TODO: div by 0
-		return n * (target_distance - dist).min(0.0);
+		n * (target_distance - dist).min(0.0)
 	}
 
 	fn spring_force_repulsive(a: Vec3, b: Vec3, target_distance: f32) -> Vec3 {
 		let (n, dist) = Dir3::new_and_length(a - b).unwrap(); // TODO: div by 0
-		return n * (target_distance - dist).max(0.0);
+		n * (target_distance - dist).max(0.0)
 	}
 
 	for (circle, vertex_ids, circle_transform) in circles.iter() {

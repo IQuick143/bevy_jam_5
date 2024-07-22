@@ -95,7 +95,7 @@ impl TryFrom<LevelData> for ValidLevelData {
 			})
 			.collect::<Vec<_>>();
 		fn set_link(
-			links: &mut Vec<Vec<Option<LinkedCycleDirection>>>,
+			links: &mut [Vec<Option<LinkedCycleDirection>>],
 			i: usize,
 			j: usize,
 			dir: LinkedCycleDirection,

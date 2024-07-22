@@ -6,7 +6,7 @@ pub struct LevelCompletionConditions {
 	pub buttons_present: u32,
 	pub buttons_triggered: u32,
 	pub players_present: u32,
-	pub players_flagged: u32
+	pub players_flagged: u32,
 }
 
 impl LevelCompletionConditions {
