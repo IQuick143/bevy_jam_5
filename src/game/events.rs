@@ -31,7 +31,7 @@ pub struct RotateSingleCycle(pub RotateCycle);
 pub struct RotateCycleGroup(pub RotateCycle);
 
 /// Event that is sent when state of the game map changes,
-/// usualy by turning a cycle
+/// usually by turning a cycle
 #[derive(Event, Debug)]
 pub struct GameLayoutChanged;
 
