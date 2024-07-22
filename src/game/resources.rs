@@ -12,12 +12,12 @@ pub struct LevelCompletionConditions {
 impl LevelCompletionConditions {
 	/// Whether the level has been completed
 	pub fn is_level_completed(&self) -> bool {
-		return self.is_goal_unlocked() && self.players_flagged == self.players_present;
+		self.is_goal_unlocked() && self.players_flagged == self.players_present
 	}
 
 	/// Whether all secondary completion criteria have been met,
 	/// and the level will be completed as soon as all players travel to a goal
 	pub fn is_goal_unlocked(&self) -> bool {
-		return self.buttons_present == self.buttons_triggered;
+		self.buttons_present == self.buttons_triggered
 	}
 }
