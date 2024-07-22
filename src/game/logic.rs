@@ -134,8 +134,8 @@ fn level_completion_check_system(
 	let mut new_completion = LevelCompletionConditions {
 		buttons_present: 0,
 		buttons_triggered: 0,
-		players_present: 0,
-		players_flagged: 0,
+		flags_present: 0,
+		flags_occupied: 0,
 	};
 
 	for (object, glyph) in &vertices_q {
@@ -156,10 +156,10 @@ fn level_completion_check_system(
 				new_completion.buttons_triggered += 1;
 			}
 		}
-		if contains_player {
-			new_completion.players_present += 1;
-			if contains_goal {
-				new_completion.players_flagged += 1;
+		if contains_goal {
+			new_completion.flags_present += 1;
+			if contains_player {
+				new_completion.flags_occupied += 1;
 			}
 		}
 	}

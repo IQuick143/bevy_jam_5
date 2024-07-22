@@ -5,14 +5,14 @@ use super::prelude::*;
 pub struct LevelCompletionConditions {
 	pub buttons_present: u32,
 	pub buttons_triggered: u32,
-	pub players_present: u32,
-	pub players_flagged: u32,
+	pub flags_present: u32,
+	pub flags_occupied: u32,
 }
 
 impl LevelCompletionConditions {
 	/// Whether the level has been completed
 	pub fn is_level_completed(&self) -> bool {
-		self.is_goal_unlocked() && self.players_flagged == self.players_present
+		self.is_goal_unlocked() && self.flags_occupied == self.flags_present
 	}
 
 	/// Whether all secondary completion criteria have been met,
