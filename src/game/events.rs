@@ -1,3 +1,4 @@
+use super::components::LinkedCycleDirection;
 use bevy::prelude::*;
 
 #[derive(Event, Debug)]
@@ -12,9 +13,8 @@ pub enum CycleTurningDirection {
 	Reverse,
 }
 
-/// Event sent to a cycle entity to rotate [`super::components::Object`]
-/// entities that lie on the cycle
-#[derive(Event, Debug)]
+/// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
+#[derive(Clone, Copy, Debug)]
 pub struct RotateCycle {
 	/// Id of the cycle entity to rotate
 	pub target_cycle: Entity,
@@ -22,7 +22,37 @@ pub struct RotateCycle {
 	pub direction: CycleTurningDirection,
 }
 
+/// Event sent to a cycle entity to rotate [`super::components::Object`]
+/// entities that lie on the cycle
+#[derive(Event, Clone, Copy, Debug)]
+pub struct RotateSingleCycle(pub RotateCycle);
+
+/// Event sent to a cycle entity to rotate [`super::components::Object`]
+/// entities that lie on the cycle and all cycles linked to it
+#[derive(Event, Clone, Copy, Debug)]
+pub struct RotateCycleGroup(pub RotateCycle);
+
 /// Event that is sent when state of the game map changes,
 /// usualy by turning a cycle
 #[derive(Event, Debug)]
 pub struct GameLayoutChanged;
+
+impl std::ops::Mul<LinkedCycleDirection> for CycleTurningDirection {
+	type Output = Self;
+	fn mul(self, rhs: LinkedCycleDirection) -> Self::Output {
+		match rhs {
+			LinkedCycleDirection::Coincident => self,
+			LinkedCycleDirection::Inverse => -self,
+		}
+	}
+}
+
+impl std::ops::Neg for CycleTurningDirection {
+	type Output = Self;
+	fn neg(self) -> Self::Output {
+		match self {
+			CycleTurningDirection::Nominal => CycleTurningDirection::Reverse,
+			CycleTurningDirection::Reverse => CycleTurningDirection::Nominal,
+		}
+	}
+}

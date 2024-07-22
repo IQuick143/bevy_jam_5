@@ -26,7 +26,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((audio::plugin, assets::plugin, spawn::plugin, logic::plugin));
 	app.add_systems(OnEnter(Screen::Playing), load_level);
 	app.add_event::<events::GameLayoutChanged>();
-	app.add_event::<events::RotateCycle>();
+	app.add_event::<events::RotateCycleGroup>();
+	app.add_event::<events::RotateSingleCycle>();
 }
 
 fn load_level(mut commands: Commands) {

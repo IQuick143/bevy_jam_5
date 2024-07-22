@@ -17,7 +17,7 @@ pub fn debug_inputs(
 	window_q: Query<&Window>,
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
 	camera_q: Query<(&Camera, &GlobalTransform)>,
-	mut rotate_cycle_events: EventWriter<RotateCycle>,
+	mut rotate_cycle_events: EventWriter<RotateCycleGroup>,
 	mut layout_changed_events: EventWriter<GameLayoutChanged>,
 ) {
 	let lmb = input.just_pressed(MouseButton::Left);
@@ -40,10 +40,10 @@ pub fn debug_inputs(
 			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
 			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a })
 		{
-			rotate_cycle_events.send(RotateCycle {
+			rotate_cycle_events.send(RotateCycleGroup(RotateCycle {
 				target_cycle: target_id,
 				direction,
-			});
+			}));
 			layout_changed_events.send(GameLayoutChanged);
 		}
 	}

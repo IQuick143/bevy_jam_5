@@ -4,26 +4,52 @@ pub fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			cycle_rotation_system.run_if(on_event::<RotateCycle>()),
+			cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>()),
+			cycle_rotation_system.run_if(on_event::<RotateSingleCycle>()),
 			(
 				level_completion_check_system,
 				cycle_turnability_update_system,
 			)
-				.run_if(on_event::<GameLayoutChanged>())
-				.after(cycle_rotation_system),
-		),
+				.run_if(on_event::<GameLayoutChanged>()),
+		)
+			.chain(),
 	);
+}
+
+/// Relays rotation events on a cycle group to the individual cycles
+fn cycle_group_rotation_relay_system(
+	mut group_events: EventReader<RotateCycleGroup>,
+	mut single_events: EventWriter<RotateSingleCycle>,
+	cycles_q: Query<&LinkedCycles>,
+) {
+	for group_rotation in group_events.read() {
+		single_events.send_batch(
+			std::iter::once(group_rotation.0)
+				.chain(
+					cycles_q
+						.get(group_rotation.0.target_cycle)
+						.into_iter()
+						.map(|links| &links.0)
+						.flatten()
+						.map(|&(id, relative_direction)| RotateCycle {
+							target_cycle: id,
+							direction: group_rotation.0.direction * relative_direction,
+						}),
+				)
+				.map(RotateSingleCycle),
+		);
+	}
 }
 
 fn cycle_rotation_system(
 	cycles_q: Query<&CycleVertices>,
-	mut events: EventReader<RotateCycle>,
+	mut events: EventReader<RotateSingleCycle>,
 	mut vertices_q: Query<&mut PlacedObject>,
 	mut objects_q: Query<&mut VertexPosition>,
 ) {
 	for event in events.read() {
 		if let Ok(cycle_vertices) = cycles_q
-			.get(event.target_cycle)
+			.get(event.0.target_cycle)
 			.inspect_err(|e| log::warn!("{e}"))
 		{
 			// Visit the first vertex again at the end to close the loop
@@ -34,7 +60,7 @@ fn cycle_rotation_system(
 				.chain(std::iter::once(cycle_vertices.0[0]));
 			// Messy but simple way of chosing the iterator direction at run time
 			// https://stackoverflow.com/a/52064434
-			let vertex_ids_wrapped = match event.direction {
+			let vertex_ids_wrapped = match event.0.direction {
 				CycleTurningDirection::Nominal => Some(vertex_ids_wrapped)
 					.into_iter()
 					.flatten()
