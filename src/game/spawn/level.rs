@@ -31,13 +31,23 @@ fn spawn_level(
 		})
 		.collect();
 
-	let _: Vec<()> = data
+	let cycle_ids = data
 		.cycles
 		.iter()
-		.map(|data| {
-			let _cycle = spawn_cycle(commands.reborrow(), data, &vertices);
-		})
-		.collect();
+		.map(|data| spawn_cycle(commands.reborrow(), data, &vertices))
+		.collect::<Vec<_>>();
+
+	for (i, cycle_id) in cycle_ids.iter().copied().enumerate() {
+		let linked_cycles = data
+			.cycles_linked_to(i)
+			.map(|(j, dir)| (cycle_ids[j], dir))
+			.collect::<Vec<_>>();
+		if !linked_cycles.is_empty() {
+			commands
+				.entity(cycle_id)
+				.insert(LinkedCycles(linked_cycles));
+		}
+	}
 
 	commands.init_resource::<LevelCompletionConditions>();
 	events.send(GameLayoutChanged);
