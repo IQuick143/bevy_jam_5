@@ -1,9 +1,6 @@
 use super::components::LinkedCycleDirection;
 use bevy::prelude::*;
 
-#[derive(Event, Debug)]
-pub struct StartLevel;
-
 /// Enumerates directions in which a cycle can turn
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CycleTurningDirection {
@@ -22,13 +19,14 @@ pub struct RotateCycle {
 	pub direction: CycleTurningDirection,
 }
 
-/// Event sent to a cycle entity to rotate [`super::components::Object`]
-/// entities that lie on the cycle
+/// Internal event sent to a cycle entity to rotate [`super::components::Object`]
+/// entities that lie on the cycle, ignores linkages.
 #[derive(Event, Clone, Copy, Debug)]
 pub struct RotateSingleCycle(pub RotateCycle);
 
 /// Event sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle and all cycles linked to it
+/// Should be sent only if it is valid to rotate the given cycle.
 #[derive(Event, Clone, Copy, Debug)]
 pub struct RotateCycleGroup(pub RotateCycle);
 

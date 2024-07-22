@@ -20,9 +20,12 @@ pub fn plugin(app: &mut App) {
 fn cycle_group_rotation_relay_system(
 	mut group_events: EventReader<RotateCycleGroup>,
 	mut single_events: EventWriter<RotateSingleCycle>,
+	mut update_event: EventWriter<GameLayoutChanged>,
 	cycles_q: Query<&LinkedCycles>,
 ) {
 	for group_rotation in group_events.read() {
+		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
+		update_event.send(GameLayoutChanged);
 		single_events.send_batch(
 			std::iter::once(group_rotation.0)
 				.chain(

@@ -18,7 +18,6 @@ pub fn debug_inputs(
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
 	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut rotate_cycle_events: EventWriter<RotateCycleGroup>,
-	mut layout_changed_events: EventWriter<GameLayoutChanged>,
 ) {
 	let lmb = input.just_pressed(MouseButton::Left);
 	let rmb = input.just_pressed(MouseButton::Right);
@@ -44,7 +43,6 @@ pub fn debug_inputs(
 				target_cycle: target_id,
 				direction,
 			}));
-			layout_changed_events.send(GameLayoutChanged);
 		}
 	}
 }
