@@ -49,13 +49,19 @@ pub fn debug_inputs(
 
 pub fn gizmo_draw(
 	vertices: Query<&Transform, With<Vertex>>,
-	circles: Query<(&CycleVertices, &ComputedCycleTurnability, &Transform)>,
+	circles: Query<(
+		&CycleVertices,
+		&ComputedCycleTurnability,
+		&CycleTurnability,
+		&Transform,
+	)>,
 	players: Query<&VertexPosition, With<Player>>,
 	boxes: Query<&VertexPosition, With<Box>>,
 	buttons: Query<&VertexPosition, With<BoxSlot>>,
 	flags: Query<&VertexPosition, With<Goal>>,
 	mut gizmos: Gizmos,
 ) {
+	// Draw vertices
 	for transform in vertices.iter() {
 		gizmos.sphere(
 			transform.translation,
@@ -65,6 +71,7 @@ pub fn gizmo_draw(
 		);
 	}
 
+	// Draw boxes
 	for vertex_id in boxes.iter() {
 		gizmos.rect(
 			vertices.get(vertex_id.0).unwrap().translation,
@@ -74,6 +81,7 @@ pub fn gizmo_draw(
 		);
 	}
 
+	// Draw players
 	for vertex_id in players.iter() {
 		gizmos.rect(
 			vertices.get(vertex_id.0).unwrap().translation,
@@ -83,6 +91,7 @@ pub fn gizmo_draw(
 		);
 	}
 
+	// Draw buttons
 	for vertex_id in buttons.iter() {
 		gizmos.rounded_rect(
 			vertices.get(vertex_id.0).unwrap().translation,
@@ -92,6 +101,7 @@ pub fn gizmo_draw(
 		);
 	}
 
+	// Draw flags
 	for vertex_id in flags.iter() {
 		gizmos.rounded_rect(
 			vertices.get(vertex_id.0).unwrap().translation,
@@ -101,15 +111,21 @@ pub fn gizmo_draw(
 		);
 	}
 
-	for (vertex_ids, turnability, circle_transform) in circles.iter() {
+	// Draw cycles
+	for (vertex_ids, current_turnability, turnability, circle_transform) in circles.iter() {
+		// Draw cycle centers
 		gizmos.sphere(
 			circle_transform.translation,
 			Quat::IDENTITY,
-			1.0,
-			if turnability.0 {
-				palettes::tailwind::AMBER_100
-			} else {
-				palettes::tailwind::AMBER_600
+			10.0,
+			match (turnability, current_turnability.0) {
+				(CycleTurnability::Always, true) => palettes::tailwind::GREEN_600,
+				(CycleTurnability::Always, false) => {
+					warn!("Always cycle has no turning somehow");
+					palettes::tailwind::RED_600
+				}
+				(CycleTurnability::WithPlayer, true) => palettes::tailwind::AMBER_100,
+				(CycleTurnability::WithPlayer, false) => palettes::tailwind::AMBER_600,
 			},
 		);
 		let mut positions: Vec<Vec3> = vertex_ids
