@@ -2,11 +2,21 @@
 
 use bevy::prelude::*;
 
+/// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Player;
 
+/// [`Object`] entity that represents a push box
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Box;
+
+/// [`Glyph`] entity that represents the destination of a [`Player`] entity
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct Goal;
+
+/// [`Glyph`] entity that represents the destination of a [`Box`] entity
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct BoxSlot;
 
 /// Movable thing
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]

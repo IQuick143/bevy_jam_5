@@ -1,8 +1,7 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::game::{
-	level::{CycleData, ValidLevelData, VertexData},
-	prelude::*,
+	level::{CycleData, GlyphType, ObjectType, ValidLevelData, VertexData}, prelude::*
 };
 
 use rand::prelude::*;
@@ -51,12 +50,18 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData) -> Entity {
 		)),
 	)).id();
 	
-	if data.object.is_some() {
-		let object_id = commands.spawn((Object, VertexPosition(vertex_id))).id();
+	if let Some(object_type) = data.object {
+		let object_id =	match object_type {
+			ObjectType::Player => commands.spawn((Object, Player, VertexPosition(vertex_id))).id(),
+			ObjectType::Box    => commands.spawn((Object, Box, VertexPosition(vertex_id))).id()
+		};
 		commands.entity(vertex_id).insert(PlacedObject(Some(object_id)));
 	}
-	if data.glyph.is_some() {
-		let glyph_id = commands.spawn((Glyph, VertexPosition(vertex_id))).id();
+	if let Some(glyph_type) = data.glyph {
+		let glyph_id = match glyph_type {
+			GlyphType::Button => commands.spawn((Glyph, BoxSlot, VertexPosition(vertex_id))).id(),
+			GlyphType::Flag   => commands.spawn((Glyph, Goal, VertexPosition(vertex_id))).id()
+		};
 		commands.entity(vertex_id).insert(PlacedGlyph(Some(glyph_id)));
 	}
 
