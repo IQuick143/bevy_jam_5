@@ -187,8 +187,30 @@ impl std::borrow::Borrow<LevelData> for ValidLevelData {
 }
 
 impl std::fmt::Display for LevelDataValidationError {
-	fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		todo!()
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::VertexIndexOutOfRange(i) => write!(
+				f,
+				"Vertex index {i} is used, but there are not that many vertices."
+			),
+			Self::CycleIndexOutOfRange(i) => write!(
+				f,
+				"Cycle index {i} is used, but there are not that many cycles."
+			),
+			Self::CycleLinkageConflict => write!(f, "Contradictory cycle links."),
+			Self::TooFewVerticesInCycle(i) => {
+				write!(f, "Cycle {i} contains less than two vertices.")
+			}
+			Self::RepeatingVertexInCycle(i) => {
+				write!(f, "Cycle {i} contains the same vertex multiple times.")
+			}
+			Self::TooManyVerticesInCycleIntersection(i, j) => {
+				write!(f, "Cycles {i} and {j} intersect in more than two vertices.")
+			}
+			Self::OverlappedLinkedCycles(i, j) => {
+				write!(f, "Cycles {i} and {j} are overlapped and linked.")
+			}
+		}
 	}
 }
 
