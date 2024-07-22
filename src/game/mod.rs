@@ -7,10 +7,12 @@ pub mod events;
 pub mod level;
 pub mod spawn;
 pub mod logic;
+pub mod resources;
 
 pub mod prelude {
 	pub use super::components::*;
 	pub use super::events::*;
+	pub use super::resources::*;
 	pub use bevy::prelude::*;
 }
 
@@ -23,6 +25,7 @@ use crate::screen::Screen;
 pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((audio::plugin, assets::plugin, spawn::plugin, logic::plugin));
 	app.add_systems(OnEnter(Screen::Playing), load_level);
+	app.add_event::<events::GameLayoutChanged>();
 }
 
 fn load_level(mut commands: Commands) {

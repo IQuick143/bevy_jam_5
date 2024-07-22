@@ -17,6 +17,7 @@ pub fn debug_inputs(
 	window_q: Query<&Window>,
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
 	camera_q: Query<(&Camera, &GlobalTransform)>,
+	mut events: EventWriter<GameLayoutChanged>,
 	mut commands: Commands
 ) {
 	let lmb = input.just_pressed(MouseButton::Left);
@@ -36,6 +37,7 @@ pub fn debug_inputs(
 			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
 			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a }) {
 			commands.trigger_targets(direction, target_id);
+			events.send(GameLayoutChanged);
 		}
 	}
 }

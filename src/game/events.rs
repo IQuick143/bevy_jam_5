@@ -12,3 +12,8 @@ pub enum RotateCycle {
     /// Rotate in reverse direction of the cycle
     Reverse
 }
+
+/// Event that is sent when state of the game map changes,
+/// usualy by turning a cycle
+#[derive(Event, Debug)]
+pub struct GameLayoutChanged;

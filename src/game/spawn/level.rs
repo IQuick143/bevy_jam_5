@@ -13,7 +13,11 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Event, Debug)]
 pub struct SpawnLevel(pub ValidLevelData);
 
-fn spawn_level(trigger: Trigger<SpawnLevel>, mut commands: Commands) {
+fn spawn_level(
+	trigger: Trigger<SpawnLevel>,
+	mut events: EventWriter<GameLayoutChanged>,
+	mut commands: Commands
+) {
 	println!("Spawning!"); //TODO: debug
 	let data = trigger.event().0.clone();
 
@@ -34,7 +38,8 @@ fn spawn_level(trigger: Trigger<SpawnLevel>, mut commands: Commands) {
 		})
 		.collect();
 
-	()
+	commands.init_resource::<LevelCompletionConditions>();
+	events.send(GameLayoutChanged);
 }
 
 fn spawn_vertex(mut commands: Commands, data: &VertexData) -> Entity {
