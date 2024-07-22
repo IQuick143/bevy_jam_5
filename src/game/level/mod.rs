@@ -69,10 +69,10 @@ pub struct ValidLevelData {
 impl ValidLevelData {
 	/// Iterates over indices of cycles that are, directly or indirectly,
 	/// linked to a given cycle. The original cycle is not included in the result.
-	pub fn cycles_linked_to<'w>(
-		&'w self,
+	pub fn cycles_linked_to(
+		&self,
 		index: usize,
-	) -> impl Iterator<Item = (usize, LinkedCycleDirection)> + 'w {
+	) -> impl Iterator<Item = (usize, LinkedCycleDirection)> + '_ {
 		self.links[index]
 			.iter()
 			.enumerate()

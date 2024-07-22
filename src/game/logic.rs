@@ -29,8 +29,7 @@ fn cycle_group_rotation_relay_system(
 					cycles_q
 						.get(group_rotation.0.target_cycle)
 						.into_iter()
-						.map(|links| &links.0)
-						.flatten()
+						.flat_map(|links| &links.0)
 						.map(|&(id, relative_direction)| RotateCycle {
 							target_cycle: id,
 							direction: group_rotation.0.direction * relative_direction,
