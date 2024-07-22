@@ -50,10 +50,11 @@ pub fn debug_inputs(
 pub fn gizmo_draw(
 	vertices: Query<&Transform, With<Vertex>>,
 	circles: Query<(
+		&Transform,
 		&CycleVertices,
 		&ComputedCycleTurnability,
 		&CycleTurnability,
-		&Transform,
+		Option<&LinkedCycles>,
 	)>,
 	players: Query<&VertexPosition, With<Player>>,
 	boxes: Query<&VertexPosition, With<Box>>,
@@ -111,8 +112,8 @@ pub fn gizmo_draw(
 		);
 	}
 
-	// Draw cycles
-	for (vertex_ids, current_turnability, turnability, circle_transform) in circles.iter() {
+	// Draw cycles & links
+	for (circle_transform, vertex_ids, current_turnability, turnability, links) in circles.iter() {
 		// Draw cycle centers
 		gizmos.sphere(
 			circle_transform.translation,
@@ -128,6 +129,7 @@ pub fn gizmo_draw(
 				(CycleTurnability::WithPlayer, false) => palettes::tailwind::AMBER_600,
 			},
 		);
+		// Draw the loops
 		let mut positions: Vec<Vec3> = vertex_ids
 			.0
 			.iter()
@@ -136,7 +138,23 @@ pub fn gizmo_draw(
 		positions.push(positions[0]);
 		let spline = CubicCardinalSpline::new(0.5, positions).to_curve();
 		let samples = spline.iter_positions(32);
-		gizmos.linestrip(samples, palettes::tailwind::AMBER_900)
+		gizmos.linestrip(samples, palettes::tailwind::AMBER_900);
+
+		// Draw links
+		if let Some(links) = links {
+			for (linked_entity, direction) in links.0.iter() {
+				if let Ok((other_transform, _, _, _, _)) = circles.get(*linked_entity) {
+					gizmos.line(
+						circle_transform.translation,
+						other_transform.translation,
+						match direction {
+							LinkedCycleDirection::Coincident => palettes::tailwind::GRAY_100,
+							LinkedCycleDirection::Inverse => palettes::tailwind::GRAY_500,
+						},
+					);
+				}
+			}
+		}
 	}
 }
 
