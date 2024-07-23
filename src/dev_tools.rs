@@ -8,7 +8,6 @@ use crate::screen::Screen;
 pub(super) fn plugin(app: &mut App) {
 	// Print state transitions in dev builds
 	app.add_systems(Update, log_transitions::<Screen>);
-	app.add_systems(Update, simulate_vertices);
 	app.add_systems(Update, (gizmo_draw, debug_inputs));
 	app.add_systems(Startup, (spawn_text));
 }
@@ -213,13 +212,13 @@ pub fn gizmo_draw(
 	}
 }
 
-const TARGET_RADIUS: f32 = 150.0;
-
-pub fn simulate_vertices(
+pub fn _simulate_vertices(
 	mut vertices: Query<&mut Transform, (With<Vertex>, Without<CycleVertices>)>,
 	mut circles: Query<(Entity, &CycleVertices, &mut Transform)>,
 	time: Res<Time<Real>>,
 ) {
+	const TARGET_RADIUS: f32 = 150.0;
+
 	let mut gradients: HashMap<Entity, Vec2> = HashMap::new();
 
 	let mut add_gradient = |e: Entity, grad: Vec2| {

@@ -42,6 +42,13 @@ OBJECT[FLAG] 2
 OBJECT[PLAYER] b
 OBJECT[BUTTON] b
 ";
-	let level: ValidLevelData = level::parser::parse(data).unwrap().try_into().unwrap();
-	commands.trigger(SpawnLevel(level));
+	let level_file = level::parser::parse(data).unwrap();
+	let level: ValidLevelData = level_file.data.try_into().unwrap();
+	let mut layout_builder = level::layout::LevelLayoutBuilder::new(&level);
+	for placement in level_file.layout {
+		layout_builder.add_placement(placement).unwrap();
+	}
+	let level_layout = layout_builder.build().unwrap();
+	eprintln!("{level_layout:?}");
+	commands.trigger(SpawnLevel(level, level_layout));
 }

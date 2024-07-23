@@ -3,6 +3,12 @@ use super::*;
 use bevy::utils::hashbrown::HashMap;
 use regex::Regex;
 
+#[derive(Clone, Debug)]
+pub struct LevelFile {
+	pub data: LevelData,
+	pub layout: Vec<layout::DeclaredPlacement>,
+}
+
 struct RawStatement<'a> {
 	verb: &'a str,
 	modifier: Option<&'a str>,
@@ -22,7 +28,7 @@ enum ObjectKind {
 }
 
 #[allow(dead_code)]
-pub fn parse(level_file: &str) -> Result<LevelData, ParsingError> {
+pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 	let lines = level_file.split('\n').map(&str::trim).enumerate();
 	let lines = lines.filter(|(_line_index, line)| !(line.starts_with('#') || line.is_empty()));
 
@@ -208,10 +214,16 @@ pub fn parse(level_file: &str) -> Result<LevelData, ParsingError> {
 		}
 	}
 
-	Ok(LevelData {
-		vertices,
-		cycles,
-		linkages,
+	// TODO: Fill it in
+	let layout = Vec::new();
+
+	Ok(LevelFile {
+		data: LevelData {
+			vertices,
+			cycles,
+			linkages,
+		},
+		layout,
 	})
 }
 
