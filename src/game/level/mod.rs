@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use crate::game::prelude::*;
 
+pub mod layout;
 pub mod parser;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

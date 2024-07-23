@@ -1,18 +1,21 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::game::{
-	level::{CycleData, GlyphType, ObjectType, ValidLevelData, VertexData},
+	level::{
+		layout::{CyclePlacement, LevelLayout},
+		CycleData, GlyphType, ObjectType, ValidLevelData, VertexData,
+	},
 	prelude::*,
 };
 
-use rand::prelude::*;
+use itertools::Itertools;
 
 pub(super) fn plugin(app: &mut App) {
 	app.observe(spawn_level);
 }
 
 #[derive(Event, Debug)]
-pub struct SpawnLevel(pub ValidLevelData);
+pub struct SpawnLevel(pub ValidLevelData, pub LevelLayout);
 
 fn spawn_level(
 	trigger: Trigger<SpawnLevel>,
@@ -21,20 +24,20 @@ fn spawn_level(
 ) {
 	println!("Spawning!"); //TODO: debug
 	let data = trigger.event().0.clone();
+	let layout = &trigger.event().1;
 
 	let vertices: Vec<Entity> = data
 		.vertices
 		.iter()
-		.map(|data| {
-			let vertex = spawn_vertex(commands.reborrow(), data);
-			vertex
-		})
+		.zip_eq(&layout.vertices)
+		.map(|(data, pos)| spawn_vertex(commands.reborrow(), data, *pos))
 		.collect();
 
 	let cycle_ids = data
 		.cycles
 		.iter()
-		.map(|data| spawn_cycle(commands.reborrow(), data, &vertices))
+		.zip_eq(&layout.cycles)
+		.map(|(data, pos)| spawn_cycle(commands.reborrow(), data, *pos, &vertices))
 		.collect::<Vec<_>>();
 
 	for (i, cycle_id) in cycle_ids.iter().copied().enumerate() {
@@ -53,18 +56,13 @@ fn spawn_level(
 	events.send(GameLayoutChanged);
 }
 
-fn spawn_vertex(mut commands: Commands, data: &VertexData) -> Entity {
-	let mut rng = thread_rng();
+fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> Entity {
 	let vertex_id = commands
 		.spawn((
 			Vertex,
 			PlacedGlyph(None),
 			PlacedObject(None),
-			Transform::from_translation(Vec3::new(
-				rng.gen_range(-100.0..100.0),
-				rng.gen_range(-100.0..100.0),
-				0.0,
-			)),
+			Transform::from_translation(position.extend(0.0)),
 		))
 		.id();
 
@@ -98,8 +96,12 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData) -> Entity {
 	vertex_id
 }
 
-fn spawn_cycle(mut commands: Commands, data: &CycleData, vertex_entities: &[Entity]) -> Entity {
-	let mut rng = thread_rng();
+fn spawn_cycle(
+	mut commands: Commands,
+	data: &CycleData,
+	placement: CyclePlacement,
+	vertex_entities: &[Entity],
+) -> Entity {
 	commands
 		.spawn((
 			data.cycle_turnability,
@@ -110,11 +112,7 @@ fn spawn_cycle(mut commands: Commands, data: &CycleData, vertex_entities: &[Enti
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
-			Transform::from_translation(Vec3::new(
-				rng.gen_range(-100.0..100.0),
-				rng.gen_range(-100.0..100.0),
-				0.0,
-			)),
+			Transform::from_translation(placement.position.extend(0.0)),
 		))
 		.id()
 }
