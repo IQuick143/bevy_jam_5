@@ -10,6 +10,61 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(Update, log_transitions::<Screen>);
 	app.add_systems(Update, simulate_vertices);
 	app.add_systems(Update, (gizmo_draw, debug_inputs));
+	app.add_systems(Startup, (spawn_text));
+}
+
+fn spawn_text(
+	mut commands: Commands,
+	asset_server: Res<AssetServer>,
+) {
+	let text_box_z = -100.0;
+	let text_box_loc = Vec2::new(0.0, -250.0);
+	let text_box_size = Vec2::new(300.0, 150.0);
+	let text_box_color = Color::srgba(0.3, 0.3, 0.3, 0.8);
+	let margin = 10.0;
+	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise!	Get the boxes on the buttons and the player to the flag!";
+	commands
+		.spawn((SpriteBundle {
+			transform: Transform::from_xyz(text_box_loc.x, text_box_loc.y, text_box_z),
+			sprite: Sprite {
+				color: text_box_color,
+				custom_size: Some(text_box_size),
+				..default()
+			},
+			..default()
+		},
+	)).with_children(|parent| {
+		parent
+			.spawn((Text2dBundle {
+				text_2d_bounds: bevy::text::Text2dBounds{ size: Vec2::new(
+					text_box_size.x - margin * 2.0,
+					text_box_size.y - margin * 2.0,
+				)},
+				transform: Transform::from_xyz(
+					-text_box_size.x / 2.0 + margin,
+					text_box_size.y / 2.0 - margin,
+					0.1, // Relative to text box
+				),
+				text_anchor: bevy::sprite::Anchor::TopLeft,
+				text: Text::from_section(
+					text,
+					 get_text_style(&asset_server))
+				.with_justify(JustifyText::Left),
+				..default()
+			},
+		));
+	});
+}
+
+fn get_text_style(
+	asset_server: &Res<AssetServer>
+) -> TextStyle {
+	TextStyle {
+		//font: asset_server.load("fonts/your_font_here.ttf"),
+		font_size: 16.0,
+		color: Color::srgba(0.9, 0.9, 0.9, 1.0),
+		..default()
+	}
 }
 
 pub fn debug_inputs(
