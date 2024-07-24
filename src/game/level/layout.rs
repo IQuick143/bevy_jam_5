@@ -44,7 +44,7 @@ pub struct CyclePlacement {
 }
 
 /// Describes the layout of all objects in a level
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LevelLayout {
 	/// Positions of vertices in the level
 	pub vertices: Vec<Vec2>,
