@@ -670,7 +670,6 @@ fn intersect_circles(c1: Vec2, c2: Vec2, r1: f32, r2: f32) -> Option<OneTwo<Vec2
 	// of the normal at rel_midpoint with one of the circles
 	let normal_offset_sq = r1.powi(2) - rel_midpoint.powi(2) * d_sq;
 	// Round here, we want to cacth a single intersection with a margin of error
-	eprintln!("circles! {rel_midpoint} {midpoint} {normal_offset_sq}");
 	const TANGENTIAL_INTERSECTION_THRESHOLD: f32 = 0.001;
 	if normal_offset_sq.abs() < TANGENTIAL_INTERSECTION_THRESHOLD {
 		Some(One(midpoint))
