@@ -314,8 +314,16 @@ impl<'w> LevelLayoutBuilder<'w> {
 							}
 							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
 						}
-						Some(Two(default_pos, alt_pos)) => {
+						Some(Two(alt_pos, default_pos)) => {
 							// If there are two intersections, we must choose one of them
+							//
+							// Since the cycles are counterclockwise, the usual best choice
+							// for a vertex is the second intersection, then the first
+							// intersection for the potential second vertex shared with the same other cycle.
+							// If the opposite is desired (for example, on the off chance
+							// that the two shared vertices are split over the start/end of the
+							// vertex list as declared), `double_intersection_hints` can be used
+							// to express this intent
 							let new_pos = new_fixed_points.entry(p.owner_cycle)
 								.and_modify(|val| {
 									let new_pos = if double_intersection_hints.contains(&val.first().0) {
@@ -383,10 +391,15 @@ impl<'w> LevelLayoutBuilder<'w> {
 		Ok(())
 	}
 
+	/// Assigns a fixed placement to a partially placed vertex
+	/// ## Parameters
+	/// - `target_vertex` - Index of the vertex to place
+	/// - `clock_angle` - Clock angle between the center of the owning
+	/// cycle and the vertex (zero is up, positive is clockwise)
 	pub fn place_vertex(
 		&mut self,
 		target_vertex: usize,
-		relative_angle: f32,
+		clock_angle: f32,
 	) -> Result<(), LevelLayoutError> {
 		if target_vertex >= self.vertices.len() {
 			return Err(LevelLayoutError::VertexIndexOutOfRange(target_vertex));
@@ -401,8 +414,10 @@ impl<'w> LevelLayoutBuilder<'w> {
 			IntermediateVertexPosition::Partial(p) => {
 				let owner_placement = self.cycles[p.owner_cycle]
 					.expect("Owner cycle of a partially placed vertex should also be placed");
+				// Recalculate from clock angle to angle of the actual vertor space
+				let real_angle = PI / 2.0 - clock_angle;
 				let new_pos = owner_placement.position
-					+ owner_placement.radius * Vec2::from_angle(relative_angle);
+					+ owner_placement.radius * Vec2::from_angle(real_angle);
 				if !self.verify_materialization_against_cycle(
 					p.owner_cycle,
 					std::iter::once((target_vertex, new_pos)),
@@ -474,7 +489,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 					// Materialize all vertices between the marked ones
 					let next_relative_pos = next_fixed_pos - cycle_placement.position;
 					let vertex_count = next_fixed_vertex - current_fixed_vertex;
-					let mut segment_angle = current_relative_pos.angle_between(next_relative_pos);
+					let mut segment_angle = next_relative_pos.angle_between(current_relative_pos);
 					if segment_angle <= 0.0 {
 						segment_angle += 2.0 * PI;
 					}
@@ -483,7 +498,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 						let target_vertex = cycle_data.vertex_indices[i];
 						let new_pos = cycle_placement.position
 							+ current_relative_pos.rotate(Vec2::from_angle(
-								segment_angle * (j + 1) as f32 / vertex_count as f32,
+								-segment_angle * (j + 1) as f32 / vertex_count as f32,
 							));
 						Self::checked_materialize(
 							&mut self.vertices[target_vertex],
@@ -501,7 +516,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 				// and this segment covers the whole cycle
 				let vertex_count =
 					first_fixed_vertex + cycle_data.vertex_indices.len() - current_fixed_vertex;
-				let mut segment_angle = current_relative_pos.angle_between(first_relative_pos);
+				let mut segment_angle = first_relative_pos.angle_between(current_relative_pos);
 				if first_fixed_vertex == current_fixed_vertex {
 					// I do not trust floats, so set this value explicitly
 					segment_angle = 2.0 * PI;
@@ -516,7 +531,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 					let target_vertex = cycle_data.vertex_indices[i];
 					let new_pos = cycle_placement.position
 						+ current_relative_pos.rotate(Vec2::from_angle(
-							segment_angle * (j + 1) as f32 / vertex_count as f32,
+							-segment_angle * (j + 1) as f32 / vertex_count as f32,
 						));
 					Self::checked_materialize(
 						&mut self.vertices[target_vertex],
@@ -526,12 +541,12 @@ impl<'w> LevelLayoutBuilder<'w> {
 					);
 				}
 			} else {
-				// If none of the vertices have fixed placement, distribute them uniformly
+				// If none of the vertices have fixed placement, distribute them uniformly in clock order
 				let vertex_count = cycle_data.vertex_indices.len();
 				for (i, &j) in cycle_data.vertex_indices.iter().enumerate() {
 					let new_pos = cycle_placement.position
 						+ cycle_placement.radius
-							* Vec2::from_angle(2.0 * PI * i as f32 / vertex_count as f32);
+							* Vec2::from_angle(PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32);
 					Self::checked_materialize(&mut self.vertices[j], new_pos, cycle_index, i);
 				}
 			}
@@ -589,16 +604,16 @@ impl<'w> LevelLayoutBuilder<'w> {
 	}
 
 	/// Checks whether a sequence of points is ordered in order of
-	/// counterclockwise navigation around a center point
+	/// clockwise navigation around a center point
 	fn are_points_in_cyclic_order(center: Vec2, points: impl Iterator<Item = Vec2>) -> bool {
 		let mut points = points.map(|p| p - center);
 		let mut total_angle = 0.0;
 		if let Some(mut current) = points.next() {
 			for next in points {
-				let mut angle = current.angle_between(next);
+				let mut angle = next.angle_between(current);
 				if angle < 0.0 {
 					// Recalculate angles to [0, 2 * pi]
-					// so that we stay in counterclockwise movement
+					// so that we stay in clockwise movement
 					angle += 2.0 * PI;
 				}
 				total_angle += angle;
