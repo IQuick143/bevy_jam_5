@@ -1,6 +1,7 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::game::{
+	assets::{HandleMap, ImageKey}, 
 	level::{
 		layout::{CyclePlacement, LevelLayout},
 		CycleData, GlyphType, ObjectType, ValidLevelData, VertexData,
@@ -24,16 +25,21 @@ fn spawn_level(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	cycle_material: ResMut<RingMaterial>,
+	image_handles: Res<HandleMap<ImageKey>>,
+	mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
 	println!("Spawning!"); //TODO: debug
 	let data = trigger.event().0.clone();
 	let layout = &trigger.event().1;
 
+	let texture_layout = TextureAtlasLayout::from_grid(UVec2::splat(32), 6, 2, Some(UVec2::splat(1)), None);
+    let texture_atlas_layout = texture_atlas_layouts.add(texture_layout);
+
 	let vertices: Vec<Entity> = data
 		.vertices
 		.iter()
 		.zip_eq(&layout.vertices)
-		.map(|(data, pos)| spawn_vertex(commands.reborrow(), data, *pos))
+		.map(|(data, pos)| spawn_vertex(commands.reborrow(), data, *pos, image_handles.as_ref(), texture_atlas_layout.clone()))
 		.collect();
 
 	let cycle_ids = data
@@ -68,13 +74,23 @@ fn spawn_level(
 	events.send(GameLayoutChanged);
 }
 
-fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> Entity {
+fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2, image_handles: &HandleMap<ImageKey>, texture_atlas_layout: Handle<TextureAtlasLayout>) -> Entity {
 	let transform =
 		TransformBundle::from_transform(Transform::from_translation(position.extend(0.0)));
 	let vertex_id = commands
 		.spawn((Vertex, PlacedGlyph(None), PlacedObject(None), transform))
 		.id();
-
+	commands.spawn((
+		SpriteBundle {
+			texture: image_handles[&ImageKey::Ducky].clone_weak(),
+			transform: Transform::from_translation(position.extend(-100.0)),
+			..Default::default()
+		},
+		TextureAtlas {
+			layout: texture_atlas_layout.clone(),
+			index: 0,
+		},
+	));
 	if let Some(object_type) = data.object {
 		let object_id = match object_type {
 			ObjectType::Player => commands
@@ -82,7 +98,15 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> En
 					Object,
 					Player,
 					VertexPosition(vertex_id),
-					transform,
+					SpriteBundle {
+						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						transform: Transform::from_translation(position.extend(-10.0)),
+						..Default::default()
+					},
+					TextureAtlas {
+						layout: texture_atlas_layout.clone(),
+						index: 1,
+					},
 					AnimatedObject::default(),
 				))
 				.id(),
@@ -91,7 +115,15 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> En
 					Object,
 					Box,
 					VertexPosition(vertex_id),
-					transform,
+					SpriteBundle {
+						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						transform: Transform::from_translation(position.extend(-10.0)),
+						..Default::default()
+					},
+					TextureAtlas {
+						layout: texture_atlas_layout.clone(),
+						index: 2,
+					},
 					AnimatedObject::default(),
 				))
 				.id(),
@@ -103,10 +135,30 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> En
 	if let Some(glyph_type) = data.glyph {
 		let glyph_id = match glyph_type {
 			GlyphType::Button => commands
-				.spawn((Glyph, BoxSlot, VertexPosition(vertex_id), transform))
+				.spawn((Glyph, BoxSlot, VertexPosition(vertex_id), 
+					SpriteBundle {
+						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						transform: Transform::from_translation(position.extend(-50.0)),
+						..Default::default()
+					},
+					TextureAtlas {
+						layout: texture_atlas_layout.clone(),
+						index: 3,
+					},
+				))
 				.id(),
 			GlyphType::Flag => commands
-				.spawn((Glyph, Goal, VertexPosition(vertex_id), transform))
+				.spawn((Glyph, Goal, VertexPosition(vertex_id),
+					SpriteBundle {
+						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						transform: Transform::from_translation(position.extend(-50.0)),
+						..Default::default()
+					},
+					TextureAtlas {
+						layout: texture_atlas_layout.clone(),
+						index: 4,
+					},
+				))
 				.id(),
 		};
 		commands
