@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use super::*;
 
 /// Declarative specification of the placement of a lone cycle
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct DeclaredCyclePlacement {
 	/// Index of the cycle being laid out
 	pub cycle_index: usize,
@@ -11,6 +11,9 @@ pub struct DeclaredCyclePlacement {
 	pub position: Vec2,
 	/// Radius of the cycle
 	pub radius: f32,
+	/// Indices of vertices that should prefer their second
+	/// option for placement instead of the first
+	pub double_intersection_hints: Vec<usize>,
 }
 
 /// Declarative specification of the placement of a vertex
@@ -25,7 +28,7 @@ pub struct DeclaredVertexPlacement {
 }
 
 /// Declarative specification of the placement of a game object
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum DeclaredPlacement {
 	/// Place a cycle that does not intersects any already-placed cycles
 	Cycle(DeclaredCyclePlacement),
@@ -62,8 +65,61 @@ pub struct LevelLayoutBuilder<'w> {
 	cycles: Vec<Option<CyclePlacement>>,
 }
 
-#[allow(dead_code)]
+/// Error data for [`LevelLayoutError::CycleDoesNotContainVertex`]
 #[derive(Clone, Copy, Debug)]
+pub struct CycleDoesNotContainVertexError {
+	/// Index of the cycle whose being attempted placement failed
+	placed_cycle: usize,
+	/// Placement that was requested for the cycle
+	requested_placement: CyclePlacement,
+	/// Index of the vertex with fixed position
+	/// that would not lie on the cycle as placed
+	failing_vertex: usize,
+	/// Position of the failing vertex
+	vertex_position: Vec2,
+}
+
+/// Error data for [`LevelLayoutError::CyclesDoNotIntersect`]
+#[derive(Clone, Copy, Debug)]
+pub struct CyclesDoNotIntersectError {
+	/// Index of the cycle whose being attempted placement failed
+	placed_cycle: usize,
+	/// Placement that was requested for the cycle
+	requested_placement: CyclePlacement,
+	/// Index of the already-placed cycle that shared a vertex
+	/// with the one being placed
+	existing_cycle: usize,
+	/// Placement of the already-placed cycle
+	existing_placement: CyclePlacement,
+	/// Index of the vertex that the cycles share
+	/// that could not be placed because the cycles do not intersect
+	failing_vertex: usize,
+}
+
+/// Error data for [`LevelLayoutError::CyclesDoNotIntersectTwice`]
+#[derive(Clone, Copy, Debug)]
+pub struct CyclesDoNotIntersectTwiceError {
+	/// Index of the cycle whose being attempted placement failed
+	placed_cycle: usize,
+	/// Placement that was requested for the cycle
+	requested_placement: CyclePlacement,
+	/// Index of the already-placed cycle that shared
+	/// two vertices with the one being placed
+	existing_cycle: usize,
+	/// Placement of the already-placed cycle
+	existing_placement: CyclePlacement,
+	/// Index of the vertex that has already been placed at the only
+	/// intersection between the cycles
+	existing_vertex: usize,
+	/// Position of the intersection (and the already-placed vertex)
+	vertex_position: Vec2,
+	/// Index of the vertex that the cycles share
+	/// that could not be placed because the cycles only intersect once
+	failing_vertex: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[allow(dead_code)]
 pub enum LevelLayoutError {
 	/// An out-of-range index was used to reference a cycle
 	CycleIndexOutOfRange(usize),
@@ -78,18 +134,12 @@ pub enum LevelLayoutError {
 	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
 	/// on a cycle that contains a vertex that has already been definitively placed,
 	/// and it would not lie on the cycle as being placed
-	///
-	/// **parameters**: The cycle, the vertex, position of the vertex
-	ConflictingPlacedVertex(usize, usize, Vec2),
+	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
 	/// Cycles that share a vertex have been placed in a way that they do not intersect
-	///
-	/// **parameters**: The placed cycle, the existing cycle, the vertex of conflict
-	CyclesDoNotIntersect(usize, usize, usize),
+	CyclesDoNotIntersect(CyclesDoNotIntersectError),
 	/// Cycles that share two vertices have been placed in a way that they
 	/// only intersect tangentially (only enough space for one shared vertex)
-	///
-	/// **parameters**: The placed cycle, the existing cycle, the existing shared vertex, the vertex of conflict
-	CyclesDoNotIntersectTwice(usize, usize, usize, usize),
+	CyclesDoNotIntersectTwice(CyclesDoNotIntersectTwiceError),
 	/// [`place_partial_vertex`](LevelLayoutBuilder::place_partial_vertex) was called
 	/// on a vertex that already has a fixed placement
 	VertexAlreadyPlaced(usize),
@@ -183,7 +233,12 @@ impl<'w> LevelLayoutBuilder<'w> {
 
 	pub fn add_placement(&mut self, placement: DeclaredPlacement) -> Result<(), LevelLayoutError> {
 		match placement {
-			DeclaredPlacement::Cycle(p) => self.place_cycle(p.cycle_index, p.position, p.radius),
+			DeclaredPlacement::Cycle(p) => self.place_cycle(
+				p.cycle_index,
+				p.position,
+				p.radius,
+				&p.double_intersection_hints,
+			),
 			DeclaredPlacement::Vertex(p) => self.place_vertex(p.vertex_index, p.relative_angle),
 		}
 	}
@@ -193,6 +248,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 		target_cycle: usize,
 		center: Vec2,
 		radius: f32,
+		double_intersection_hints: &[usize],
 	) -> Result<(), LevelLayoutError> {
 		if target_cycle >= self.cycles.len() {
 			return Err(LevelLayoutError::CycleIndexOutOfRange(target_cycle));
@@ -200,6 +256,10 @@ impl<'w> LevelLayoutBuilder<'w> {
 		if self.cycles[target_cycle].is_some() {
 			return Err(LevelLayoutError::CycleAlreadyPlaced(target_cycle));
 		}
+		let placement = CyclePlacement {
+			position: center,
+			radius,
+		};
 		// This will be filled with placements of all vertices after the cycle is placed
 		let mut placements_after = Vec::new();
 		// This will be filled with vertices that are already partially placed
@@ -211,10 +271,13 @@ impl<'w> LevelLayoutBuilder<'w> {
 					// Fixed vertex cannot be moved, we can only proceed if
 					// it already lies on the cycle being placed
 					if !approx_eq(center.distance_squared(pos), radius.powi(2)) {
-						return Err(LevelLayoutError::ConflictingPlacedVertex(
-							target_cycle,
-							i,
-							pos,
+						return Err(LevelLayoutError::CycleDoesNotContainVertex(
+							CycleDoesNotContainVertexError {
+								placed_cycle: target_cycle,
+								requested_placement: placement,
+								failing_vertex: i,
+								vertex_position: pos,
+							},
 						));
 					}
 					placements_after.push(IntermediateVertexPosition::Fixed(pos));
@@ -238,10 +301,15 @@ impl<'w> LevelLayoutBuilder<'w> {
 							// Fail if there is already a vertex there
 							if let Some(existing_vertices) = replaced {
 								return Err(LevelLayoutError::CyclesDoNotIntersectTwice(
-									target_cycle,
-									p.owner_cycle,
-									existing_vertices.first().0,
-									i,
+									CyclesDoNotIntersectTwiceError {
+										placed_cycle: target_cycle,
+										requested_placement: placement,
+										existing_cycle: p.owner_cycle,
+										existing_placement: owner_placement,
+										existing_vertex: existing_vertices.first().0,
+										vertex_position: new_pos,
+										failing_vertex: i,
+									},
 								));
 							}
 							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
@@ -249,18 +317,38 @@ impl<'w> LevelLayoutBuilder<'w> {
 						Some(Two(default_pos, alt_pos)) => {
 							// If there are two intersections, we must choose one of them
 							let new_pos = new_fixed_points.entry(p.owner_cycle)
-								.and_modify(|val| *val = val.add_to_one((i, alt_pos))
-									.expect("More than two vertices in intersection of two cycles, should have been caught by sanitizer"))
-								.or_insert(One((i, default_pos)))
+								.and_modify(|val| {
+									let new_pos = if double_intersection_hints.contains(&val.first().0) {
+										default_pos
+									}
+									else {
+										alt_pos
+									};
+									*val = val.add_to_one((i, new_pos))
+										.expect("More than two vertices in intersection of two cycles, should have been caught by sanitizer")
+								})
+								.or_insert_with(|| {
+									let new_pos = if double_intersection_hints.contains(&i) {
+										alt_pos
+									}
+									else {
+										default_pos
+									};
+									One((i, new_pos))
+								})
 								.last().1;
 							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
 						}
 						None => {
 							// Fail if the cycles do not intersect
 							return Err(LevelLayoutError::CyclesDoNotIntersect(
-								target_cycle,
-								p.owner_cycle,
-								i,
+								CyclesDoNotIntersectError {
+									placed_cycle: target_cycle,
+									requested_placement: placement,
+									existing_cycle: p.owner_cycle,
+									existing_placement: owner_placement,
+									failing_vertex: i,
+								},
 							));
 						}
 					}
@@ -291,10 +379,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 		for (&i, new_pos) in vertex_indices.iter().zip_eq(placements_after) {
 			self.vertices[i] = new_pos;
 		}
-		self.cycles[target_cycle] = Some(CyclePlacement {
-			position: center,
-			radius,
-		});
+		self.cycles[target_cycle] = Some(placement);
 		Ok(())
 	}
 
@@ -526,11 +611,57 @@ impl<'w> LevelLayoutBuilder<'w> {
 	}
 }
 
+impl std::fmt::Display for CyclePlacement {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"[x={} y={} r={}]",
+			self.position.x, self.position.y, self.radius
+		)
+	}
+}
+
 impl std::error::Error for LevelLayoutError {}
 
 impl std::fmt::Display for LevelLayoutError {
-	fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		todo!()
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::VertexIndexOutOfRange(i) => write!(f, "Cannot place vertex {i} because there are not that many vertices."),
+			Self::CycleIndexOutOfRange(i) => write!(f, "Cannot place cycle {i} because there are not that many cycles."),
+			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
+			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
+			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
+			Self::VertexNotPartiallyPlaced(i) => write!(f, "Cannot place vertex {i} because it does not lie on any placed cycle."),
+			Self::CycleDoesNotContainVertex(e) => write!(
+				f,
+				"Cycle {} cannot be placed at {} because it contains vertex {} which has already been placed at {}.",
+				e.placed_cycle,
+				e.requested_placement,
+				e.failing_vertex,
+				e.vertex_position
+			),
+			Self::CyclesDoNotIntersect(e) => write!(
+				f,
+				"Cycle {} cannot be placed at {} because it shares vertex {} with cycle {} at {} and the cycles would not intersect.",
+				e.placed_cycle,
+				e.requested_placement,
+				e.failing_vertex,
+				e.existing_cycle,
+				e.existing_placement
+			),
+			Self::CyclesDoNotIntersectTwice(e) => write!(
+				f,
+				"Cycle {} cannot be placed at {} because it shares vertices {} and {} with cycle {} at {} and the cycles would only intersect once at {}.",
+				e.placed_cycle,
+				e.requested_placement,
+				e.existing_vertex,
+				e.failing_vertex,
+				e.existing_cycle,
+				e.existing_placement,
+				e.vertex_position
+			),
+			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order.")
+		}
 	}
 }
 

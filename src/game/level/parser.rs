@@ -263,6 +263,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 				cycle_index: i,
 				position: placement.position,
 				radius: placement.radius,
+				double_intersection_hints: Vec::new(),
 			})
 		})
 		.collect();
