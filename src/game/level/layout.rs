@@ -2,87 +2,21 @@ use std::f32::consts::PI;
 
 use super::*;
 
-/// Specification of radius of the representation of a cycle
-#[derive(Clone, Copy, Debug)]
-pub enum DeclaredCycleRadius {
-	/// Exact radius expressed in the global units
-	WorldUnits(f32),
-	/// Preferred radius of a cycle with a given vertex count.
-	/// Non-integer numbers are allowed, since the conversion
-	/// function happens to be continuous
-	DefaultForVertexCount(f32),
-	/// Preferred radius of the targeted cycle
-	DefaultForCycle,
-}
-
 /// Declarative specification of the placement of a lone cycle
 #[derive(Clone, Copy, Debug)]
-pub struct FirstCycleDeclaredPlacement {
+pub struct DeclaredCyclePlacement {
 	/// Index of the cycle being laid out
 	pub cycle_index: usize,
 	/// Position of the center point of the cycle
 	pub position: Vec2,
 	/// Radius of the cycle
-	pub radius: DeclaredCycleRadius,
-}
-
-/// Declarative specification of the placement of a cycle
-/// that intersects one cycle that has already been laid out
-#[derive(Clone, Copy, Debug)]
-pub struct JoinedCycleDeclaredPlacement {
-	/// Index of the cycle being laid out
-	pub cycle_index: usize,
-	/// Index of the already-laid-out cycle that the target cycle intersects
-	pub existing_cycle_index: usize,
-	/// Radius of the cycle
-	pub radius: DeclaredCycleRadius,
-	/// Angle of the vector from the centerpoint
-	/// of the existing cycle to the centerpoint of the current cycle.
-	/// If omitted, it is laid out to distribute vertices of the
-	/// existing cycle as uniformly as possible
-	pub relative_angle: Option<f32>,
-}
-
-/// Enumerates possible ways of specifying the placement
-/// of a cycle relative to two other cycles
-#[derive(Clone, Copy, Debug)]
-pub enum DoubleJoinPlacementMetric {
-	/// Specify the radius of the cycle being laid out
-	Radius(DeclaredCycleRadius),
-	/// Specify the angle of the vector from the centerpoint
-	/// of first of the existing cycles to the centerpoint
-	/// of the new cycle
-	RelativeAngle(f32),
-}
-
-/// Declarative specification of the placement of a cycle
-/// that intersects two cycles that have already been laid out
-#[derive(Clone, Copy, Debug)]
-pub struct DoublyJoinedCycleDeclaredPlacement {
-	/// Index of the cycle being laid out
-	pub cycle_index: usize,
-	/// Index of the already-laid-out cycles that the target cycle intersects
-	pub existing_cycle_indices: [usize; 2],
-	/// Optionally specify the placement of the new cycle.
-	/// If omitted, it is laid out to distribute vertices of the
-	/// existing cycles as uniformly as possible
-	pub metric: Option<DoubleJoinPlacementMetric>,
-}
-
-/// Declarative specification of the placement of a cycle
-/// that intersects three cycles that have already been laid out
-#[derive(Clone, Copy, Debug)]
-pub struct TriplyJoinedCycleDeclaredPlacement {
-	/// Index of the cycle being laid out
-	pub cycle_index: usize,
-	/// Index of the already-laid-out cycles that the target cycle intersects
-	pub existing_cycle_indices: [usize; 3],
+	pub radius: f32,
 }
 
 /// Declarative specification of the placement of a vertex
 /// that does not lie in the intersection of multiple cycles
 #[derive(Clone, Copy, Debug)]
-pub struct VertexDeclaredPlacement {
+pub struct DeclaredVertexPlacement {
 	/// Index of the vertex being laid out
 	pub vertex_index: usize,
 	/// Angle of the vector from the centerpoint of the cycle that
@@ -94,16 +28,10 @@ pub struct VertexDeclaredPlacement {
 #[derive(Clone, Copy, Debug)]
 pub enum DeclaredPlacement {
 	/// Place a cycle that does not intersects any already-placed cycles
-	FirstCycle(FirstCycleDeclaredPlacement),
-	/// Place a cycle that intersects one already-placed cycle
-	Join(JoinedCycleDeclaredPlacement),
-	/// Place a cycle that intersects two already-placed cycles
-	Join2(DoublyJoinedCycleDeclaredPlacement),
-	/// Place a cycle that intersects three already-placed cycles
-	Join3(TriplyJoinedCycleDeclaredPlacement),
+	Cycle(DeclaredCyclePlacement),
 	/// Place a vertex that belongs to exactly one already-placed cycle
 	/// and does not yet have a fixed position
-	Vertex(VertexDeclaredPlacement),
+	Vertex(DeclaredVertexPlacement),
 }
 
 /// Computed placement of a cycle
@@ -202,26 +130,6 @@ enum OneTwo<T> {
 }
 use OneTwo::*;
 
-impl DeclaredCycleRadius {
-	pub fn computed_value(self, cycle_vertex_count: usize) -> f32 {
-		match self {
-			Self::WorldUnits(x) => x,
-			Self::DefaultForVertexCount(x) => Self::default_size_for_vertex_count(x),
-			Self::DefaultForCycle => Self::default_size_for_vertex_count(cycle_vertex_count as f32),
-		}
-	}
-
-	const DEFAULT_VERTEX_SPACING: f32 = 100.0;
-
-	fn default_size_for_vertex_count(vertices: f32) -> f32 {
-		// We want a circle that will layout the vertices
-		// at a constant distance when they are spaced evenly
-		// https://math.stackexchange.com/a/2589
-		// I was too lazy to derive it myself, do not judge me
-		Self::DEFAULT_VERTEX_SPACING / 2.0 / (PI / vertices).sin()
-	}
-}
-
 impl IntermediateVertexPosition {
 	fn get_fixed(&self) -> Option<Vec2> {
 		match self {
@@ -235,19 +143,19 @@ impl<T> OneTwo<T> {
 	fn add_to_one(self, x: T) -> Result<Self, (T, T, T)> {
 		match self {
 			One(a) => Ok(Two(a, x)),
-			Two(a, b) => Err((a, b, x))
+			Two(a, b) => Err((a, b, x)),
 		}
 	}
 
 	fn first(self) -> T {
 		match self {
-			One(x) | Two(x, _) => x
+			One(x) | Two(x, _) => x,
 		}
 	}
 
 	fn last(self) -> T {
 		match self {
-			One(x) | Two(_, x) => x
+			One(x) | Two(_, x) => x,
 		}
 	}
 }
@@ -258,7 +166,7 @@ impl<T> IntoIterator for OneTwo<T> {
 	fn into_iter(self) -> Self::IntoIter {
 		match self {
 			One(a) => vec![a].into_iter(),
-			Two(a, b) => vec![a, b].into_iter()
+			Two(a, b) => vec![a, b].into_iter(),
 		}
 	}
 }
@@ -274,43 +182,36 @@ impl<'w> LevelLayoutBuilder<'w> {
 
 	pub fn add_placement(&mut self, placement: DeclaredPlacement) -> Result<(), LevelLayoutError> {
 		match placement {
-			DeclaredPlacement::FirstCycle(p) => self.place_cycle(p),
-			DeclaredPlacement::Join(p) => self.place_cycle_joined(p),
-			DeclaredPlacement::Join2(p) => self.place_cycle_joined_2(p),
-			DeclaredPlacement::Join3(p) => self.place_cycle_joined_3(p),
-			DeclaredPlacement::Vertex(p) => self.place_partial_vertex(p),
+			DeclaredPlacement::Cycle(p) => self.place_cycle(p.cycle_index, p.position, p.radius),
+			DeclaredPlacement::Vertex(p) => self.place_vertex(p.vertex_index, p.relative_angle),
 		}
 	}
 
 	pub fn place_cycle(
 		&mut self,
-		placement: FirstCycleDeclaredPlacement,
+		target_cycle: usize,
+		center: Vec2,
+		radius: f32,
 	) -> Result<(), LevelLayoutError> {
-		if placement.cycle_index >= self.cycles.len() {
-			return Err(LevelLayoutError::CycleIndexOutOfRange(
-				placement.cycle_index,
-			));
+		if target_cycle >= self.cycles.len() {
+			return Err(LevelLayoutError::CycleIndexOutOfRange(target_cycle));
 		}
-		if self.cycles[placement.cycle_index].is_some() {
-			return Err(LevelLayoutError::CycleAlreadyPlaced(placement.cycle_index));
+		if self.cycles[target_cycle].is_some() {
+			return Err(LevelLayoutError::CycleAlreadyPlaced(target_cycle));
 		}
-		let cycle_vertex_count = self.level.cycles[placement.cycle_index]
-			.vertex_indices
-			.len();
-		let radius = placement.radius.computed_value(cycle_vertex_count);
 		// This will be filled with placements of all vertices after the cycle is placed
 		let mut placements_after = Vec::new();
 		// This will be filled with vertices that are already partially placed
 		let mut new_fixed_points = std::collections::BTreeMap::new();
-		let vertex_indices = &self.level.cycles[placement.cycle_index].vertex_indices;
+		let vertex_indices = &self.level.cycles[target_cycle].vertex_indices;
 		for (j, &i) in vertex_indices.iter().enumerate() {
 			match self.vertices[i] {
 				IntermediateVertexPosition::Fixed(pos) => {
 					// Fixed vertex cannot be moved, we can only proceed if
 					// it already lies on the cycle being placed
-					if !approx_eq(placement.position.distance_squared(pos), radius.powi(2)) {
+					if !approx_eq(center.distance_squared(pos), radius.powi(2)) {
 						return Err(LevelLayoutError::ConflictingPlacedVertex(
-							placement.cycle_index,
+							target_cycle,
 							i,
 							pos,
 						));
@@ -324,21 +225,22 @@ impl<'w> LevelLayoutBuilder<'w> {
 					// Find one intersection of the two cycles, if it exists
 					let intersection = intersect_circles(
 						owner_placement.position,
-						placement.position,
+						center,
 						owner_placement.radius,
 						radius,
 					);
 					match intersection {
 						Some(One(new_pos)) => {
 							// Cycles intersect tangentially, there is one intersection
-							let replaced = new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
+							let replaced =
+								new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
 							// Fail if there is already a vertex there
 							if let Some(existing_vertices) = replaced {
 								return Err(LevelLayoutError::CyclesDoNotIntersectTwice(
-									placement.cycle_index,
+									target_cycle,
 									p.owner_cycle,
 									existing_vertices.first().0,
-									i
+									i,
 								));
 							}
 							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
@@ -355,10 +257,10 @@ impl<'w> LevelLayoutBuilder<'w> {
 						None => {
 							// Fail if the cycles do not intersect
 							return Err(LevelLayoutError::CyclesDoNotIntersect(
-								placement.cycle_index,
+								target_cycle,
 								p.owner_cycle,
 								i,
-							))
+							));
 						}
 					}
 				}
@@ -366,7 +268,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 					// Free vertex can be partially placed without further complication
 					placements_after.push(IntermediateVertexPosition::Partial(
 						PartiallyBoundVertexPosition {
-							owner_cycle: placement.cycle_index,
+							owner_cycle: target_cycle,
 							index_in_owner: j,
 						},
 					));
@@ -375,10 +277,8 @@ impl<'w> LevelLayoutBuilder<'w> {
 		}
 		// All fixed points on the cycle must be in cycle order
 		let fixed_points_after = placements_after.iter().filter_map(|p| p.get_fixed());
-		if !Self::are_points_in_cyclic_order(placement.position, fixed_points_after) {
-			return Err(LevelLayoutError::VertexOrderViolationOnCycle(
-				placement.cycle_index,
-			));
+		if !Self::are_points_in_cyclic_order(center, fixed_points_after) {
+			return Err(LevelLayoutError::VertexOrderViolationOnCycle(target_cycle));
 		}
 		// Newly fixed points on other cycles must also work with those cycles
 		for (cycle_index, placement) in new_fixed_points {
@@ -390,62 +290,40 @@ impl<'w> LevelLayoutBuilder<'w> {
 		for (&i, new_pos) in vertex_indices.iter().zip_eq(placements_after) {
 			self.vertices[i] = new_pos;
 		}
-		self.cycles[placement.cycle_index] = Some(CyclePlacement {
-			position: placement.position,
+		self.cycles[target_cycle] = Some(CyclePlacement {
+			position: center,
 			radius,
 		});
 		Ok(())
 	}
 
-	pub fn place_cycle_joined(
+	pub fn place_vertex(
 		&mut self,
-		_placement: JoinedCycleDeclaredPlacement,
+		target_vertex: usize,
+		relative_angle: f32,
 	) -> Result<(), LevelLayoutError> {
-		todo!();
-	}
-
-	pub fn place_cycle_joined_2(
-		&mut self,
-		_placement: DoublyJoinedCycleDeclaredPlacement,
-	) -> Result<(), LevelLayoutError> {
-		todo!();
-	}
-
-	pub fn place_cycle_joined_3(
-		&mut self,
-		_placement: TriplyJoinedCycleDeclaredPlacement,
-	) -> Result<(), LevelLayoutError> {
-		todo!();
-	}
-
-	pub fn place_partial_vertex(
-		&mut self,
-		placement: VertexDeclaredPlacement,
-	) -> Result<(), LevelLayoutError> {
-		if placement.vertex_index >= self.vertices.len() {
-			return Err(LevelLayoutError::VertexIndexOutOfRange(
-				placement.vertex_index,
-			));
+		if target_vertex >= self.vertices.len() {
+			return Err(LevelLayoutError::VertexIndexOutOfRange(target_vertex));
 		}
-		match self.vertices[placement.vertex_index] {
-			IntermediateVertexPosition::Free => Err(LevelLayoutError::VertexNotPartiallyPlaced(
-				placement.vertex_index,
-			)),
-			IntermediateVertexPosition::Fixed(_) => Err(LevelLayoutError::VertexAlreadyPlaced(
-				placement.vertex_index,
-			)),
+		match self.vertices[target_vertex] {
+			IntermediateVertexPosition::Free => {
+				Err(LevelLayoutError::VertexNotPartiallyPlaced(target_vertex))
+			}
+			IntermediateVertexPosition::Fixed(_) => {
+				Err(LevelLayoutError::VertexAlreadyPlaced(target_vertex))
+			}
 			IntermediateVertexPosition::Partial(p) => {
 				let owner_placement = self.cycles[p.owner_cycle]
 					.expect("Owner cycle of a partially placed vertex should also be placed");
 				let new_pos = owner_placement.position
-					+ owner_placement.radius * Vec2::from_angle(placement.relative_angle);
+					+ owner_placement.radius * Vec2::from_angle(relative_angle);
 				if !self.verify_materialization_against_cycle(
 					p.owner_cycle,
-					std::iter::once((placement.vertex_index, new_pos)),
+					std::iter::once((target_vertex, new_pos)),
 				) {
 					return Err(LevelLayoutError::VertexOrderViolationOnCycle(p.owner_cycle));
 				}
-				self.vertices[placement.vertex_index] = IntermediateVertexPosition::Fixed(new_pos);
+				self.vertices[target_vertex] = IntermediateVertexPosition::Fixed(new_pos);
 				Ok(())
 			}
 		}
