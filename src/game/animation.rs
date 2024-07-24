@@ -102,7 +102,8 @@ fn move_objects(mut objects: Query<(&mut Transform, &mut AnimatedObject)>, time:
 		}
 		animation.progress += (time.delta_seconds() / ANIMATION_TIME).min(1.0);
 		if let Some(goal) = animation.sample() {
-			transform.translation = goal;
+			transform.translation.x = goal.x;
+			transform.translation.y = goal.y;
 		}
 	}
 }

@@ -197,7 +197,7 @@ fn spawn_cycle(
 					.collect(),
 			),
 			ColorMesh2dBundle {
-				transform: Transform::from_translation(placement.position.extend(0.0)),
+				transform: Transform::from_translation(placement.position.extend(-200.0)),
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 				material,
 				..default()
