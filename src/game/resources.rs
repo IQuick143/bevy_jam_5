@@ -21,3 +21,20 @@ impl LevelCompletionConditions {
 		self.buttons_present == self.buttons_triggered
 	}
 }
+
+/// Contains an overview of conditions that are needed to complete the level
+#[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
+pub struct RingMaterial(pub Handle<ColorMaterial>);
+
+impl FromWorld for RingMaterial {
+	fn from_world(world: &mut World) -> Self {
+		let mut materials = world
+			.get_resource_mut::<Assets<ColorMaterial>>()
+			.expect("I'd expect materials to exist pretty please.");
+
+		RingMaterial(materials.add(ColorMaterial {
+			color: Color::WHITE,
+			..default()
+		}))
+	}
+}

@@ -8,10 +8,11 @@ use crate::game::{
 	prelude::*,
 };
 
+use bevy::math::primitives;
 use itertools::Itertools;
 
 pub(super) fn plugin(app: &mut App) {
-	app.observe(spawn_level);
+	app.observe(spawn_level).init_resource::<RingMaterial>();
 }
 
 #[derive(Event, Debug)]
@@ -21,6 +22,8 @@ fn spawn_level(
 	trigger: Trigger<SpawnLevel>,
 	mut events: EventWriter<GameLayoutChanged>,
 	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
+	cycle_material: ResMut<RingMaterial>,
 ) {
 	println!("Spawning!"); //TODO: debug
 	let data = trigger.event().0.clone();
@@ -37,7 +40,16 @@ fn spawn_level(
 		.cycles
 		.iter()
 		.zip_eq(&layout.cycles)
-		.map(|(data, pos)| spawn_cycle(commands.reborrow(), data, *pos, &vertices))
+		.map(|(data, pos)| {
+			spawn_cycle(
+				commands.reborrow(),
+				meshes.reborrow(),
+				cycle_material.0.clone(),
+				data,
+				*pos,
+				&vertices,
+			)
+		})
 		.collect::<Vec<_>>();
 
 	for (i, cycle_id) in cycle_ids.iter().copied().enumerate() {
@@ -96,12 +108,23 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> En
 	vertex_id
 }
 
+/// Half the width of the circle
+const HALF_WIDTH: f32 = 5.0;
+
 fn spawn_cycle(
 	mut commands: Commands,
+	mut meshes: Mut<Assets<Mesh>>,
+	material: Handle<ColorMaterial>,
 	data: &CycleData,
 	placement: CyclePlacement,
 	vertex_entities: &[Entity],
 ) -> Entity {
+	let mesh =
+		primitives::Annulus::new(placement.radius - HALF_WIDTH, placement.radius + HALF_WIDTH)
+			.mesh()
+			.resolution(64)
+			.build();
+
 	commands
 		.spawn((
 			data.cycle_turnability,
@@ -112,7 +135,12 @@ fn spawn_cycle(
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
-			Transform::from_translation(placement.position.extend(0.0)),
+			ColorMesh2dBundle {
+				transform: Transform::from_translation(placement.position.extend(0.0)),
+				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
+				material,
+				..default()
+			},
 		))
 		.id()
 }
