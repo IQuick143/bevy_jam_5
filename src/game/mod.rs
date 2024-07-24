@@ -41,6 +41,9 @@ OBJECT[BOX] x a
 OBJECT[FLAG] 2
 OBJECT[PLAYER] b
 OBJECT[BUTTON] b
+
+PLACE cycle_a -100 0 100
+PLACE cycle_b +100 0 100
 ";
 	let level_file = level::parser::parse(data).unwrap();
 	let level: ValidLevelData = level_file.data.try_into().unwrap();

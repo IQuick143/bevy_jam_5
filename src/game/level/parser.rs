@@ -1,6 +1,7 @@
 use super::*;
 
 use bevy::utils::hashbrown::HashMap;
+use layout::{CyclePlacement, DeclaredCyclePlacement, DeclaredPlacement, DeclaredVertexPlacement};
 use regex::Regex;
 
 #[derive(Clone, Debug)]
@@ -20,6 +21,8 @@ enum Statement<'a> {
 	Cycle(CycleTurnability, Vec<&'a str>),
 	Link(LinkedCycleDirection, Vec<&'a str>),
 	Object(ObjectKind, Vec<&'a str>),
+	Place(Vec<&'a str>),
+	PlaceVertex(Vec<&'a str>),
 }
 
 enum ObjectKind {
@@ -101,6 +104,8 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 					};
 					Statement::Object(kind, raw_statement.values)
 				}
+				"PLACE" => Statement::Place(raw_statement.values),
+				"PLACE_VERT" => Statement::PlaceVertex(raw_statement.values),
 				k => return Err(ParsingError::InvalidKeyword(k.to_string())), // TODO: line number
 			},
 		));
@@ -214,8 +219,71 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 		}
 	}
 
-	// TODO: Fill it in
-	let layout = Vec::new();
+	let mut cycle_layout: Vec<Option<CyclePlacement>> = (0..cycles.len()).map(|_| None).collect();
+
+	for (line_id, statement) in statements.iter() {
+		if let Statement::Place(data) = statement {
+			if data.len() < 4 {
+				return Err(ParsingError::MalformedStatement(*line_id));
+			}
+			let cycle_name = data[0];
+			let x_str = data[1].replace(",", ".");
+			let y_str = data[2].replace(",", ".");
+			let r_str = data[3].replace(",", ".");
+			if let Some(cycle_id) = cycle_names.get(cycle_name) {
+				let Ok(x) = x_str.parse::<f32>() else {
+					return Err(ParsingError::MalformedStatement(*line_id));
+				};
+				let Ok(y) = y_str.parse::<f32>() else {
+					return Err(ParsingError::MalformedStatement(*line_id));
+				};
+				let Ok(r) = r_str.parse::<f32>() else {
+					return Err(ParsingError::MalformedStatement(*line_id));
+				};
+				cycle_layout[*cycle_id] = Some(CyclePlacement {
+					position: Vec2::new(x, y),
+					radius: r,
+				});
+			} else {
+				return Err(ParsingError::UnknownCycleName(cycle_name.to_string()));
+			}
+		}
+	}
+
+	if !cycle_layout.iter().all(Option::is_some) {
+		return Err(ParsingError::MissingCycleLayout);
+	}
+
+	let mut layout: Vec<DeclaredPlacement> = cycle_layout
+		.into_iter()
+		.enumerate()
+		.map(|(i, x)| {
+			let placement = x.unwrap();
+			DeclaredPlacement::Cycle(DeclaredCyclePlacement {
+				cycle_index: i,
+				position: placement.position,
+				radius: placement.radius,
+			})
+		})
+		.collect();
+
+	for (line_id, statement) in statements.iter() {
+		if let Statement::PlaceVertex(data) = statement {
+			if data.len() < 2 {
+				return Err(ParsingError::MalformedStatement(*line_id));
+			}
+			let vertex_name = data[0];
+			let angle_str = data[1].replace(",", ".");
+			if let Some(vertex_id) = vertex_names.get(vertex_name) {
+				let Ok(angle) = angle_str.parse::<f32>() else {
+					return Err(ParsingError::MalformedStatement(*line_id));
+				};
+				layout.push(DeclaredPlacement::Vertex(DeclaredVertexPlacement { vertex_index: *vertex_id, relative_angle: angle }))
+			} else {
+				return Err(ParsingError::UnknownCycleName(vertex_name.to_string()));
+			}
+		}
+	}
 
 	Ok(LevelFile {
 		data: LevelData {
@@ -255,6 +323,12 @@ CYCLE cycle_extra k l m
 
 # Cycles can be linked together
 LINK cycle_a cycle_extra
+
+# We have to position the cycles with x y radius data
+PLACE cycle_a -100 0.0 100
+PLACE cycle_b +100 0,0 100
+
+PLACE cycle_extra -100 100 50
 ";
 	let parsed = parse(data);
 	println!("{:?}", parsed);
@@ -273,6 +347,7 @@ pub enum ParsingError {
 	ObjectCollision(String),
 	NonAsciiLine,
 	MalformedStatement(usize),
+	MissingCycleLayout,
 }
 
 impl std::error::Error for ParsingError {}
@@ -303,6 +378,9 @@ impl std::fmt::Display for ParsingError {
 			ParsingError::NonAsciiLine => write!(f, "Non-ASCII characters in input")?,
 			ParsingError::MalformedStatement(line_id) => {
 				write!(f, "Line {} contains a malformed statement.", line_id + 1)?
+			}
+			ParsingError::MissingCycleLayout => {
+				write!(f, "Some cycles don't have a position specified")?
 			}
 		}
 		Ok(())
