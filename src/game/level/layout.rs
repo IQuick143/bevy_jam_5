@@ -132,9 +132,6 @@ pub struct LevelLayoutBuilder<'w> {
 	vertices: Vec<IntermediateVertexPosition>,
 	/// Placements of cycles, if they have been placed yet
 	cycles: Vec<Option<CyclePlacement>>,
-	/// Map from pairs of cycles to the vertices where they intersect.
-	/// First index in the key is always the lower one
-	intersections: std::collections::BTreeMap<(usize, usize), CycleIntersection>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -150,16 +147,20 @@ pub enum LevelLayoutError {
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
 	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
-	/// on a cycle that contains a vertex that has already been definitively placed
+	/// on a cycle that contains a vertex that has already been definitively placed,
+	/// and it would not lie on the cycle as being placed
 	///
-	/// **parameters**: The cycle, the vertex
-	ConflictingPlacedVertex(usize, usize),
-	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
-	/// on a cycle that contains a vertex that has already been partially
-	/// placed, and is not owned by one of the cycles that the placement expects
+	/// **parameters**: The cycle, the vertex, position of the vertex
+	ConflictingPlacedVertex(usize, usize, Vec2),
+	/// Cycles that share a vertex have been placed in a way that they do not intersect
 	///
-	/// **parameters**: The cycle, the vertex, the owning cycle
-	ConflictingPartiallyPlacedVertex(usize, usize, usize),
+	/// **parameters**: The placed cycle, the existing cycle, the vertex of conflict
+	CyclesDoNotIntersect(usize, usize, usize),
+	/// Cycles that share two vertices have been placed in a way that they
+	/// only intersect tangentially (only enough space for one shared vertex)
+	///
+	/// **parameters**: The placed cycle, the existing cycle, the existing shared vertex, the vertex of conflict
+	CyclesDoNotIntersectTwice(usize, usize, usize, usize),
 	/// [`place_partial_vertex`](LevelLayoutBuilder::place_partial_vertex) was called
 	/// on a vertex that already has a fixed placement
 	VertexAlreadyPlaced(usize),
@@ -193,14 +194,13 @@ struct PartiallyBoundVertexPosition {
 	index_in_owner: usize,
 }
 
-/// Represents the vertices on the intersection of two cycles
-#[derive(Clone, Copy, Debug)]
-enum CycleIntersection {
-	/// Cycles intersect at one vertex
-	One(usize),
-	/// Cycles intersect at two vertices
-	Two(usize, usize),
+/// Container that holds one or two of something
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum OneTwo<T> {
+	One(T),
+	Two(T, T),
 }
+use OneTwo::*;
 
 impl DeclaredCycleRadius {
 	pub fn computed_value(self, cycle_vertex_count: usize) -> f32 {
@@ -231,34 +231,44 @@ impl IntermediateVertexPosition {
 	}
 }
 
+impl<T> OneTwo<T> {
+	fn add_to_one(self, x: T) -> Result<Self, (T, T, T)> {
+		match self {
+			One(a) => Ok(Two(a, x)),
+			Two(a, b) => Err((a, b, x))
+		}
+	}
+
+	fn first(self) -> T {
+		match self {
+			One(x) | Two(x, _) => x
+		}
+	}
+
+	fn last(self) -> T {
+		match self {
+			One(x) | Two(_, x) => x
+		}
+	}
+}
+
+impl<T> IntoIterator for OneTwo<T> {
+	type Item = T;
+	type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
+	fn into_iter(self) -> Self::IntoIter {
+		match self {
+			One(a) => vec![a].into_iter(),
+			Two(a, b) => vec![a, b].into_iter()
+		}
+	}
+}
+
 impl<'w> LevelLayoutBuilder<'w> {
 	pub fn new(level: &'w ValidLevelData) -> Self {
-		let vertices_per_cycle = level
-			.cycles
-			.iter()
-			.map(|c| std::collections::BTreeSet::from_iter(c.vertex_indices.iter().copied()))
-			.collect::<Vec<_>>();
-		let intersections = vertices_per_cycle.iter()
-			.enumerate()
-			.tuple_combinations()
-			.filter_map(|((i, a), (j, b))| {
-				let mut intersection = None;
-				for &vertex in a.intersection(b) {
-					intersection = match intersection {
-						None => Some(CycleIntersection::One(vertex)),
-						Some(CycleIntersection::One(old_vertex)) => Some(CycleIntersection::Two(old_vertex, vertex)),
-						// [`ValidLevelData`] ensures level data integrity
-						Some(CycleIntersection::Two(..)) => panic!("More than two vertices in intersection of two cycles, should have been caught by sanitizer")
-					}
-				}
-				intersection.map(|x| ((i, j), x))
-			})
-			.collect();
 		Self {
 			level,
 			vertices: vec![IntermediateVertexPosition::Free; level.vertices.len()],
 			cycles: vec![None; level.cycles.len()],
-			intersections,
 		}
 	}
 
@@ -284,31 +294,105 @@ impl<'w> LevelLayoutBuilder<'w> {
 		if self.cycles[placement.cycle_index].is_some() {
 			return Err(LevelLayoutError::CycleAlreadyPlaced(placement.cycle_index));
 		}
-		self.checked_reposition_cycle_vertices(
-			placement.cycle_index,
-			placement.position,
-			|i, pos| match pos {
-				IntermediateVertexPosition::Fixed(_) => Err(LevelLayoutError::ConflictingPlacedVertex(
-					placement.cycle_index,
-					i,
-				)),
-				IntermediateVertexPosition::Partial(p) => Err(LevelLayoutError::ConflictingPartiallyPlacedVertex(
-					placement.cycle_index,
-					i,
-					p.owner_cycle,
-				)),
-				IntermediateVertexPosition::Free => Ok(IntermediateVertexPosition::Partial(PartiallyBoundVertexPosition {
-					owner_cycle: placement.cycle_index,
-					index_in_owner: i,
-				}))
-			}
-		)?;
 		let cycle_vertex_count = self.level.cycles[placement.cycle_index]
 			.vertex_indices
 			.len();
+		let radius = placement.radius.computed_value(cycle_vertex_count);
+		// This will be filled with placements of all vertices after the cycle is placed
+		let mut placements_after = Vec::new();
+		// This will be filled with vertices that are already partially placed
+		let mut new_fixed_points = std::collections::BTreeMap::new();
+		let vertex_indices = &self.level.cycles[placement.cycle_index].vertex_indices;
+		for (j, &i) in vertex_indices.iter().enumerate() {
+			match self.vertices[i] {
+				IntermediateVertexPosition::Fixed(pos) => {
+					// Fixed vertex cannot be moved, we can only proceed if
+					// it already lies on the cycle being placed
+					if !approx_eq(placement.position.distance_squared(pos), radius.powi(2)) {
+						return Err(LevelLayoutError::ConflictingPlacedVertex(
+							placement.cycle_index,
+							i,
+							pos,
+						));
+					}
+					placements_after.push(IntermediateVertexPosition::Fixed(pos));
+				}
+				IntermediateVertexPosition::Partial(p) => {
+					// Partially placed vertex will be fixed at an intersection of the two cycles
+					let owner_placement = self.cycles[p.owner_cycle]
+						.expect("Owner cycle of a partially placed vertex should also be placed");
+					// Find one intersection of the two cycles, if it exists
+					let intersection = intersect_circles(
+						owner_placement.position,
+						placement.position,
+						owner_placement.radius,
+						radius,
+					);
+					match intersection {
+						Some(One(new_pos)) => {
+							// Cycles intersect tangentially, there is one intersection
+							let replaced = new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
+							// Fail if there is already a vertex there
+							if let Some(existing_vertices) = replaced {
+								return Err(LevelLayoutError::CyclesDoNotIntersectTwice(
+									placement.cycle_index,
+									p.owner_cycle,
+									existing_vertices.first().0,
+									i
+								));
+							}
+							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
+						}
+						Some(Two(default_pos, alt_pos)) => {
+							// If there are two intersections, we must choose one of them
+							let new_pos = new_fixed_points.entry(p.owner_cycle)
+								.and_modify(|val| *val = val.add_to_one((i, alt_pos))
+									.expect("More than two vertices in intersection of two cycles, should have been caught by sanitizer"))
+								.or_insert(One((i, default_pos)))
+								.last().1;
+							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
+						}
+						None => {
+							// Fail if the cycles do not intersect
+							return Err(LevelLayoutError::CyclesDoNotIntersect(
+								placement.cycle_index,
+								p.owner_cycle,
+								i,
+							))
+						}
+					}
+				}
+				IntermediateVertexPosition::Free => {
+					// Free vertex can be partially placed without further complication
+					placements_after.push(IntermediateVertexPosition::Partial(
+						PartiallyBoundVertexPosition {
+							owner_cycle: placement.cycle_index,
+							index_in_owner: j,
+						},
+					));
+				}
+			}
+		}
+		// All fixed points on the cycle must be in cycle order
+		let fixed_points_after = placements_after.iter().filter_map(|p| p.get_fixed());
+		if !Self::are_points_in_cyclic_order(placement.position, fixed_points_after) {
+			return Err(LevelLayoutError::VertexOrderViolationOnCycle(
+				placement.cycle_index,
+			));
+		}
+		// Newly fixed points on other cycles must also work with those cycles
+		for (cycle_index, placement) in new_fixed_points {
+			if !self.verify_materialization_against_cycle(cycle_index, placement.into_iter()) {
+				return Err(LevelLayoutError::VertexOrderViolationOnCycle(cycle_index));
+			}
+		}
+		// We are done verifying that the placement is valid, now we can commit to it
+		for (&i, new_pos) in vertex_indices.iter().zip_eq(placements_after) {
+			self.vertices[i] = new_pos;
+		}
 		self.cycles[placement.cycle_index] = Some(CyclePlacement {
 			position: placement.position,
-			radius: placement.radius.computed_value(cycle_vertex_count),
+			radius,
 		});
 		Ok(())
 	}
@@ -355,15 +439,14 @@ impl<'w> LevelLayoutBuilder<'w> {
 					.expect("Owner cycle of a partially placed vertex should also be placed");
 				let new_pos = owner_placement.position
 					+ owner_placement.radius * Vec2::from_angle(placement.relative_angle);
-				self.checked_reposition_cycle_vertices(
+				if !self.verify_materialization_against_cycle(
 					p.owner_cycle,
-					owner_placement.position,
-					|i, pos| if i == placement.vertex_index {
-						Ok(IntermediateVertexPosition::Fixed(new_pos))
-					} else {
-						Ok(pos)
-					}
-				)
+					std::iter::once((placement.vertex_index, new_pos)),
+				) {
+					return Err(LevelLayoutError::VertexOrderViolationOnCycle(p.owner_cycle));
+				}
+				self.vertices[placement.vertex_index] = IntermediateVertexPosition::Fixed(new_pos);
+				Ok(())
 			}
 		}
 	}
@@ -512,34 +595,33 @@ impl<'w> LevelLayoutBuilder<'w> {
 		*pos = IntermediateVertexPosition::Fixed(new_pos);
 	}
 
-	/// Iterates over vertices of a cycle and applies a fallible transformation to each,
-	/// then checks whether the new layout respects cycle order and commits it
-	/// ## Side Effects
-	/// If any invocation of the transformation fails, nothing happens.
-	/// If the transformed placements do not respect cycle order, nothing happens.
-	/// In both cases, this is indicated by an error value being returned
-	fn checked_reposition_cycle_vertices(
-		&mut self,
+	/// Checks whether a materialization can be done or if it breaks
+	/// cycle order of a particular cycle
+	/// ## Notes
+	/// - The cycle to test against must already be placed
+	/// - Materialized points are intentionally passed as an iterator.
+	/// The list is searched linearly for every vertex of the cycle,
+	/// as the list is expected to be very small.
+	/// Use a fast implementation of iterator
+	/// - Only the cycle order is verified, radius of the cycle is not checked
+	fn verify_materialization_against_cycle(
+		&self,
 		cycle_index: usize,
-		cycle_center: Vec2,
-		mut f: impl FnMut(
-			usize,
-			IntermediateVertexPosition,
-		) -> Result<IntermediateVertexPosition, LevelLayoutError>,
-	) -> Result<(), LevelLayoutError> {
-		let vertex_indices = &self.level.cycles[cycle_index].vertex_indices;
-		let new_placements = vertex_indices.iter()
-			.map(|&i| f(i, self.vertices[i]))
-			.collect::<Result<Vec<_>, _>>()?;
-		let fixed_placements = new_placements.iter()
-			.filter_map(|p| p.get_fixed());
-		if !Self::are_points_in_cyclic_order(cycle_center, fixed_placements) {
-			return Err(LevelLayoutError::VertexOrderViolationOnCycle(cycle_index));
-		}
-		for (i, new_placement) in new_placements.into_iter().enumerate() {
-			self.vertices[vertex_indices[i]] = new_placement;
-		}
-		Ok(())
+		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
+	) -> bool {
+		let cycle_center = self.cycles[cycle_index]
+			.expect("Partial materialization checks can only be run on placed cycles")
+			.position;
+		let fixed_points = self.level.cycles[cycle_index]
+			.vertex_indices
+			.iter()
+			.filter_map(|&i| {
+				points_to_materialize
+					.clone()
+					.find_map(|(j, p)| if i == j { Some(p) } else { None })
+					.or_else(|| self.vertices[i].get_fixed())
+			});
+		Self::are_points_in_cyclic_order(cycle_center, fixed_points)
 	}
 
 	/// Checks whether a sequence of points is ordered in order of
@@ -571,4 +653,41 @@ impl std::fmt::Display for LevelLayoutError {
 	fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		todo!()
 	}
+}
+
+fn intersect_circles(c1: Vec2, c2: Vec2, r1: f32, r2: f32) -> Option<OneTwo<Vec2>> {
+	let d_sq = c1.distance_squared(c2);
+	// Do not even try if the circles share a center point
+	const CENTER_OVERLAP_THRESHOLD: f32 = 0.001;
+	if d_sq < CENTER_OVERLAP_THRESHOLD {
+		return None;
+	}
+	// First we find the projection of the intersections onto the line that connects center points
+	// This is the distance of that point along that line, as a multiple of distance between the centers
+	let rel_midpoint = (r1.powi(2) - r2.powi(2)) / 2.0 / d_sq + 0.5;
+	let midpoint = c1.lerp(c2, rel_midpoint);
+	// Now we try to construct the actual intersection points, they will lie at the intersections
+	// of the normal at rel_midpoint with one of the circles
+	let normal_offset_sq = r1.powi(2) - rel_midpoint.powi(2) * d_sq;
+	// Round here, we want to cacth a single intersection with a margin of error
+	eprintln!("circles! {rel_midpoint} {midpoint} {normal_offset_sq}");
+	const TANGENTIAL_INTERSECTION_THRESHOLD: f32 = 0.001;
+	if normal_offset_sq.abs() < TANGENTIAL_INTERSECTION_THRESHOLD {
+		Some(One(midpoint))
+	} else if normal_offset_sq > 0.0 {
+		let normal_offset = normal_offset_sq.sqrt();
+		let normal_unit = (c2 - c1).normalize().perp();
+		let offset = normal_offset * normal_unit;
+		Some(Two(midpoint + offset, midpoint - offset))
+	} else {
+		None
+	}
+}
+
+fn approx_eq(a: f32, b: f32) -> bool {
+	// Threshold is intentionally chosen to be fairly large
+	// so as to make up for rounding errors in arithmetics
+	// and/or human inputs
+	const THRESHOLD: f32 = 0.001;
+	(a - b).abs() < THRESHOLD * a.max(b)
 }
