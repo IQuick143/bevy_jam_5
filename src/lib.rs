@@ -7,7 +7,7 @@ mod ui;
 use bevy::{
 	asset::AssetMetaCheck,
 	audio::{AudioPlugin, Volume},
-	prelude::*,
+	prelude::*, render::camera::ScalingMode,
 };
 
 pub struct AppPlugin;
@@ -74,10 +74,18 @@ enum AppSet {
 	Update,
 }
 
+pub const ORTHO: Vec2 = Vec2::new(1920.0, 1080.0);
+
 fn spawn_camera(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Camera"),
-		Camera2dBundle::default(),
+		Camera2dBundle{
+			projection: OrthographicProjection {
+				scaling_mode: ScalingMode::AutoMin{min_width: ORTHO.x, min_height: ORTHO.y},
+				..default()
+			},
+			..default()	
+		},
 		// Render all UI to this camera.
 		// Not strictly necessary since we only use one camera,
 		// but if we don't use this component, our UI will disappear as soon
