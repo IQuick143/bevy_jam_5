@@ -140,10 +140,10 @@ pub enum LevelLayoutError {
 	/// Cycles that share two vertices have been placed in a way that they
 	/// only intersect tangentially (only enough space for one shared vertex)
 	CyclesDoNotIntersectTwice(CyclesDoNotIntersectTwiceError),
-	/// [`place_partial_vertex`](LevelLayoutBuilder::place_partial_vertex) was called
+	/// [`place_vertex`](LevelLayoutBuilder::place_vertex) was called
 	/// on a vertex that already has a fixed placement
 	VertexAlreadyPlaced(usize),
-	/// [`place_partial_vertex`](LevelLayoutBuilder::place_partial_vertex) was called
+	/// [`place_vertex`](LevelLayoutBuilder::place_vertex) was called
 	/// on a vertex that already has not yet been partially placed
 	VertexNotPartiallyPlaced(usize),
 	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
