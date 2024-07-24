@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use super::*;
 
 /// Declarative specification of the placement of a lone cycle
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct DeclaredCyclePlacement {
 	/// Index of the cycle being laid out
 	pub cycle_index: usize,
@@ -11,6 +11,9 @@ pub struct DeclaredCyclePlacement {
 	pub position: Vec2,
 	/// Radius of the cycle
 	pub radius: f32,
+	/// Indices of vertices that should prefer their second
+	/// option for placement instead of the first
+	pub double_intersection_hints: Vec<usize>,
 }
 
 /// Declarative specification of the placement of a vertex
@@ -25,7 +28,7 @@ pub struct DeclaredVertexPlacement {
 }
 
 /// Declarative specification of the placement of a game object
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum DeclaredPlacement {
 	/// Place a cycle that does not intersects any already-placed cycles
 	Cycle(DeclaredCyclePlacement),
@@ -182,7 +185,12 @@ impl<'w> LevelLayoutBuilder<'w> {
 
 	pub fn add_placement(&mut self, placement: DeclaredPlacement) -> Result<(), LevelLayoutError> {
 		match placement {
-			DeclaredPlacement::Cycle(p) => self.place_cycle(p.cycle_index, p.position, p.radius),
+			DeclaredPlacement::Cycle(p) => self.place_cycle(
+				p.cycle_index,
+				p.position,
+				p.radius,
+				&p.double_intersection_hints,
+			),
 			DeclaredPlacement::Vertex(p) => self.place_vertex(p.vertex_index, p.relative_angle),
 		}
 	}
@@ -192,6 +200,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 		target_cycle: usize,
 		center: Vec2,
 		radius: f32,
+		double_intersection_hints: &[usize],
 	) -> Result<(), LevelLayoutError> {
 		if target_cycle >= self.cycles.len() {
 			return Err(LevelLayoutError::CycleIndexOutOfRange(target_cycle));
@@ -248,9 +257,25 @@ impl<'w> LevelLayoutBuilder<'w> {
 						Some(Two(default_pos, alt_pos)) => {
 							// If there are two intersections, we must choose one of them
 							let new_pos = new_fixed_points.entry(p.owner_cycle)
-								.and_modify(|val| *val = val.add_to_one((i, alt_pos))
-									.expect("More than two vertices in intersection of two cycles, should have been caught by sanitizer"))
-								.or_insert(One((i, default_pos)))
+								.and_modify(|val| {
+									let new_pos = if double_intersection_hints.contains(&val.first().0) {
+										default_pos
+									}
+									else {
+										alt_pos
+									};
+									*val = val.add_to_one((i, new_pos))
+										.expect("More than two vertices in intersection of two cycles, should have been caught by sanitizer")
+								})
+								.or_insert_with(|| {
+									let new_pos = if double_intersection_hints.contains(&i) {
+										alt_pos
+									}
+									else {
+										default_pos
+									};
+									One((i, new_pos))
+								})
 								.last().1;
 							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
 						}
