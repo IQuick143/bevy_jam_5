@@ -610,11 +610,57 @@ impl<'w> LevelLayoutBuilder<'w> {
 	}
 }
 
+impl std::fmt::Display for CyclePlacement {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"[x={} y={} r={}]",
+			self.position.x, self.position.y, self.radius
+		)
+	}
+}
+
 impl std::error::Error for LevelLayoutError {}
 
 impl std::fmt::Display for LevelLayoutError {
-	fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		todo!()
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::VertexIndexOutOfRange(i) => write!(f, "Cannot place vertex {i} because there are not that many vertices."),
+			Self::CycleIndexOutOfRange(i) => write!(f, "Cannot place cycle {i} because there are not that many cycles."),
+			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
+			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
+			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
+			Self::VertexNotPartiallyPlaced(i) => write!(f, "Cannot place vertex {i} because it does not lie on any placed cycle."),
+			Self::CycleDoesNotContainVertex(e) => write!(
+				f,
+				"Cycle {} cannot be placed at {} because it contains vertex {} which has already been placed at {}.",
+				e.placed_cycle,
+				e.requested_placement,
+				e.failing_vertex,
+				e.vertex_position
+			),
+			Self::CyclesDoNotIntersect(e) => write!(
+				f,
+				"Cycle {} cannot be placed at {} because it shares vertex {} with cycle {} at {} and the cycles would not intersect.",
+				e.placed_cycle,
+				e.requested_placement,
+				e.failing_vertex,
+				e.existing_cycle,
+				e.existing_placement
+			),
+			Self::CyclesDoNotIntersectTwice(e) => write!(
+				f,
+				"Cycle {} cannot be placed at {} because it shares vertices {} and {} with cycle {} at {} and the cycles would only intersect once at {}.",
+				e.placed_cycle,
+				e.requested_placement,
+				e.existing_vertex,
+				e.failing_vertex,
+				e.existing_cycle,
+				e.existing_placement,
+				e.vertex_position
+			),
+			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order.")
+		}
 	}
 }
 
