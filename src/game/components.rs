@@ -97,9 +97,8 @@ pub enum RotationDirection {
 impl From<CycleTurningDirection> for RotationDirection {
 	fn from(value: CycleTurningDirection) -> Self {
 		match value {
-			// TODO: verify
-			CycleTurningDirection::Nominal => RotationDirection::CounterClockwise,
-			CycleTurningDirection::Reverse => RotationDirection::Clockwise,
+			CycleTurningDirection::Nominal => RotationDirection::Clockwise,
+			CycleTurningDirection::Reverse => RotationDirection::CounterClockwise,
 		}
 	}
 }
