@@ -546,7 +546,9 @@ impl<'w> LevelLayoutBuilder<'w> {
 				for (i, &j) in cycle_data.vertex_indices.iter().enumerate() {
 					let new_pos = cycle_placement.position
 						+ cycle_placement.radius
-							* Vec2::from_angle(PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32);
+							* Vec2::from_angle(
+								PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32,
+							);
 					Self::checked_materialize(&mut self.vertices[j], new_pos, cycle_index, i);
 				}
 			}
