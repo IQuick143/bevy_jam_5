@@ -1,6 +1,10 @@
 //! Spawn the player.
 
+use std::f32::consts::TAU;
+
 use bevy::prelude::*;
+
+use super::events::CycleTurningDirection;
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -80,5 +84,68 @@ impl std::ops::Mul for LinkedCycleDirection {
 		} else {
 			LinkedCycleDirection::Inverse
 		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, Default, Reflect)]
+pub enum RotationDirection {
+	#[default]
+	Clockwise,
+	CounterClockwise,
+}
+
+impl From<CycleTurningDirection> for RotationDirection {
+	fn from(value: CycleTurningDirection) -> Self {
+		match value {
+			// TODO: verify
+			CycleTurningDirection::Nominal => RotationDirection::CounterClockwise,
+			CycleTurningDirection::Reverse => RotationDirection::Clockwise,
+		}
+	}
+}
+
+/// Component for enabling animation behaviour
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct AnimatedObject {
+	/// Which way the slerp should go.
+	pub rotation_direction: RotationDirection,
+	/// <0.0-1.0> percentage of the animation progress
+	pub progress: f32,
+	/// Center of rotation
+	pub cycle_center: Vec3,
+	/// The direction we're starting from, if None, the animation skips to the end
+	pub start_direction: Option<Dir2>,
+	pub start_magnitude: f32,
+	/// The direction we're ending on, if None, the animation cannot play
+	pub final_direction: Option<Dir2>,
+	pub final_magnitude: f32,
+}
+
+impl AnimatedObject {
+	pub fn sample(&self) -> Option<Vec3> {
+		let target = self.final_direction?;
+		Some(if let Some(source) = self.start_direction {
+			let t = self.progress.clamp(0.0, 1.0);
+			let dir = {
+				let mut angle = Vec2::angle_between(*source, *target);
+				match self.rotation_direction {
+					RotationDirection::Clockwise => {
+						if angle > 0.0 {
+							angle -= TAU
+						}
+					}
+					RotationDirection::CounterClockwise => {
+						if angle < 0.0 {
+							angle += TAU
+						}
+					}
+				}
+				Rot2::radians(angle * t) * source
+			};
+			let magnitude = f32::lerp(self.start_magnitude, self.final_magnitude, t);
+			self.cycle_center + (magnitude * dir).extend(0.0)
+		} else {
+			self.cycle_center + (self.final_magnitude * target).extend(0.0)
+		})
 	}
 }

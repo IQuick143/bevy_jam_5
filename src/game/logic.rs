@@ -1,5 +1,8 @@
 use super::prelude::*;
 
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LogicSystemSet;
+
 pub fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
@@ -12,7 +15,8 @@ pub fn plugin(app: &mut App) {
 			)
 				.run_if(on_event::<GameLayoutChanged>()),
 		)
-			.chain(),
+			.chain()
+			.in_set(LogicSystemSet),
 	);
 }
 
@@ -54,24 +58,8 @@ fn cycle_rotation_system(
 			.get(event.0.target_cycle)
 			.inspect_err(|e| log::warn!("{e}"))
 		{
-			// Visit the first vertex again at the end to close the loop
-			let vertex_ids_wrapped = cycle_vertices
-				.0
-				.iter()
-				.copied()
-				.chain(std::iter::once(cycle_vertices.0[0]));
-			// Messy but simple way of chosing the iterator direction at run time
-			// https://stackoverflow.com/a/52064434
-			let vertex_ids_wrapped = match event.0.direction {
-				CycleTurningDirection::Nominal => Some(vertex_ids_wrapped)
-					.into_iter()
-					.flatten()
-					.chain(None.into_iter().flatten()),
-				CycleTurningDirection::Reverse => None
-					.into_iter()
-					.flatten()
-					.chain(Some(vertex_ids_wrapped.rev()).into_iter().flatten()),
-			};
+			let vertex_ids_wrapped =
+				get_flipped_wrapped_iterator(&cycle_vertices.0, event.0.direction);
 			let mut cached_object_id = None;
 			for vertex_id in vertex_ids_wrapped {
 				if let Some(cached_object_id) = cached_object_id {
@@ -90,6 +78,27 @@ fn cycle_rotation_system(
 				}
 			}
 		}
+	}
+}
+
+/// Returns an iterator which wraps the first element to the end and also flips the direction based on `direction`
+pub fn get_flipped_wrapped_iterator<T: Copy>(
+	array: &[T],
+	direction: CycleTurningDirection,
+) -> impl Iterator<Item = T> + '_ {
+	// Visit the first vertex again at the end to close the loop
+	let vertex_ids_wrapped = array.iter().copied().chain(std::iter::once(array[0]));
+	// Messy but simple way of chosing the iterator direction at run time
+	// https://stackoverflow.com/a/52064434
+	match direction {
+		CycleTurningDirection::Nominal => Some(vertex_ids_wrapped)
+			.into_iter()
+			.flatten()
+			.chain(None.into_iter().flatten()),
+		CycleTurningDirection::Reverse => None
+			.into_iter()
+			.flatten()
+			.chain(Some(vertex_ids_wrapped.rev()).into_iter().flatten()),
 	}
 }
 

@@ -69,22 +69,31 @@ fn spawn_level(
 }
 
 fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> Entity {
+	let transform =
+		TransformBundle::from_transform(Transform::from_translation(position.extend(0.0)));
 	let vertex_id = commands
-		.spawn((
-			Vertex,
-			PlacedGlyph(None),
-			PlacedObject(None),
-			Transform::from_translation(position.extend(0.0)),
-		))
+		.spawn((Vertex, PlacedGlyph(None), PlacedObject(None), transform))
 		.id();
 
 	if let Some(object_type) = data.object {
 		let object_id = match object_type {
 			ObjectType::Player => commands
-				.spawn((Object, Player, VertexPosition(vertex_id)))
+				.spawn((
+					Object,
+					Player,
+					VertexPosition(vertex_id),
+					transform,
+					AnimatedObject::default(),
+				))
 				.id(),
 			ObjectType::Box => commands
-				.spawn((Object, Box, VertexPosition(vertex_id)))
+				.spawn((
+					Object,
+					Box,
+					VertexPosition(vertex_id),
+					transform,
+					AnimatedObject::default(),
+				))
 				.id(),
 		};
 		commands
@@ -94,10 +103,10 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2) -> En
 	if let Some(glyph_type) = data.glyph {
 		let glyph_id = match glyph_type {
 			GlyphType::Button => commands
-				.spawn((Glyph, BoxSlot, VertexPosition(vertex_id)))
+				.spawn((Glyph, BoxSlot, VertexPosition(vertex_id), transform))
 				.id(),
 			GlyphType::Flag => commands
-				.spawn((Glyph, Goal, VertexPosition(vertex_id)))
+				.spawn((Glyph, Goal, VertexPosition(vertex_id), transform))
 				.id(),
 		};
 		commands

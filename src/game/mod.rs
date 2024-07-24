@@ -1,5 +1,6 @@
 //! Game mechanics and content.
 
+pub mod animation;
 pub mod assets;
 pub mod audio;
 pub mod components;
@@ -23,7 +24,13 @@ use spawn::level::SpawnLevel;
 use crate::screen::Screen;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_plugins((audio::plugin, assets::plugin, spawn::plugin, logic::plugin));
+	app.add_plugins((
+		audio::plugin,
+		assets::plugin,
+		spawn::plugin,
+		logic::plugin,
+		animation::plugin,
+	));
 	app.add_systems(OnEnter(Screen::Playing), load_level);
 	app.add_event::<events::GameLayoutChanged>();
 	app.add_event::<events::RotateCycleGroup>();

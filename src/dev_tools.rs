@@ -103,10 +103,10 @@ pub fn gizmo_draw(
 		&CycleTurnability,
 		Option<&LinkedCycles>,
 	)>,
-	players: Query<&VertexPosition, With<Player>>,
-	boxes: Query<&VertexPosition, With<Box>>,
-	buttons: Query<&VertexPosition, With<BoxSlot>>,
-	flags: Query<&VertexPosition, With<Goal>>,
+	players: Query<&Transform, With<Player>>,
+	boxes: Query<&Transform, With<Box>>,
+	buttons: Query<&Transform, With<BoxSlot>>,
+	flags: Query<&Transform, With<Goal>>,
 	mut gizmos: Gizmos,
 ) {
 	// Draw vertices
@@ -120,9 +120,9 @@ pub fn gizmo_draw(
 	}
 
 	// Draw boxes
-	for vertex_id in boxes.iter() {
+	for transform in boxes.iter() {
 		gizmos.rect(
-			vertices.get(vertex_id.0).unwrap().translation,
+			transform.translation,
 			Quat::IDENTITY,
 			Vec2::splat(10.0),
 			palettes::css::MAROON,
@@ -130,9 +130,9 @@ pub fn gizmo_draw(
 	}
 
 	// Draw players
-	for vertex_id in players.iter() {
+	for transform in players.iter() {
 		gizmos.rect(
-			vertices.get(vertex_id.0).unwrap().translation,
+			transform.translation,
 			Quat::IDENTITY,
 			Vec2::splat(10.0),
 			palettes::css::TEAL,
@@ -140,9 +140,9 @@ pub fn gizmo_draw(
 	}
 
 	// Draw buttons
-	for vertex_id in buttons.iter() {
+	for transform in buttons.iter() {
 		gizmos.rounded_rect(
-			vertices.get(vertex_id.0).unwrap().translation,
+			transform.translation,
 			Quat::IDENTITY,
 			Vec2::splat(20.0),
 			palettes::css::MAROON,
@@ -150,9 +150,9 @@ pub fn gizmo_draw(
 	}
 
 	// Draw flags
-	for vertex_id in flags.iter() {
+	for transform in flags.iter() {
 		gizmos.rounded_rect(
-			vertices.get(vertex_id.0).unwrap().translation,
+			transform.translation,
 			Quat::IDENTITY,
 			Vec2::splat(20.0),
 			palettes::css::TEAL,
