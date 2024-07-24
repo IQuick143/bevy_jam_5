@@ -90,7 +90,8 @@ fn listen_for_moves(
 			animation.final_magnitude = end_magnitude;
 		} else {
 			// Object is not animated, so we just set the translation to the desired place.
-			transform.translation = end_position;
+			transform.translation.x = end_position.x;
+			transform.translation.y = end_position.y;
 		}
 	}
 }
