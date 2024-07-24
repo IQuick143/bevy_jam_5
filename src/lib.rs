@@ -74,7 +74,7 @@ enum AppSet {
 	Update,
 }
 
-pub const ORTHO: Vec2 = Vec2::new(1920.0, 1080.0);
+pub const ORTHO: Vec2 = Vec2::new(1600.0, 900.0);
 
 fn spawn_camera(mut commands: Commands) {
 	commands.spawn((

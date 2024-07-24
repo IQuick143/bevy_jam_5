@@ -17,11 +17,11 @@ pub(super) fn plugin(app: &mut App) {
 
 fn spawn_text(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let text_box_z = -100.0;
-	let text_box_loc = Vec2::new(0.0, -250.0);
-	let text_box_size = Vec2::new(300.0, 150.0);
+	let text_box_loc = Vec2::new(0.0, -337.5);
+	let text_box_size = Vec2::new(1600.0, 225.0);
 	let text_box_color = Color::srgba(0.3, 0.3, 0.3, 0.8);
 	let margin = 10.0;
-	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise!	Get the boxes on the buttons and the player to the flag!";
+	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
 	commands
 		.spawn((SpriteBundle {
 			transform: Transform::from_xyz(text_box_loc.x, text_box_loc.y, text_box_z),
@@ -56,7 +56,7 @@ fn spawn_text(mut commands: Commands, asset_server: Res<AssetServer>) {
 fn get_text_style(_asset_server: &Res<AssetServer>) -> TextStyle {
 	TextStyle {
 		//font: asset_server.load("fonts/your_font_here.ttf"),
-		font_size: 16.0,
+		font_size: 32.0,
 		color: Color::srgba(0.9, 0.9, 0.9, 1.0),
 		..default()
 	}
