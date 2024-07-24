@@ -1,6 +1,6 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
-use crate::game::prelude::*;
+use crate::game::{logic, prelude::*};
 use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
 
 use crate::screen::Screen;
@@ -8,7 +8,10 @@ use crate::screen::Screen;
 pub(super) fn plugin(app: &mut App) {
 	// Print state transitions in dev builds
 	app.add_systems(Update, log_transitions::<Screen>);
-	app.add_systems(Update, (gizmo_draw, debug_inputs));
+	app.add_systems(
+		Update,
+		(gizmo_draw, debug_inputs.before(logic::LogicSystemSet)),
+	);
 	app.add_systems(Startup, spawn_text);
 }
 
