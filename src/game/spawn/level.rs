@@ -1,7 +1,7 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::game::{
-	assets::{HandleMap, ImageKey}, 
+	assets::{HandleMap, ImageKey},
 	level::{
 		layout::{CyclePlacement, LevelLayout},
 		CycleData, GlyphType, ObjectType, ValidLevelData, VertexData,
@@ -32,14 +32,23 @@ fn spawn_level(
 	let data = trigger.event().0.clone();
 	let layout = &trigger.event().1;
 
-	let texture_layout = TextureAtlasLayout::from_grid(UVec2::splat(32), 6, 2, Some(UVec2::splat(1)), None);
-    let texture_atlas_layout = texture_atlas_layouts.add(texture_layout);
+	let texture_layout =
+		TextureAtlasLayout::from_grid(UVec2::splat(32), 6, 2, Some(UVec2::splat(1)), None);
+	let texture_atlas_layout = texture_atlas_layouts.add(texture_layout);
 
 	let vertices: Vec<Entity> = data
 		.vertices
 		.iter()
 		.zip_eq(&layout.vertices)
-		.map(|(data, pos)| spawn_vertex(commands.reborrow(), data, *pos, image_handles.as_ref(), texture_atlas_layout.clone()))
+		.map(|(data, pos)| {
+			spawn_vertex(
+				commands.reborrow(),
+				data,
+				*pos,
+				image_handles.as_ref(),
+				texture_atlas_layout.clone(),
+			)
+		})
 		.collect();
 
 	let cycle_ids = data
@@ -74,7 +83,13 @@ fn spawn_level(
 	events.send(GameLayoutChanged);
 }
 
-fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2, image_handles: &HandleMap<ImageKey>, texture_atlas_layout: Handle<TextureAtlasLayout>) -> Entity {
+fn spawn_vertex(
+	mut commands: Commands,
+	data: &VertexData,
+	position: Vec2,
+	image_handles: &HandleMap<ImageKey>,
+	texture_atlas_layout: Handle<TextureAtlasLayout>,
+) -> Entity {
 	let transform =
 		TransformBundle::from_transform(Transform::from_translation(position.extend(0.0)));
 	let vertex_id = commands
@@ -135,7 +150,10 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2, image
 	if let Some(glyph_type) = data.glyph {
 		let glyph_id = match glyph_type {
 			GlyphType::Button => commands
-				.spawn((Glyph, BoxSlot, VertexPosition(vertex_id), 
+				.spawn((
+					Glyph,
+					BoxSlot,
+					VertexPosition(vertex_id),
 					SpriteBundle {
 						texture: image_handles[&ImageKey::Ducky].clone_weak(),
 						transform: Transform::from_translation(position.extend(-50.0)),
@@ -148,7 +166,10 @@ fn spawn_vertex(mut commands: Commands, data: &VertexData, position: Vec2, image
 				))
 				.id(),
 			GlyphType::Flag => commands
-				.spawn((Glyph, Goal, VertexPosition(vertex_id),
+				.spawn((
+					Glyph,
+					Goal,
+					VertexPosition(vertex_id),
 					SpriteBundle {
 						texture: image_handles[&ImageKey::Ducky].clone_weak(),
 						transform: Transform::from_translation(position.extend(-50.0)),
