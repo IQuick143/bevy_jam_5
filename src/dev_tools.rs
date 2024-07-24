@@ -9,13 +9,10 @@ pub(super) fn plugin(app: &mut App) {
 	// Print state transitions in dev builds
 	app.add_systems(Update, log_transitions::<Screen>);
 	app.add_systems(Update, (gizmo_draw, debug_inputs));
-	app.add_systems(Startup, (spawn_text));
+	app.add_systems(Startup, spawn_text);
 }
 
-fn spawn_text(
-	mut commands: Commands,
-	asset_server: Res<AssetServer>,
-) {
+fn spawn_text(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let text_box_z = -100.0;
 	let text_box_loc = Vec2::new(0.0, -250.0);
 	let text_box_size = Vec2::new(300.0, 150.0);
@@ -31,33 +28,29 @@ fn spawn_text(
 				..default()
 			},
 			..default()
-		},
-	)).with_children(|parent| {
-		parent
-			.spawn((Text2dBundle {
-				text_2d_bounds: bevy::text::Text2dBounds{ size: Vec2::new(
-					text_box_size.x - margin * 2.0,
-					text_box_size.y - margin * 2.0,
-				)},
+		},))
+		.with_children(|parent| {
+			parent.spawn((Text2dBundle {
+				text_2d_bounds: bevy::text::Text2dBounds {
+					size: Vec2::new(
+						text_box_size.x - margin * 2.0,
+						text_box_size.y - margin * 2.0,
+					),
+				},
 				transform: Transform::from_xyz(
 					-text_box_size.x / 2.0 + margin,
 					text_box_size.y / 2.0 - margin,
 					0.1, // Relative to text box
 				),
 				text_anchor: bevy::sprite::Anchor::TopLeft,
-				text: Text::from_section(
-					text,
-					 get_text_style(&asset_server))
-				.with_justify(JustifyText::Left),
+				text: Text::from_section(text, get_text_style(&asset_server))
+					.with_justify(JustifyText::Left),
 				..default()
-			},
-		));
-	});
+			},));
+		});
 }
 
-fn get_text_style(
-	asset_server: &Res<AssetServer>
-) -> TextStyle {
+fn get_text_style(_asset_server: &Res<AssetServer>) -> TextStyle {
 	TextStyle {
 		//font: asset_server.load("fonts/your_font_here.ttf"),
 		font_size: 16.0,

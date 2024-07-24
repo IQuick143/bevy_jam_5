@@ -62,6 +62,7 @@ pub struct LevelLayoutBuilder<'w> {
 	cycles: Vec<Option<CyclePlacement>>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 pub enum LevelLayoutError {
 	/// An out-of-range index was used to reference a cycle
@@ -384,7 +385,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 				let first_relative_pos = first_fixed_pos - cycle_placement.position;
 				let mut current_fixed_vertex = first_fixed_vertex;
 				let mut current_relative_pos = first_relative_pos;
-				while let Some((next_fixed_vertex, next_fixed_pos)) = fixed_vertices.next() {
+				for (next_fixed_vertex, next_fixed_pos) in fixed_vertices {
 					// Materialize all vertices between the marked ones
 					let next_relative_pos = next_fixed_pos - cycle_placement.position;
 					let vertex_count = next_fixed_vertex - current_fixed_vertex;
@@ -508,7 +509,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 		let mut points = points.map(|p| p - center);
 		let mut total_angle = 0.0;
 		if let Some(mut current) = points.next() {
-			while let Some(next) = points.next() {
+			for next in points {
 				let mut angle = current.angle_between(next);
 				if angle < 0.0 {
 					// Recalculate angles to [0, 2 * pi]

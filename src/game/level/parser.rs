@@ -227,9 +227,9 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 				return Err(ParsingError::MalformedStatement(*line_id));
 			}
 			let cycle_name = data[0];
-			let x_str = data[1].replace(",", ".");
-			let y_str = data[2].replace(",", ".");
-			let r_str = data[3].replace(",", ".");
+			let x_str = data[1].replace(',', ".");
+			let y_str = data[2].replace(',', ".");
+			let r_str = data[3].replace(',', ".");
 			if let Some(cycle_id) = cycle_names.get(cycle_name) {
 				let Ok(x) = x_str.parse::<f32>() else {
 					return Err(ParsingError::MalformedStatement(*line_id));
@@ -273,12 +273,15 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 				return Err(ParsingError::MalformedStatement(*line_id));
 			}
 			let vertex_name = data[0];
-			let angle_str = data[1].replace(",", ".");
+			let angle_str = data[1].replace(',', ".");
 			if let Some(vertex_id) = vertex_names.get(vertex_name) {
 				let Ok(angle) = angle_str.parse::<f32>() else {
 					return Err(ParsingError::MalformedStatement(*line_id));
 				};
-				layout.push(DeclaredPlacement::Vertex(DeclaredVertexPlacement { vertex_index: *vertex_id, relative_angle: angle }))
+				layout.push(DeclaredPlacement::Vertex(DeclaredVertexPlacement {
+					vertex_index: *vertex_id,
+					relative_angle: angle,
+				}))
 			} else {
 				return Err(ParsingError::UnknownCycleName(vertex_name.to_string()));
 			}
