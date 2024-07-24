@@ -65,7 +65,8 @@ fn listen_for_moves(
 
 			// If the animation hasn't finished playing, we give it a chance to catch up.
 			let sample = animation.sample();
-			#[allow(clippy::unnecessary_unwrap)] // Clippy is annoying and it cannot be fixed cleanly
+			#[allow(clippy::unnecessary_unwrap)]
+			// Clippy is annoying and it cannot be fixed cleanly
 			let start_vector = if sample.is_some() && animation.progress < 1.0 {
 				sample.unwrap()
 			} else {
