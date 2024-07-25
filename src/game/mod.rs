@@ -41,18 +41,20 @@ pub(super) fn plugin(app: &mut App) {
 
 fn load_level(mut commands: Commands) {
 	let data = r"
-VERTEX a b c x 1 2 3 
+VERTEX b1 b2 b3 bgi bgo bri bro r1 r2 r3 rgi rgo g1 g2 g3
 
-CYCLE[MANUAL] cycle_a a b c x
-CYCLE[ENGINE] cycle_b x 1 2 3
+CYCLE[MANUAL] blue b1 b2 b3 bgo bri bgi bro
+CYCLE[MANUAL] red r1 r2 r3 bro rgi bri rgo
+CYCLE[MANUAL] green g1 g2 g3 rgo bgi rgi bgo
 
-OBJECT[BOX] x a
-OBJECT[FLAG] 2
-OBJECT[PLAYER] b
-OBJECT[BUTTON] b
+OBJECT[BOX] b2 r2 g2
+OBJECT[BUTTON] rgi bri bgi
+OBJECT[PLAYER] rgi bri bgi
+OBJECT[FLAG] b2 r2 g2
 
-PLACE cycle_a -100 0 100
-PLACE cycle_b +100 0 100
+PLACE blue -200 280 300
+PLACE red 0 0 300
+PLACE green 200 280 300
 ";
 	let level_file = level::parser::parse(data).unwrap();
 	let level: ValidLevelData = level_file.data.try_into().unwrap();

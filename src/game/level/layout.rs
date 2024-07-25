@@ -82,16 +82,17 @@ impl LevelLayout {
 	pub fn recompute_to_fit(&mut self, half_extents: Vec2, center: Vec2) {
 		let Aabb2d { min, max } = self.get_bounding_box();
 		let own_half_extents = (max - min) / 2.0;
+		let own_center = (max + min) / 2.0;
 		let x_scale = half_extents.x / own_half_extents.x;
 		let y_scale = half_extents.y / own_half_extents.y;
 		let scale_factor = f32::min(x_scale, y_scale);
 
 		for vertex in self.vertices.iter_mut() {
-			*vertex = scale_factor * (*vertex - center) + center;
+			*vertex = scale_factor * (*vertex - own_center) + center;
 		}
 
 		for circle in self.cycles.iter_mut() {
-			circle.position = scale_factor * (circle.position - center) + center;
+			circle.position = scale_factor * (circle.position - own_center) + center;
 			circle.radius *= scale_factor;
 		}
 	}

@@ -1,9 +1,6 @@
 use bevy::{color::palettes, utils::hashbrown::HashMap};
 
-use super::{
-	level::ThingType,
-	prelude::*,
-};
+use super::{level::ThingType, prelude::*};
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
@@ -73,9 +70,9 @@ impl Default for ThingColor {
 
 		let map = [
 			(ThingType::Glyph(Button), p::RED_800.into()),
-			(ThingType::Glyph(Flag), p::YELLOW_800.into()),
+			(ThingType::Glyph(Flag), p::AMBER_400.into()),
 			(ThingType::Object(Player), p::BLUE_700.into()),
-			(ThingType::Object(Box), p::AMBER_400.into()),
+			(ThingType::Object(Box), p::YELLOW_800.into()),
 		]
 		.into();
 		ThingColor(map)
