@@ -1,5 +1,7 @@
 use std::f32::consts::PI;
 
+use bevy::math::bounding::Aabb2d;
+
 use super::*;
 
 /// Declarative specification of the placement of a lone cycle
@@ -53,6 +55,43 @@ pub struct LevelLayout {
 	pub vertices: Vec<Vec2>,
 	/// Placements of cycles in the level
 	pub cycles: Vec<CyclePlacement>,
+}
+
+impl LevelLayout {
+	/// Returns a bounding box that narrowly contains 
+	pub fn get_bounding_box(&self) -> Aabb2d {
+		let mut maximum = Vec2::MIN;
+		let mut minimum = Vec2::MAX;
+
+		for &vertex in self.vertices.iter() {
+			maximum = maximum.max(vertex);
+			minimum = minimum.min(vertex);
+		}
+
+		for &circle in self.cycles.iter() {
+			// I'm assuming that the radius is positive, pls
+			maximum = maximum.max(circle.position + Vec2::splat(circle.radius));
+			minimum = minimum.min(circle.position - Vec2::splat(circle.radius));
+		}
+		Aabb2d { min: minimum, max: maximum }
+	}
+
+	pub fn recompute_to_fit(&mut self, half_extents: Vec2, center: Vec2) {
+		let Aabb2d { min, max } = self.get_bounding_box();
+		let own_half_extents = (max - min) / 2.0;
+		let x_scale = half_extents.x / own_half_extents.x;
+		let y_scale = half_extents.y / own_half_extents.y;
+		let scale_factor = f32::min(x_scale, y_scale);
+
+		for vertex in self.vertices.iter_mut() {
+			*vertex = scale_factor * (*vertex - center) + center;
+		}
+
+		for circle in self.cycles.iter_mut() {
+			circle.position = scale_factor * (circle.position - center) + center;
+			circle.radius *= scale_factor;
+		}
+	}
 }
 
 /// Helper object for constructing a [`LevelLayout`]

@@ -5,6 +5,7 @@ pub mod assets;
 pub mod audio;
 pub mod components;
 pub mod events;
+pub mod graphics;
 pub mod level;
 pub mod logic;
 pub mod resources;
@@ -30,6 +31,7 @@ pub(super) fn plugin(app: &mut App) {
 		spawn::plugin,
 		logic::plugin,
 		animation::plugin,
+		graphics::plugin,
 	));
 	app.add_systems(OnEnter(Screen::Playing), load_level);
 	app.add_event::<events::GameLayoutChanged>();
