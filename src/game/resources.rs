@@ -1,4 +1,6 @@
-use super::prelude::*;
+use bevy::{color::palettes, utils::hashbrown::HashMap};
+
+use super::{level::ThingType, prelude::*};
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
@@ -22,7 +24,7 @@ impl LevelCompletionConditions {
 	}
 }
 
-/// Contains an overview of conditions that are needed to complete the level
+/// Contains a handle to the material used for rendering the cycle rings
 #[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
 pub struct RingMaterial(pub Handle<ColorMaterial>);
 
@@ -36,5 +38,43 @@ impl FromWorld for RingMaterial {
 			color: Color::WHITE,
 			..default()
 		}))
+	}
+}
+
+/// Contains handles to the materials used for rendering objects and glyphs
+#[doc(alias = "ObjectMaterial")]
+#[doc(alias = "GlyphMaterial")]
+#[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
+pub struct ThingColor(HashMap<ThingType, Color>);
+
+impl ThingColor {
+	pub fn get<'a>(&'a self, object: ThingType) -> &'a Color {
+		self.0
+			.get(&object)
+			.expect("All ThingTypes should have a material registered")
+	}
+
+	#[allow(dead_code)]
+	pub fn get_mut<'a>(&'a mut self, object: ThingType) -> &'a mut Color {
+		self.0
+			.get_mut(&object)
+			.expect("All ThingTypes should have a material registered")
+	}
+}
+
+impl Default for ThingColor {
+	fn default() -> Self {
+		use super::level::GlyphType::*;
+		use super::level::ObjectType::*;
+		use palettes::tailwind as p;
+
+		let map = [
+			(ThingType::Glyph(Button), p::RED_800.into()),
+			(ThingType::Glyph(Flag), p::YELLOW_800.into()),
+			(ThingType::Object(Player), p::BLUE_700.into()),
+			(ThingType::Object(Box), p::AMBER_400.into()),
+		]
+		.into();
+		ThingColor(map)
 	}
 }

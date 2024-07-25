@@ -1,17 +1,21 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::game::{
-	assets::{HandleMap, ImageKey}, graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH}, level::{
+	assets::{HandleMap, ImageKey},
+	graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, RING_HALF_WIDTH, SPRITE_SIZE},
+	level::{
 		layout::{CyclePlacement, LevelLayout},
-		CycleData, GlyphType, ObjectType, ValidLevelData, VertexData,
-	}, prelude::*
+		CycleData, GlyphType, ObjectType, ThingType, ValidLevelData, VertexData,
+	},
+	prelude::*,
 };
 
 use bevy::math::primitives;
+use bevy::sprite::Anchor::Custom;
 use itertools::Itertools;
 
 pub(super) fn plugin(app: &mut App) {
-	app.observe(spawn_level).init_resource::<RingMaterial>();
+	app.observe(spawn_level);
 }
 
 #[derive(Event, Debug)]
@@ -23,6 +27,7 @@ fn spawn_level(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	cycle_material: ResMut<RingMaterial>,
+	thing_materials: ResMut<ThingColor>,
 	image_handles: Res<HandleMap<ImageKey>>,
 	mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
@@ -47,6 +52,7 @@ fn spawn_level(
 				commands.reborrow(),
 				data,
 				*pos,
+				thing_materials.as_ref(),
 				image_handles.as_ref(),
 				texture_atlas_layout.clone(),
 			)
@@ -89,6 +95,7 @@ fn spawn_vertex(
 	mut commands: Commands,
 	data: &VertexData,
 	position: Vec2,
+	materials: &ThingColor,
 	image_handles: &HandleMap<ImageKey>,
 	texture_atlas_layout: Handle<TextureAtlasLayout>,
 ) -> Entity {
@@ -109,20 +116,24 @@ fn spawn_vertex(
 		},
 	));
 	if let Some(object_type) = data.object {
+		let thing_type = ThingType::Object(object_type);
 		let object_id = match object_type {
 			ObjectType::Player => commands
 				.spawn((
 					Object,
 					Player,
 					VertexPosition(vertex_id),
+					ObjectKind(thing_type),
 					SpriteBundle {
-						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						sprite: Sprite {
+							color: *materials.get(thing_type),
+							custom_size: Some(SPRITE_SIZE),
+							anchor: Custom(Vec2::new(0.0, -0.25)),
+							..default()
+						},
+						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
 						transform: Transform::from_translation(position.extend(-10.0)),
 						..Default::default()
-					},
-					TextureAtlas {
-						layout: texture_atlas_layout.clone(),
-						index: 1,
 					},
 					AnimatedObject::default(),
 				))
@@ -132,14 +143,17 @@ fn spawn_vertex(
 					Object,
 					Box,
 					VertexPosition(vertex_id),
+					ObjectKind(thing_type),
 					SpriteBundle {
-						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						sprite: Sprite {
+							color: *materials.get(thing_type),
+							custom_size: Some(SPRITE_SIZE),
+							anchor: Custom(Vec2::new(0.0, -0.25)),
+							..default()
+						},
+						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
 						transform: Transform::from_translation(position.extend(-10.0)),
 						..Default::default()
-					},
-					TextureAtlas {
-						layout: texture_atlas_layout.clone(),
-						index: 2,
 					},
 					AnimatedObject::default(),
 				))
@@ -150,20 +164,24 @@ fn spawn_vertex(
 			.insert(PlacedObject(Some(object_id)));
 	}
 	if let Some(glyph_type) = data.glyph {
+		let thing_type = ThingType::Glyph(glyph_type);
 		let glyph_id = match glyph_type {
 			GlyphType::Button => commands
 				.spawn((
 					Glyph,
 					BoxSlot,
 					VertexPosition(vertex_id),
+					ObjectKind(thing_type),
 					SpriteBundle {
-						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						sprite: Sprite {
+							color: *materials.get(thing_type),
+							custom_size: Some(SPRITE_SIZE),
+							anchor: Custom(Vec2::new(0.0, -0.25)),
+							..default()
+						},
+						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
 						transform: Transform::from_translation(position.extend(-50.0)),
 						..Default::default()
-					},
-					TextureAtlas {
-						layout: texture_atlas_layout.clone(),
-						index: 3,
 					},
 				))
 				.id(),
@@ -172,14 +190,17 @@ fn spawn_vertex(
 					Glyph,
 					Goal,
 					VertexPosition(vertex_id),
+					ObjectKind(thing_type),
 					SpriteBundle {
-						texture: image_handles[&ImageKey::Ducky].clone_weak(),
+						sprite: Sprite {
+							color: *materials.get(thing_type),
+							custom_size: Some(SPRITE_SIZE),
+							anchor: Custom(Vec2::new(0.0, -0.25)),
+							..default()
+						},
+						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
 						transform: Transform::from_translation(position.extend(-50.0)),
 						..Default::default()
-					},
-					TextureAtlas {
-						layout: texture_atlas_layout.clone(),
-						index: 4,
 					},
 				))
 				.id(),
@@ -192,9 +213,6 @@ fn spawn_vertex(
 	vertex_id
 }
 
-/// Half the width of the circle
-const HALF_WIDTH: f32 = 5.0;
-
 fn spawn_cycle(
 	mut commands: Commands,
 	mut meshes: Mut<Assets<Mesh>>,
@@ -203,11 +221,13 @@ fn spawn_cycle(
 	placement: CyclePlacement,
 	vertex_entities: &[Entity],
 ) -> Entity {
-	let mesh =
-		primitives::Annulus::new(placement.radius - HALF_WIDTH, placement.radius + HALF_WIDTH)
-			.mesh()
-			.resolution(64)
-			.build();
+	let mesh = primitives::Annulus::new(
+		placement.radius - RING_HALF_WIDTH,
+		placement.radius + RING_HALF_WIDTH,
+	)
+	.mesh()
+	.resolution(64)
+	.build();
 
 	commands
 		.spawn((

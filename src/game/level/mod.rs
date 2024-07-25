@@ -5,16 +5,23 @@ use crate::game::prelude::*;
 pub mod layout;
 pub mod parser;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum ObjectType {
 	Box,
 	Player,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum GlyphType {
 	Button,
 	Flag,
+}
+
+/// Type describing any gameplay object
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+pub enum ThingType {
+	Object(ObjectType),
+	Glyph(GlyphType),
 }
 
 #[derive(Debug, Clone)]

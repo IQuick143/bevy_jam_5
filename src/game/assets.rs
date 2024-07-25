@@ -4,6 +4,8 @@ use bevy::{
 	utils::HashMap,
 };
 
+use super::level::ThingType;
+
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<ImageKey>>();
 	app.init_resource::<HandleMap<ImageKey>>();
@@ -18,6 +20,7 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum ImageKey {
 	Ducky,
+	Object(ThingType),
 }
 
 impl AssetKey for ImageKey {
@@ -27,15 +30,33 @@ impl AssetKey for ImageKey {
 impl FromWorld for HandleMap<ImageKey> {
 	fn from_world(world: &mut World) -> Self {
 		let asset_server = world.resource::<AssetServer>();
-		[(
-			ImageKey::Ducky,
-			asset_server.load_with_settings(
-				"images/ducky.png",
-				|settings: &mut ImageLoaderSettings| {
-					settings.sampler = ImageSampler::nearest();
-				},
+		[
+			(
+				ImageKey::Ducky,
+				asset_server.load_with_settings(
+					"images/ducky.png",
+					|settings: &mut ImageLoaderSettings| {
+						settings.sampler = ImageSampler::nearest();
+					},
+				),
 			),
-		)]
+			(
+				ImageKey::Object(ThingType::Object(super::level::ObjectType::Box)),
+				asset_server.load("images/box.png"),
+			),
+			(
+				ImageKey::Object(ThingType::Object(super::level::ObjectType::Player)),
+				asset_server.load("images/player.png"),
+			),
+			(
+				ImageKey::Object(ThingType::Glyph(super::level::GlyphType::Button)),
+				asset_server.load("images/button.png"),
+			),
+			(
+				ImageKey::Object(ThingType::Glyph(super::level::GlyphType::Flag)),
+				asset_server.load("images/flag.png"),
+			),
+		]
 		.into()
 	}
 }

@@ -4,7 +4,7 @@ use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 
-use super::events::CycleTurningDirection;
+use super::{events::CycleTurningDirection, level::ThingType};
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -29,6 +29,10 @@ pub struct Object;
 /// Imovable (until we add second layer cycles) thing
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Glyph;
+
+/// Identifier in enum form
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+pub struct ObjectKind(pub ThingType);
 
 /// Link to a vertex this object is occupying
 #[derive(Component, Debug, Clone, Reflect)]

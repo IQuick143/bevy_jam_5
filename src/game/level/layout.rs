@@ -58,7 +58,7 @@ pub struct LevelLayout {
 }
 
 impl LevelLayout {
-	/// Returns a bounding box that narrowly contains 
+	/// Returns a bounding box that narrowly contains
 	pub fn get_bounding_box(&self) -> Aabb2d {
 		let mut maximum = Vec2::MIN;
 		let mut minimum = Vec2::MAX;
@@ -73,7 +73,10 @@ impl LevelLayout {
 			maximum = maximum.max(circle.position + Vec2::splat(circle.radius));
 			minimum = minimum.min(circle.position - Vec2::splat(circle.radius));
 		}
-		Aabb2d { min: minimum, max: maximum }
+		Aabb2d {
+			min: minimum,
+			max: maximum,
+		}
 	}
 
 	pub fn recompute_to_fit(&mut self, half_extents: Vec2, center: Vec2) {
