@@ -10,6 +10,7 @@ use bevy::{
 	prelude::*,
 	render::camera::ScalingMode,
 };
+use game::graphics::GAME_AREA;
 
 pub struct AppPlugin;
 
@@ -75,16 +76,14 @@ enum AppSet {
 	Update,
 }
 
-pub const ORTHO: Vec2 = Vec2::new(1600.0, 900.0);
-
 fn spawn_camera(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Camera"),
 		Camera2dBundle {
 			projection: OrthographicProjection {
 				scaling_mode: ScalingMode::AutoMin {
-					min_width: ORTHO.x,
-					min_height: ORTHO.y,
+					min_width: GAME_AREA.x,
+					min_height: GAME_AREA.y,
 				},
 				..default()
 			},

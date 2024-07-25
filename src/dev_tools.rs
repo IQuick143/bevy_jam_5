@@ -1,6 +1,10 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
-use crate::game::{logic, prelude::*};
+use crate::game::{
+	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
+	logic,
+	prelude::*,
+};
 use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
 
 use crate::screen::Screen;
@@ -10,9 +14,23 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(Update, log_transitions::<Screen>);
 	app.add_systems(
 		Update,
-		(gizmo_draw, debug_inputs.before(logic::LogicSystemSet)),
+		(
+			gizmo_draw,
+			draw_layout,
+			debug_inputs.before(logic::LogicSystemSet),
+		),
 	);
 	app.add_systems(Startup, spawn_text);
+}
+
+fn draw_layout(mut gizmos: Gizmos) {
+	gizmos.rect(Vec3::ZERO, Quat::IDENTITY, GAME_AREA, palettes::basic::RED);
+	gizmos.rect(
+		LEVEL_AREA_CENTER.extend(0.0),
+		Quat::IDENTITY,
+		LEVEL_AREA_WIDTH,
+		palettes::basic::NAVY,
+	);
 }
 
 fn spawn_text(mut commands: Commands, asset_server: Res<AssetServer>) {

@@ -1,12 +1,10 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::game::{
-	assets::{HandleMap, ImageKey},
-	level::{
+	assets::{HandleMap, ImageKey}, graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH}, level::{
 		layout::{CyclePlacement, LevelLayout},
 		CycleData, GlyphType, ObjectType, ValidLevelData, VertexData,
-	},
-	prelude::*,
+	}, prelude::*
 };
 
 use bevy::math::primitives;
@@ -30,7 +28,11 @@ fn spawn_level(
 ) {
 	println!("Spawning!"); //TODO: debug
 	let data = trigger.event().0.clone();
-	let layout = &trigger.event().1;
+	let layout = &{
+		let mut layout = trigger.event().1.clone();
+		layout.recompute_to_fit(LEVEL_AREA_WIDTH / 2.0, LEVEL_AREA_CENTER);
+		layout
+	};
 
 	let texture_layout =
 		TextureAtlasLayout::from_grid(UVec2::splat(32), 6, 2, Some(UVec2::splat(1)), None);
