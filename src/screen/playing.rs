@@ -3,10 +3,16 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use super::Screen;
-use crate::game::{assets::SoundtrackKey, audio::soundtrack::PlaySoundtrack};
+use crate::{
+	game::{assets::SoundtrackKey, audio::soundtrack::PlaySoundtrack},
+	ui::hud,
+};
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(OnEnter(Screen::Playing), enter_playing);
+	app.add_systems(OnEnter(Screen::Playing), (
+		enter_playing,
+		hud::set_main_text_area("Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!")
+	));
 	app.add_systems(OnExit(Screen::Playing), exit_playing);
 
 	app.add_systems(
