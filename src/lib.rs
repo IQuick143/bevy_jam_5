@@ -80,6 +80,10 @@ fn spawn_camera(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Camera"),
 		Camera2dBundle {
+			camera: Camera {
+				clear_color: ClearColorConfig::Custom(Color::WHITE),
+				..default()
+			},
 			projection: OrthographicProjection {
 				scaling_mode: ScalingMode::AutoMin {
 					min_width: GAME_AREA.x,

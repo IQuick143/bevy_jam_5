@@ -1,6 +1,9 @@
 use bevy::{color::palettes, utils::hashbrown::HashMap};
 
-use super::{level::ThingType, prelude::*};
+use super::{
+	level::ThingType,
+	prelude::*,
+};
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
@@ -35,7 +38,7 @@ impl FromWorld for RingMaterial {
 			.expect("I'd expect materials to exist pretty please.");
 
 		RingMaterial(materials.add(ColorMaterial {
-			color: Color::WHITE,
+			color: palettes::tailwind::GRAY_400.into(),
 			..default()
 		}))
 	}
@@ -48,14 +51,14 @@ impl FromWorld for RingMaterial {
 pub struct ThingColor(HashMap<ThingType, Color>);
 
 impl ThingColor {
-	pub fn get<'a>(&'a self, object: ThingType) -> &'a Color {
+	pub fn get(&self, object: ThingType) -> &Color {
 		self.0
 			.get(&object)
 			.expect("All ThingTypes should have a material registered")
 	}
 
 	#[allow(dead_code)]
-	pub fn get_mut<'a>(&'a mut self, object: ThingType) -> &'a mut Color {
+	pub fn get_mut(&mut self, object: ThingType) -> &mut Color {
 		self.0
 			.get_mut(&object)
 			.expect("All ThingTypes should have a material registered")
