@@ -15,7 +15,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			gizmo_draw,
+			//gizmo_draw,
 			draw_layout,
 			debug_inputs.before(logic::LogicSystemSet),
 		),
@@ -115,7 +115,7 @@ pub fn debug_inputs(
 	}
 }
 
-pub fn gizmo_draw(
+pub fn _gizmo_draw(
 	vertices: Query<&Transform, With<Vertex>>,
 	circles: Query<(
 		&Transform,
