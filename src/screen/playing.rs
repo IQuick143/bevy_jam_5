@@ -2,36 +2,16 @@
 
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-use super::Screen;
-use crate::{
-	game::{assets::SoundtrackKey, audio::soundtrack::PlaySoundtrack},
-	ui::hud,
-};
+use super::{QueueScreenTransition, Screen};
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(OnEnter(Screen::Playing), (
-		enter_playing,
-		hud::set_main_text_area("Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!")
-	));
-	app.add_systems(OnExit(Screen::Playing), exit_playing);
-
 	app.add_systems(
 		Update,
 		return_to_title_screen
-			.run_if(in_state(Screen::Playing).and_then(input_just_pressed(KeyCode::Escape))),
+			.run_if(in_state(Screen::LevelSelect).and_then(input_just_pressed(KeyCode::Escape))),
 	);
 }
 
-fn enter_playing(mut commands: Commands) {
-	//	commands.trigger(SpawnLevel);
-	commands.trigger(PlaySoundtrack::Key(SoundtrackKey::Gameplay));
-}
-
-fn exit_playing(mut commands: Commands) {
-	// We could use [`StateScoped`] on the sound playing entities instead.
-	commands.trigger(PlaySoundtrack::Disable);
-}
-
-fn return_to_title_screen(mut next_screen: ResMut<NextState<Screen>>) {
-	next_screen.set(Screen::Title);
+fn return_to_title_screen(mut next_screen: EventWriter<QueueScreenTransition>) {
+	next_screen.send(QueueScreenTransition::instant(Screen::Title));
 }

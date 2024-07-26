@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::Screen;
+use super::{QueueScreenTransition, Screen};
 use crate::ui::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -36,16 +36,21 @@ fn enter_title(mut commands: Commands) {
 }
 
 fn handle_title_action(
-	mut next_screen: ResMut<NextState<Screen>>,
+	mut next_screen: EventWriter<QueueScreenTransition>,
 	mut button_query: InteractionQuery<&TitleAction>,
 	#[cfg(not(target_family = "wasm"))] mut app_exit: EventWriter<AppExit>,
 ) {
 	for (interaction, action) in &mut button_query {
 		if matches!(interaction, Interaction::Pressed) {
 			match action {
-				TitleAction::Play => next_screen.set(Screen::Playing),
-				TitleAction::Credits => next_screen.set(Screen::Credits),
-
+				TitleAction::Play => {
+					next_screen.send(QueueScreenTransition::fade(Screen::Level(
+						crate::game::LevelID::Level1,
+					)));
+				}
+				TitleAction::Credits => {
+					next_screen.send(QueueScreenTransition::fade(Screen::Credits));
+				}
 				#[cfg(not(target_family = "wasm"))]
 				TitleAction::Exit => {
 					app_exit.send(AppExit::Success);

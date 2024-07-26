@@ -1,13 +1,15 @@
 //! Spawn the main level by triggering other observers.
 
-use crate::game::{
-	assets::{HandleMap, ImageKey},
-	graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, RING_HALF_WIDTH, SPRITE_SIZE},
-	level::{
-		layout::{CyclePlacement, LevelLayout},
-		CycleData, GlyphType, ObjectType, ThingType, ValidLevelData, VertexData,
+use crate::{
+	game::{
+		assets::{HandleMap, ImageKey},
+		graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, RING_HALF_WIDTH, SPRITE_SIZE},
+		level::{
+			self, layout::{CyclePlacement, LevelLayout}, CycleData, GlyphType, ObjectType, ThingType, ValidLevelData, VertexData
+		},
+		prelude::*,
 	},
-	prelude::*,
+	screen::Screen,
 };
 
 use bevy::math::primitives;
@@ -15,11 +17,58 @@ use bevy::sprite::Anchor::Custom;
 use itertools::Itertools;
 
 pub(super) fn plugin(app: &mut App) {
-	app.observe(spawn_level);
+	app.add_systems(
+		Update,
+		load_level.run_if(on_event::<StateTransitionEvent<Screen>>()),
+	)
+	.observe(spawn_level);
 }
 
 #[derive(Event, Debug)]
 pub struct SpawnLevel(pub ValidLevelData, pub LevelLayout);
+
+fn load_level(mut commands: Commands, mut event: EventReader<StateTransitionEvent<Screen>>) {
+	let Some(StateTransitionEvent {
+		exited: _,
+		entered: Some(Screen::Level(level_id)),
+	}) = event.read().last()
+	else {
+		return;
+	};
+
+	let data = {
+		use crate::game::LevelID::*;
+		match level_id {
+			Level1 => {
+				r"
+VERTEX b1 b2 b3 bgi bgo bri bro r1 r2 r3 rgi rgo g1 g2 g3
+
+CYCLE[MANUAL] blue b1 b2 b3 bgo bri bgi bro
+CYCLE[MANUAL] red r1 r2 r3 bro rgi bri rgo
+CYCLE[MANUAL] green g1 g2 g3 rgo bgi rgi bgo
+
+OBJECT[BOX] b2 r2 g2
+OBJECT[BUTTON] rgi bri bgi
+OBJECT[PLAYER] rgi bri bgi
+OBJECT[FLAG] b2 r2 g2
+
+PLACE blue -200 280 300
+PLACE red 0 0 300
+PLACE green 200 280 300
+"
+			}
+		}
+	};
+	let level_file = level::parser::parse(data).unwrap();
+	let level: ValidLevelData = level_file.data.try_into().unwrap();
+	let mut layout_builder = level::layout::LevelLayoutBuilder::new(&level);
+	for placement in level_file.layout {
+		layout_builder.add_placement(placement).unwrap();
+	}
+	let level_layout = layout_builder.build().unwrap();
+	eprintln!("{level_layout:?}");
+	commands.trigger(SpawnLevel(level, level_layout));
+}
 
 fn spawn_level(
 	trigger: Trigger<SpawnLevel>,
