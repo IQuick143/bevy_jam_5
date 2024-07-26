@@ -6,8 +6,8 @@
 pub mod hud;
 pub mod interaction;
 pub mod palette;
-mod widgets;
 pub mod screen_fade;
+mod widgets;
 
 pub mod prelude {
 	pub use super::{

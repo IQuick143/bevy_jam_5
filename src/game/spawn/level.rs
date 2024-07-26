@@ -5,7 +5,9 @@ use crate::{
 		assets::{HandleMap, ImageKey},
 		graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, RING_HALF_WIDTH, SPRITE_SIZE},
 		level::{
-			self, layout::{CyclePlacement, LevelLayout}, CycleData, GlyphType, ObjectType, ThingType, ValidLevelData, VertexData
+			self,
+			layout::{CyclePlacement, LevelLayout},
+			CycleData, GlyphType, ObjectType, ThingType, ValidLevelData, VertexData,
 		},
 		prelude::*,
 	},

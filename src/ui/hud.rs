@@ -11,6 +11,7 @@ pub(super) fn plugin(app: &mut App) {
 		);
 }
 
+#[allow(clippy::assigning_clones)]
 /// Shorthand to create a system that sets the content of the main text area of the HUD UI
 pub fn set_main_text_area(value: &'static str) -> impl Fn(Query<&mut Text, With<HudTextbox>>) {
 	|mut q| {

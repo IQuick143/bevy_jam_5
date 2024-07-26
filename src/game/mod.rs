@@ -22,7 +22,7 @@ use bevy::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum LevelID {
-	Level1
+	Level1,
 }
 
 pub(super) fn plugin(app: &mut App) {

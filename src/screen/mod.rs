@@ -51,7 +51,11 @@ fn transition(
 	}
 }
 
-fn delete_objects_on_transition(mut commands: Commands, mut events: EventReader<StateTransitionEvent<Screen>>, objects: Query<Entity, With<DestroyOnTransition>>) {
+fn delete_objects_on_transition(
+	mut commands: Commands,
+	mut events: EventReader<StateTransitionEvent<Screen>>,
+	objects: Query<Entity, With<DestroyOnTransition>>,
+) {
 	if events.read().last().is_some() {
 		for object in objects.iter() {
 			commands.entity(object).despawn_recursive();
@@ -72,11 +76,17 @@ impl QueueScreenTransition {
 	}
 
 	fn fade(next_screen: Screen) -> Self {
-		QueueScreenTransition { next_screen, fade: true }
+		QueueScreenTransition {
+			next_screen,
+			fade: true,
+		}
 	}
 
 	fn instant(next_screen: Screen) -> Self {
-		QueueScreenTransition { next_screen, fade: false }
+		QueueScreenTransition {
+			next_screen,
+			fade: false,
+		}
 	}
 }
 
