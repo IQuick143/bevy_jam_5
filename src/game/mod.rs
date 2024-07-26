@@ -22,7 +22,19 @@ use bevy::prelude::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum LevelID {
-	Level1,
+	Cycle,
+	Bicycle,
+	Tricycle,
+	CargoTricycle,
+	SquareCycle,
+	DiamondCycle,
+	Lotus,
+	ThreeInARow,
+	TripleRing,
+	Car,
+	Olympic,
+	Pedalo,
+	Pyramid,
 }
 
 pub(super) fn plugin(app: &mut App) {

@@ -75,7 +75,7 @@ impl QueueScreenTransition {
 		QueueScreenTransition { next_screen, fade }
 	}
 
-	fn fade(next_screen: Screen) -> Self {
+	pub fn fade(next_screen: Screen) -> Self {
 		QueueScreenTransition {
 			next_screen,
 			fade: true,

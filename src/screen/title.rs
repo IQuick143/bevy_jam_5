@@ -45,7 +45,7 @@ fn handle_title_action(
 			match action {
 				TitleAction::Play => {
 					next_screen.send(QueueScreenTransition::fade(Screen::Level(
-						crate::game::LevelID::Level1,
+						crate::game::LevelID::Lotus,
 					)));
 				}
 				TitleAction::Credits => {

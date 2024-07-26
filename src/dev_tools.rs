@@ -1,10 +1,10 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
-use crate::game::{
+use crate::{game::{
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	logic,
 	prelude::*,
-};
+}, screen::QueueScreenTransition};
 use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
 
 use crate::screen::Screen;
@@ -15,6 +15,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
+			switch_level,
 			//gizmo_draw,
 			draw_layout,
 			debug_inputs.before(logic::LogicSystemSet),
@@ -31,6 +32,77 @@ fn draw_layout(mut gizmos: Gizmos) {
 		LEVEL_AREA_WIDTH,
 		palettes::basic::NAVY,
 	);
+}
+
+fn switch_level(
+	keyboard: Res<ButtonInput<KeyCode>>,
+	mut next_screen: EventWriter<QueueScreenTransition>,
+) {
+	if keyboard.just_pressed(KeyCode::Digit1) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Cycle,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit2) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Bicycle,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit3) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Tricycle,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit4) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::CargoTricycle,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit5) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::SquareCycle,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit6) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::DiamondCycle,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit7) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Lotus,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit8) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::ThreeInARow,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit9) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::TripleRing,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::Digit0) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Car,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::KeyQ) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Olympic,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::KeyW) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Pedalo,
+		)));
+	}
+	if keyboard.just_pressed(KeyCode::KeyE) {
+		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+			crate::game::LevelID::Pyramid,
+		)));
+	}
 }
 
 fn spawn_text(mut commands: Commands, asset_server: Res<AssetServer>) {
