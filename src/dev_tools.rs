@@ -1,10 +1,13 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
-use crate::{game::{
-	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
-	logic,
-	prelude::*,
-}, screen::QueueScreenTransition};
+use crate::{
+	game::{
+		graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
+		logic,
+		prelude::*,
+	},
+	screen::QueueScreenTransition,
+};
 use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
 
 use crate::screen::Screen;
