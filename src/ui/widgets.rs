@@ -9,6 +9,9 @@ pub trait Widgets {
 	/// Spawn a simple button with text.
 	fn button(&mut self, text: impl Into<String>) -> EntityCommands;
 
+	/// Spawn a compact button. Smaller than [`Widgets::button`].
+	fn small_button(&mut self, text: impl Into<String>) -> EntityCommands;
+
 	/// Spawn a simple header label. Bigger than [`Widgets::label`].
 	fn header(&mut self, text: impl Into<String>) -> EntityCommands;
 
@@ -44,6 +47,42 @@ impl<T: Spawn> Widgets for T {
 					text,
 					TextStyle {
 						font_size: 40.0,
+						color: BUTTON_TEXT,
+						..default()
+					},
+				),
+			));
+		});
+		entity
+	}
+
+	fn small_button(&mut self, text: impl Into<String>) -> EntityCommands {
+		let mut entity = self.spawn((
+			Name::new("Button"),
+			ButtonBundle {
+				style: Style {
+					width: Px(200.0),
+					height: Px(45.0),
+					justify_content: JustifyContent::Center,
+					align_items: AlignItems::Center,
+					..default()
+				},
+				background_color: BackgroundColor(NODE_BACKGROUND),
+				..default()
+			},
+			InteractionPalette {
+				none: NODE_BACKGROUND,
+				hovered: BUTTON_HOVERED_BACKGROUND,
+				pressed: BUTTON_PRESSED_BACKGROUND,
+			},
+		));
+		entity.with_children(|children| {
+			children.spawn((
+				Name::new("Button Text"),
+				TextBundle::from_section(
+					text,
+					TextStyle {
+						font_size: 30.0,
 						color: BUTTON_TEXT,
 						..default()
 					},

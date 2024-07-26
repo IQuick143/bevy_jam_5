@@ -7,11 +7,15 @@ use super::{QueueScreenTransition, Screen};
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		return_to_title_screen
-			.run_if(in_state(Screen::LevelSelect).and_then(input_just_pressed(KeyCode::Escape))),
+		return_to_level_select_screen
+			.run_if(is_on_level_screen.and_then(input_just_pressed(KeyCode::Escape)))
 	);
 }
 
-fn return_to_title_screen(mut next_screen: EventWriter<QueueScreenTransition>) {
-	next_screen.send(QueueScreenTransition::instant(Screen::Title));
+fn is_on_level_screen(s: Option<Res<State<Screen>>>) -> bool {
+	s.is_some_and(|s| matches!(s.get(), Screen::Level(_)))
+}
+
+fn return_to_level_select_screen(mut next_screen: EventWriter<QueueScreenTransition>) {
+	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
 }

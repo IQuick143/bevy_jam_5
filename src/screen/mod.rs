@@ -5,6 +5,7 @@ mod loading;
 mod playing;
 mod splash;
 mod title;
+mod level_select;
 
 use bevy::prelude::*;
 
@@ -22,6 +23,7 @@ pub(super) fn plugin(app: &mut App) {
 		title::plugin,
 		credits::plugin,
 		playing::plugin,
+		level_select::plugin,
 	));
 
 	app.add_systems(Update, (transition, delete_objects_on_transition).chain());
