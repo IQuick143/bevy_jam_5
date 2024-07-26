@@ -263,7 +263,7 @@ fn spawn_cycle(
 						color: palette.cycle_ready,
 						..default()
 					},
-					texture: image_handles[&ImageKey::CycleCenter(CycleTurnability::WithPlayer)]
+					texture: image_handles[&ImageKey::CycleCenter(data.cycle_turnability)]
 						.clone_weak(),
 					transform: Transform::from_translation(Vec2::ZERO.extend(-300.0)),
 					..default()
