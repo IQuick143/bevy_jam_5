@@ -15,7 +15,8 @@ pub fn plugin(app: &mut App) {
 				(
 					button_trigger_animation_system,
 					cycle_center_visuals_update_system,
-				).run_if(on_event::<GameLayoutChanged>()),
+				)
+					.run_if(on_event::<GameLayoutChanged>()),
 			)
 				.after(logic::LogicSystemSet),
 			spin_animation_system,
@@ -191,7 +192,7 @@ fn cycle_center_visuals_update_system(
 
 fn spin_animation_system(
 	mut query: Query<(&mut SpinAnimation, &mut Transform)>,
-	time: Res<Time<Real>>
+	time: Res<Time<Real>>,
 ) {
 	let delta_seconds = time.delta_seconds();
 	for (mut animation, mut transform) in &mut query {

@@ -250,10 +250,10 @@ fn spawn_cycle(
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
-			TransformBundle::from_transform(
-				Transform::from_translation(placement.position.extend(0.0)),
-			),
-			VisibilityBundle::default()
+			TransformBundle::from_transform(Transform::from_translation(
+				placement.position.extend(0.0),
+			)),
+			VisibilityBundle::default(),
 		))
 		.with_children(|parent| {
 			parent.spawn((
@@ -263,14 +263,15 @@ fn spawn_cycle(
 						color: palette.cycle_ready,
 						..default()
 					},
-					texture: image_handles[&ImageKey::CycleCenter(CycleTurnability::WithPlayer)].clone_weak(),
+					texture: image_handles[&ImageKey::CycleCenter(CycleTurnability::WithPlayer)]
+						.clone_weak(),
 					transform: Transform::from_translation(Vec2::ZERO.extend(-300.0)),
 					..default()
 				},
 				SpinAnimation {
 					current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
 					..default()
-				}
+				},
 			));
 			parent.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
