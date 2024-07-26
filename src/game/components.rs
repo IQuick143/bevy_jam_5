@@ -128,7 +128,7 @@ impl AnimatedObject {
 	pub fn sample(&self) -> Option<Vec3> {
 		let target = self.final_direction?;
 		Some(if let Some(source) = self.start_direction {
-			let t = self.progress.clamp(0.0, 1.0);
+			let t = Self::easing_function(self.progress).clamp(0.0, 1.0);
 			let dir = {
 				let mut angle = Vec2::angle_between(*source, *target);
 				match self.rotation_direction {
@@ -150,5 +150,16 @@ impl AnimatedObject {
 		} else {
 			self.cycle_center + (self.final_magnitude * target).extend(0.0)
 		})
+	}
+
+	fn easing_function(t: f32) -> f32 {
+		// Quadratic ease-out.
+		// Looks better that a flat rotation, but is easier
+		// to chain like we do that a double-ended easing function
+		if t > 0.5 {
+			1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
+		} else {
+			t * 4.0 / 3.0
+		}
 	}
 }
