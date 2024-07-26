@@ -3,7 +3,7 @@
 use crate::{
 	game::{
 		assets::{HandleMap, ImageKey},
-		graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, RING_HALF_WIDTH, SPRITE_SIZE},
+		graphics::*,
 		level::{
 			self,
 			layout::{CyclePlacement, LevelLayout},
@@ -17,6 +17,7 @@ use crate::{
 use bevy::math::primitives;
 use bevy::sprite::Anchor::Custom;
 use itertools::Itertools;
+use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -326,7 +327,7 @@ fn spawn_level(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	cycle_material: ResMut<RingMaterial>,
-	thing_materials: ResMut<ThingColor>,
+	palette: ResMut<ThingPalette>,
 	image_handles: Res<HandleMap<ImageKey>>,
 	mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
@@ -351,7 +352,9 @@ fn spawn_level(
 				commands.reborrow(),
 				data,
 				*pos,
-				thing_materials.as_ref(),
+				meshes.reborrow(),
+				cycle_material.0.clone(),
+				palette.as_ref(),
 				image_handles.as_ref(),
 				texture_atlas_layout.clone(),
 			)
@@ -367,6 +370,8 @@ fn spawn_level(
 				commands.reborrow(),
 				meshes.reborrow(),
 				cycle_material.0.clone(),
+				&palette,
+				&image_handles,
 				data,
 				*pos,
 				&vertices,
@@ -394,7 +399,9 @@ fn spawn_vertex(
 	mut commands: Commands,
 	data: &VertexData,
 	position: Vec2,
-	materials: &ThingColor,
+	mut meshes: Mut<Assets<Mesh>>,
+	base_material: Handle<ColorMaterial>,
+	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
 	texture_atlas_layout: Handle<TextureAtlasLayout>,
 ) -> Entity {
@@ -409,12 +416,14 @@ fn spawn_vertex(
 			transform,
 		))
 		.id();
+	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
 		DestroyOnTransition,
-		SpriteBundle {
-			texture: image_handles[&ImageKey::Ducky].clone_weak(),
+		ColorMesh2dBundle {
 			transform: Transform::from_translation(position.extend(-100.0)),
-			..Default::default()
+			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
+			material: base_material,
+			..default()
 		},
 		TextureAtlas {
 			layout: texture_atlas_layout.clone(),
@@ -433,7 +442,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.player,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -454,7 +463,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.box_base,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -483,7 +492,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.button_base,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -503,7 +512,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.goal_closed,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -527,6 +536,8 @@ fn spawn_cycle(
 	mut commands: Commands,
 	mut meshes: Mut<Assets<Mesh>>,
 	material: Handle<ColorMaterial>,
+	palette: &ThingPalette,
+	image_handles: &HandleMap<ImageKey>,
 	data: &CycleData,
 	placement: CyclePlacement,
 	vertex_entities: &[Entity],
@@ -550,12 +561,35 @@ fn spawn_cycle(
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
-			ColorMesh2dBundle {
-				transform: Transform::from_translation(placement.position.extend(-200.0)),
+			TransformBundle::from_transform(Transform::from_translation(
+				placement.position.extend(0.0),
+			)),
+			VisibilityBundle::default(),
+		))
+		.with_children(|parent| {
+			parent.spawn((
+				SpriteBundle {
+					sprite: Sprite {
+						custom_size: Some(SPRITE_SIZE),
+						color: palette.cycle_ready,
+						..default()
+					},
+					texture: image_handles[&ImageKey::CycleCenter(data.cycle_turnability)]
+						.clone_weak(),
+					transform: Transform::from_translation(Vec2::ZERO.extend(-300.0)),
+					..default()
+				},
+				SpinAnimation {
+					current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
+					..default()
+				},
+			));
+			parent.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 				material,
+				transform: Transform::from_translation(Vec2::ZERO.extend(-200.0)),
 				..default()
-			},
-		))
+			});
+		})
 		.id()
 }

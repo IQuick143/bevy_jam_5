@@ -1,6 +1,6 @@
-use bevy::{color::palettes, utils::hashbrown::HashMap};
+use bevy::color::palettes;
 
-use super::{level::ThingType, prelude::*};
+use super::prelude::*;
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
@@ -41,40 +41,33 @@ impl FromWorld for RingMaterial {
 	}
 }
 
-/// Contains handles to the materials used for rendering objects and glyphs
-#[doc(alias = "ObjectMaterial")]
-#[doc(alias = "GlyphMaterial")]
-#[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
-pub struct ThingColor(HashMap<ThingType, Color>);
-
-impl ThingColor {
-	pub fn get(&self, object: ThingType) -> &Color {
-		self.0
-			.get(&object)
-			.expect("All ThingTypes should have a material registered")
-	}
-
-	#[allow(dead_code)]
-	pub fn get_mut(&mut self, object: ThingType) -> &mut Color {
-		self.0
-			.get_mut(&object)
-			.expect("All ThingTypes should have a material registered")
-	}
+/// Contains colors used for rendering objects and glyphs
+#[derive(Resource, Debug, Clone, Reflect)]
+pub struct ThingPalette {
+	pub box_base: Color,
+	pub box_trigger: Color,
+	pub button_base: Color,
+	pub button_trigger: Color,
+	pub player: Color,
+	pub goal_closed: Color,
+	pub goal_open: Color,
+	pub cycle_disabled: Color,
+	pub cycle_ready: Color,
 }
 
-impl Default for ThingColor {
+impl Default for ThingPalette {
 	fn default() -> Self {
-		use super::level::GlyphType::*;
-		use super::level::ObjectType::*;
 		use palettes::tailwind as p;
-
-		let map = [
-			(ThingType::Glyph(Button), p::RED_800.into()),
-			(ThingType::Glyph(Flag), p::AMBER_400.into()),
-			(ThingType::Object(Player), p::BLUE_700.into()),
-			(ThingType::Object(Box), p::YELLOW_800.into()),
-		]
-		.into();
-		ThingColor(map)
+		Self {
+			box_base: p::ROSE_100.into(),
+			box_trigger: p::ROSE_500.into(),
+			button_base: p::ROSE_100.into(),
+			button_trigger: p::ROSE_500.into(),
+			player: p::SKY_100.into(),
+			goal_closed: p::SKY_100.into(),
+			goal_open: p::GREEN_500.into(),
+			cycle_disabled: p::GRAY_200.into(),
+			cycle_ready: p::GRAY_300.into(),
+		}
 	}
 }

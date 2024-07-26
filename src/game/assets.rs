@@ -1,10 +1,6 @@
-use bevy::{
-	prelude::*,
-	render::texture::{ImageLoaderSettings, ImageSampler},
-	utils::HashMap,
-};
+use bevy::{prelude::*, utils::HashMap};
 
-use super::level::ThingType;
+use super::{level::ThingType, prelude::CycleTurnability};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<ImageKey>>();
@@ -19,8 +15,8 @@ pub(super) fn plugin(app: &mut App) {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum ImageKey {
-	Ducky,
 	Object(ThingType),
+	CycleCenter(CycleTurnability),
 }
 
 impl AssetKey for ImageKey {
@@ -31,15 +27,6 @@ impl FromWorld for HandleMap<ImageKey> {
 	fn from_world(world: &mut World) -> Self {
 		let asset_server = world.resource::<AssetServer>();
 		[
-			(
-				ImageKey::Ducky,
-				asset_server.load_with_settings(
-					"images/ducky.png",
-					|settings: &mut ImageLoaderSettings| {
-						settings.sampler = ImageSampler::nearest();
-					},
-				),
-			),
 			(
 				ImageKey::Object(ThingType::Object(super::level::ObjectType::Box)),
 				asset_server.load("images/box.png"),
@@ -55,6 +42,14 @@ impl FromWorld for HandleMap<ImageKey> {
 			(
 				ImageKey::Object(ThingType::Glyph(super::level::GlyphType::Flag)),
 				asset_server.load("images/flag.png"),
+			),
+			(
+				ImageKey::CycleCenter(CycleTurnability::Always),
+				asset_server.load("images/cycle-engine.png"),
+			),
+			(
+				ImageKey::CycleCenter(CycleTurnability::WithPlayer),
+				asset_server.load("images/cycle-player.png"),
 			),
 		]
 		.into()
