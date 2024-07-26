@@ -11,7 +11,9 @@ pub const LEVEL_AREA_CENTER: Vec2 = Vec2::new(0.0, 0.0);
 
 pub const SPRITE_LENGTH: f32 = 100.0;
 
-pub const RING_HALF_WIDTH: f32 = 0.225 / 8.0 * SPRITE_LENGTH;
+pub const RING_HALF_WIDTH: f32 = 0.225 / 4.0 * SPRITE_LENGTH;
+
+pub const NODE_RADIUS: f32 = SPRITE_LENGTH / 8.0;
 
 pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
 

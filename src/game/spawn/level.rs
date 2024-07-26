@@ -2,7 +2,7 @@
 
 use crate::game::{
 	assets::{HandleMap, ImageKey},
-	graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, RING_HALF_WIDTH, SPRITE_SIZE},
+	graphics::*,
 	level::{
 		layout::{CyclePlacement, LevelLayout},
 		CycleData, GlyphType, ObjectType, ThingType, ValidLevelData, VertexData,
@@ -52,6 +52,8 @@ fn spawn_level(
 				commands.reborrow(),
 				data,
 				*pos,
+				meshes.reborrow(),
+				cycle_material.0.clone(),
 				thing_materials.as_ref(),
 				image_handles.as_ref(),
 				texture_atlas_layout.clone(),
@@ -95,6 +97,8 @@ fn spawn_vertex(
 	mut commands: Commands,
 	data: &VertexData,
 	position: Vec2,
+	mut meshes: Mut<Assets<Mesh>>,
+	base_material: Handle<ColorMaterial>,
 	materials: &ThingColor,
 	image_handles: &HandleMap<ImageKey>,
 	texture_atlas_layout: Handle<TextureAtlasLayout>,
@@ -104,11 +108,13 @@ fn spawn_vertex(
 	let vertex_id = commands
 		.spawn((Vertex, PlacedGlyph(None), PlacedObject(None), transform))
 		.id();
+	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
-		SpriteBundle {
-			texture: image_handles[&ImageKey::Ducky].clone_weak(),
+		ColorMesh2dBundle {
 			transform: Transform::from_translation(position.extend(-100.0)),
-			..Default::default()
+			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
+			material: base_material,
+			..default()
 		},
 		TextureAtlas {
 			layout: texture_atlas_layout.clone(),
