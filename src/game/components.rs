@@ -55,7 +55,7 @@ pub struct PlacedGlyph(pub Option<Entity>);
 pub struct CycleVertices(pub Vec<Entity>);
 
 /// Defines conditions under which a cycle may be turned
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum CycleTurnability {
 	/// Cycle may be turned anytime
 	Always,
@@ -160,6 +160,30 @@ impl AnimatedObject {
 			1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
 		} else {
 			t * 4.0 / 3.0
+		}
+	}
+}
+
+/// A component that causes an entity to rotate steadily
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct SpinAnimation {
+	pub frequency: f32,
+	pub current_phase: f32,
+}
+
+impl SpinAnimation {
+	pub fn progress(&mut self, delta_seconds: f32) {
+		self.current_phase -= delta_seconds * self.frequency;
+	}
+
+	pub const DEFAULT_FREQUENCY: f32 = 0.3;
+}
+
+impl Default for SpinAnimation {
+	fn default() -> Self {
+		Self {
+			frequency: Self::DEFAULT_FREQUENCY,
+			current_phase: 0.0
 		}
 	}
 }

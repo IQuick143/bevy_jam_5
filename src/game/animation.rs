@@ -7,13 +7,19 @@ use super::logic;
 pub fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		((
-			(listen_for_moves, move_objects).chain(),
-			goal_unlock_animation_system
-				.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
-			button_trigger_animation_system.run_if(on_event::<GameLayoutChanged>()),
-		)
-			.after(logic::LogicSystemSet),),
+		(
+			(
+				(listen_for_moves, move_objects).chain(),
+				goal_unlock_animation_system
+					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
+				(
+					button_trigger_animation_system,
+					cycle_center_visuals_update_system,
+				).run_if(on_event::<GameLayoutChanged>()),
+			)
+				.after(logic::LogicSystemSet),
+			spin_animation_system,
+		),
 	);
 }
 
@@ -160,5 +166,36 @@ fn button_trigger_animation_system(
 			}
 			(None, None) => {}
 		}
+	}
+}
+
+fn cycle_center_visuals_update_system(
+	cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
+	mut sprites_q: Query<(&mut SpinAnimation, &mut Sprite)>,
+	palette: Res<ThingPalette>,
+) {
+	for (is_turnable, children) in &cycles_q {
+		let Ok((mut animation, mut sprite)) = sprites_q.get_mut(children[0]) else {
+			log::warn!("Child of cycle entity does not have SpinAnimation and Sprite components");
+			continue;
+		};
+		if is_turnable.0 {
+			animation.frequency = SpinAnimation::DEFAULT_FREQUENCY;
+			sprite.color = palette.cycle_ready;
+		} else {
+			animation.frequency = 0.0;
+			sprite.color = palette.cycle_disabled;
+		}
+	}
+}
+
+fn spin_animation_system(
+	mut query: Query<(&mut SpinAnimation, &mut Transform)>,
+	time: Res<Time<Real>>
+) {
+	let delta_seconds = time.delta_seconds();
+	for (mut animation, mut transform) in &mut query {
+		animation.progress(delta_seconds);
+		transform.rotation = Quat::from_axis_angle(Vec3::Z, animation.current_phase);
 	}
 }

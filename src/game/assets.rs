@@ -1,6 +1,6 @@
 use bevy::{prelude::*, utils::HashMap};
 
-use super::level::ThingType;
+use super::{level::ThingType, prelude::CycleTurnability};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<ImageKey>>();
@@ -16,6 +16,7 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum ImageKey {
 	Object(ThingType),
+	CycleCenter(CycleTurnability),
 }
 
 impl AssetKey for ImageKey {
@@ -41,6 +42,14 @@ impl FromWorld for HandleMap<ImageKey> {
 			(
 				ImageKey::Object(ThingType::Glyph(super::level::GlyphType::Flag)),
 				asset_server.load("images/flag.png"),
+			),
+			(
+				ImageKey::CycleCenter(CycleTurnability::Always),
+				asset_server.load("images/cycle-engine.png"),
+			),
+			(
+				ImageKey::CycleCenter(CycleTurnability::WithPlayer),
+				asset_server.load("images/cycle-player.png"),
 			),
 		]
 		.into()

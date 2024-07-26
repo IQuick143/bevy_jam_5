@@ -13,6 +13,7 @@ use crate::game::{
 use bevy::math::primitives;
 use bevy::sprite::Anchor::Custom;
 use itertools::Itertools;
+use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
 	app.observe(spawn_level);
@@ -70,6 +71,8 @@ fn spawn_level(
 				commands.reborrow(),
 				meshes.reborrow(),
 				cycle_material.0.clone(),
+				&palette,
+				&image_handles,
 				data,
 				*pos,
 				&vertices,
@@ -223,6 +226,8 @@ fn spawn_cycle(
 	mut commands: Commands,
 	mut meshes: Mut<Assets<Mesh>>,
 	material: Handle<ColorMaterial>,
+	palette: &ThingPalette,
+	image_handles: &HandleMap<ImageKey>,
 	data: &CycleData,
 	placement: CyclePlacement,
 	vertex_entities: &[Entity],
@@ -245,12 +250,34 @@ fn spawn_cycle(
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
-			ColorMesh2dBundle {
-				transform: Transform::from_translation(placement.position.extend(-200.0)),
+			TransformBundle::from_transform(
+				Transform::from_translation(placement.position.extend(0.0)),
+			),
+			VisibilityBundle::default()
+		))
+		.with_children(|parent| {
+			parent.spawn((
+				SpriteBundle {
+					sprite: Sprite {
+						custom_size: Some(SPRITE_SIZE),
+						color: palette.cycle_ready,
+						..default()
+					},
+					texture: image_handles[&ImageKey::CycleCenter(CycleTurnability::WithPlayer)].clone_weak(),
+					transform: Transform::from_translation(Vec2::ZERO.extend(-300.0)),
+					..default()
+				},
+				SpinAnimation {
+					current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
+					..default()
+				}
+			));
+			parent.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 				material,
+				transform: Transform::from_translation(Vec2::ZERO.extend(-200.0)),
 				..default()
-			},
-		))
+			});
+		})
 		.id()
 }

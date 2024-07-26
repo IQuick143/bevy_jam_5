@@ -51,6 +51,8 @@ pub struct ThingPalette {
 	pub player: Color,
 	pub goal_closed: Color,
 	pub goal_open: Color,
+	pub cycle_disabled: Color,
+	pub cycle_ready: Color,
 }
 
 impl Default for ThingPalette {
@@ -64,6 +66,8 @@ impl Default for ThingPalette {
 			player: p::SKY_100.into(),
 			goal_closed: p::SKY_100.into(),
 			goal_open: p::GREEN_500.into(),
+			cycle_disabled: p::GRAY_200.into(),
+			cycle_ready: p::GRAY_300.into(),
 		}
 	}
 }
