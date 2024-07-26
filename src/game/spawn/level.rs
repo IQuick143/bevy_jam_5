@@ -27,7 +27,7 @@ fn spawn_level(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	cycle_material: ResMut<RingMaterial>,
-	thing_materials: ResMut<ThingColor>,
+	palette: ResMut<ThingPalette>,
 	image_handles: Res<HandleMap<ImageKey>>,
 	mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
@@ -54,7 +54,7 @@ fn spawn_level(
 				*pos,
 				meshes.reborrow(),
 				cycle_material.0.clone(),
-				thing_materials.as_ref(),
+				palette.as_ref(),
 				image_handles.as_ref(),
 				texture_atlas_layout.clone(),
 			)
@@ -99,7 +99,7 @@ fn spawn_vertex(
 	position: Vec2,
 	mut meshes: Mut<Assets<Mesh>>,
 	base_material: Handle<ColorMaterial>,
-	materials: &ThingColor,
+	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
 	texture_atlas_layout: Handle<TextureAtlasLayout>,
 ) -> Entity {
@@ -132,7 +132,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.player,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -152,7 +152,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.box_base,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -180,7 +180,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.button_base,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
@@ -199,7 +199,7 @@ fn spawn_vertex(
 					ObjectKind(thing_type),
 					SpriteBundle {
 						sprite: Sprite {
-							color: *materials.get(thing_type),
+							color: palette.goal_closed,
 							custom_size: Some(SPRITE_SIZE),
 							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
