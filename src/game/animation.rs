@@ -7,7 +7,13 @@ use super::logic;
 pub fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		(listen_for_moves.after(logic::LogicSystemSet), move_objects).chain(),
+		((
+			(listen_for_moves, move_objects).chain(),
+			goal_unlock_animation_system
+				.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
+			button_trigger_animation_system.run_if(on_event::<GameLayoutChanged>()),
+		)
+			.after(logic::LogicSystemSet),),
 	);
 }
 
@@ -105,6 +111,54 @@ fn move_objects(mut objects: Query<(&mut Transform, &mut AnimatedObject)>, time:
 		if let Some(goal) = animation.sample() {
 			transform.translation.x = goal.x;
 			transform.translation.y = goal.y;
+		}
+	}
+}
+
+fn goal_unlock_animation_system(
+	mut query: Query<&mut Sprite, With<Goal>>,
+	palette: Res<ThingPalette>,
+	completion: Res<LevelCompletionConditions>,
+) {
+	let color = if completion.is_goal_unlocked() {
+		palette.goal_open
+	} else {
+		palette.goal_closed
+	};
+	for mut sprite in &mut query {
+		sprite.color = color;
+	}
+}
+
+fn button_trigger_animation_system(
+	mut buttons_q: Query<&mut Sprite, With<BoxSlot>>,
+	mut boxes_q: Query<
+		&mut Sprite,
+		(
+			With<Box>,
+			Without<BoxSlot>, /* To guarantee memory aliasing */
+		),
+	>,
+	nodes_q: Query<(&PlacedGlyph, &PlacedObject)>,
+	palette: Res<ThingPalette>,
+) {
+	for (glyph_id, object_id) in &nodes_q {
+		let button = glyph_id.0.and_then(|id| buttons_q.get_mut(id).ok());
+		let object = object_id.0.and_then(|id| boxes_q.get_mut(id).ok());
+		// Use trigger color if both things are at the same place,
+		// otherwise use base color
+		match (button, object) {
+			(Some(mut button), Some(mut object)) => {
+				button.color = palette.button_trigger;
+				object.color = palette.box_trigger;
+			}
+			(Some(mut button), None) => {
+				button.color = palette.button_base;
+			}
+			(None, Some(mut object)) => {
+				object.color = palette.box_base;
+			}
+			(None, None) => {}
 		}
 	}
 }
