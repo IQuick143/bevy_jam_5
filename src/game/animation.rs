@@ -17,6 +17,7 @@ pub fn plugin(app: &mut App) {
 					cycle_center_visuals_update_system,
 				)
 					.run_if(on_event::<GameLayoutChanged>()),
+				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>()),
 			)
 				.after(logic::LogicSystemSet),
 			spin_animation_system,
@@ -197,6 +198,33 @@ fn spin_animation_system(
 	let delta_seconds = time.delta_seconds();
 	for (mut animation, mut transform) in &mut query {
 		animation.progress(delta_seconds);
-		transform.rotation = Quat::from_axis_angle(Vec3::Z, animation.current_phase);
+		transform.rotation = Quat::from_axis_angle(Vec3::Z, animation.sample());
+	}
+}
+
+const CYCLE_CENTER_ANIMATION_ANGLE: f32 = std::f32::consts::PI / 2.0;
+
+fn cycle_turning_animation_system(
+	cycles_q: Query<&Children, With<CycleVertices>>,
+	mut spin_q: Query<&mut SpinAnimation>,
+	mut events: EventReader<RotateSingleCycle>,
+) {
+	for event in events.read() {
+		let Ok(children) = cycles_q.get(event.0.target_cycle) else {
+			log::warn!("RotateSingleCycle event does not target a cycle entity");
+			continue;
+		};
+		let Ok(mut animation) = spin_q.get_mut(children[0]) else {
+			log::warn!("Child of cycle entity does not have SpinAnimation component");
+			continue;
+		};
+		let direction_multiplier = match event.0.direction.into() {
+			RotationDirection::Clockwise => -1.0,
+			RotationDirection::CounterClockwise => 1.0,
+		};
+		animation.make_jump(
+			direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
+			ANIMATION_TIME,
+		);
 	}
 }

@@ -128,7 +128,7 @@ impl AnimatedObject {
 	pub fn sample(&self) -> Option<Vec3> {
 		let target = self.final_direction?;
 		Some(if let Some(source) = self.start_direction {
-			let t = Self::easing_function(self.progress).clamp(0.0, 1.0);
+			let t = animation_easing_function(self.progress).clamp(0.0, 1.0);
 			let dir = {
 				let mut angle = Vec2::angle_between(*source, *target);
 				match self.rotation_direction {
@@ -151,16 +151,16 @@ impl AnimatedObject {
 			self.cycle_center + (self.final_magnitude * target).extend(0.0)
 		})
 	}
+}
 
-	fn easing_function(t: f32) -> f32 {
-		// Quadratic ease-out.
-		// Looks better that a flat rotation, but is easier
-		// to chain like we do that a double-ended easing function
-		if t > 0.5 {
-			1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
-		} else {
-			t * 4.0 / 3.0
-		}
+fn animation_easing_function(t: f32) -> f32 {
+	// Quadratic ease-out.
+	// Looks better that a flat rotation, but is easier
+	// to chain like we do that a double-ended easing function
+	if t > 0.5 {
+		1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
+	} else {
+		t * 4.0 / 3.0
 	}
 }
 
@@ -169,11 +169,37 @@ impl AnimatedObject {
 pub struct SpinAnimation {
 	pub frequency: f32,
 	pub current_phase: f32,
+	pub jump_animation_progress: f32,
+	pub jump_animation_time: f32,
+	pub jump_animation_magitude: f32,
 }
 
 impl SpinAnimation {
 	pub fn progress(&mut self, delta_seconds: f32) {
 		self.current_phase -= delta_seconds * self.frequency;
+		if self.current_phase < 0.0 {
+			self.current_phase += TAU;
+		}
+		if self.jump_animation_progress < 1.0 {
+			self.jump_animation_progress += delta_seconds / self.jump_animation_time;
+		}
+	}
+
+	pub fn make_jump(&mut self, magnitude: f32, animation_time: f32) {
+		self.current_phase = self.sample() + magnitude;
+		self.jump_animation_time = animation_time;
+		self.jump_animation_magitude = magnitude;
+		self.jump_animation_progress = 0.0;
+	}
+
+	pub fn sample(&self) -> f32 {
+		if self.jump_animation_progress >= 1.0 {
+			self.current_phase
+		} else {
+			self.current_phase
+				- (1.0 - animation_easing_function(self.jump_animation_progress))
+					* self.jump_animation_magitude
+		}
 	}
 
 	pub const DEFAULT_FREQUENCY: f32 = 0.3;
@@ -183,7 +209,10 @@ impl Default for SpinAnimation {
 	fn default() -> Self {
 		Self {
 			frequency: Self::DEFAULT_FREQUENCY,
-			current_phase: 0.0
+			current_phase: 0.0,
+			jump_animation_progress: 1.0,
+			jump_animation_magitude: 0.0,
+			jump_animation_time: 0.0,
 		}
 	}
 }
