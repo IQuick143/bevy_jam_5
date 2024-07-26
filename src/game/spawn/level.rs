@@ -11,7 +11,7 @@ use crate::{
 		},
 		prelude::*,
 	},
-	screen::Screen,
+	screen::{DestroyOnTransition, Screen},
 };
 
 use bevy::math::primitives;
@@ -401,9 +401,16 @@ fn spawn_vertex(
 	let transform =
 		TransformBundle::from_transform(Transform::from_translation(position.extend(0.0)));
 	let vertex_id = commands
-		.spawn((Vertex, PlacedGlyph(None), PlacedObject(None), transform))
+		.spawn((
+			Vertex,
+			DestroyOnTransition,
+			PlacedGlyph(None),
+			PlacedObject(None),
+			transform,
+		))
 		.id();
 	commands.spawn((
+		DestroyOnTransition,
 		SpriteBundle {
 			texture: image_handles[&ImageKey::Ducky].clone_weak(),
 			transform: Transform::from_translation(position.extend(-100.0)),
@@ -419,6 +426,7 @@ fn spawn_vertex(
 		let object_id = match object_type {
 			ObjectType::Player => commands
 				.spawn((
+					DestroyOnTransition,
 					Object,
 					Player,
 					VertexPosition(vertex_id),
@@ -439,6 +447,7 @@ fn spawn_vertex(
 				.id(),
 			ObjectType::Box => commands
 				.spawn((
+					DestroyOnTransition,
 					Object,
 					Box,
 					VertexPosition(vertex_id),
@@ -467,6 +476,7 @@ fn spawn_vertex(
 		let glyph_id = match glyph_type {
 			GlyphType::Button => commands
 				.spawn((
+					DestroyOnTransition,
 					Glyph,
 					BoxSlot,
 					VertexPosition(vertex_id),
@@ -486,6 +496,7 @@ fn spawn_vertex(
 				.id(),
 			GlyphType::Flag => commands
 				.spawn((
+					DestroyOnTransition,
 					Glyph,
 					Goal,
 					VertexPosition(vertex_id),
@@ -531,6 +542,7 @@ fn spawn_cycle(
 	commands
 		.spawn((
 			data.cycle_turnability,
+			DestroyOnTransition,
 			ComputedCycleTurnability(true),
 			CycleVertices(
 				data.vertex_indices
