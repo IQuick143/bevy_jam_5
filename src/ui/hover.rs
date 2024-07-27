@@ -129,14 +129,7 @@ fn update_hover_text(
 	state: Res<State<Screen>>,
 	asset_server: Res<AssetServer>,
 ) {
-	let should_be_visible = match state.get() {
-		Screen::Splash => false,
-		Screen::Loading => false,
-		Screen::Title => false,
-		Screen::Credits => false,
-		Screen::LevelSelect => false,
-		Screen::Level(_) => true,
-	};
+	let should_be_visible = *state.get() == Screen::Playing;
 
 	let chosen_text = match *hint_text {
 		HintText {

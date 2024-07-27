@@ -1,7 +1,7 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use super::*;
-use crate::ui::prelude::*;
+use crate::{game::LevelID, ui::prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::LevelSelect), spawn_screen)
@@ -107,7 +107,8 @@ fn spawn_screen(mut commands: Commands) {
 }
 
 fn handle_level_select_screen_action(
-	mut next_screen: EventWriter<QueueScreenTransition>,
+	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+	mut next_level: ResMut<NextState<PlayingLevel>>,
 	query: InteractionQuery<&LevelSelectAction>,
 ) {
 	for (interaction, action) in &query {
@@ -119,12 +120,13 @@ fn handle_level_select_screen_action(
 				next_screen.send(QueueScreenTransition::fade(Screen::Title));
 			}
 			LevelSelectAction::PlayLevel(id) => {
-				next_screen.send(QueueScreenTransition::fade(Screen::Level(*id)));
+				next_level.set(PlayingLevel(Some(*id)));
+				next_screen.send(QueueScreenTransition::fade(Screen::Playing));
 			}
 		}
 	}
 }
 
-fn return_to_title_screen(mut next_screen: EventWriter<QueueScreenTransition>) {
+fn return_to_title_screen(mut next_screen: EventWriter<QueueScreenTransition<Screen>>) {
 	next_screen.send(QueueScreenTransition::fade(Screen::Title));
 }

@@ -8,44 +8,52 @@ use crate::game::{
 	level::{self, layout::LevelLayout, ValidLevelData},
 };
 
-use super::{QueueScreenTransition, Screen};
+use super::{process_enqueued_transitions, PendingTransition, QueueScreenTransition, Screen};
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
-			return_to_level_select_screen
-				.run_if(is_on_level_screen.and_then(input_just_pressed(KeyCode::Escape))),
-			load_level.run_if(on_event::<StateTransitionEvent<Screen>>()),
-		),
-	);
+	app.init_state::<PlayingLevel>()
+		.init_resource::<PendingTransition<PlayingLevel>>()
+		.add_event::<QueueScreenTransition<PlayingLevel>>()
+		.enable_state_scoped_entities::<PlayingLevel>()
+		.add_systems(OnEnter(Screen::Playing), load_level)
+		.add_systems(OnExit(Screen::Playing), clear_playing_level_state)
+		.add_systems(
+			Update,
+			(
+				process_enqueued_transitions::<PlayingLevel>,
+				return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
+				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
+			)
+				.run_if(in_state(Screen::Playing)),
+		);
 }
 
-fn is_on_level_screen(s: Option<Res<State<Screen>>>) -> bool {
-	s.is_some_and(|s| matches!(s.get(), Screen::Level(_)))
-}
+/// Complementary state variable for [`Screen::Playing`]
+#[derive(States, Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
+pub struct PlayingLevel(pub Option<LevelID>);
 
-fn return_to_level_select_screen(mut next_screen: EventWriter<QueueScreenTransition>) {
+fn return_to_level_select_screen(mut next_screen: EventWriter<QueueScreenTransition<Screen>>) {
 	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+}
+
+fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
+	next_state.set(PlayingLevel(None));
 }
 
 fn load_level(
 	mut commands: Commands,
 	level_handles: Res<HandleMap<LevelID>>,
 	level_assets: Res<Assets<PlainText>>,
-	mut event: EventReader<StateTransitionEvent<Screen>>,
-	mut next_screen: EventWriter<QueueScreenTransition>,
+	playing_level: Res<State<PlayingLevel>>,
+	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
 ) {
-	let Some(StateTransitionEvent {
-		exited: _,
-		entered: Some(Screen::Level(level_id)),
-	}) = event.read().last()
-	else {
-		return;
-	};
+	let level_id = playing_level
+		.get()
+		.0
+		.expect("Systems that transition into Screen::Playing must also set PlayingLevel state");
 
 	let level_handle = level_handles
-		.get(level_id)
+		.get(&level_id)
 		.expect("All level IDs should be assigned a level");
 	let level_data = level_assets
 		.get(level_handle)
@@ -72,7 +80,7 @@ fn load_level(
 
 	if let Ok((level, level_layout)) = prepare_level(level_data) {
 		// Spawn the level
-		commands.trigger(SpawnLevel(level, level_layout));
+		commands.trigger(SpawnLevel(level_id, level, level_layout));
 	} else {
 		// If the level could not be loaded, go back to level select screen
 		// (errors have already been reported)

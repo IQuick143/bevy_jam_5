@@ -4,6 +4,7 @@ use bevy::prelude::*;
 /// Trigger event that spawns the content entities of a level
 #[derive(Event, Debug)]
 pub struct SpawnLevel(
+	pub super::assets::LevelID,
 	pub super::level::ValidLevelData,
 	pub super::level::layout::LevelLayout,
 );

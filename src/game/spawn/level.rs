@@ -6,8 +6,9 @@ use crate::{
 		graphics::*,
 		level::{layout::CyclePlacement, CycleData, GlyphType, ObjectType, ThingType, VertexData},
 		prelude::*,
+		LevelID,
 	},
-	screen::DestroyOnTransition,
+	screen::PlayingLevel,
 	ui::hover,
 };
 
@@ -34,9 +35,10 @@ fn spawn_level(
 	image_handles: Res<HandleMap<ImageKey>>,
 ) {
 	println!("Spawning!"); //TODO: debug
-	let data = trigger.event().0.clone();
+	let level_id = trigger.event().0;
+	let data = &trigger.event().1;
 	let layout = &{
-		let mut layout = trigger.event().1.clone();
+		let mut layout = trigger.event().2.clone();
 		layout.recompute_to_fit(LEVEL_AREA_WIDTH / 2.0, LEVEL_AREA_CENTER);
 		layout
 	};
@@ -48,6 +50,7 @@ fn spawn_level(
 		.map(|(data, pos)| {
 			spawn_vertex(
 				commands.reborrow(),
+				level_id,
 				data,
 				*pos,
 				meshes.reborrow(),
@@ -65,6 +68,7 @@ fn spawn_level(
 		.map(|(data, pos)| {
 			spawn_cycle(
 				commands.reborrow(),
+				level_id,
 				meshes.reborrow(),
 				cycle_material.0.clone(),
 				&palette,
@@ -101,7 +105,7 @@ fn spawn_level(
 		let position = a.lerp(b, 0.5);
 		let offset = (a - b).normalize_or_zero().perp() * CYCLE_LINK_SPACING / 2.0;
 		commands.spawn((
-			DestroyOnTransition,
+			StateScoped(PlayingLevel(Some(level_id))),
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
 				transform: Transform::from_rotation(rotation)
@@ -111,7 +115,7 @@ fn spawn_level(
 			},
 		));
 		commands.spawn((
-			DestroyOnTransition,
+			StateScoped(PlayingLevel(Some(level_id))),
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh),
 				transform: Transform::from_rotation(rotation)
@@ -128,6 +132,7 @@ fn spawn_level(
 
 fn spawn_vertex(
 	mut commands: Commands,
+	level_id: LevelID,
 	data: &VertexData,
 	position: Vec2,
 	mut meshes: Mut<Assets<Mesh>>,
@@ -140,7 +145,7 @@ fn spawn_vertex(
 	let vertex_id = commands
 		.spawn((
 			Vertex,
-			DestroyOnTransition,
+			StateScoped(PlayingLevel(Some(level_id))),
 			PlacedGlyph(None),
 			PlacedObject(None),
 			transform,
@@ -148,7 +153,7 @@ fn spawn_vertex(
 		.id();
 	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
-		DestroyOnTransition,
+		StateScoped(PlayingLevel(Some(level_id))),
 		ColorMesh2dBundle {
 			transform: Transform::from_translation(position.extend(-100.0)),
 			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
@@ -161,7 +166,7 @@ fn spawn_vertex(
 		let object_id = match object_type {
 			ObjectType::Player => commands
 				.spawn((
-					DestroyOnTransition,
+					StateScoped(PlayingLevel(Some(level_id))),
 					Object,
 					Player,
 					VertexPosition(vertex_id),
@@ -190,7 +195,7 @@ fn spawn_vertex(
 				.id(),
 			ObjectType::Box => commands
 				.spawn((
-					DestroyOnTransition,
+					StateScoped(PlayingLevel(Some(level_id))),
 					Object,
 					Box,
 					VertexPosition(vertex_id),
@@ -227,7 +232,7 @@ fn spawn_vertex(
 		let glyph_id = match glyph_type {
 			GlyphType::Button => commands
 				.spawn((
-					DestroyOnTransition,
+					StateScoped(PlayingLevel(Some(level_id))),
 					Glyph,
 					BoxSlot,
 					VertexPosition(vertex_id),
@@ -255,7 +260,7 @@ fn spawn_vertex(
 				.id(),
 			GlyphType::Flag => commands
 				.spawn((
-					DestroyOnTransition,
+					StateScoped(PlayingLevel(Some(level_id))),
 					Glyph,
 					Goal,
 					VertexPosition(vertex_id),
@@ -292,6 +297,7 @@ fn spawn_vertex(
 
 fn spawn_cycle(
 	mut commands: Commands,
+	level_id: LevelID,
 	mut meshes: Mut<Assets<Mesh>>,
 	material: Handle<ColorMaterial>,
 	palette: &ThingPalette,
@@ -311,7 +317,7 @@ fn spawn_cycle(
 	commands
 		.spawn((
 			data.cycle_turnability,
-			DestroyOnTransition,
+			StateScoped(PlayingLevel(Some(level_id))),
 			ComputedCycleTurnability(true),
 			CycleVertices(
 				data.vertex_indices

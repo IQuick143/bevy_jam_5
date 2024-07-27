@@ -5,7 +5,7 @@ use crate::{
 		graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 		prelude::*,
 	},
-	screen::QueueScreenTransition,
+	screen::{PlayingLevel, QueueScreenTransition},
 };
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
@@ -16,10 +16,11 @@ use crate::screen::Screen;
 
 pub(super) fn plugin(app: &mut App) {
 	// Print state transitions in dev builds
-	app.add_systems(Update, log_transitions::<Screen>);
 	app.add_systems(
 		Update,
 		(
+			log_transitions::<Screen>,
+			log_transitions::<PlayingLevel>,
 			switch_level,
 			//gizmo_draw,
 			draw_layout,
@@ -60,72 +61,72 @@ fn draw_layout(mut gizmos: Gizmos) {
 
 fn switch_level(
 	keyboard: Res<ButtonInput<KeyCode>>,
-	mut next_screen: EventWriter<QueueScreenTransition>,
+	mut next_screen: EventWriter<QueueScreenTransition<PlayingLevel>>,
 ) {
 	if keyboard.just_pressed(KeyCode::Digit1) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Cycle,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit2) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Bicycle,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit3) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Tricycle,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit4) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::CargoTricycle,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit5) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::SquareCycle,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit6) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::DiamondCycle,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit7) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Lotus,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit8) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::ThreeInARow,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit9) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::TripleRing,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::Digit0) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Car,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::KeyQ) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Olympic,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::KeyW) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Pedalo,
-		)));
+		))));
 	}
 	if keyboard.just_pressed(KeyCode::KeyE) {
-		next_screen.send(QueueScreenTransition::fade(Screen::Level(
+		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Pyramid,
-		)));
+		))));
 	}
 }
 

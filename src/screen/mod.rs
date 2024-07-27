@@ -9,12 +9,14 @@ mod title;
 
 use bevy::prelude::*;
 
-use crate::{game::assets::LevelID, ui::screen_fade::Fader};
+use crate::ui::screen_fade::Fader;
+
+pub use playing::PlayingLevel;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<Screen>();
-	app.add_event::<QueueScreenTransition>();
-	app.init_resource::<PendingTransition>();
+	app.add_event::<QueueScreenTransition<Screen>>();
+	app.init_resource::<PendingTransition<Screen>>();
 	app.enable_state_scoped_entities::<Screen>();
 
 	app.add_plugins((
@@ -26,66 +28,57 @@ pub(super) fn plugin(app: &mut App) {
 		level_select::plugin,
 	));
 
-	app.add_systems(Update, (transition, delete_objects_on_transition).chain());
+	app.add_systems(Update, process_enqueued_transitions::<Screen>);
 }
 
-fn transition(
-	mut in_events: EventReader<QueueScreenTransition>,
-	mut state: ResMut<NextState<Screen>>,
+fn process_enqueued_transitions<S: bevy::state::state::FreelyMutableState + Clone>(
+	mut in_events: EventReader<QueueScreenTransition<S>>,
+	mut state: ResMut<NextState<S>>,
 	mut fader: ResMut<Fader>,
-	mut pending: ResMut<PendingTransition>,
+	mut pending: ResMut<PendingTransition<S>>,
 ) {
 	if let Some(event) = in_events.read().last() {
 		if !event.fade {
-			state.set(event.next_screen);
+			state.set(event.next_screen.clone());
 			pending.next_screen = None;
 		} else {
 			fader.start_fade(crate::ui::screen_fade::FadeTarget::FadeOut);
-			pending.next_screen = Some(event.next_screen);
+			pending.next_screen = Some(event.next_screen.clone());
 		}
 	}
 	if fader.is_faded_out() {
-		if let Some(next_state) = pending.next_screen {
+		if let Some(next_state) = pending.next_screen.clone() {
 			state.set(next_state);
 			pending.next_screen = None;
+			fader.start_fade(crate::ui::screen_fade::FadeTarget::FadeIn);
 		}
-		fader.start_fade(crate::ui::screen_fade::FadeTarget::FadeIn);
-	}
-}
-
-fn delete_objects_on_transition(
-	mut commands: Commands,
-	mut events: EventReader<StateTransitionEvent<Screen>>,
-	objects: Query<Entity, With<DestroyOnTransition>>,
-) {
-	if events.read().last().is_some() {
-		for object in objects.iter() {
-			commands.entity(object).despawn_recursive();
-		}
+		// If there is no transition enqueued, stay faded out
+		// It most likely means a different specialization of this system
+		// has enqueued a transition
 	}
 }
 
 #[derive(Event, PartialEq, Eq, Clone, Copy)]
-pub struct QueueScreenTransition {
-	pub next_screen: Screen,
+pub struct QueueScreenTransition<S: States> {
+	pub next_screen: S,
 	pub fade: bool,
 }
 
 #[allow(dead_code)]
-impl QueueScreenTransition {
-	fn new(next_screen: Screen, fade: bool) -> Self {
-		QueueScreenTransition { next_screen, fade }
+impl<S: States> QueueScreenTransition<S> {
+	fn new(next_screen: S, fade: bool) -> Self {
+		Self { next_screen, fade }
 	}
 
-	pub fn fade(next_screen: Screen) -> Self {
-		QueueScreenTransition {
+	pub fn fade(next_screen: S) -> Self {
+		Self {
 			next_screen,
 			fade: true,
 		}
 	}
 
-	fn instant(next_screen: Screen) -> Self {
-		QueueScreenTransition {
+	fn instant(next_screen: S) -> Self {
+		Self {
 			next_screen,
 			fade: false,
 		}
@@ -93,8 +86,8 @@ impl QueueScreenTransition {
 }
 
 #[derive(Resource, PartialEq, Eq, Clone, Copy, Default)]
-struct PendingTransition {
-	pub next_screen: Option<Screen>,
+struct PendingTransition<S: States> {
+	pub next_screen: Option<S>,
 }
 
 /// The game's main screen states.
@@ -107,8 +100,5 @@ pub enum Screen {
 	Title,
 	Credits,
 	LevelSelect,
-	Level(LevelID),
+	Playing,
 }
-
-#[derive(Component, Clone, Copy, Default)]
-pub struct DestroyOnTransition;
