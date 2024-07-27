@@ -6,7 +6,7 @@ pub const GAME_AREA: Vec2 = Vec2::new(1600.0, 900.0);
 /// Rectangle extents into which the level should fit for layout purposes.
 pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 800.0);
 /// Center of the rectangle into which the level should fit for layout purposes.
-/// See [`LEVEL_AREA_HALF_WIDTH`]
+/// See [`LEVEL_AREA_WIDTH`]
 pub const LEVEL_AREA_CENTER: Vec2 = Vec2::new(0.0, 0.0);
 
 pub const SPRITE_LENGTH: f32 = 100.0;
