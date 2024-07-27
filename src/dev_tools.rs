@@ -3,7 +3,6 @@
 use crate::{
 	game::{
 		graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
-		logic,
 		prelude::*,
 	},
 	screen::QueueScreenTransition,
@@ -21,7 +20,6 @@ pub(super) fn plugin(app: &mut App) {
 			switch_level,
 			//gizmo_draw,
 			draw_layout,
-			debug_inputs.before(logic::LogicSystemSet),
 		),
 	);
 	app.add_systems(Startup, spawn_text);
@@ -155,7 +153,7 @@ fn get_text_style(_asset_server: &Res<AssetServer>) -> TextStyle {
 	}
 }
 
-pub fn debug_inputs(
+pub fn _debug_inputs(
 	input: Res<ButtonInput<MouseButton>>,
 	window_q: Query<&Window>,
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,

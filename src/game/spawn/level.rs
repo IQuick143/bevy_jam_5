@@ -561,6 +561,8 @@ fn spawn_cycle(
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
+			CycleInterationRadius(placement.radius),
+			CycleInteraction::default(),
 			TransformBundle::from_transform(Transform::from_translation(
 				placement.position.extend(0.0),
 			)),

@@ -91,6 +91,18 @@ impl std::ops::Mul for LinkedCycleDirection {
 	}
 }
 
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct CycleInterationRadius(pub f32);
+
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect, Default)]
+pub enum CycleInteraction {
+	#[default]
+	None,
+	Hover,
+	LeftClick,
+	RightClick,
+}
+
 #[derive(Debug, Clone, Copy, Default, Reflect)]
 pub enum RotationDirection {
 	#[default]
