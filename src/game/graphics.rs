@@ -9,6 +9,11 @@ pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 800.0);
 /// See [`LEVEL_AREA_WIDTH`]
 pub const LEVEL_AREA_CENTER: Vec2 = Vec2::new(0.0, 0.0);
 
+/// Size of the hint text at the bottom of the level
+/// Position is glued to the bottom of the [`GAME_AREA`]
+pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
+
+/// Size of a sprite in world-units.
 pub const SPRITE_LENGTH: f32 = 100.0;
 
 pub const RING_HALF_WIDTH: f32 = 0.225 / 4.0 * SPRITE_LENGTH;
@@ -24,6 +29,8 @@ pub const CYCLE_LINK_SPACING: f32 = SPRITE_LENGTH * 0.7;
 /// between the centers of the cycles
 pub const CYCLE_LINK_END_CUT: f32 = SPRITE_LENGTH / 2.0;
 
+/// How big should a sprite be.
+/// See [`SPRITE_LENGTH`]
 pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
 
 /// Colour into which the screen fades during transitions
