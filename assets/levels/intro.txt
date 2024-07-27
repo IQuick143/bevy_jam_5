@@ -1,0 +1,8 @@
+VERTEX a b c d e f g
+
+CYCLE cycle a b c d e f g
+
+OBJECT[PLAYER] f
+OBJECT[FLAG] b
+
+PLACE cycle 0 0 100

@@ -124,10 +124,15 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub enum LevelID {
+	Intro,
+	Boxes,
+	Manual,
 	Cycle,
 	Bicycle,
+	Swap,
 	Tricycle,
 	CargoTricycle,
+	CargoSinglePlayer,
 	SquareCycle,
 	DiamondCycle,
 	Lotus,
@@ -136,6 +141,7 @@ pub enum LevelID {
 	Car,
 	Olympic,
 	Pedalo,
+	Disrupt,
 	Pyramid,
 }
 
@@ -176,12 +182,20 @@ impl FromWorld for HandleMap<LevelID> {
 	fn from_world(world: &mut World) -> Self {
 		let asset_server = world.resource::<AssetServer>();
 		[
+			(LevelID::Intro, asset_server.load("levels/intro.txt")),
+			(LevelID::Boxes, asset_server.load("levels/boxes.txt")),
+			(LevelID::Manual, asset_server.load("levels/manual.txt")),
 			(LevelID::Cycle, asset_server.load("levels/cycle.txt")),
+			(LevelID::Swap, asset_server.load("levels/swap.txt")),
 			(LevelID::Bicycle, asset_server.load("levels/bicycle.txt")),
 			(LevelID::Tricycle, asset_server.load("levels/tricycle.txt")),
 			(
 				LevelID::CargoTricycle,
 				asset_server.load("levels/cargo.txt"),
+			),
+			(
+				LevelID::CargoSinglePlayer,
+				asset_server.load("levels/cargo-single.txt"),
 			),
 			(LevelID::SquareCycle, asset_server.load("levels/square.txt")),
 			(
@@ -197,6 +211,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(LevelID::Car, asset_server.load("levels/car.txt")),
 			(LevelID::Olympic, asset_server.load("levels/olympic.txt")),
 			(LevelID::Pedalo, asset_server.load("levels/pedalo.txt")),
+			(LevelID::Disrupt, asset_server.load("levels/disrupt.txt")),
 			(LevelID::Pyramid, asset_server.load("levels/pyramid.txt")),
 		]
 		.into()
