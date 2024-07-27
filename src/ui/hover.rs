@@ -10,6 +10,7 @@ pub const PLAYER: &str =
 //pub const CYCLE_MANUAL_POWERED: &'static str = "A powered player-powered cycle, rotate it by clicking with left/right mouse button in the clockwise/counterclockwise direction.";
 pub const CYCLE_MANUAL: &str = "A player-powered cycle, usable only with a player on it, rotate it by clicking with left/right mouse button in the clockwise/counterclockwise direction.";
 pub const CYCLE_AUTOMATIC: &str = "An always-powered cycle, rotate it by clicking with left/right mouse button in the clockwise/counterclockwise direction.";
+pub const CYCLE_STILL: &str = "A still cycle, can only be rotated if it is linked to another cycle";
 
 pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if you hover on it!";
 

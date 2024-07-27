@@ -344,6 +344,7 @@ fn spawn_cycle(
 					hover_text: match data.cycle_turnability {
 						CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
 						CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
+						CycleTurnability::Never => hover::CYCLE_STILL,
 					},
 					hover_bounding_circle: Some(BoundingCircle::new(
 						Vec2::ZERO,
