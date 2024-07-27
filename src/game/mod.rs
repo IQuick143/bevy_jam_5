@@ -36,6 +36,7 @@ pub enum LevelID {
 	CargoTricycle,
 	CargoSinglePlayer,
 	Lotus,
+	ThreeInARowSimple,
 	ThreeInARow,
 	Car,
 	Olympic,
@@ -72,7 +73,8 @@ impl LevelID {
 			Self::CargoTricycle => "Tricycle 2",
 			Self::CargoSinglePlayer => "Tricycle 3",
 			Self::Lotus => "Lotus",
-			Self::ThreeInARow => "ThreeInARow",
+			Self::ThreeInARowSimple => "Grid",
+			Self::ThreeInARow => "Grid EX",
 			Self::Car => "Car",
 			Self::Olympic => "Olympic",
 			Self::Disrupt => "Disrupt",
@@ -83,7 +85,7 @@ impl LevelID {
 	}
 
 	/// The canonical level order
-	pub const LEVEL_ORDER: [LevelID; 19] = [
+	pub const LEVEL_ORDER: [LevelID; 20] = [
 		Self::Intro,
 		Self::Transfer,
 		Self::Boxes,
@@ -96,13 +98,14 @@ impl LevelID {
 		Self::CargoTricycle,
 		Self::CargoSinglePlayer,
 		Self::Lotus,
-		Self::ThreeInARow,
-		Self::Car,
+		Self::ThreeInARowSimple,
 		Self::Olympic,
 		Self::Disrupt,
 		Self::Send,
 		Self::Teamwork,
 		Self::Sort2,
+		Self::ThreeInARow,
+		Self::Car,
 	];
 }
 

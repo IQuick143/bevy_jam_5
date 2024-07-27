@@ -182,6 +182,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(CargoTricycle, asset_server.load("levels/cargo.txt")),
 			(CargoSinglePlayer, asset_server.load("levels/cargo-single.txt")),
 			(Lotus, asset_server.load("levels/lotus.txt")),
+			(ThreeInARowSimple, asset_server.load("levels/three-row-simple.txt")),
 			(ThreeInARow, asset_server.load("levels/three-row.txt")),
 			(Car, asset_server.load("levels/car.txt")),
 			(Olympic, asset_server.load("levels/olympic.txt")),
