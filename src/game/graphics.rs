@@ -35,9 +35,3 @@ pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
 
 /// Colour into which the screen fades during transitions
 pub const FADE_COLOUR: Color = Color::WHITE;
-
-pub fn plugin(app: &mut App) {
-	app.init_resource::<RingMaterial>()
-		.init_resource::<LinkMaterial>()
-		.init_resource::<ThingPalette>();
-}

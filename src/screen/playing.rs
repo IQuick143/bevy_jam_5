@@ -7,7 +7,7 @@ use crate::{
 		assets::{HandleMap, PlainText},
 		events::SpawnLevel,
 		level::{self, layout::LevelLayout, ValidLevelData},
-		LevelID,
+		prelude::*,
 	},
 	ui::prelude::*,
 };
@@ -28,6 +28,7 @@ pub(super) fn plugin(app: &mut App) {
 				return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
 				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 				game_ui_input_system,
+				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 			)
 				.run_if(in_state(Screen::Playing)),
 		);
@@ -36,6 +37,10 @@ pub(super) fn plugin(app: &mut App) {
 /// Complementary state variable for [`Screen::Playing`]
 #[derive(States, Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct PlayingLevel(pub Option<LevelID>);
+
+/// Marker component for the next level button
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct NextLevelButton;
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
@@ -65,18 +70,21 @@ fn spawn_game_ui(mut commands: Commands) {
 				column_gap: Val::Px(10.0),
 				margin: UiRect::all(Val::Px(10.0)),
 				..default()
-			}
+			},
 		))
 		.with_children(|parent| {
 			parent.button("Back").insert(GameUiAction::Back);
 			parent
 				.button("Next Level")
 				.insert(GameUiAction::NextLevel)
-				.insert(InteractionPalette {
-					none: bevy::color::palettes::tailwind::GREEN_500.into(),
-					hovered: bevy::color::palettes::tailwind::GREEN_700.into(),
-					pressed: bevy::color::palettes::tailwind::GREEN_400.into(),
-				});
+				.insert((
+					NextLevelButton,
+					InteractionPalette {
+						none: bevy::color::palettes::tailwind::GREEN_500.into(),
+						hovered: bevy::color::palettes::tailwind::GREEN_700.into(),
+						pressed: bevy::color::palettes::tailwind::GREEN_400.into(),
+					},
+				));
 		});
 }
 
@@ -106,6 +114,27 @@ fn game_ui_input_system(
 				}
 			}
 		}
+	}
+}
+
+fn update_next_level_button_display(
+	is_level_completed: Res<IsLevelCompleted>,
+	playing_level: Res<State<PlayingLevel>>,
+	mut query: Query<&mut Style, With<NextLevelButton>>,
+) {
+	let is_last_level = playing_level
+		.get()
+		.0
+		.expect("When in Screen::Playing state, PlayingLevel must also be set")
+		.next_level()
+		.is_none();
+	let display = if is_level_completed.0 && !is_last_level {
+		Display::DEFAULT
+	} else {
+		Display::None
+	};
+	for mut style in &mut query {
+		style.display = display;
 	}
 }
 

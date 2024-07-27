@@ -2,6 +2,14 @@ use bevy::color::palettes;
 
 use super::prelude::*;
 
+pub(super) fn plugin(app: &mut App) {
+	app.init_resource::<LevelCompletionConditions>()
+		.init_resource::<IsLevelCompleted>()
+		.init_resource::<RingMaterial>()
+		.init_resource::<LinkMaterial>()
+		.init_resource::<ThingPalette>();
+}
+
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
 pub struct LevelCompletionConditions {
@@ -23,6 +31,11 @@ impl LevelCompletionConditions {
 		self.buttons_present == self.buttons_triggered
 	}
 }
+
+/// Contains an information whether the level being played has been completed
+/// in this session (making moves after completion does not matter)
+#[derive(Resource, Clone, Copy, Debug, Default)]
+pub struct IsLevelCompleted(pub bool);
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]

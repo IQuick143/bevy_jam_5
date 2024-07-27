@@ -16,6 +16,7 @@ pub mod prelude {
 	pub use super::components::*;
 	pub use super::events::*;
 	pub use super::resources::*;
+	pub use super::LevelID;
 	pub use bevy::prelude::*;
 }
 
@@ -80,7 +81,7 @@ pub(super) fn plugin(app: &mut App) {
 		spawn::plugin,
 		logic::plugin,
 		animation::plugin,
-		graphics::plugin,
+		resources::plugin,
 		inputs::plugin,
 	));
 	app.add_event::<events::GameLayoutChanged>();

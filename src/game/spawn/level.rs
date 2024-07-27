@@ -29,6 +29,7 @@ fn spawn_level(
 	mut events: EventWriter<GameLayoutChanged>,
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
+	mut is_level_completed: ResMut<IsLevelCompleted>,
 	cycle_material: ResMut<RingMaterial>,
 	link_material: Res<LinkMaterial>,
 	palette: ResMut<ThingPalette>,
@@ -126,7 +127,7 @@ fn spawn_level(
 		));
 	}
 
-	commands.init_resource::<LevelCompletionConditions>();
+	is_level_completed.0 = false;
 	events.send(GameLayoutChanged);
 }
 

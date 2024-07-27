@@ -139,6 +139,7 @@ fn level_completion_check_system(
 	objects_q: Query<(Option<&Player>, Option<&Box>), With<Object>>,
 	glyphs_q: Query<(Option<&Goal>, Option<&BoxSlot>), With<Glyph>>,
 	mut completion: ResMut<LevelCompletionConditions>,
+	mut is_completed: ResMut<IsLevelCompleted>,
 ) {
 	let mut new_completion = LevelCompletionConditions {
 		buttons_present: 0,
@@ -174,11 +175,8 @@ fn level_completion_check_system(
 	}
 
 	if new_completion.is_level_completed() {
-		// TODO: End the level
-		eprintln!("Completed!");
-	} else if new_completion.is_goal_unlocked() {
-		// TODO: Possibly add a visual indicator that the goal is open
-		eprintln!("Goal open!");
+		// This stays true until a different level is loaded
+		is_completed.0 = true;
 	}
 
 	*completion = new_completion;
