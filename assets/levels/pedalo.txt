@@ -10,5 +10,5 @@ OBJECT[BUTTON] g
 OBJECT[PLAYER] a
 OBJECT[FLAG] c
 
-PLACE back_wheel -300 0 300
-PLACE front_wheel 300 0 300
+PLACE back_wheel -300 0 250
+PLACE front_wheel 300 0 250
