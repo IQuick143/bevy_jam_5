@@ -1,0 +1,10 @@
+VERTEX a b c d e g h
+
+CYCLE A a b c d
+CYCLE B d e g h
+
+OBJECT[PLAYER] c
+OBJECT[FLAG] h
+
+PLACE A -100 0 100
+PLACE B +100 0 100

@@ -136,6 +136,7 @@ pub enum LevelID {
 	Intro,
 	Boxes,
 	Manual,
+	Transfer,
 	Cycle,
 	Bicycle,
 	Swap,
@@ -153,6 +154,8 @@ pub enum LevelID {
 	Disrupt,
 	Pyramid,
 	Teamwork,
+	//	#[cfg(not(target = "wasm"))]
+	//	Custom, TODO
 }
 
 #[derive(Asset, Clone, Deref, DerefMut, Debug, Reflect)]
@@ -189,40 +192,31 @@ impl AssetKey for LevelID {
 }
 
 impl FromWorld for HandleMap<LevelID> {
+	#[rustfmt::skip]
 	fn from_world(world: &mut World) -> Self {
+		use LevelID::*;
 		let asset_server = world.resource::<AssetServer>();
 		[
-			(LevelID::Intro, asset_server.load("levels/intro.txt")),
-			(LevelID::Boxes, asset_server.load("levels/boxes.txt")),
-			(LevelID::Manual, asset_server.load("levels/manual.txt")),
-			(LevelID::Cycle, asset_server.load("levels/cycle.txt")),
-			(LevelID::Swap, asset_server.load("levels/swap.txt")),
-			(LevelID::Bicycle, asset_server.load("levels/bicycle.txt")),
-			(LevelID::Tricycle, asset_server.load("levels/tricycle.txt")),
-			(
-				LevelID::CargoTricycle,
-				asset_server.load("levels/cargo.txt"),
-			),
-			(
-				LevelID::CargoSinglePlayer,
-				asset_server.load("levels/cargo-single.txt"),
-			),
-			(LevelID::SquareCycle, asset_server.load("levels/square.txt")),
-			(
-				LevelID::DiamondCycle,
-				asset_server.load("levels/diamond.txt"),
-			),
-			(LevelID::Lotus, asset_server.load("levels/lotus.txt")),
-			(
-				LevelID::ThreeInARow,
-				asset_server.load("levels/three-row.txt"),
-			),
-			(LevelID::TripleRing, asset_server.load("levels/triple.txt")),
-			(LevelID::Car, asset_server.load("levels/car.txt")),
-			(LevelID::Olympic, asset_server.load("levels/olympic.txt")),
-			(LevelID::Pedalo, asset_server.load("levels/pedalo.txt")),
-			(LevelID::Disrupt, asset_server.load("levels/disrupt.txt")),
-			(LevelID::Pyramid, asset_server.load("levels/pyramid.txt")),
+			(Intro, asset_server.load("levels/tutorials/1_intro.txt")),
+			(Boxes, asset_server.load("levels/tutorials/2_boxes.txt")),
+			(Cycle, asset_server.load("levels/tutorials/3_cycle.txt")),
+			(Transfer, asset_server.load("levels/tutorials/4_transfer.txt")),
+			(Manual, asset_server.load("levels/tutorials/5_manual.txt")),
+			(Swap, asset_server.load("levels/1_swap.txt")),
+			(Bicycle, asset_server.load("levels/bicycle.txt")),
+			(Tricycle, asset_server.load("levels/tricycle.txt")),
+			(CargoTricycle, asset_server.load("levels/cargo.txt")),
+			(CargoSinglePlayer, asset_server.load("levels/cargo-single.txt")),
+			(SquareCycle, asset_server.load("levels/square.txt")),
+			(DiamondCycle, asset_server.load("levels/diamond.txt")),
+			(Lotus, asset_server.load("levels/lotus.txt")),
+			(ThreeInARow, asset_server.load("levels/three-row.txt")),
+			(TripleRing, asset_server.load("levels/triple.txt")),
+			(Car, asset_server.load("levels/car.txt")),
+			(Olympic, asset_server.load("levels/olympic.txt")),
+			(Pedalo, asset_server.load("levels/linkage/pedalo.txt")),
+			(Disrupt, asset_server.load("levels/linkage/disrupt.txt")),
+			(Pyramid, asset_server.load("levels/pyramid.txt")),
 			(LevelID::Teamwork, asset_server.load("levels/teamwork.txt")),
 		]
 		.into()
