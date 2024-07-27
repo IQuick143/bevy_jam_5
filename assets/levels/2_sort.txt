@@ -1,0 +1,12 @@
+VERTEX a b c d e f g h x y
+
+CYCLE main a b c d e f g h x y
+CYCLE[MANUAL] side y x
+
+OBJECT[PLAYER] a   c d     g   x  
+OBJECT[BOX]      b     e f   h   y
+OBJECT[FLAG] e f g h x
+OBJECT[BUTTON] a b c d y
+
+PLACE main 0 0 100
+PLACE side 100 0 30

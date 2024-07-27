@@ -53,6 +53,7 @@ fn spawn_screen(mut commands: Commands) {
 					button("Transfer", Transfer);
 					button("Manual", Manual);
 					button("Swap", Swap);
+					button("Sort", Sort);
 					button("Bicycle", Bicycle);
 					button("Tricycle", Tricycle);
 					button("CargoTricycle", CargoTricycle);

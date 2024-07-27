@@ -10,10 +10,10 @@ CYCLE[MANUAL] bot_left o s v r
 CYCLE[MANUAL] bot_mid p t w s
 CYCLE[MANUAL] bot_right q u x t
 
-OBJECT[BOX]
-OBJECT[BUTTON]
-OBJECT[PLAYER] a
-OBJECT[FLAG] x
+OBJECT[BOX] a b c       o p q
+OBJECT[BUTTON] h i j       w v x
+OBJECT[PLAYER] i
+# OBJECT[FLAG] g
 
 PLACE top_left -600 600 300
 PLACE top_mid 0 600 300

@@ -140,6 +140,7 @@ pub enum LevelID {
 	Cycle,
 	Bicycle,
 	Swap,
+	Sort,
 	Tricycle,
 	CargoTricycle,
 	CargoSinglePlayer,
@@ -203,6 +204,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(Transfer, asset_server.load("levels/tutorials/4_transfer.txt")),
 			(Manual, asset_server.load("levels/tutorials/5_manual.txt")),
 			(Swap, asset_server.load("levels/1_swap.txt")),
+			(Sort, asset_server.load("levels/2_sort.txt")),
 			(Bicycle, asset_server.load("levels/bicycle.txt")),
 			(Tricycle, asset_server.load("levels/tricycle.txt")),
 			(CargoTricycle, asset_server.load("levels/cargo.txt")),
@@ -217,7 +219,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(Pedalo, asset_server.load("levels/linkage/pedalo.txt")),
 			(Disrupt, asset_server.load("levels/linkage/disrupt.txt")),
 			(Pyramid, asset_server.load("levels/pyramid.txt")),
-			(LevelID::Teamwork, asset_server.load("levels/teamwork.txt")),
+			(Teamwork, asset_server.load("levels/teamwork.txt")),
 		]
 		.into()
 	}
