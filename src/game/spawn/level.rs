@@ -303,6 +303,19 @@ fn spawn_cycle(
 					transform: Transform::from_translation(Vec2::ZERO.extend(-300.0)),
 					..default()
 				},
+				JumpTurnAnimation::default(),
+			));
+			parent.spawn((
+				SpriteBundle {
+					sprite: Sprite {
+						custom_size: Some(SPRITE_SIZE * 2.0),
+						color: palette.cycle_ready,
+						..default()
+					},
+					texture: image_handles[&ImageKey::CycleRotationArrow].clone_weak(),
+					transform: Transform::from_translation(Vec3::Z * -250.0),
+					..default()
+				},
 				SpinAnimation {
 					current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
 					..default()

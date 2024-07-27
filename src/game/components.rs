@@ -181,9 +181,6 @@ fn animation_easing_function(t: f32) -> f32 {
 pub struct SpinAnimation {
 	pub frequency: f32,
 	pub current_phase: f32,
-	pub jump_animation_progress: f32,
-	pub jump_animation_time: f32,
-	pub jump_animation_magitude: f32,
 }
 
 impl SpinAnimation {
@@ -192,6 +189,35 @@ impl SpinAnimation {
 		if self.current_phase < 0.0 {
 			self.current_phase += TAU;
 		}
+	}
+
+	pub fn sample(&self) -> f32 {
+		self.current_phase
+	}
+
+	pub const DEFAULT_FREQUENCY: f32 = 0.3;
+}
+
+impl Default for SpinAnimation {
+	fn default() -> Self {
+		Self {
+			frequency: Self::DEFAULT_FREQUENCY,
+			current_phase: 0.0,
+		}
+	}
+}
+
+/// A component that lets an entity rotate quickly
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct JumpTurnAnimation {
+	pub current_phase: f32,
+	pub jump_animation_progress: f32,
+	pub jump_animation_time: f32,
+	pub jump_animation_magitude: f32,
+}
+
+impl JumpTurnAnimation {
+	pub fn progress(&mut self, delta_seconds: f32) {
 		if self.jump_animation_progress < 1.0 {
 			self.jump_animation_progress += delta_seconds / self.jump_animation_time;
 		}
@@ -213,16 +239,13 @@ impl SpinAnimation {
 					* self.jump_animation_magitude
 		}
 	}
-
-	pub const DEFAULT_FREQUENCY: f32 = 0.3;
 }
 
-impl Default for SpinAnimation {
+impl Default for JumpTurnAnimation {
 	fn default() -> Self {
 		Self {
-			frequency: Self::DEFAULT_FREQUENCY,
 			current_phase: 0.0,
-			jump_animation_progress: 1.0,
+			jump_animation_progress: 0.0,
 			jump_animation_magitude: 0.0,
 			jump_animation_time: 0.0,
 		}

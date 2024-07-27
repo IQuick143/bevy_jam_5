@@ -21,6 +21,7 @@ pub(super) fn plugin(app: &mut App) {
 pub enum ImageKey {
 	Object(ThingType),
 	CycleCenter(CycleTurnability),
+	CycleRotationArrow,
 }
 
 impl AssetKey for ImageKey {
@@ -54,6 +55,10 @@ impl FromWorld for HandleMap<ImageKey> {
 			(
 				ImageKey::CycleCenter(CycleTurnability::WithPlayer),
 				asset_server.load("images/cycle-player.png"),
+			),
+			(
+				ImageKey::CycleRotationArrow,
+				asset_server.load("images/cycle-rot.png"),
 			),
 		]
 		.into()

@@ -23,6 +23,7 @@ pub fn plugin(app: &mut App) {
 			)
 				.after(logic::LogicSystemSet),
 			spin_animation_system,
+			jump_turn_animation_system,
 		),
 	);
 }
@@ -175,19 +176,28 @@ fn button_trigger_animation_system(
 
 fn cycle_center_turnability_visuals_update_system(
 	cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
-	mut sprites_q: Query<(&mut SpinAnimation, &mut Sprite)>,
+	mut sprites_q: Query<&mut Sprite, With<JumpTurnAnimation>>,
+	mut arrows_q: Query<&mut Visibility, With<SpinAnimation>>,
 	palette: Res<ThingPalette>,
 ) {
 	for (is_turnable, children) in &cycles_q {
-		let Ok((mut animation, mut sprite)) = sprites_q.get_mut(children[0]) else {
-			log::warn!("Child of cycle entity does not have SpinAnimation and Sprite components");
+		let Ok(mut sprite) = sprites_q.get_mut(children[0]) else {
+			log::warn!(
+				"Child of cycle entity does not have JumpTurnAnimation and Sprite components"
+			);
+			continue;
+		};
+		let Ok(mut arrow_visibility) = arrows_q.get_mut(children[1]) else {
+			log::warn!(
+				"Child of cycle entity does not have SpinAnimation and Visibility components"
+			);
 			continue;
 		};
 		if is_turnable.0 {
-			animation.frequency = SpinAnimation::DEFAULT_FREQUENCY;
+			*arrow_visibility = default();
 			sprite.color = palette.cycle_ready;
 		} else {
-			animation.frequency = 0.0;
+			*arrow_visibility = Visibility::Hidden;
 			sprite.color = palette.cycle_disabled;
 		}
 	}
@@ -204,7 +214,7 @@ fn cycle_center_interaction_visuals_update_system(
 		Changed<CycleInteraction>,
 	>,
 	all_cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
-	mut sprites_q: Query<&mut Sprite, With<SpinAnimation>>,
+	mut sprites_q: Query<&mut Sprite, With<JumpTurnAnimation>>,
 	palette: Res<ThingPalette>,
 ) {
 	for (interaction, is_turnable, links, children) in &cycles_q {
@@ -225,7 +235,7 @@ fn cycle_center_interaction_visuals_update_system(
 		for (id, is_turnable) in target_sprites {
 			let Ok(mut sprite) = sprites_q.get_mut(id) else {
 				log::warn!(
-					"Child of cycle entity does not have SpinAnimation and Sprite components"
+					"Child of cycle entity does not have JumpTurnAnimation and Sprite components"
 				);
 				continue;
 			};
@@ -251,11 +261,22 @@ fn spin_animation_system(
 	}
 }
 
+fn jump_turn_animation_system(
+	mut query: Query<(&mut JumpTurnAnimation, &mut Transform)>,
+	time: Res<Time<Real>>,
+) {
+	let delta_seconds = time.delta_seconds();
+	for (mut animation, mut transform) in &mut query {
+		animation.progress(delta_seconds);
+		transform.rotation = Quat::from_axis_angle(Vec3::Z, animation.sample());
+	}
+}
+
 const CYCLE_CENTER_ANIMATION_ANGLE: f32 = std::f32::consts::PI / 2.0;
 
 fn cycle_turning_animation_system(
 	cycles_q: Query<&Children, With<CycleVertices>>,
-	mut spin_q: Query<&mut SpinAnimation>,
+	mut jump_q: Query<&mut JumpTurnAnimation>,
 	mut events: EventReader<RotateSingleCycle>,
 ) {
 	for event in events.read() {
@@ -263,8 +284,8 @@ fn cycle_turning_animation_system(
 			log::warn!("RotateSingleCycle event does not target a cycle entity");
 			continue;
 		};
-		let Ok(mut animation) = spin_q.get_mut(children[0]) else {
-			log::warn!("Child of cycle entity does not have SpinAnimation component");
+		let Ok(mut animation) = jump_q.get_mut(children[0]) else {
+			log::warn!("Child of cycle entity does not have JumpTurnAnimation component");
 			continue;
 		};
 		let direction_multiplier = match event.0.direction.into() {
