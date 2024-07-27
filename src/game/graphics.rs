@@ -4,10 +4,10 @@ use crate::game::prelude::*;
 pub const GAME_AREA: Vec2 = Vec2::new(1600.0, 900.0);
 
 /// Rectangle extents into which the level should fit for layout purposes.
-pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 800.0);
+pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 750.0);
 /// Center of the rectangle into which the level should fit for layout purposes.
 /// See [`LEVEL_AREA_WIDTH`]
-pub const LEVEL_AREA_CENTER: Vec2 = Vec2::new(0.0, 0.0);
+pub const LEVEL_AREA_CENTER: Vec2 = Vec2::new(0.0, 25.0);
 
 /// Size of the hint text at the bottom of the level
 /// Position is glued to the bottom of the [`GAME_AREA`]
