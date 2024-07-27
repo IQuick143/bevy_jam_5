@@ -1,0 +1,18 @@
+VERTEX a b c d e f g h i j k x
+
+CYCLE main a b c d e f g
+CYCLE side h i j k
+CYCLE[STILL] connect a h
+CYCLE[MANUAL] spin g f x
+
+OBJECT[PLAYER] b
+OBJECT[FLAG] c
+OBJECT[BOX] d
+OBJECT[BUTTON] j
+
+LINK spin connect
+
+PLACE main 0 0 100
+PLACE connect 140 0 40
+PLACE side 210.7 -70.7 60
+PLACE spin 50 120 50

@@ -78,11 +78,6 @@ fn switch_level(
 	keyboard: Res<ButtonInput<KeyCode>>,
 	mut next_screen: EventWriter<QueueScreenTransition<PlayingLevel>>,
 ) {
-	if keyboard.just_pressed(KeyCode::Digit1) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Cycle,
-		))));
-	}
 	if keyboard.just_pressed(KeyCode::Digit2) {
 		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Bicycle,
@@ -98,16 +93,6 @@ fn switch_level(
 			crate::game::LevelID::CargoTricycle,
 		))));
 	}
-	if keyboard.just_pressed(KeyCode::Digit5) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::SquareCycle,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::Digit6) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::DiamondCycle,
-		))));
-	}
 	if keyboard.just_pressed(KeyCode::Digit7) {
 		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Lotus,
@@ -118,11 +103,6 @@ fn switch_level(
 			crate::game::LevelID::ThreeInARow,
 		))));
 	}
-	if keyboard.just_pressed(KeyCode::Digit9) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::TripleRing,
-		))));
-	}
 	if keyboard.just_pressed(KeyCode::Digit0) {
 		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Car,
@@ -131,16 +111,6 @@ fn switch_level(
 	if keyboard.just_pressed(KeyCode::KeyQ) {
 		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
 			crate::game::LevelID::Olympic,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::KeyW) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Pedalo,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::KeyE) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Pyramid,
 		))));
 	}
 }
