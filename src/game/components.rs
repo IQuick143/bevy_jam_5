@@ -2,7 +2,10 @@
 
 use std::f32::consts::TAU;
 
-use bevy::{math::bounding::{Aabb2d, BoundingCircle}, prelude::*};
+use bevy::{
+	math::bounding::{Aabb2d, BoundingCircle},
+	prelude::*,
+};
 
 use super::{events::CycleTurningDirection, level::ThingType};
 

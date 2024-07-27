@@ -3,11 +3,11 @@
 // Unused utilities and re-exports may trigger these lints undesirably.
 #![allow(dead_code, unused_imports)]
 
+pub mod hover;
 pub mod interaction;
 pub mod palette;
 pub mod screen_fade;
 mod widgets;
-pub mod hover;
 
 pub mod prelude {
 	pub use super::{

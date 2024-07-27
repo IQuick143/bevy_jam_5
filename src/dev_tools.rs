@@ -7,7 +7,10 @@ use crate::{
 	},
 	screen::QueueScreenTransition,
 };
-use bevy::{color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume, utils::hashbrown::HashMap};
+use bevy::{
+	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
+	utils::hashbrown::HashMap,
+};
 
 use crate::screen::Screen;
 
@@ -28,10 +31,19 @@ pub(super) fn plugin(app: &mut App) {
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
 	for (hover, transform) in hoverables.iter() {
 		if let Some(bounding_box) = hover.hover_bounding_box {
-			gizmos.rect_2d(transform.translation().xy() + bounding_box.center(), Rot2::IDENTITY, bounding_box.half_size() * 2.0, palettes::basic::LIME);
+			gizmos.rect_2d(
+				transform.translation().xy() + bounding_box.center(),
+				Rot2::IDENTITY,
+				bounding_box.half_size() * 2.0,
+				palettes::basic::LIME,
+			);
 		}
 		if let Some(bounding_circle) = hover.hover_bounding_circle {
-			gizmos.circle_2d(transform.translation().xy() + bounding_circle.center, bounding_circle.radius(), palettes::basic::LIME);
+			gizmos.circle_2d(
+				transform.translation().xy() + bounding_circle.center,
+				bounding_circle.radius(),
+				palettes::basic::LIME,
+			);
 		}
 	}
 }
