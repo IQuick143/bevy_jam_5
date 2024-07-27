@@ -329,7 +329,6 @@ fn spawn_level(
 	cycle_material: ResMut<RingMaterial>,
 	palette: ResMut<ThingPalette>,
 	image_handles: Res<HandleMap<ImageKey>>,
-	mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
 	println!("Spawning!"); //TODO: debug
 	let data = trigger.event().0.clone();
@@ -338,10 +337,6 @@ fn spawn_level(
 		layout.recompute_to_fit(LEVEL_AREA_WIDTH / 2.0, LEVEL_AREA_CENTER);
 		layout
 	};
-
-	let texture_layout =
-		TextureAtlasLayout::from_grid(UVec2::splat(32), 6, 2, Some(UVec2::splat(1)), None);
-	let texture_atlas_layout = texture_atlas_layouts.add(texture_layout);
 
 	let vertices: Vec<Entity> = data
 		.vertices
@@ -356,7 +351,6 @@ fn spawn_level(
 				cycle_material.0.clone(),
 				palette.as_ref(),
 				image_handles.as_ref(),
-				texture_atlas_layout.clone(),
 			)
 		})
 		.collect();
@@ -403,7 +397,6 @@ fn spawn_vertex(
 	base_material: Handle<ColorMaterial>,
 	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
-	texture_atlas_layout: Handle<TextureAtlasLayout>,
 ) -> Entity {
 	let transform =
 		TransformBundle::from_transform(Transform::from_translation(position.extend(0.0)));
@@ -424,10 +417,6 @@ fn spawn_vertex(
 			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 			material: base_material,
 			..default()
-		},
-		TextureAtlas {
-			layout: texture_atlas_layout.clone(),
-			index: 0,
 		},
 	));
 	if let Some(object_type) = data.object {
