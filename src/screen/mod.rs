@@ -73,7 +73,7 @@ pub struct QueueScreenTransition {
 
 #[allow(dead_code)]
 impl QueueScreenTransition {
-	fn new(next_screen: Screen, fade: bool) -> Self {
+	pub fn new(next_screen: Screen, fade: bool) -> Self {
 		QueueScreenTransition { next_screen, fade }
 	}
 
@@ -84,7 +84,7 @@ impl QueueScreenTransition {
 		}
 	}
 
-	fn instant(next_screen: Screen) -> Self {
+	pub fn instant(next_screen: Screen) -> Self {
 		QueueScreenTransition {
 			next_screen,
 			fade: false,
