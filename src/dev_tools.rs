@@ -9,7 +9,7 @@ use crate::{
 };
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions,
-	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
+	math::bounding::BoundingVolume,
 	utils::hashbrown::HashMap,
 };
 
@@ -26,22 +26,8 @@ pub(super) fn plugin(app: &mut App) {
 			//gizmo_draw,
 			draw_layout,
 			draw_hover_boxes,
-			reload_screen.run_if(input_just_pressed(KeyCode::KeyR)),
 		),
 	);
-}
-
-fn reload_screen(
-	mut commands: Commands,
-	state: Res<State<PlayingLevel>>,
-	mut transition: EventWriter<QueueScreenTransition<PlayingLevel>>,
-	query: Query<Entity, With<StateScoped<PlayingLevel>>>,
-) {
-	// Despawn state-scoped entities explicitly since the state does not actually change
-	for e in &query {
-		commands.entity(e).despawn_recursive();
-	}
-	transition.send(QueueScreenTransition::instant(*state.get()));
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {

@@ -26,11 +26,16 @@ pub(super) fn plugin(app: &mut App) {
 			(
 				process_enqueued_transitions::<PlayingLevel>,
 				return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
+				reload_level.run_if(input_just_pressed(KeyCode::KeyR)),
 				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 				game_ui_input_system,
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 			)
 				.run_if(in_state(Screen::Playing)),
+		)
+		.add_systems(
+			Update,
+			despawn_level_state_scoped.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 		);
 }
 
@@ -45,11 +50,19 @@ struct NextLevelButton;
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
+	Reset,
 	NextLevel,
 }
 
 fn return_to_level_select_screen(mut next_screen: EventWriter<QueueScreenTransition<Screen>>) {
 	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+}
+
+fn reload_level(
+	state: Res<State<PlayingLevel>>,
+	mut transition: EventWriter<QueueScreenTransition<PlayingLevel>>,
+) {
+	transition.send(QueueScreenTransition::fade(*state.get()));
 }
 
 fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
@@ -74,10 +87,11 @@ fn spawn_game_ui(mut commands: Commands) {
 		))
 		.with_children(|parent| {
 			parent.button("Back").insert(GameUiAction::Back);
+			parent.button("Reset").insert(GameUiAction::Reset);
 			parent
 				.button("Next Level")
-				.insert(GameUiAction::NextLevel)
 				.insert((
+					GameUiAction::NextLevel,
 					NextLevelButton,
 					InteractionPalette {
 						none: bevy::color::palettes::tailwind::GREEN_500.into(),
@@ -101,6 +115,9 @@ fn game_ui_input_system(
 		match action {
 			GameUiAction::Back => {
 				next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+			}
+			GameUiAction::Reset => {
+				next_level.send(QueueScreenTransition::fade(*playing_level.get()));
 			}
 			GameUiAction::NextLevel => {
 				let playing_level = playing_level
@@ -135,6 +152,18 @@ fn update_next_level_button_display(
 	};
 	for mut style in &mut query {
 		style.display = display;
+	}
+}
+
+/// Custom handler for despawning level-scoped entities
+/// Unlike the built-in despawner, this despawns everything
+/// in all transitions, including identity transitions
+fn despawn_level_state_scoped(
+	mut commands: Commands,
+	query: Query<Entity, With<StateScoped<PlayingLevel>>>,
+) {
+	for e in &query {
+		commands.entity(e).despawn_recursive();
 	}
 }
 
