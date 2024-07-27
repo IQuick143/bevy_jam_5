@@ -88,17 +88,15 @@ fn spawn_game_ui(mut commands: Commands) {
 		.with_children(|parent| {
 			parent.button("Back").insert(GameUiAction::Back);
 			parent.button("Reset").insert(GameUiAction::Reset);
-			parent
-				.button("Next Level")
-				.insert((
-					GameUiAction::NextLevel,
-					NextLevelButton,
-					InteractionPalette {
-						none: bevy::color::palettes::tailwind::GREEN_500.into(),
-						hovered: bevy::color::palettes::tailwind::GREEN_700.into(),
-						pressed: bevy::color::palettes::tailwind::GREEN_400.into(),
-					},
-				));
+			parent.button("Next Level").insert((
+				GameUiAction::NextLevel,
+				NextLevelButton,
+				InteractionPalette {
+					none: bevy::color::palettes::tailwind::GREEN_500.into(),
+					hovered: bevy::color::palettes::tailwind::GREEN_700.into(),
+					pressed: bevy::color::palettes::tailwind::GREEN_400.into(),
+				},
+			));
 		});
 }
 

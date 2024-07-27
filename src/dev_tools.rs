@@ -8,8 +8,7 @@ use crate::{
 	screen::{PlayingLevel, QueueScreenTransition},
 };
 use bevy::{
-	color::palettes, dev_tools::states::log_transitions,
-	math::bounding::BoundingVolume,
+	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
 	utils::hashbrown::HashMap,
 };
 
