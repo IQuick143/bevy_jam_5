@@ -438,7 +438,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 	/// ## Parameters
 	/// - `target_vertex` - Index of the vertex to place
 	/// - `clock_angle` - Clock angle between the center of the owning
-	/// cycle and the vertex (zero is up, positive is clockwise)
+	///   cycle and the vertex (zero is up, positive is clockwise)
 	pub fn place_vertex(
 		&mut self,
 		target_vertex: usize,
@@ -624,9 +624,9 @@ impl<'w> LevelLayoutBuilder<'w> {
 	/// ## Notes
 	/// - The cycle to test against must already be placed
 	/// - Materialized points are intentionally passed as an iterator.
-	/// The list is searched linearly for every vertex of the cycle,
-	/// as the list is expected to be very small.
-	/// Use a fast implementation of iterator
+	///   The list is searched linearly for every vertex of the cycle,
+	///   as the list is expected to be very small.
+	///   Use a fast implementation of iterator
 	/// - Only the cycle order is verified, radius of the cycle is not checked
 	fn verify_materialization_against_cycle(
 		&self,
