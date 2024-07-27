@@ -7,7 +7,10 @@ use crate::{
 	},
 	screen::QueueScreenTransition,
 };
-use bevy::{color::palettes, dev_tools::states::log_transitions, utils::hashbrown::HashMap};
+use bevy::{
+	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
+	utils::hashbrown::HashMap,
+};
 
 use crate::screen::Screen;
 
@@ -20,9 +23,29 @@ pub(super) fn plugin(app: &mut App) {
 			switch_level,
 			//gizmo_draw,
 			draw_layout,
+			draw_hover_boxes,
 		),
 	);
-	app.add_systems(Startup, spawn_text);
+}
+
+fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
+	for (hover, transform) in hoverables.iter() {
+		if let Some(bounding_box) = hover.hover_bounding_box {
+			gizmos.rect_2d(
+				transform.translation().xy() + bounding_box.center(),
+				Rot2::IDENTITY,
+				bounding_box.half_size() * 2.0,
+				palettes::basic::LIME,
+			);
+		}
+		if let Some(bounding_circle) = hover.hover_bounding_circle {
+			gizmos.circle_2d(
+				transform.translation().xy() + bounding_circle.center,
+				bounding_circle.radius(),
+				palettes::basic::LIME,
+			);
+		}
+	}
 }
 
 fn draw_layout(mut gizmos: Gizmos) {
@@ -103,53 +126,6 @@ fn switch_level(
 		next_screen.send(QueueScreenTransition::fade(Screen::Level(
 			crate::game::LevelID::Pyramid,
 		)));
-	}
-}
-
-fn spawn_text(mut commands: Commands, asset_server: Res<AssetServer>) {
-	let text_box_z = -100.0;
-	let text_box_loc = Vec2::new(0.0, -337.5);
-	let text_box_size = Vec2::new(1600.0, 225.0);
-	let text_box_color = Color::srgba(0.3, 0.3, 0.3, 0.8);
-	let margin = 10.0;
-	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
-	commands
-		.spawn((SpriteBundle {
-			transform: Transform::from_xyz(text_box_loc.x, text_box_loc.y, text_box_z),
-			sprite: Sprite {
-				color: text_box_color,
-				custom_size: Some(text_box_size),
-				..default()
-			},
-			..default()
-		},))
-		.with_children(|parent| {
-			parent.spawn((Text2dBundle {
-				text_2d_bounds: bevy::text::Text2dBounds {
-					size: Vec2::new(
-						text_box_size.x - margin * 2.0,
-						text_box_size.y - margin * 2.0,
-					),
-				},
-				transform: Transform::from_xyz(
-					-text_box_size.x / 2.0 + margin,
-					text_box_size.y / 2.0 - margin,
-					0.1, // Relative to text box
-				),
-				text_anchor: bevy::sprite::Anchor::TopLeft,
-				text: Text::from_section(text, get_text_style(&asset_server))
-					.with_justify(JustifyText::Left),
-				..default()
-			},));
-		});
-}
-
-fn get_text_style(_asset_server: &Res<AssetServer>) -> TextStyle {
-	TextStyle {
-		//font: asset_server.load("fonts/your_font_here.ttf"),
-		font_size: 32.0,
-		color: Color::srgba(0.9, 0.9, 0.9, 1.0),
-		..default()
 	}
 }
 

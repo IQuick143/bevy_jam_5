@@ -8,9 +8,13 @@ use crate::{
 		prelude::*,
 	},
 	screen::DestroyOnTransition,
+	ui::hover,
 };
 
-use bevy::math::primitives;
+use bevy::math::{
+	bounding::{Aabb2d, BoundingCircle},
+	primitives,
+};
 use bevy::sprite::Anchor::Custom;
 use itertools::Itertools;
 use rand::Rng;
@@ -174,6 +178,14 @@ fn spawn_vertex(
 						..Default::default()
 					},
 					AnimatedObject::default(),
+					Hoverable {
+						hover_text: hover::PLAYER,
+						hover_bounding_circle: None,
+						hover_bounding_box: Some(Aabb2d::new(
+							SPRITE_LENGTH * Vec2::new(0.0, 0.25),
+							SPRITE_LENGTH * Vec2::new(0.25, 0.4),
+						)),
+					},
 				))
 				.id(),
 			ObjectType::Box => commands
@@ -195,6 +207,14 @@ fn spawn_vertex(
 						..Default::default()
 					},
 					AnimatedObject::default(),
+					Hoverable {
+						hover_text: hover::BOX,
+						hover_bounding_circle: None,
+						hover_bounding_box: Some(Aabb2d::new(
+							SPRITE_LENGTH * Vec2::new(0.0, 0.125),
+							SPRITE_LENGTH * Vec2::new(0.25, 0.25),
+						)),
+					},
 				))
 				.id(),
 		};
@@ -223,6 +243,14 @@ fn spawn_vertex(
 						transform: Transform::from_translation(position.extend(-50.0)),
 						..Default::default()
 					},
+					Hoverable {
+						hover_text: hover::BUTTON,
+						hover_bounding_circle: None,
+						hover_bounding_box: Some(Aabb2d::new(
+							SPRITE_LENGTH * Vec2::new(0.0, -0.125),
+							SPRITE_LENGTH * Vec2::new(0.375, 0.125),
+						)),
+					},
 				))
 				.id(),
 			GlyphType::Flag => commands
@@ -242,6 +270,14 @@ fn spawn_vertex(
 						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
 						transform: Transform::from_translation(position.extend(-50.0)),
 						..Default::default()
+					},
+					Hoverable {
+						hover_text: hover::FLAG,
+						hover_bounding_circle: None,
+						hover_bounding_box: Some(Aabb2d::new(
+							SPRITE_LENGTH * Vec2::new(0.0, 0.125),
+							SPRITE_LENGTH * Vec2::new(0.25, 0.30),
+						)),
 					},
 				))
 				.id(),
@@ -304,6 +340,17 @@ fn spawn_cycle(
 					..default()
 				},
 				JumpTurnAnimation::default(),
+				Hoverable {
+					hover_text: match data.cycle_turnability {
+						CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
+						CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
+					},
+					hover_bounding_circle: Some(BoundingCircle::new(
+						Vec2::ZERO,
+						SPRITE_LENGTH / 2.0,
+					)),
+					hover_bounding_box: None,
+				},
 			));
 			parent.spawn((
 				SpriteBundle {
