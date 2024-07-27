@@ -3,9 +3,10 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::game::{
-	assets::{HandleMap, LevelID, PlainText},
+	assets::{HandleMap, PlainText},
 	events::SpawnLevel,
 	level::{self, layout::LevelLayout, ValidLevelData},
+	LevelID,
 };
 
 use super::{process_enqueued_transitions, PendingTransition, QueueScreenTransition, Screen};

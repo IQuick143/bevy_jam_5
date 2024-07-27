@@ -4,7 +4,10 @@
 use bevy::prelude::*;
 
 use super::Screen;
-use crate::{game::assets::*, ui::prelude::*};
+use crate::{
+	game::{assets::*, LevelID},
+	ui::prelude::*,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Loading), enter_loading);

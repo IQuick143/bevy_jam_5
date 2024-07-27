@@ -21,7 +21,29 @@ pub mod prelude {
 
 use bevy::prelude::*;
 
-pub use assets::LevelID;
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum LevelID {
+	Intro,
+	Boxes,
+	Manual,
+	Cycle,
+	Bicycle,
+	Swap,
+	Tricycle,
+	CargoTricycle,
+	CargoSinglePlayer,
+	SquareCycle,
+	DiamondCycle,
+	Lotus,
+	ThreeInARow,
+	TripleRing,
+	Car,
+	Olympic,
+	Pedalo,
+	Disrupt,
+	Pyramid,
+	Teamwork,
+}
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((

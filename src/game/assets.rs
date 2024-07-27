@@ -1,6 +1,6 @@
 use bevy::{asset::AsyncReadExt, prelude::*, utils::HashMap};
 
-use super::{level::ThingType, prelude::CycleTurnability};
+use super::{level::ThingType, prelude::CycleTurnability, LevelID};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<ImageKey>>();
@@ -129,30 +129,6 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 		]
 		.into()
 	}
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
-pub enum LevelID {
-	Intro,
-	Boxes,
-	Manual,
-	Cycle,
-	Bicycle,
-	Swap,
-	Tricycle,
-	CargoTricycle,
-	CargoSinglePlayer,
-	SquareCycle,
-	DiamondCycle,
-	Lotus,
-	ThreeInARow,
-	TripleRing,
-	Car,
-	Olympic,
-	Pedalo,
-	Disrupt,
-	Pyramid,
-	Teamwork,
 }
 
 #[derive(Asset, Clone, Deref, DerefMut, Debug, Reflect)]
