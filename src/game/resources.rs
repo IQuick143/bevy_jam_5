@@ -53,6 +53,7 @@ pub struct ThingPalette {
 	pub goal_open: Color,
 	pub cycle_disabled: Color,
 	pub cycle_ready: Color,
+	pub cycle_trigger: Color,
 }
 
 impl Default for ThingPalette {
@@ -68,6 +69,7 @@ impl Default for ThingPalette {
 			goal_open: p::GREEN_500.into(),
 			cycle_disabled: p::GRAY_200.into(),
 			cycle_ready: p::GRAY_300.into(),
+			cycle_trigger: p::GRAY_400.into(),
 		}
 	}
 }

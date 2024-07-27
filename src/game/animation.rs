@@ -14,9 +14,11 @@ pub fn plugin(app: &mut App) {
 					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
 				(
 					button_trigger_animation_system,
-					cycle_center_visuals_update_system,
+					cycle_center_turnability_visuals_update_system
+						.before(cycle_center_interaction_visuals_update_system),
 				)
 					.run_if(on_event::<GameLayoutChanged>()),
+				cycle_center_interaction_visuals_update_system,
 				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>()),
 			)
 				.after(logic::LogicSystemSet),
@@ -171,7 +173,7 @@ fn button_trigger_animation_system(
 	}
 }
 
-fn cycle_center_visuals_update_system(
+fn cycle_center_turnability_visuals_update_system(
 	cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
 	mut sprites_q: Query<(&mut SpinAnimation, &mut Sprite)>,
 	palette: Res<ThingPalette>,
@@ -187,6 +189,53 @@ fn cycle_center_visuals_update_system(
 		} else {
 			animation.frequency = 0.0;
 			sprite.color = palette.cycle_disabled;
+		}
+	}
+}
+
+fn cycle_center_interaction_visuals_update_system(
+	cycles_q: Query<
+		(
+			&CycleInteraction,
+			&ComputedCycleTurnability,
+			Option<&LinkedCycles>,
+			&Children,
+		),
+		Changed<CycleInteraction>,
+	>,
+	all_cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
+	mut sprites_q: Query<&mut Sprite, With<SpinAnimation>>,
+	palette: Res<ThingPalette>,
+) {
+	for (interaction, is_turnable, links, children) in &cycles_q {
+		let target_sprites = std::iter::once((children[0], is_turnable.0)).chain(
+			links
+				.into_iter()
+				.flat_map(|links| &links.0)
+				.filter_map(|&(id, _)| {
+					all_cycles_q
+						.get(id)
+						.inspect_err(|e| {
+							log::warn!("LinkedCycles refers to a non-cycle entity {e}")
+						})
+						.ok()
+						.map(|(turnable, children)| (children[0], turnable.0))
+				}),
+		);
+		for (id, is_turnable) in target_sprites {
+			let Ok(mut sprite) = sprites_q.get_mut(id) else {
+				log::warn!(
+					"Child of cycle entity does not have SpinAnimation and Sprite components"
+				);
+				continue;
+			};
+			sprite.color = if *interaction != CycleInteraction::None {
+				palette.cycle_trigger
+			} else if is_turnable {
+				palette.cycle_ready
+			} else {
+				palette.cycle_disabled
+			};
 		}
 	}
 }
