@@ -41,31 +41,11 @@ fn spawn_screen(mut commands: Commands) {
 					..default()
 				})
 				.with_children(|parent| {
-					let mut button = |text: &str, level: LevelID| {
+					for level_id in &LevelID::LEVEL_ORDER {
 						parent
-							.small_button(text)
-							.insert(LevelSelectAction::PlayLevel(level));
-					};
-					use LevelID::*;
-					button("Intro", Intro);
-					button("Transfer", Transfer);
-					button("Boxes", Boxes);
-					button("Manual", Manual);
-					button("Sync", Sync);
-					button("Swap", Swap);
-					button("Sort", Sort);
-					button("Bicycle", Bicycle);
-					button("Tricycle", Tricycle);
-					button("CargoTricycle", CargoTricycle);
-					button("CargoSingle", CargoSinglePlayer);
-					button("Lotus", Lotus);
-					button("ThreeInARow", ThreeInARow);
-					button("Car", Car);
-					button("Olympic", Olympic);
-					button("Disrupt", Disrupt);
-					button("Send", Send);
-					button("Teamwork", Teamwork);
-					button("Sort 2", Sort2);
+							.small_button(level_id.level_name())
+							.insert(LevelSelectAction::PlayLevel(*level_id));
+					}
 				});
 			parent.button("Back").insert(LevelSelectAction::Back);
 		});

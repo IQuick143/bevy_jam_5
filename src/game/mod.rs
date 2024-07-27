@@ -50,28 +50,60 @@ pub enum LevelID {
 impl LevelID {
 	/// Get the level that comes after a specific one, if any
 	pub fn next_level(self) -> Option<Self> {
+		let mut level_order = Self::LEVEL_ORDER.iter();
+		level_order
+			.find(|x| **x == self)
+			.expect("All levels should be included in canonical order");
+		level_order.next().copied()
+	}
+
+	/// Get the display name of a level
+	pub fn level_name(self) -> &'static str {
 		match self {
-			Self::Intro => Some(Self::Transfer),
-			Self::Transfer => Some(Self::Boxes),
-			Self::Boxes => Some(Self::Manual),
-			Self::Manual => Some(Self::Sync),
-			Self::Sync => Some(Self::Bicycle),
-			Self::Bicycle => Some(Self::Swap),
-			Self::Swap => Some(Self::Sort),
-			Self::Sort => Some(Self::Tricycle),
-			Self::Tricycle => Some(Self::CargoTricycle),
-			Self::CargoTricycle => Some(Self::CargoSinglePlayer),
-			Self::CargoSinglePlayer => Some(Self::Lotus),
-			Self::Lotus => Some(Self::ThreeInARow),
-			Self::ThreeInARow => Some(Self::Car),
-			Self::Car => Some(Self::Olympic),
-			Self::Olympic => Some(Self::Disrupt),
-			Self::Disrupt => Some(Self::Send),
-			Self::Send => Some(Self::Teamwork),
-			Self::Teamwork => Some(Self::Sort2),
-			Self::Sort2 => None,
+			Self::Intro => "Intro",
+			Self::Transfer => "Transfer",
+			Self::Boxes => "Boxes",
+			Self::Manual => "Manual",
+			Self::Sync => "Sync",
+			Self::Bicycle => "Bicycle",
+			Self::Swap => "Swap",
+			Self::Sort => "Sort",
+			Self::Tricycle => "Tricycle",
+			Self::CargoTricycle => "Tricycle 2",
+			Self::CargoSinglePlayer => "Tricycle 3",
+			Self::Lotus => "Lotus",
+			Self::ThreeInARow => "ThreeInARow",
+			Self::Car => "Car",
+			Self::Olympic => "Olympic",
+			Self::Disrupt => "Disrupt",
+			Self::Send => "Send",
+			Self::Teamwork => "Teamwork",
+			Self::Sort2 => "Sort 2",
 		}
 	}
+
+	/// The canonical level order
+	pub const LEVEL_ORDER: [LevelID; 19] = [
+		Self::Intro,
+		Self::Transfer,
+		Self::Boxes,
+		Self::Manual,
+		Self::Sync,
+		Self::Bicycle,
+		Self::Swap,
+		Self::Sort,
+		Self::Tricycle,
+		Self::CargoTricycle,
+		Self::CargoSinglePlayer,
+		Self::Lotus,
+		Self::ThreeInARow,
+		Self::Car,
+		Self::Olympic,
+		Self::Disrupt,
+		Self::Send,
+		Self::Teamwork,
+		Self::Sort2,
+	];
 }
 
 pub(super) fn plugin(app: &mut App) {

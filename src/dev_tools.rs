@@ -78,40 +78,24 @@ fn switch_level(
 	keyboard: Res<ButtonInput<KeyCode>>,
 	mut next_screen: EventWriter<QueueScreenTransition<PlayingLevel>>,
 ) {
-	if keyboard.just_pressed(KeyCode::Digit2) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Bicycle,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::Digit3) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Tricycle,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::Digit4) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::CargoTricycle,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::Digit7) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Lotus,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::Digit8) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::ThreeInARow,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::Digit0) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Car,
-		))));
-	}
-	if keyboard.just_pressed(KeyCode::KeyQ) {
-		next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(
-			crate::game::LevelID::Olympic,
-		))));
+	const SWITCH_INPUTS: [KeyCode; 10] = [
+		KeyCode::Digit1,
+		KeyCode::Digit2,
+		KeyCode::Digit3,
+		KeyCode::Digit4,
+		KeyCode::Digit5,
+		KeyCode::Digit6,
+		KeyCode::Digit7,
+		KeyCode::Digit8,
+		KeyCode::Digit9,
+		KeyCode::Digit0,
+	];
+
+	for (key, level_id) in SWITCH_INPUTS.iter().zip(LevelID::LEVEL_ORDER) {
+		if keyboard.just_pressed(*key) {
+			next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(level_id))));
+			return;
+		}
 	}
 }
 
