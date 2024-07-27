@@ -2,11 +2,14 @@
 
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-use crate::game::{
-	assets::{HandleMap, PlainText},
-	events::SpawnLevel,
-	level::{self, layout::LevelLayout, ValidLevelData},
-	LevelID,
+use crate::{
+	game::{
+		assets::{HandleMap, PlainText},
+		events::SpawnLevel,
+		level::{self, layout::LevelLayout, ValidLevelData},
+		LevelID,
+	},
+	ui::prelude::*,
 };
 
 use super::{process_enqueued_transitions, PendingTransition, QueueScreenTransition, Screen};
@@ -16,7 +19,7 @@ pub(super) fn plugin(app: &mut App) {
 		.init_resource::<PendingTransition<PlayingLevel>>()
 		.add_event::<QueueScreenTransition<PlayingLevel>>()
 		.enable_state_scoped_entities::<PlayingLevel>()
-		.add_systems(OnEnter(Screen::Playing), load_level)
+		.add_systems(OnEnter(Screen::Playing), (load_level, spawn_game_ui))
 		.add_systems(OnExit(Screen::Playing), clear_playing_level_state)
 		.add_systems(
 			Update,
@@ -24,6 +27,7 @@ pub(super) fn plugin(app: &mut App) {
 				process_enqueued_transitions::<PlayingLevel>,
 				return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
 				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
+				game_ui_input_system,
 			)
 				.run_if(in_state(Screen::Playing)),
 		);
@@ -33,12 +37,76 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(States, Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct PlayingLevel(pub Option<LevelID>);
 
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+enum GameUiAction {
+	Back,
+	NextLevel,
+}
+
 fn return_to_level_select_screen(mut next_screen: EventWriter<QueueScreenTransition<Screen>>) {
 	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
 }
 
 fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
 	next_state.set(PlayingLevel(None));
+}
+
+fn spawn_game_ui(mut commands: Commands) {
+	commands
+		.ui_root()
+		.insert((
+			StateScoped(Screen::Playing),
+			Style {
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0),
+				justify_content: JustifyContent::Start,
+				align_items: AlignItems::Start,
+				flex_direction: FlexDirection::Row,
+				column_gap: Val::Px(10.0),
+				margin: UiRect::all(Val::Px(10.0)),
+				..default()
+			}
+		))
+		.with_children(|parent| {
+			parent.button("Back").insert(GameUiAction::Back);
+			parent
+				.button("Next Level")
+				.insert(GameUiAction::NextLevel)
+				.insert(InteractionPalette {
+					none: bevy::color::palettes::tailwind::GREEN_500.into(),
+					hovered: bevy::color::palettes::tailwind::GREEN_700.into(),
+					pressed: bevy::color::palettes::tailwind::GREEN_400.into(),
+				});
+		});
+}
+
+fn game_ui_input_system(
+	query: InteractionQuery<&GameUiAction>,
+	playing_level: Res<State<PlayingLevel>>,
+	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+	mut next_level: EventWriter<QueueScreenTransition<PlayingLevel>>,
+) {
+	for (interaction, action) in &query {
+		if *interaction != Interaction::Pressed {
+			continue;
+		}
+		match action {
+			GameUiAction::Back => {
+				next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+			}
+			GameUiAction::NextLevel => {
+				let playing_level = playing_level
+					.get()
+					.0
+					.expect("When in Screen::Playing state, PlayingLevel must also be set");
+				if let Some(next) = playing_level.next_level() {
+					next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(next))));
+				} else {
+					log::warn!("NextLevel action received on the last level");
+				}
+			}
+		}
+	}
 }
 
 fn load_level(
