@@ -6,10 +6,10 @@ CYCLE[MANUAL] black c d j p o i
 CYCLE[MANUAL] green v u p j k q
 CYCLE[MANUAL] red e f l r q k
 
-OBJECT[BOX] b c d e f h i j k l m n o p q r s t u v
-OBJECT[BUTTON] a b c d e g h i j k
-OBJECT[PLAYER] a g
-OBJECT[FLAG] f l
+OBJECT[BOX] b m
+OBJECT[BUTTON] f l
+OBJECT[PLAYER] a
+OBJECT[FLAG] a
 
 PLACE blue -400 300 300
 PLACE yellow 0 0 300

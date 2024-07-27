@@ -41,66 +41,34 @@ fn spawn_screen(mut commands: Commands) {
 					..default()
 				})
 				.with_children(|parent| {
-					parent
-						.small_button("Intro")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Intro));
-					parent
-						.small_button("Boxes")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Boxes));
-					parent
-						.small_button("Manual")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Manual));
-					parent
-						.small_button("Cycle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Cycle));
-					parent
-						.small_button("Swap")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Swap));
-					parent
-						.small_button("Bicycle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Bicycle));
-					parent
-						.small_button("Tricycle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Tricycle));
-					parent
-						.small_button("CargoTricycle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::CargoTricycle));
-					parent
-						.small_button("CargoSingle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::CargoSinglePlayer));
-					parent
-						.small_button("SquareCycle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::SquareCycle));
-					parent
-						.small_button("DiamondCycle")
-						.insert(LevelSelectAction::PlayLevel(LevelID::DiamondCycle));
-					parent
-						.small_button("Lotus")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Lotus));
-					parent
-						.small_button("ThreeInARow")
-						.insert(LevelSelectAction::PlayLevel(LevelID::ThreeInARow));
-					parent
-						.small_button("TripleRing")
-						.insert(LevelSelectAction::PlayLevel(LevelID::TripleRing));
-					parent
-						.small_button("Car")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Car));
-					parent
-						.small_button("Olympic")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Olympic));
-					parent
-						.small_button("Pedalo")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Pedalo));
-					parent
-						.small_button("Disrupt")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Disrupt));
-					parent
-						.small_button("Pyramid")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Pyramid));
-					parent
-						.small_button("Teamwork")
-						.insert(LevelSelectAction::PlayLevel(LevelID::Teamwork));
+					let mut button = |text: &str, level: LevelID| {
+						parent
+							.small_button(text)
+							.insert(LevelSelectAction::PlayLevel(level));
+					};
+					use LevelID::*;
+					button("Intro", Intro);
+					button("Boxes", Boxes);
+					button("Cycle", Cycle);
+					button("Transfer", Transfer);
+					button("Manual", Manual);
+					button("Swap", Swap);
+					button("Sort", Sort);
+					button("Bicycle", Bicycle);
+					button("Tricycle", Tricycle);
+					button("CargoTricycle", CargoTricycle);
+					button("CargoSingle", CargoSinglePlayer);
+					button("SquareCycle", SquareCycle);
+					button("DiamondCycle", DiamondCycle);
+					button("Lotus", Lotus);
+					button("ThreeInARow", ThreeInARow);
+					button("TripleRing", TripleRing);
+					button("Car", Car);
+					button("Olympic", Olympic);
+					button("Pedalo", Pedalo);
+					button("Disrupt", Disrupt);
+					button("Pyramid", Pyramid);
+					button("Teamwork", Teamwork);
 				});
 			parent.button("Back").insert(LevelSelectAction::Back);
 		});

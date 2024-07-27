@@ -77,7 +77,7 @@ impl<S: States> QueueScreenTransition<S> {
 		}
 	}
 
-	fn instant(next_screen: S) -> Self {
+	pub fn instant(next_screen: S) -> Self {
 		Self {
 			next_screen,
 			fade: false,

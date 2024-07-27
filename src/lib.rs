@@ -33,6 +33,8 @@ impl Plugin for AppPlugin {
 					// This causes errors and even panics on web build on itch.
 					// See https://github.com/bevyengine/bevy_github_ci_template/issues/48.
 					meta_check: AssetMetaCheck::Never,
+					#[cfg(feature = "dev")]
+					watch_for_changes_override: Some(true),
 					..default()
 				})
 				.set(WindowPlugin {

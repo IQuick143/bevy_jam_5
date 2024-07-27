@@ -8,7 +8,8 @@ use crate::{
 	screen::{PlayingLevel, QueueScreenTransition},
 };
 use bevy::{
-	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
+	color::palettes, dev_tools::states::log_transitions,
+	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
 	utils::hashbrown::HashMap,
 };
 
@@ -25,8 +26,16 @@ pub(super) fn plugin(app: &mut App) {
 			//gizmo_draw,
 			draw_layout,
 			draw_hover_boxes,
+			reload_screen.run_if(input_just_pressed(KeyCode::KeyR)),
 		),
 	);
+}
+
+fn reload_screen(
+	state: Res<State<Screen>>,
+	mut transition: EventWriter<QueueScreenTransition<Screen>>,
+) {
+	transition.send(QueueScreenTransition::instant(*state.get()));
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {

@@ -27,9 +27,11 @@ pub enum LevelID {
 	Intro,
 	Boxes,
 	Manual,
+	Transfer,
 	Cycle,
 	Bicycle,
 	Swap,
+	Sort,
 	Tricycle,
 	CargoTricycle,
 	CargoSinglePlayer,
@@ -44,6 +46,8 @@ pub enum LevelID {
 	Disrupt,
 	Pyramid,
 	Teamwork,
+	//	#[cfg(not(target = "wasm"))]
+	//	Custom, TODO
 }
 
 impl LevelID {
@@ -52,10 +56,12 @@ impl LevelID {
 		match self {
 			Self::Intro => Some(Self::Boxes),
 			Self::Boxes => Some(Self::Manual),
-			Self::Manual => Some(Self::Cycle),
+			Self::Manual => Some(Self::Transfer),
+			Self::Transfer => Some(Self::Cycle),
 			Self::Cycle => Some(Self::Bicycle),
 			Self::Bicycle => Some(Self::Swap),
-			Self::Swap => Some(Self::Tricycle),
+			Self::Swap => Some(Self::Sort),
+			Self::Sort => Some(Self::Tricycle),
 			Self::Tricycle => Some(Self::CargoTricycle),
 			Self::CargoTricycle => Some(Self::CargoSinglePlayer),
 			Self::CargoSinglePlayer => Some(Self::SquareCycle),
