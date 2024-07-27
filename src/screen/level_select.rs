@@ -69,6 +69,7 @@ fn spawn_screen(mut commands: Commands) {
 					button("Disrupt", Disrupt);
 					button("Pyramid", Pyramid);
 					button("Teamwork", Teamwork);
+					button("Sort 2", Sort2);
 				});
 			parent.button("Back").insert(LevelSelectAction::Back);
 		});

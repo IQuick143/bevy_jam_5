@@ -46,6 +46,7 @@ pub enum LevelID {
 	Disrupt,
 	Pyramid,
 	Teamwork,
+	Sort2,
 	//	#[cfg(not(target = "wasm"))]
 	//	Custom, TODO
 }
@@ -72,7 +73,8 @@ impl LevelID {
 			Self::TripleRing => Some(Self::Car),
 			Self::Car => Some(Self::Olympic),
 			Self::Olympic => Some(Self::Pedalo),
-			Self::Pedalo => Some(Self::Disrupt),
+			Self::Pedalo => Some(Self::Sort2),
+			Self::Sort2 => Some(Self::Disrupt),
 			Self::Disrupt => Some(Self::Pyramid),
 			Self::Pyramid => Some(Self::Teamwork),
 			Self::Teamwork => None,

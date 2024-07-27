@@ -192,6 +192,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(Disrupt, asset_server.load("levels/linkage/disrupt.txt")),
 			(Pyramid, asset_server.load("levels/pyramid.txt")),
 			(Teamwork, asset_server.load("levels/teamwork.txt")),
+			(Sort2, asset_server.load("levels/linkage/linked_sort.txt")),
 		]
 		.into()
 	}
