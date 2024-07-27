@@ -1,11 +1,11 @@
 //! The game's main screen states and transitions between them.
 
 mod credits;
+mod level_select;
 mod loading;
 mod playing;
 mod splash;
 mod title;
-mod level_select;
 
 use bevy::prelude::*;
 

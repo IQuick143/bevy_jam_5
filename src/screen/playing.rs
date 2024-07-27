@@ -8,7 +8,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		return_to_level_select_screen
-			.run_if(is_on_level_screen.and_then(input_just_pressed(KeyCode::Escape)))
+			.run_if(is_on_level_screen.and_then(input_just_pressed(KeyCode::Escape))),
 	);
 }
 
