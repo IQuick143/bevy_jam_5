@@ -80,6 +80,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 						None => CycleTurnability::Always,
 						Some("MANUAL") => CycleTurnability::WithPlayer,
 						Some("ENGINE") => CycleTurnability::Always,
+						Some("STILL") => CycleTurnability::Never,
 						Some(m) => return Err(ParsingError::InvalidModifier(m.to_string())),
 					};
 					Statement::Cycle(turnability, raw_statement.values)

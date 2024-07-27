@@ -57,6 +57,10 @@ impl FromWorld for HandleMap<ImageKey> {
 				asset_server.load("images/cycle-player.png"),
 			),
 			(
+				ImageKey::CycleCenter(CycleTurnability::Never),
+				asset_server.load("images/cycle-still.png"),
+			),
+			(
 				ImageKey::CycleRotationArrow,
 				asset_server.load("images/cycle-rot.png"),
 			),
@@ -148,6 +152,7 @@ pub enum LevelID {
 	Pedalo,
 	Disrupt,
 	Pyramid,
+	Teamwork,
 }
 
 #[derive(Asset, Clone, Deref, DerefMut, Debug, Reflect)]
@@ -218,6 +223,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(LevelID::Pedalo, asset_server.load("levels/pedalo.txt")),
 			(LevelID::Disrupt, asset_server.load("levels/disrupt.txt")),
 			(LevelID::Pyramid, asset_server.load("levels/pyramid.txt")),
+			(LevelID::Teamwork, asset_server.load("levels/teamwork.txt")),
 		]
 		.into()
 	}

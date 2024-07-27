@@ -61,6 +61,8 @@ pub enum CycleTurnability {
 	Always,
 	/// Cycle may be turned when a [`Player`] entity lies on one of its vertices
 	WithPlayer,
+	/// Cycle may never be turned directly
+	Never,
 }
 
 /// Determines whether a cycle may be turned at any given moment

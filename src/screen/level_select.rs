@@ -98,6 +98,9 @@ fn spawn_screen(mut commands: Commands) {
 					parent
 						.small_button("Pyramid")
 						.insert(LevelSelectAction::PlayLevel(LevelID::Pyramid));
+					parent
+						.small_button("Teamwork")
+						.insert(LevelSelectAction::PlayLevel(LevelID::Teamwork));
 				});
 			parent.button("Back").insert(LevelSelectAction::Back);
 		});

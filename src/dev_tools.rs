@@ -268,6 +268,11 @@ pub fn _gizmo_draw(
 				}
 				(CycleTurnability::WithPlayer, true) => palettes::tailwind::AMBER_100,
 				(CycleTurnability::WithPlayer, false) => palettes::tailwind::AMBER_600,
+				(CycleTurnability::Never, false) => palettes::tailwind::RED_600,
+				(CycleTurnability::Never, true) => {
+					warn!("Never cycle has turning somehow");
+					palettes::tailwind::GREEN_600
+				}
 			},
 		);
 		// Draw the loops

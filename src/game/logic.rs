@@ -112,25 +112,25 @@ fn cycle_turnability_update_system(
 	)>,
 ) {
 	'next_cycle: for (vertex_ids, turnability, mut computed_turnability) in &mut cycles_q {
-		if *turnability == CycleTurnability::Always {
-			computed_turnability.0 = true;
-			continue;
-		}
-
-		for &vertex_id in &vertex_ids.0 {
-			let player_is_present = vertices_q
-				.get(vertex_id)
-				.inspect_err(|e| log::warn!("{e}"))
-				.ok()
-				.and_then(|object_id| object_id.0.and_then(|id| players_q.get(id).ok()))
-				.is_some();
-			if player_is_present {
-				computed_turnability.0 = true;
-				continue 'next_cycle;
+		match *turnability {
+			CycleTurnability::Always => computed_turnability.0 = true,
+			CycleTurnability::Never => computed_turnability.0 = false,
+			CycleTurnability::WithPlayer => {
+				for &vertex_id in &vertex_ids.0 {
+					let player_is_present = vertices_q
+						.get(vertex_id)
+						.inspect_err(|e| log::warn!("{e}"))
+						.ok()
+						.and_then(|object_id| object_id.0.and_then(|id| players_q.get(id).ok()))
+						.is_some();
+					if player_is_present {
+						computed_turnability.0 = true;
+						continue 'next_cycle;
+					}
+				}
+				computed_turnability.0 = false;
 			}
 		}
-
-		computed_turnability.0 = false;
 	}
 }
 
