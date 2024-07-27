@@ -1,0 +1,14 @@
+VERTEX a b c d e f g h i j k l m
+
+CYCLE[MANUAL] left a b g k j e
+CYCLE[MANUAL] middle c h l k f b
+CYCLE[MANUAL] right d i m l g c
+
+OBJECT[BOX] b c k l
+OBJECT[BUTTON] a d m j
+OBJECT[PLAYER] e i
+OBJECT[FLAG] g
+
+PLACE left -300 0 300
+PLACE middle 0 0 300
+PLACE right 300 0 300

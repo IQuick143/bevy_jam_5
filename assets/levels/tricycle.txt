@@ -1,0 +1,14 @@
+VERTEX b1 b2 b3 bgi bgo bri bro r1 r2 r3 rgi rgo g1 g2 g3
+
+CYCLE[MANUAL] blue b1 b2 b3 bgo bri bgi bro
+CYCLE[MANUAL] red r1 r2 r3 bro rgi bri rgo
+CYCLE[MANUAL] green g1 g2 g3 rgo bgi rgi bgo
+
+OBJECT[BOX]
+OBJECT[BUTTON] 
+OBJECT[PLAYER] b2 r2 g2
+OBJECT[FLAG] rgi bri bgi
+
+PLACE blue -200 280 300
+PLACE red 0 0 300
+PLACE green 200 280 300

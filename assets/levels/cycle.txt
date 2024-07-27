@@ -1,0 +1,10 @@
+VERTEX a b c d
+
+CYCLE[MANUAL] circle a b c d
+
+OBJECT[BOX] a
+OBJECT[BUTTON] c
+OBJECT[PLAYER] b
+OBJECT[FLAG] d
+
+PLACE circle 0 0 300

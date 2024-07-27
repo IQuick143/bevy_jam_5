@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{asset::AsyncReadExt, prelude::*, utils::HashMap};
 
 use super::{level::ThingType, prelude::CycleTurnability};
 
@@ -11,6 +11,10 @@ pub(super) fn plugin(app: &mut App) {
 
 	app.register_type::<HandleMap<SoundtrackKey>>();
 	app.init_resource::<HandleMap<SoundtrackKey>>();
+
+	app.init_asset_loader::<PlainTextLoader>();
+	app.init_asset::<PlainText>();
+	app.init_resource::<HandleMap<LevelID>>();
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
@@ -113,6 +117,87 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 				SoundtrackKey::Gameplay,
 				asset_server.load("audio/soundtracks/Fluffing A Duck.ogg"),
 			),
+		]
+		.into()
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+pub enum LevelID {
+	Cycle,
+	Bicycle,
+	Tricycle,
+	CargoTricycle,
+	SquareCycle,
+	DiamondCycle,
+	Lotus,
+	ThreeInARow,
+	TripleRing,
+	Car,
+	Olympic,
+	Pedalo,
+	Pyramid,
+}
+
+#[derive(Asset, Clone, Deref, DerefMut, Debug, Reflect)]
+pub struct PlainText(pub String);
+
+#[derive(Default)]
+struct PlainTextLoader;
+
+impl bevy::asset::AssetLoader for PlainTextLoader {
+	type Asset = PlainText;
+	type Error = std::io::Error;
+	type Settings = ();
+
+	fn load<'a>(
+		&'a self,
+		reader: &'a mut bevy::asset::io::Reader,
+		_settings: &'a Self::Settings,
+		_load_context: &'a mut bevy::asset::LoadContext,
+	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
+		async {
+			let mut s = String::new();
+			reader.read_to_string(&mut s).await?;
+			Ok(PlainText(s))
+		}
+	}
+
+	fn extensions(&self) -> &[&str] {
+		&["txt"]
+	}
+}
+
+impl AssetKey for LevelID {
+	type Asset = PlainText;
+}
+
+impl FromWorld for HandleMap<LevelID> {
+	fn from_world(world: &mut World) -> Self {
+		let asset_server = world.resource::<AssetServer>();
+		[
+			(LevelID::Cycle, asset_server.load("levels/cycle.txt")),
+			(LevelID::Bicycle, asset_server.load("levels/bicycle.txt")),
+			(LevelID::Tricycle, asset_server.load("levels/tricycle.txt")),
+			(
+				LevelID::CargoTricycle,
+				asset_server.load("levels/cargo.txt"),
+			),
+			(LevelID::SquareCycle, asset_server.load("levels/square.txt")),
+			(
+				LevelID::DiamondCycle,
+				asset_server.load("levels/diamond.txt"),
+			),
+			(LevelID::Lotus, asset_server.load("levels/lotus.txt")),
+			(
+				LevelID::ThreeInARow,
+				asset_server.load("levels/three-row.txt"),
+			),
+			(LevelID::TripleRing, asset_server.load("levels/triple.txt")),
+			(LevelID::Car, asset_server.load("levels/car.txt")),
+			(LevelID::Olympic, asset_server.load("levels/olympic.txt")),
+			(LevelID::Pedalo, asset_server.load("levels/pedalo.txt")),
+			(LevelID::Pyramid, asset_server.load("levels/pyramid.txt")),
 		]
 		.into()
 	}

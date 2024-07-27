@@ -64,7 +64,7 @@ pub enum LevelDataValidationError {
 
 /// A sanitized [`LevelData`] instance.
 /// It is read-only to ensure that it truly remains valid
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, TypePath)]
 pub struct ValidLevelData {
 	/// The contained level data. Guaranteed to be sanitized
 	inner: LevelData,

@@ -9,7 +9,7 @@ mod title;
 
 use bevy::prelude::*;
 
-use crate::{game::LevelID, ui::screen_fade::Fader};
+use crate::{game::assets::LevelID, ui::screen_fade::Fader};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<Screen>();

@@ -1,0 +1,18 @@
+VERTEX a b c d e f g h i j k l m n o p q r s t u v
+
+CYCLE[MANUAL] blue a b h n m g
+CYCLE[MANUAL] yellow t s n h i o
+CYCLE[MANUAL] black c d j p o i
+CYCLE[MANUAL] green v u p j k q
+CYCLE[MANUAL] red e f l r q k
+
+OBJECT[BOX] b c d e f h i j k l m n o p q r s t u v
+OBJECT[BUTTON] a b c d e g h i j k
+OBJECT[PLAYER] a g
+OBJECT[FLAG] f l
+
+PLACE blue -400 300 300
+PLACE yellow 0 0 300
+PLACE black 400 300 300
+PLACE green 800 0 300
+PLACE red 1200 300 300

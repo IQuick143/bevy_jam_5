@@ -1,0 +1,26 @@
+VERTEX a b c d e f g h i j k l m n o p q r s t u v w x
+
+CYCLE[MANUAL] top_left a e h d
+CYCLE[MANUAL] top_mid b f i e
+CYCLE[MANUAL] top_right c g j f
+CYCLE[MANUAL] mid_left h l o k
+CYCLE[MANUAL] mid_mid i m p l
+CYCLE[MANUAL] mid_right j n q m
+CYCLE[MANUAL] bot_left o s v r
+CYCLE[MANUAL] bot_mid p t w s
+CYCLE[MANUAL] bot_right q u x t
+
+OBJECT[BOX]
+OBJECT[BUTTON]
+OBJECT[PLAYER] a
+OBJECT[FLAG] x
+
+PLACE top_left -600 600 300
+PLACE top_mid 0 600 300
+PLACE top_right 600 600 300
+PLACE mid_left -600 0 300
+PLACE mid_mid 0 0 300
+PLACE mid_right 600 0 300
+PLACE bot_left -600 -600 300
+PLACE bot_mid 0 -600 300
+PLACE bot_right 600 -600 300

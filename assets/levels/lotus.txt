@@ -1,0 +1,26 @@
+VERTEX n e s w n1 n2 n3 e1 e2 e3 s1 s2 s3 w1 w2 w3
+
+CYCLE[MANUAL] center n e s w
+CYCLE[MANUAL] north n n1 n2 n3
+CYCLE[MANUAL] east e e1 e2 e3
+CYCLE[MANUAL] south s s1 s2 s3
+CYCLE[MANUAL] west w w1 w2 w3
+CYCLE[MANUAL] ne n3 e1
+CYCLE[MANUAL] se e3 s1
+CYCLE[MANUAL] sw s3 w1
+CYCLE[MANUAL] nw w3 n1
+
+OBJECT[BOX] n2 e2 s2 w2
+OBJECT[BUTTON] n e s w
+OBJECT[PLAYER] s1
+OBJECT[FLAG] s1
+
+PLACE center 0 0 300
+PLACE north 0 600 300
+PLACE east 600 0 300
+PLACE south 0 -600 300
+PLACE west -600 0 300
+PLACE ne 400 400 150
+PLACE se 400 -400 150
+PLACE sw -400 -400 150
+PLACE nw -400 400 150

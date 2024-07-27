@@ -1,0 +1,16 @@
+VERTEX a b c d
+
+CYCLE[MANUAL] top a b
+CYCLE[MANUAL] right b c
+CYCLE[MANUAL] bottom c d
+CYCLE[MANUAL] left d a
+
+OBJECT[BOX] b
+OBJECT[BUTTON] c
+OBJECT[PLAYER] a
+OBJECT[FLAG] d
+
+PLACE top 0 424 300
+PLACE right 424 0 300
+PLACE bottom 0 -424 300
+PLACE left -424 0 300

@@ -1,0 +1,14 @@
+VERTEX a b c d e f g h
+
+CYCLE[MANUAL] back_wheel a b c d
+CYCLE[MANUAL] front_wheel e f g h
+
+LINK[STRAIGHT] back_wheel front_wheel
+
+OBJECT[BOX] e
+OBJECT[BUTTON] g
+OBJECT[PLAYER] a
+OBJECT[FLAG] c
+
+PLACE back_wheel -300 0 300
+PLACE front_wheel 300 0 300
