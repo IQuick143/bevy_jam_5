@@ -93,7 +93,7 @@ fn spawn_level(
 		))
 		.mesh();
 		let mesh = meshes.add(mesh);
-		let rotation = Quat::from_axis_angle(Vec3::Z, a.angle_between(b));
+		let rotation = Quat::from_axis_angle(Vec3::Z, -(a - b).angle_between(Vec2::X));
 		let position = a.lerp(b, 0.5);
 		let offset = (a - b).normalize_or_zero().perp() * CYCLE_LINK_SPACING / 2.0;
 		commands.spawn((
