@@ -32,9 +32,15 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn reload_screen(
-	state: Res<State<Screen>>,
-	mut transition: EventWriter<QueueScreenTransition<Screen>>,
+	mut commands: Commands,
+	state: Res<State<PlayingLevel>>,
+	mut transition: EventWriter<QueueScreenTransition<PlayingLevel>>,
+	query: Query<Entity, With<StateScoped<PlayingLevel>>>,
 ) {
+	// Despawn state-scoped entities explicitly since the state does not actually change
+	for e in &query {
+		commands.entity(e).despawn_recursive();
+	}
 	transition.send(QueueScreenTransition::instant(*state.get()));
 }
 
