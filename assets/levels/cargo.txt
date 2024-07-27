@@ -9,6 +9,6 @@ OBJECT[BUTTON] rgi bri bgi
 OBJECT[PLAYER] rgi bri bgi
 OBJECT[FLAG] b2 r2 g2
 
-PLACE blue -200 280 300
-PLACE red 0 0 300
-PLACE green 200 280 300
+PLACE blue -87 50 130
+PLACE red 0 -100 130
+PLACE green 87 50 130

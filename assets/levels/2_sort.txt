@@ -9,4 +9,4 @@ OBJECT[FLAG] e f g h x
 OBJECT[BUTTON] a b c d y
 
 PLACE main 0 0 100
-PLACE side 100 0 30
+PLACE side 120 0 40

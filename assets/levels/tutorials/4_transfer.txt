@@ -1,10 +1,10 @@
-VERTEX a b c d e g h
+VERTEX a b c d e f g h i j
 
-CYCLE A a b c d
-CYCLE B d e g h
+CYCLE A a b c d e f
+CYCLE B f g h i j
 
 OBJECT[PLAYER] c
 OBJECT[FLAG] h
 
-PLACE A -100 0 100
-PLACE B +100 0 100
+PLACE A 0 0 100
+PLACE B 144 108 80

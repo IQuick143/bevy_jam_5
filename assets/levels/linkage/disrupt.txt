@@ -2,8 +2,8 @@ VERTEX a1 a2 a3 ab1 ab2 b1 b2 b3 b4 c1 c2 c3 c4 c5 d1 d2 d3 d4 d5 d6
 
 CYCLE[MANUAL] a a1 a2 a3 ab1 ab2
 CYCLE[MANUAL] b b1 b2 b3 b4 ab2 ab1
-CYCLE[MANUAL] c c1 c2 c3 c4 c5
-CYCLE[MANUAL] d d1 d2 d3 d4 d5 d6
+CYCLE[STILL] c c1 c2 c3 c4 c5
+CYCLE[STILL] d d1 d2 d3 d4 d5 d6
 
 OBJECT[BOX] c1 d1
 OBJECT[BUTTON] c1 d1

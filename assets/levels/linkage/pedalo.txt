@@ -1,14 +1,16 @@
-VERTEX a b c d e f g h
+VERTEX a b c d e f g h i j k l m n
 
-CYCLE[MANUAL] back_wheel a b c d
-CYCLE[MANUAL] front_wheel e f g h
+CYCLE main a b c d e f g h
+CYCLE[MANUAL] spin h g
+CYCLE[STILL] side i j k l m n
 
-LINK[STRAIGHT] back_wheel front_wheel
-
-OBJECT[BOX] e
-OBJECT[BUTTON] g
-OBJECT[PLAYER] a
+OBJECT[PLAYER] e
 OBJECT[FLAG] c
+OBJECT[BOX] j
+OBJECT[BUTTON] l
 
-PLACE back_wheel -300 0 250
-PLACE front_wheel 300 0 250
+LINK spin side
+
+PLACE main 0 0 100
+PLACE spin 110 0 40
+PLACE side 240 0 60
