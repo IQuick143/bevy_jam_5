@@ -327,6 +327,7 @@ fn spawn_level(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	cycle_material: ResMut<RingMaterial>,
+	link_material: Res<LinkMaterial>,
 	palette: ResMut<ThingPalette>,
 	image_handles: Res<HandleMap<ImageKey>>,
 ) {
@@ -383,6 +384,40 @@ fn spawn_level(
 				.entity(cycle_id)
 				.insert(LinkedCycles(linked_cycles));
 		}
+	}
+
+	for link in &data.linkages {
+		let a = layout.cycles[link.cycle_a_index].position;
+		let b = layout.cycles[link.cycle_b_index].position;
+		let mesh = primitives::Rectangle::from_size(Vec2::new(
+			a.distance(b) - CYCLE_LINK_END_CUT,
+			CYCLE_LINK_WIDTH,
+		))
+		.mesh();
+		let mesh = meshes.add(mesh);
+		let rotation = Quat::from_axis_angle(Vec3::Z, a.angle_between(b));
+		let position = a.lerp(b, 0.5);
+		let offset = (a - b).normalize_or_zero().perp() * CYCLE_LINK_SPACING / 2.0;
+		commands.spawn((
+			DestroyOnTransition,
+			ColorMesh2dBundle {
+				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
+				transform: Transform::from_rotation(rotation)
+					.with_translation((position + offset).extend(-400.0)),
+				material: link_material.clone_weak(),
+				..default()
+			},
+		));
+		commands.spawn((
+			DestroyOnTransition,
+			ColorMesh2dBundle {
+				mesh: bevy::sprite::Mesh2dHandle(mesh),
+				transform: Transform::from_rotation(rotation)
+					.with_translation((position - offset).extend(-400.0)),
+				material: link_material.clone_weak(),
+				..default()
+			},
+		));
 	}
 
 	commands.init_resource::<LevelCompletionConditions>();

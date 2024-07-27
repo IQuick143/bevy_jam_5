@@ -41,6 +41,23 @@ impl FromWorld for RingMaterial {
 	}
 }
 
+/// Contains a handle to the material used for rendering cycle links
+#[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
+pub struct LinkMaterial(pub Handle<ColorMaterial>);
+
+impl FromWorld for LinkMaterial {
+	fn from_world(world: &mut World) -> Self {
+		let mut materials = world
+			.get_resource_mut::<Assets<ColorMaterial>>()
+			.expect("I'd expect materials to exist pretty please.");
+
+		LinkMaterial(materials.add(ColorMaterial {
+			color: palettes::tailwind::GRAY_300.into(),
+			..default()
+		}))
+	}
+}
+
 /// Contains colors used for rendering objects and glyphs
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct ThingPalette {
