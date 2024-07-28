@@ -55,7 +55,7 @@ impl FromWorld for RingMaterial {
 			.expect("I'd expect materials to exist pretty please.");
 
 		RingMaterial(materials.add(ColorMaterial {
-			color: palettes::tailwind::GRAY_400.into(),
+			color: palettes::tailwind::SLATE_400.into(),
 			..default()
 		}))
 	}
@@ -72,7 +72,7 @@ impl FromWorld for LinkMaterial {
 			.expect("I'd expect materials to exist pretty please.");
 
 		LinkMaterial(materials.add(ColorMaterial {
-			color: palettes::tailwind::GRAY_300.into(),
+			color: palettes::tailwind::SLATE_300.into(),
 			..default()
 		}))
 	}
@@ -99,16 +99,16 @@ impl Default for ThingPalette {
 	fn default() -> Self {
 		use palettes::tailwind as p;
 		Self {
-			box_base: p::ROSE_100.into(),
-			box_trigger: p::ROSE_500.into(),
-			button_base: p::ROSE_100.into(),
-			button_trigger: p::ROSE_500.into(),
-			player: p::SKY_100.into(),
-			goal_closed: p::SKY_100.into(),
+			box_base: p::ORANGE_200.into(),
+			box_trigger: p::GREEN_500.into(),
+			button_base: p::ORANGE_200.into(),
+			button_trigger: p::GREEN_500.into(),
+			player: p::SLATE_200.into(),
+			goal_closed: p::SLATE_100.into(),
 			goal_open: p::GREEN_500.into(),
-			cycle_disabled: p::GRAY_200.into(),
-			cycle_ready: p::GRAY_300.into(),
-			cycle_trigger: p::GRAY_400.into(),
+			cycle_disabled: p::SLATE_200.into(),
+			cycle_ready: p::SLATE_300.into(),
+			cycle_trigger: p::SLATE_400.into(),
 			colored_base: [
 				p::ROSE_200.into(),
 				p::YELLOW_200.into(),
