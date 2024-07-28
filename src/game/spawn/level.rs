@@ -131,28 +131,7 @@ fn spawn_level(
 	is_level_completed.0 = false;
 	events.send(GameLayoutChanged);
 
-	hint_text.hint_text = match level_id {
-		LevelID::Intro => None,
-		LevelID::Transfer => None,
-		LevelID::Boxes => None,
-		LevelID::Manual => None,
-		LevelID::Sync => Some("Linkages make cycles move in Sync!"),
-		LevelID::Bicycle => None,
-		LevelID::Swap => None,
-		LevelID::Sort => None,
-		LevelID::Tricycle => None,
-		LevelID::CargoTricycle => None,
-		LevelID::CargoSinglePlayer => None,
-		LevelID::Lotus => Some("In compliance with the Aperture Science regulatory body, I am legally forced to inform you, this level is looking kinda good."),
-		LevelID::ThreeInARowSimple => Some("Tip: Think about the paths the player can take and plan them ahead."),
-		LevelID::ThreeInARow => Some("I hope you enjoyed Grid."),
-		LevelID::Car => Some("Fun fact: Originally this level was thought to be impossible!"),
-		LevelID::Olympic => Some("Tip: In levels with a single player and manual cycles, it's helpful to think about the player's routes through the crossings."),
-		LevelID::Disrupt => Some("So close, yet so far... Tip: Modular arithmetic."),
-		LevelID::Send => None,
-		LevelID::Teamwork => Some("Fact: Teamwork makes the dream work, sometimes."),
-		LevelID::Sort2 => None,
-	}
+	hint_text.hint_text = level_id.level_hint();
 }
 
 fn spawn_vertex(

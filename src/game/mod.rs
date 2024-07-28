@@ -88,6 +88,34 @@ impl LevelID {
 		}
 	}
 
+	/// Get the hint for a level
+	pub fn level_hint(self) -> Option<&'static str> {
+		match self {
+			Self::Intro => None,
+			Self::Transfer => None,
+			Self::Boxes => None,
+			Self::Manual => None,
+			Self::Sync => Some("Linkages make cycles move in Sync!"),
+			Self::Sync2 => None,
+			Self::Colors => None,
+			Self::Bicycle => None,
+			Self::Swap => None,
+			Self::Sort => None,
+			Self::Tricycle => None,
+			Self::CargoTricycle => None,
+			Self::CargoSinglePlayer => None,
+			Self::Lotus => Some("In compliance with the Aperture Science regulatory body, I am legally forced to inform you, this level is looking kinda good."),
+			Self::ThreeInARowSimple => Some("Tip: Think about the paths the player can take and plan them ahead."),
+			Self::ThreeInARow => Some("I hope you enjoyed Grid."),
+			Self::Car => Some("Fun fact: Originally this level was thought to be impossible!"),
+			Self::Olympic => Some("Tip: In levels with a single player and manual cycles, it's helpful to think about the player's routes through the crossings."),
+			Self::Disrupt => Some("So close, yet so far... Tip: Modular arithmetic."),
+			Self::Send => None,
+			Self::Teamwork => Some("Fact: Teamwork makes the dream work, sometimes."),
+			Self::Sort2 => None,
+		}
+	}
+
 	/// The canonical level order
 	pub const LEVEL_ORDER: [LevelID; 22] = [
 		Self::Intro,
