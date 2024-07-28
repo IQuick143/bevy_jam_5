@@ -152,6 +152,8 @@ fn spawn_level(
 		LevelID::Send => None,
 		LevelID::Teamwork => Some("Fact: Teamwork makes the dream work, sometimes."),
 		LevelID::Sort2 => None,
+		LevelID::Sync2 => None,
+		LevelID::Colors => None,
 	}
 }
 
