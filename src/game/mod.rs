@@ -46,6 +46,7 @@ pub enum LevelID {
 	Send,
 	Teamwork,
 	Sort2,
+	Rubik,
 	//	#[cfg(not(target = "wasm"))]
 	//	Custom, TODO
 }
@@ -85,6 +86,7 @@ impl LevelID {
 			Self::Send => "Send",
 			Self::Teamwork => "Teamwork",
 			Self::Sort2 => "Sort 2",
+			Self::Rubik => "Rubik",
 		}
 	}
 
@@ -113,11 +115,12 @@ impl LevelID {
 			Self::Send => None,
 			Self::Teamwork => Some("Fact: Teamwork makes the dream work, sometimes."),
 			Self::Sort2 => None,
+			Self::Rubik => None,
 		}
 	}
 
 	/// The canonical level order
-	pub const LEVEL_ORDER: [LevelID; 22] = [
+	pub const LEVEL_ORDER: [LevelID; 23] = [
 		Self::Intro,
 		Self::Transfer,
 		Self::Boxes,
@@ -140,6 +143,7 @@ impl LevelID {
 		Self::Sort2,
 		Self::ThreeInARow,
 		Self::Car,
+		Self::Rubik,
 	];
 }
 

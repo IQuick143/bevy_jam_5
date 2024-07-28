@@ -236,7 +236,8 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 		}
 	}
 
-	let mut cycle_layout: Vec<Option<CyclePlacement>> = (0..cycles.len()).map(|_| None).collect();
+	let mut cycle_layout: Vec<Option<(CyclePlacement, Vec<usize>)>> =
+		(0..cycles.len()).map(|_| None).collect();
 
 	for (line_id, statement) in statements.iter() {
 		if let Statement::Place(data) = statement {
@@ -247,23 +248,34 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 			let x_str = data[1].replace(',', ".");
 			let y_str = data[2].replace(',', ".");
 			let r_str = data[3].replace(',', ".");
-			if let Some(cycle_id) = cycle_names.get(cycle_name) {
-				let Ok(x) = x_str.parse::<f32>() else {
-					return Err(ParsingError::MalformedStatement(*line_id));
-				};
-				let Ok(y) = y_str.parse::<f32>() else {
-					return Err(ParsingError::MalformedStatement(*line_id));
-				};
-				let Ok(r) = r_str.parse::<f32>() else {
-					return Err(ParsingError::MalformedStatement(*line_id));
-				};
-				cycle_layout[*cycle_id] = Some(CyclePlacement {
+			let Some(cycle_id) = cycle_names.get(cycle_name) else {
+				return Err(ParsingError::UnknownCycleName(cycle_name.to_string()));
+			};
+			let Ok(x) = x_str.parse::<f32>() else {
+				return Err(ParsingError::MalformedStatement(*line_id));
+			};
+			let Ok(y) = y_str.parse::<f32>() else {
+				return Err(ParsingError::MalformedStatement(*line_id));
+			};
+			let Ok(r) = r_str.parse::<f32>() else {
+				return Err(ParsingError::MalformedStatement(*line_id));
+			};
+			let hints = data[4..]
+				.iter()
+				.map(|name| {
+					vertex_names
+						.get(*name)
+						.copied()
+						.ok_or(ParsingError::UnknownVertexName(name.to_string()))
+				})
+				.collect::<Result<_, _>>()?;
+			cycle_layout[*cycle_id] = Some((
+				CyclePlacement {
 					position: Vec2::new(x, y),
 					radius: r,
-				});
-			} else {
-				return Err(ParsingError::UnknownCycleName(cycle_name.to_string()));
-			}
+				},
+				hints,
+			));
 		}
 	}
 
@@ -275,12 +287,12 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 		.into_iter()
 		.enumerate()
 		.map(|(i, x)| {
-			let placement = x.unwrap();
+			let (placement, hints) = x.unwrap();
 			DeclaredPlacement::Cycle(DeclaredCyclePlacement {
 				cycle_index: i,
 				position: placement.position,
 				radius: placement.radius,
-				double_intersection_hints: Vec::new(),
+				double_intersection_hints: hints,
 			})
 		})
 		.collect();

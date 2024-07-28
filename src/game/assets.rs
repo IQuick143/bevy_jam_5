@@ -184,6 +184,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(Send, asset_server.load("levels/linkage/send.txt")),
 			(Teamwork, asset_server.load("levels/teamwork.txt")),
 			(Sort2, asset_server.load("levels/linkage/linked_sort.txt")),
+			(Rubik, asset_server.load("levels/rubik.txt")),
 		]
 		.into()
 	}
