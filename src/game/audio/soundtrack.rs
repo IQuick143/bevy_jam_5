@@ -36,6 +36,7 @@ fn play_soundtrack(
 /// Trigger this event to play or disable the soundtrack.
 /// Playing a new soundtrack will overwrite the previous one.
 /// Soundtracks will loop.
+#[allow(dead_code)]
 #[derive(Event)]
 pub enum PlaySoundtrack {
 	Key(SoundtrackKey),
