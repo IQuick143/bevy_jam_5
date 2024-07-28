@@ -7,9 +7,9 @@ mod playing;
 mod splash;
 mod title;
 
-use bevy::prelude::*;
+use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-use crate::ui::{freeze::FreezeUi, screen_fade::Fader};
+use crate::ui::{freeze::{ui_not_frozen, FreezeUi}, screen_fade::Fader};
 
 pub use playing::PlayingLevel;
 
@@ -29,6 +29,16 @@ pub(super) fn plugin(app: &mut App) {
 	));
 
 	app.add_systems(Update, process_enqueued_transitions::<Screen>);
+	app.add_systems(Update, go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and_then(ui_not_frozen)));
+}
+
+fn go_to_return_screen(
+	current_screen: Res<State<Screen>>,
+	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+) {
+	if let Some(next) = current_screen.return_screen() {
+		next_screen.send(QueueScreenTransition::fade(next));
+	}
 }
 
 fn process_enqueued_transitions<S: bevy::state::state::FreelyMutableState + Clone>(
@@ -104,4 +114,16 @@ pub enum Screen {
 	Credits,
 	LevelSelect,
 	Playing,
+}
+
+impl Screen {
+	/// Which screen should we return to
+	fn return_screen(self) -> Option<Self> {
+		match self {
+			Self::Credits => Some(Self::Title),
+			Self::LevelSelect => Some(Self::Title),
+			Self::Playing => Some(Self::LevelSelect),
+			_ => None,
+		}
+	}
 }

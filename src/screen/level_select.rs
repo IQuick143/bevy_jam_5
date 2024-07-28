@@ -1,4 +1,4 @@
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::prelude::*;
 
 use super::*;
 use crate::{
@@ -10,10 +10,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::LevelSelect), spawn_screen)
 		.add_systems(
 			Update,
-			(
-				handle_level_select_screen_action,
-				return_to_title_screen.run_if(input_just_pressed(KeyCode::Escape)),
-			)
+	handle_level_select_screen_action
 				.run_if(in_state(Screen::LevelSelect).and_then(ui_not_frozen)),
 		);
 }
@@ -75,8 +72,4 @@ fn handle_level_select_screen_action(
 			}
 		}
 	}
-}
-
-fn return_to_title_screen(mut next_screen: EventWriter<QueueScreenTransition<Screen>>) {
-	next_screen.send(QueueScreenTransition::fade(Screen::Title));
 }

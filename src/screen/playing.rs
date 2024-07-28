@@ -26,7 +26,6 @@ pub(super) fn plugin(app: &mut App) {
 			(
 				process_enqueued_transitions::<PlayingLevel>,
 				(
-					return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
 					reload_level.run_if(input_just_pressed(KeyCode::KeyR)),
 					game_ui_input_system,
 				)
@@ -55,10 +54,6 @@ enum GameUiAction {
 	Back,
 	Reset,
 	NextLevel,
-}
-
-fn return_to_level_select_screen(mut next_screen: EventWriter<QueueScreenTransition<Screen>>) {
-	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
 }
 
 fn reload_level(
