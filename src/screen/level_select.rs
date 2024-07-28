@@ -14,7 +14,7 @@ pub(super) fn plugin(app: &mut App) {
 				handle_level_select_screen_action,
 				return_to_title_screen.run_if(input_just_pressed(KeyCode::Escape)),
 			)
-				.run_if(in_state(Screen::LevelSelect)),
+				.run_if(in_state(Screen::LevelSelect).and_then(ui_not_frozen)),
 		);
 }
 

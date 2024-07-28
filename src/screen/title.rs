@@ -2,14 +2,17 @@
 
 use bevy::prelude::*;
 
-use super::{QueueScreenTransition, Screen};
+use super::*;
 use crate::{game::assets::GlobalFont, ui::prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
 
 	app.register_type::<TitleAction>();
-	app.add_systems(Update, handle_title_action.run_if(in_state(Screen::Title)));
+	app.add_systems(
+		Update,
+		handle_title_action.run_if(in_state(Screen::Title).and_then(ui_not_frozen)),
+	);
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]

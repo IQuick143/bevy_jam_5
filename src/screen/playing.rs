@@ -12,7 +12,7 @@ use crate::{
 	ui::prelude::*,
 };
 
-use super::{process_enqueued_transitions, PendingTransition, QueueScreenTransition, Screen};
+use super::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<PlayingLevel>()
@@ -25,10 +25,13 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				process_enqueued_transitions::<PlayingLevel>,
-				return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
-				reload_level.run_if(input_just_pressed(KeyCode::KeyR)),
+				(
+					return_to_level_select_screen.run_if(input_just_pressed(KeyCode::Escape)),
+					reload_level.run_if(input_just_pressed(KeyCode::KeyR)),
+					game_ui_input_system,
+				)
+					.run_if(ui_not_frozen),
 				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
-				game_ui_input_system,
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 			)
 				.run_if(in_state(Screen::Playing)),

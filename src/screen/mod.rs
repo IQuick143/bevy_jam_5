@@ -9,7 +9,7 @@ mod title;
 
 use bevy::prelude::*;
 
-use crate::ui::screen_fade::Fader;
+use crate::ui::{freeze::FreezeUi, screen_fade::Fader};
 
 pub use playing::PlayingLevel;
 
@@ -36,6 +36,7 @@ fn process_enqueued_transitions<S: bevy::state::state::FreelyMutableState + Clon
 	mut state: ResMut<NextState<S>>,
 	mut fader: ResMut<Fader>,
 	mut pending: ResMut<PendingTransition<S>>,
+	mut freeze: ResMut<FreezeUi>,
 ) {
 	if let Some(event) = in_events.read().last() {
 		if !event.fade {
@@ -44,6 +45,7 @@ fn process_enqueued_transitions<S: bevy::state::state::FreelyMutableState + Clon
 		} else {
 			fader.start_fade(crate::ui::screen_fade::FadeTarget::FadeOut);
 			pending.next_screen = Some(event.next_screen.clone());
+			freeze.0 = true;
 		}
 	}
 	if fader.is_faded_out() {
@@ -51,6 +53,7 @@ fn process_enqueued_transitions<S: bevy::state::state::FreelyMutableState + Clon
 			state.set(next_state);
 			pending.next_screen = None;
 			fader.start_fade(crate::ui::screen_fade::FadeTarget::FadeIn);
+			freeze.0 = false;
 		}
 		// If there is no transition enqueued, stay faded out
 		// It most likely means a different specialization of this system

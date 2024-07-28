@@ -4,6 +4,7 @@
 #![allow(dead_code, unused_imports)]
 
 pub mod background;
+pub mod freeze;
 pub mod hover;
 pub mod interaction;
 pub mod palette;
@@ -12,6 +13,7 @@ mod widgets;
 
 pub mod prelude {
 	pub use super::{
+		freeze::ui_not_frozen,
 		interaction::{InteractionPalette, InteractionQuery},
 		palette as ui_palette,
 		widgets::{Containers as _, Widgets as _},
@@ -26,5 +28,6 @@ pub(super) fn plugin(app: &mut App) {
 		screen_fade::plugin,
 		hover::plugin,
 		background::plugin,
+		freeze::plugin,
 	));
 }

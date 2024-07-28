@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use super::{QueueScreenTransition, Screen};
+use super::*;
 use crate::{game::assets::GlobalFont, ui::prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
@@ -11,7 +11,7 @@ pub(super) fn plugin(app: &mut App) {
 
 	app.add_systems(
 		Update,
-		handle_credits_action.run_if(in_state(Screen::Credits)),
+		handle_credits_action.run_if(in_state(Screen::Credits).and_then(ui_not_frozen)),
 	);
 	app.register_type::<CreditsAction>();
 }

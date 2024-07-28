@@ -1,3 +1,5 @@
+use crate::ui::freeze::ui_not_frozen;
+
 use super::{logic::LogicSystemSet, prelude::*};
 
 /// System set that updates [`CycleInteraction`] components
@@ -12,7 +14,8 @@ pub(super) fn plugin(app: &mut App) {
 			cycle_rotation_with_inputs_system
 				.after(InputsUpdateSet)
 				.before(LogicSystemSet),
-		),
+		)
+			.run_if(ui_not_frozen),
 	);
 }
 

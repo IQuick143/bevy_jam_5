@@ -2,9 +2,14 @@ use bevy::prelude::*;
 
 use crate::game::{assets::SfxKey, audio::sfx::PlaySfx};
 
+use super::freeze::ui_not_frozen;
+
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<InteractionPalette>();
-	app.add_systems(Update, (apply_interaction_palette, trigger_interaction_sfx));
+	app.add_systems(
+		Update,
+		(apply_interaction_palette, trigger_interaction_sfx).run_if(ui_not_frozen),
+	);
 }
 
 pub type InteractionQuery<'w, 's, T> =
