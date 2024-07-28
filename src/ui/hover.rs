@@ -63,7 +63,7 @@ fn get_text_style(_asset_server: &Res<AssetServer>) -> TextStyle {
 	TextStyle {
 		//font: asset_server.load("fonts/your_font_here.ttf"),
 		font_size: 32.0,
-		color: Color::BLACK,
+		color: super::palette::LABEL_TEXT,
 		..default()
 	}
 }

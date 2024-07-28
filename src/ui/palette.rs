@@ -1,10 +1,14 @@
-use bevy::prelude::*;
+use bevy::{color::palettes::tailwind::*, prelude::*};
 
-pub const BUTTON_HOVERED_BACKGROUND: Color = Color::srgb(0.186, 0.328, 0.573);
-pub const BUTTON_PRESSED_BACKGROUND: Color = Color::srgb(0.286, 0.478, 0.773);
+pub const BUTTON_HOVERED_BACKGROUND: Color = Color::Srgba(SLATE_500);
+pub const BUTTON_PRESSED_BACKGROUND: Color = Color::Srgba(SLATE_300);
 
 pub const BUTTON_TEXT: Color = Color::srgb(0.925, 0.925, 0.925);
-pub const LABEL_TEXT: Color = Color::srgb(0.867, 0.827, 0.412);
-pub const HEADER_TEXT: Color = Color::srgb(0.867, 0.827, 0.412);
+pub const LABEL_TEXT: Color = Color::Srgba(SLATE_800);
+pub const HEADER_TEXT: Color = BUTTON_TEXT;
 
-pub const NODE_BACKGROUND: Color = Color::srgb(0.286, 0.478, 0.773);
+pub const NODE_BACKGROUND: Color = Color::Srgba(SLATE_400);
+
+pub const NEXT_LEVEL_BUTTON_BACKGROUND: Color = Color::Srgba(GREEN_600);
+pub const NEXT_LEVEL_BUTTON_HOVER: Color = Color::Srgba(GREEN_700);
+pub const NEXT_LEVEL_BUTTON_PRESS: Color = Color::Srgba(GREEN_500);

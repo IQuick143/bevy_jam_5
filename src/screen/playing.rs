@@ -92,9 +92,9 @@ fn spawn_game_ui(mut commands: Commands) {
 				GameUiAction::NextLevel,
 				NextLevelButton,
 				InteractionPalette {
-					none: bevy::color::palettes::tailwind::GREEN_500.into(),
-					hovered: bevy::color::palettes::tailwind::GREEN_700.into(),
-					pressed: bevy::color::palettes::tailwind::GREEN_400.into(),
+					none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
+					hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
+					pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
 				},
 			));
 		});
