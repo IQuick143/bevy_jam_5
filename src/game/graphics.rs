@@ -1,3 +1,5 @@
+use core::f32;
+
 use crate::game::prelude::*;
 
 /// Rectangle centered on (0,0), into which everything should fit in order to guarantee it being rendered.
@@ -35,3 +37,8 @@ pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
 
 /// Colour into which the screen fades during transitions
 pub const FADE_COLOUR: Color = Color::WHITE;
+
+/// Velocity of the background in local background coordinates
+pub const BACKGROUND_VELOCITY: Vec2 = Vec2::new(16.0, -8.0 * f32::consts::SQRT_2);
+/// Velocity of the background in local background coordinates
+pub const BACKGROUND_TILING: f32 = 400.0;

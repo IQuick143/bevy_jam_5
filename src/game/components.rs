@@ -270,3 +270,7 @@ impl Default for JumpTurnAnimation {
 		}
 	}
 }
+
+/// Background visuals
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct Background;

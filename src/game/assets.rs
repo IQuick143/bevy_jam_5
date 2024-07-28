@@ -22,6 +22,7 @@ pub enum ImageKey {
 	Object(ThingType),
 	CycleCenter(CycleTurnability),
 	CycleRotationArrow,
+	Background,
 }
 
 impl AssetKey for ImageKey {
@@ -64,6 +65,10 @@ impl FromWorld for HandleMap<ImageKey> {
 				ImageKey::CycleRotationArrow,
 				asset_server.load("images/cycle-rot.png"),
 			),
+			(
+				ImageKey::Background,
+				asset_server.load("images/background.png"),
+			),
 		]
 		.into()
 	}
@@ -98,7 +103,6 @@ impl FromWorld for HandleMap<SfxKey> {
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum SoundtrackKey {
-	Credits,
 	Gameplay,
 }
 
@@ -108,16 +112,12 @@ impl AssetKey for SoundtrackKey {
 
 impl FromWorld for HandleMap<SoundtrackKey> {
 	fn from_world(world: &mut World) -> Self {
-		let asset_server = world.resource::<AssetServer>();
+		let _asset_server = world.resource::<AssetServer>();
 		[
-			(
-				SoundtrackKey::Credits,
-				asset_server.load("audio/soundtracks/Monkeys Spinning Monkeys.ogg"),
-			),
-			(
-				SoundtrackKey::Gameplay,
-				asset_server.load("audio/soundtracks/Fluffing A Duck.ogg"),
-			),
+			//(
+			//	SoundtrackKey::Gameplay,
+			//	Handle::default() //TODO asset_server.load("audio/soundtracks/Fluffing A Duck.ogg"),
+			//),
 		]
 		.into()
 	}
