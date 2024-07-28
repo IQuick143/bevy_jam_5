@@ -1,0 +1,14 @@
+VERTEX a b c d e f g h i j k
+
+CYCLE player a b c d e
+CYCLE colors f g h i j k
+
+OBJECT[PLAYER] d
+OBJECT[FLAG] b
+OBJECT[BOX:0] f g i
+OBJECT[BOX:1] h j
+OBJECT[BUTTON:0] j k g
+OBJECT[BUTTON:1] f h
+
+PLACE player 0 0 80
+PLACE colors 200 100 100

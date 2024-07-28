@@ -1,6 +1,6 @@
 use bevy::color::palettes;
 
-use super::prelude::*;
+use super::{level::LOGICAL_COLORS, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
@@ -91,6 +91,8 @@ pub struct ThingPalette {
 	pub cycle_disabled: Color,
 	pub cycle_ready: Color,
 	pub cycle_trigger: Color,
+	pub colored_base: [Color; LOGICAL_COLORS],
+	pub colored_trigger: [Color; LOGICAL_COLORS],
 }
 
 impl Default for ThingPalette {
@@ -107,6 +109,22 @@ impl Default for ThingPalette {
 			cycle_disabled: p::GRAY_200.into(),
 			cycle_ready: p::GRAY_300.into(),
 			cycle_trigger: p::GRAY_400.into(),
+			colored_base: [
+				p::ROSE_200.into(),
+				p::YELLOW_200.into(),
+				p::INDIGO_200.into(),
+				p::TEAL_200.into(),
+				p::PURPLE_200.into(),
+				p::ORANGE_200.into(),
+			],
+			colored_trigger: [
+				p::ROSE_500.into(),
+				p::YELLOW_500.into(),
+				p::INDIGO_500.into(),
+				p::TEAL_500.into(),
+				p::PURPLE_500.into(),
+				p::ORANGE_500.into(),
+			],
 		}
 	}
 }

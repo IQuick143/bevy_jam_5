@@ -41,6 +41,10 @@ pub struct ObjectKind(pub ThingType);
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct VertexPosition(pub Entity);
 
+/// Color matching component for a [`Object`] or [`Glyph`] entity
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+pub struct LogicalColor(pub usize);
+
 /// A vertex (node) on the circle
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;

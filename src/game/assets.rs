@@ -176,6 +176,7 @@ impl FromWorld for HandleMap<LevelID> {
 			(Manual, asset_server.load("levels/tutorials/4_manual.txt")),
 			(Sync, asset_server.load("levels/tutorials/5_sync.txt")),
 			(Sync2, asset_server.load("levels/tutorials/6_sync2.txt")),
+			(Colors, asset_server.load("levels/tutorials/7_colors.txt")),
 			(Swap, asset_server.load("levels/1_swap.txt")),
 			(Sort, asset_server.load("levels/2_sort.txt")),
 			(Bicycle, asset_server.load("levels/bicycle.txt")),

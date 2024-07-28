@@ -20,7 +20,7 @@ enum Statement<'a> {
 	Vertex(Vec<&'a str>),
 	Cycle(CycleTurnability, Vec<&'a str>),
 	Link(LinkedCycleDirection, Vec<&'a str>),
-	Object(ObjectKind, Vec<&'a str>),
+	Object(ObjectKind, Option<LogicalColor>, Vec<&'a str>),
 	Place(Vec<&'a str>),
 	PlaceVertex(Vec<&'a str>),
 }
@@ -35,7 +35,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 	let lines = level_file.split('\n').map(&str::trim).enumerate();
 	let lines = lines.filter(|(_line_index, line)| !(line.starts_with('#') || line.is_empty()));
 
-	let statement_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>\w+)\])?(?<VALUES>.+)?$")
+	let statement_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>[\w\:]+)\])?(?<VALUES>.+)?$")
 		.expect("I expected to be able to write a valid regex.");
 	let mut raw_statements: Vec<(usize, RawStatement)> = Vec::new();
 
@@ -95,15 +95,25 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 					Statement::Link(flip, raw_statement.values)
 				}
 				"OBJECT" => {
-					let kind = match raw_statement.modifier {
-						None => return Err(ParsingError::MalformedStatement(line_id)),
-						Some("BOX") => ObjectKind::Object(ObjectType::Box),
-						Some("PLAYER") => ObjectKind::Object(ObjectType::Player),
-						Some("BUTTON") => ObjectKind::Glyph(GlyphType::Button),
-						Some("FLAG") => ObjectKind::Glyph(GlyphType::Flag),
-						Some(m) => return Err(ParsingError::InvalidModifier(m.to_string())),
+					let Some(modifier) = raw_statement.modifier else {
+						return Err(ParsingError::MalformedStatement(line_id));
 					};
-					Statement::Object(kind, raw_statement.values)
+					let (object_kind, color) = modifier.split_once(':').unwrap_or((modifier, ""));
+					let kind = match object_kind {
+						"BOX" => ObjectKind::Object(ObjectType::Box),
+						"PLAYER" => ObjectKind::Object(ObjectType::Player),
+						"BUTTON" => ObjectKind::Glyph(GlyphType::Button),
+						"FLAG" => ObjectKind::Glyph(GlyphType::Flag),
+						_ => return Err(ParsingError::InvalidModifier(modifier.to_string())),
+					};
+					let color_id = if color.is_empty() {
+						None
+					} else if let Ok(color_id) = color.parse() {
+						Some(LogicalColor(color_id))
+					} else {
+						return Err(ParsingError::InvalidModifier(modifier.to_string()));
+					};
+					Statement::Object(kind, color_id, raw_statement.values)
 				}
 				"PLACE" => Statement::Place(raw_statement.values),
 				"PLACE_VERT" => Statement::PlaceVertex(raw_statement.values),
@@ -192,7 +202,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 	}
 
 	for (_, statement) in statements.iter() {
-		if let Statement::Object(kind, placed_vertex_names) = statement {
+		if let Statement::Object(kind, color, placed_vertex_names) = statement {
 			if placed_vertex_names.is_empty() {
 				// TODO: warn
 			}
@@ -204,13 +214,19 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 							if vertex.object.is_some() {
 								return Err(ParsingError::ObjectCollision(name.to_string()));
 							}
-							vertex.object = Some(*object);
+							vertex.object = Some(ObjectData {
+								object_type: *object,
+								color: *color,
+							});
 						}
 						ObjectKind::Glyph(glyph) => {
 							if vertex.glyph.is_some() {
 								return Err(ParsingError::ObjectCollision(name.to_string()));
 							}
-							vertex.glyph = Some(*glyph);
+							vertex.glyph = Some(GlyphData {
+								glyph_type: *glyph,
+								color: *color,
+							});
 						}
 					}
 				} else {

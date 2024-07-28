@@ -162,132 +162,140 @@ fn spawn_vertex(
 			..default()
 		},
 	));
-	if let Some(object_type) = data.object {
+	if let Some(object_data) = data.object {
+		let object_type = object_data.object_type;
 		let thing_type = ThingType::Object(object_type);
-		let object_id = match object_type {
-			ObjectType::Player => commands
-				.spawn((
-					StateScoped(PlayingLevel(Some(level_id))),
-					Object,
-					Player,
-					VertexPosition(vertex_id),
-					ObjectKind(thing_type),
-					SpriteBundle {
-						sprite: Sprite {
-							color: palette.player,
-							custom_size: Some(SPRITE_SIZE),
-							anchor: Custom(Vec2::new(0.0, -0.25)),
-							..default()
-						},
-						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-						transform: Transform::from_translation(position.extend(-10.0)),
-						..Default::default()
+		let mut entity = match object_type {
+			ObjectType::Player => commands.spawn((
+				StateScoped(PlayingLevel(Some(level_id))),
+				Object,
+				Player,
+				VertexPosition(vertex_id),
+				ObjectKind(thing_type),
+				SpriteBundle {
+					sprite: Sprite {
+						color: palette.player,
+						custom_size: Some(SPRITE_SIZE),
+						anchor: Custom(Vec2::new(0.0, -0.25)),
+						..default()
 					},
-					AnimatedObject::default(),
-					Hoverable {
-						hover_text: hover::PLAYER,
-						hover_bounding_circle: None,
-						hover_bounding_box: Some(Aabb2d::new(
-							SPRITE_LENGTH * Vec2::new(0.0, 0.25),
-							SPRITE_LENGTH * Vec2::new(0.25, 0.4),
-						)),
+					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
+					transform: Transform::from_translation(position.extend(-10.0)),
+					..Default::default()
+				},
+				AnimatedObject::default(),
+				Hoverable {
+					hover_text: hover::PLAYER,
+					hover_bounding_circle: None,
+					hover_bounding_box: Some(Aabb2d::new(
+						SPRITE_LENGTH * Vec2::new(0.0, 0.25),
+						SPRITE_LENGTH * Vec2::new(0.25, 0.4),
+					)),
+				},
+			)),
+			ObjectType::Box => commands.spawn((
+				StateScoped(PlayingLevel(Some(level_id))),
+				Object,
+				Box,
+				VertexPosition(vertex_id),
+				ObjectKind(thing_type),
+				SpriteBundle {
+					sprite: Sprite {
+						color: object_data
+							.color
+							.map(|c| palette.colored_base[c.0])
+							.unwrap_or(palette.box_base),
+						custom_size: Some(SPRITE_SIZE),
+						anchor: Custom(Vec2::new(0.0, -0.25)),
+						..default()
 					},
-				))
-				.id(),
-			ObjectType::Box => commands
-				.spawn((
-					StateScoped(PlayingLevel(Some(level_id))),
-					Object,
-					Box,
-					VertexPosition(vertex_id),
-					ObjectKind(thing_type),
-					SpriteBundle {
-						sprite: Sprite {
-							color: palette.box_base,
-							custom_size: Some(SPRITE_SIZE),
-							anchor: Custom(Vec2::new(0.0, -0.25)),
-							..default()
-						},
-						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-						transform: Transform::from_translation(position.extend(-10.0)),
-						..Default::default()
-					},
-					AnimatedObject::default(),
-					Hoverable {
-						hover_text: hover::BOX,
-						hover_bounding_circle: None,
-						hover_bounding_box: Some(Aabb2d::new(
-							SPRITE_LENGTH * Vec2::new(0.0, 0.125),
-							SPRITE_LENGTH * Vec2::new(0.25, 0.25),
-						)),
-					},
-				))
-				.id(),
+					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
+					transform: Transform::from_translation(position.extend(-10.0)),
+					..Default::default()
+				},
+				AnimatedObject::default(),
+				Hoverable {
+					hover_text: hover::BOX,
+					hover_bounding_circle: None,
+					hover_bounding_box: Some(Aabb2d::new(
+						SPRITE_LENGTH * Vec2::new(0.0, 0.125),
+						SPRITE_LENGTH * Vec2::new(0.25, 0.25),
+					)),
+				},
+			)),
 		};
+		if let Some(color) = object_data.color {
+			entity.insert(color);
+		}
+		let object_id = entity.id();
 		commands
 			.entity(vertex_id)
 			.insert(PlacedObject(Some(object_id)));
 	}
-	if let Some(glyph_type) = data.glyph {
+	if let Some(glyph_data) = data.glyph {
+		let glyph_type = glyph_data.glyph_type;
 		let thing_type = ThingType::Glyph(glyph_type);
-		let glyph_id = match glyph_type {
-			GlyphType::Button => commands
-				.spawn((
-					StateScoped(PlayingLevel(Some(level_id))),
-					Glyph,
-					BoxSlot,
-					VertexPosition(vertex_id),
-					ObjectKind(thing_type),
-					SpriteBundle {
-						sprite: Sprite {
-							color: palette.button_base,
-							custom_size: Some(SPRITE_SIZE),
-							anchor: Custom(Vec2::new(0.0, -0.25)),
-							..default()
-						},
-						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-						transform: Transform::from_translation(position.extend(-50.0)),
-						..Default::default()
+		let mut entity = match glyph_type {
+			GlyphType::Button => commands.spawn((
+				StateScoped(PlayingLevel(Some(level_id))),
+				Glyph,
+				BoxSlot,
+				VertexPosition(vertex_id),
+				ObjectKind(thing_type),
+				SpriteBundle {
+					sprite: Sprite {
+						color: glyph_data
+							.color
+							.map(|c| palette.colored_base[c.0])
+							.unwrap_or(palette.button_base),
+						custom_size: Some(SPRITE_SIZE),
+						anchor: Custom(Vec2::new(0.0, -0.25)),
+						..default()
 					},
-					Hoverable {
-						hover_text: hover::BUTTON,
-						hover_bounding_circle: None,
-						hover_bounding_box: Some(Aabb2d::new(
-							SPRITE_LENGTH * Vec2::new(0.0, -0.125),
-							SPRITE_LENGTH * Vec2::new(0.375, 0.125),
-						)),
+					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
+					transform: Transform::from_translation(position.extend(-50.0)),
+					..Default::default()
+				},
+				Hoverable {
+					hover_text: hover::BUTTON,
+					hover_bounding_circle: None,
+					hover_bounding_box: Some(Aabb2d::new(
+						SPRITE_LENGTH * Vec2::new(0.0, -0.125),
+						SPRITE_LENGTH * Vec2::new(0.375, 0.125),
+					)),
+				},
+			)),
+			GlyphType::Flag => commands.spawn((
+				StateScoped(PlayingLevel(Some(level_id))),
+				Glyph,
+				Goal,
+				VertexPosition(vertex_id),
+				ObjectKind(thing_type),
+				SpriteBundle {
+					sprite: Sprite {
+						color: palette.goal_closed,
+						custom_size: Some(SPRITE_SIZE),
+						anchor: Custom(Vec2::new(0.0, -0.25)),
+						..default()
 					},
-				))
-				.id(),
-			GlyphType::Flag => commands
-				.spawn((
-					StateScoped(PlayingLevel(Some(level_id))),
-					Glyph,
-					Goal,
-					VertexPosition(vertex_id),
-					ObjectKind(thing_type),
-					SpriteBundle {
-						sprite: Sprite {
-							color: palette.goal_closed,
-							custom_size: Some(SPRITE_SIZE),
-							anchor: Custom(Vec2::new(0.0, -0.25)),
-							..default()
-						},
-						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-						transform: Transform::from_translation(position.extend(-50.0)),
-						..Default::default()
-					},
-					Hoverable {
-						hover_text: hover::FLAG,
-						hover_bounding_circle: None,
-						hover_bounding_box: Some(Aabb2d::new(
-							SPRITE_LENGTH * Vec2::new(0.0, 0.125),
-							SPRITE_LENGTH * Vec2::new(0.25, 0.30),
-						)),
-					},
-				))
-				.id(),
+					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
+					transform: Transform::from_translation(position.extend(-50.0)),
+					..Default::default()
+				},
+				Hoverable {
+					hover_text: hover::FLAG,
+					hover_bounding_circle: None,
+					hover_bounding_box: Some(Aabb2d::new(
+						SPRITE_LENGTH * Vec2::new(0.0, 0.125),
+						SPRITE_LENGTH * Vec2::new(0.25, 0.30),
+					)),
+				},
+			)),
 		};
+		if let Some(color) = glyph_data.color {
+			entity.insert(color);
+		}
+		let glyph_id = entity.id();
 		commands
 			.entity(vertex_id)
 			.insert(PlacedGlyph(Some(glyph_id)));

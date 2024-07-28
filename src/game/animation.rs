@@ -142,9 +142,9 @@ fn goal_unlock_animation_system(
 }
 
 fn button_trigger_animation_system(
-	mut buttons_q: Query<&mut Sprite, With<BoxSlot>>,
+	mut buttons_q: Query<(&mut Sprite, Option<&LogicalColor>), With<BoxSlot>>,
 	mut boxes_q: Query<
-		&mut Sprite,
+		(&mut Sprite, Option<&LogicalColor>),
 		(
 			With<Box>,
 			Without<BoxSlot>, /* To guarantee memory aliasing */
@@ -156,18 +156,48 @@ fn button_trigger_animation_system(
 	for (glyph_id, object_id) in &nodes_q {
 		let button = glyph_id.0.and_then(|id| buttons_q.get_mut(id).ok());
 		let object = object_id.0.and_then(|id| boxes_q.get_mut(id).ok());
-		// Use trigger color if both things are at the same place,
-		// otherwise use base color
+		// Use trigger color if both things are at the same place
+		// and are of the same logical color, otherwise use base color
 		match (button, object) {
 			(Some(mut button), Some(mut object)) => {
-				button.color = palette.button_trigger;
-				object.color = palette.box_trigger;
+				let colors_compatible = object
+					.1
+					.and_then(|object_color| {
+						button.1.map(|glyph_color| *object_color == *glyph_color)
+					})
+					// If either thing is colorless, they are considered compatible
+					.unwrap_or(true);
+				if colors_compatible {
+					button.0.color = button
+						.1
+						.map(|c| palette.colored_trigger[c.0])
+						.unwrap_or(palette.button_trigger);
+					object.0.color = object
+						.1
+						.map(|c| palette.colored_trigger[c.0])
+						.unwrap_or(palette.box_trigger);
+				} else {
+					button.0.color = button
+						.1
+						.map(|c| palette.colored_base[c.0])
+						.unwrap_or(palette.button_base);
+					object.0.color = object
+						.1
+						.map(|c| palette.colored_base[c.0])
+						.unwrap_or(palette.box_base);
+				}
 			}
 			(Some(mut button), None) => {
-				button.color = palette.button_base;
+				button.0.color = button
+					.1
+					.map(|c| palette.colored_base[c.0])
+					.unwrap_or(palette.button_base);
 			}
 			(None, Some(mut object)) => {
-				object.color = palette.box_base;
+				object.0.color = object
+					.1
+					.map(|c| palette.colored_base[c.0])
+					.unwrap_or(palette.box_base);
 			}
 			(None, None) => {}
 		}

@@ -5,6 +5,9 @@ use crate::game::prelude::*;
 pub mod layout;
 pub mod parser;
 
+/// How many colors we can paint objects in
+pub const LOGICAL_COLORS: usize = 6;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum ObjectType {
 	Box,
@@ -15,6 +18,18 @@ pub enum ObjectType {
 pub enum GlyphType {
 	Button,
 	Flag,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+pub struct ObjectData {
+	pub object_type: ObjectType,
+	pub color: Option<LogicalColor>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+pub struct GlyphData {
+	pub glyph_type: GlyphType,
+	pub color: Option<LogicalColor>,
 }
 
 /// Type describing any gameplay object
@@ -39,8 +54,8 @@ pub struct LinkageData {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct VertexData {
-	pub object: Option<ObjectType>,
-	pub glyph: Option<GlyphType>,
+	pub object: Option<ObjectData>,
+	pub glyph: Option<GlyphData>,
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +75,7 @@ pub enum LevelDataValidationError {
 	RepeatingVertexInCycle(usize),
 	TooManyVerticesInCycleIntersection(usize, usize),
 	OverlappedLinkedCycles(usize, usize),
+	ColorOutOfRange(usize),
 }
 
 /// A sanitized [`LevelData`] instance.
@@ -93,6 +109,24 @@ impl TryFrom<LevelData> for ValidLevelData {
 	type Error = LevelDataValidationError;
 
 	fn try_from(value: LevelData) -> Result<Self, Self::Error> {
+		// Object color range
+		for vertex in &value.vertices {
+			if let Some(object) = vertex.object {
+				if let Some(color) = object.color {
+					if color.0 >= LOGICAL_COLORS {
+						return Err(LevelDataValidationError::ColorOutOfRange(color.0));
+					}
+				}
+			}
+			if let Some(glyph) = vertex.glyph {
+				if let Some(color) = glyph.color {
+					if color.0 >= LOGICAL_COLORS {
+						return Err(LevelDataValidationError::ColorOutOfRange(color.0));
+					}
+				}
+			}
+		}
+
 		// Everything about integrity of individual cycles
 		for (i, cycle) in value.cycles.iter().enumerate() {
 			if cycle.vertex_indices.len() < 2 {
@@ -217,6 +251,12 @@ impl std::fmt::Display for LevelDataValidationError {
 			}
 			Self::OverlappedLinkedCycles(i, j) => {
 				write!(f, "Cycles {i} and {j} are overlapped and linked.")
+			}
+			Self::ColorOutOfRange(c) => {
+				write!(
+					f,
+					"Color {c} is used, but there are only {LOGICAL_COLORS} colors."
+				)
 			}
 		}
 	}

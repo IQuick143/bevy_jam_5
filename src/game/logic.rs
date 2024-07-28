@@ -136,8 +136,8 @@ fn cycle_turnability_update_system(
 
 fn level_completion_check_system(
 	vertices_q: Query<(&PlacedObject, &PlacedGlyph)>,
-	objects_q: Query<(Option<&Player>, Option<&Box>), With<Object>>,
-	glyphs_q: Query<(Option<&Goal>, Option<&BoxSlot>), With<Glyph>>,
+	objects_q: Query<(Option<&Player>, Option<&Box>, Option<&LogicalColor>), With<Object>>,
+	glyphs_q: Query<(Option<&Goal>, Option<&BoxSlot>, Option<&LogicalColor>), With<Glyph>>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
 ) {
@@ -149,26 +149,31 @@ fn level_completion_check_system(
 	};
 
 	for (object, glyph) in &vertices_q {
-		let (contains_player, contains_box) = object
+		let (contains_player, contains_box, object_color) = object
 			.0
 			.and_then(|id| objects_q.get(id).inspect_err(|e| log::warn!("{e}")).ok())
-			.map(|(a, b)| (a.is_some(), b.is_some()))
-			.unwrap_or((false, false));
-		let (contains_goal, contains_button) = glyph
+			.map(|(a, b, c)| (a.is_some(), b.is_some(), c))
+			.unwrap_or((false, false, None));
+		let (contains_goal, contains_button, glyph_color) = glyph
 			.0
 			.and_then(|id| glyphs_q.get(id).inspect_err(|e| log::warn!("{e}")).ok())
-			.map(|(a, b)| (a.is_some(), b.is_some()))
-			.unwrap_or((false, false));
+			.map(|(a, b, c)| (a.is_some(), b.is_some(), c))
+			.unwrap_or((false, false, None));
+
+		let colors_compatible = object_color
+			.and_then(|object_color| glyph_color.map(|glyph_color| *object_color == *glyph_color))
+			// If either thing is colorless, they are considered compatible
+			.unwrap_or(true);
 
 		if contains_button {
 			new_completion.buttons_present += 1;
-			if contains_box {
+			if contains_box && colors_compatible {
 				new_completion.buttons_triggered += 1;
 			}
 		}
 		if contains_goal {
 			new_completion.flags_present += 1;
-			if contains_player {
+			if contains_player && colors_compatible {
 				new_completion.flags_occupied += 1;
 			}
 		}
