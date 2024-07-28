@@ -93,7 +93,7 @@ impl LevelID {
 	/// Get the hint for a level
 	pub fn level_hint(self) -> Option<&'static str> {
 		match self {
-			Self::Intro => None,
+			Self::Intro => Some("Left/right click a ring to turn it!"),
 			Self::Transfer => None,
 			Self::Boxes => None,
 			Self::Manual => None,
