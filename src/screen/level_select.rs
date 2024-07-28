@@ -1,7 +1,10 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use super::*;
-use crate::{game::LevelID, ui::prelude::*};
+use crate::{
+	game::{assets::GlobalFont, LevelID},
+	ui::prelude::*,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::LevelSelect), spawn_screen)
@@ -21,12 +24,12 @@ enum LevelSelectAction {
 	PlayLevel(LevelID),
 }
 
-fn spawn_screen(mut commands: Commands) {
+fn spawn_screen(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::LevelSelect))
 		.with_children(|parent| {
-			parent.header("Level Select");
+			parent.header("Level Select", font.0.clone_weak());
 			parent
 				.spawn(NodeBundle {
 					style: Style {
@@ -43,11 +46,13 @@ fn spawn_screen(mut commands: Commands) {
 				.with_children(|parent| {
 					for level_id in &LevelID::LEVEL_ORDER {
 						parent
-							.small_button(level_id.level_name())
+							.small_button(level_id.level_name(), font.0.clone_weak())
 							.insert(LevelSelectAction::PlayLevel(*level_id));
 					}
 				});
-			parent.button("Back").insert(LevelSelectAction::Back);
+			parent
+				.button("Back", font.0.clone_weak())
+				.insert(LevelSelectAction::Back);
 		});
 }
 

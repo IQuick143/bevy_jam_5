@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use super::{QueueScreenTransition, Screen};
-use crate::ui::prelude::*;
+use crate::{game::assets::GlobalFont, ui::prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
@@ -22,17 +22,23 @@ enum TitleAction {
 	Exit,
 }
 
-fn enter_title(mut commands: Commands) {
+fn enter_title(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::Title))
 		.with_children(|children| {
-			children.header("Ptolemy's Epicycles");
-			children.button("Play").insert(TitleAction::Play);
-			children.button("Credits").insert(TitleAction::Credits);
+			children.header("Ptolemy's Epicycles", font.0.clone_weak());
+			children
+				.button("Play", font.0.clone_weak())
+				.insert(TitleAction::Play);
+			children
+				.button("Credits", font.0.clone_weak())
+				.insert(TitleAction::Credits);
 
 			#[cfg(not(target_family = "wasm"))]
-			children.button("Exit").insert(TitleAction::Exit);
+			children
+				.button("Exit", font.0.clone_weak())
+				.insert(TitleAction::Exit);
 		});
 }
 

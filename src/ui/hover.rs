@@ -16,6 +16,7 @@ pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if 
 
 use crate::{
 	game::{
+		assets::GlobalFont,
 		graphics::{GAME_AREA, HINT_TEXT_SIZE},
 		prelude::*,
 	},
@@ -28,7 +29,7 @@ pub fn plugin(app: &mut App) {
 		.add_systems(Startup, spawn_hover_text);
 }
 
-fn spawn_hover_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
 	let text_box_z = -100.0;
 	let margin = 10.0;
 	//	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
@@ -46,8 +47,7 @@ fn spawn_hover_text(mut commands: Commands, asset_server: Res<AssetServer>) {
 				text_box_z,
 			),
 			text_anchor: bevy::sprite::Anchor::Center,
-			text: Text::from_section("", get_text_style(&asset_server))
-				.with_justify(JustifyText::Left),
+			text: Text::from_section("", get_text_style(&font)).with_justify(JustifyText::Left),
 			..default()
 		},
 		HoverText,
@@ -59,12 +59,11 @@ fn spawn_hover_text(mut commands: Commands, asset_server: Res<AssetServer>) {
 	));
 }
 
-fn get_text_style(_asset_server: &Res<AssetServer>) -> TextStyle {
+fn get_text_style(font: &GlobalFont) -> TextStyle {
 	TextStyle {
-		//font: asset_server.load("fonts/your_font_here.ttf"),
+		font: font.0.clone_weak(),
 		font_size: 32.0,
 		color: super::palette::LABEL_TEXT,
-		..default()
 	}
 }
 
@@ -127,7 +126,7 @@ fn update_hover_text(
 	mut text_query: Query<(&mut Text, &mut Visibility), With<HoverText>>,
 	hint_text: Res<HintText>,
 	state: Res<State<Screen>>,
-	asset_server: Res<AssetServer>,
+	font: Res<GlobalFont>,
 ) {
 	let should_be_visible = *state.get() == Screen::Playing;
 
@@ -147,6 +146,6 @@ fn update_hover_text(
 			true => Visibility::Visible,
 			false => Visibility::Hidden,
 		};
-		text.sections = vec![TextSection::new(chosen_text, get_text_style(&asset_server))];
+		text.sections = vec![TextSection::new(chosen_text, get_text_style(&font))];
 	}
 }

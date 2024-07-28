@@ -4,7 +4,7 @@ use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::{
 	game::{
-		assets::{HandleMap, PlainText},
+		assets::{GlobalFont, HandleMap, PlainText},
 		events::SpawnLevel,
 		level::{self, layout::LevelLayout, ValidLevelData},
 		prelude::*,
@@ -69,7 +69,7 @@ fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
 	next_state.set(PlayingLevel(None));
 }
 
-fn spawn_game_ui(mut commands: Commands) {
+fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
 		.ui_root()
 		.insert((
@@ -86,9 +86,13 @@ fn spawn_game_ui(mut commands: Commands) {
 			},
 		))
 		.with_children(|parent| {
-			parent.button("Back").insert(GameUiAction::Back);
-			parent.button("Reset").insert(GameUiAction::Reset);
-			parent.button("Next Level").insert((
+			parent
+				.button("Back", font.0.clone_weak())
+				.insert(GameUiAction::Back);
+			parent
+				.button("Reset", font.0.clone_weak())
+				.insert(GameUiAction::Reset);
+			parent.button("Next Level", font.0.clone_weak()).insert((
 				GameUiAction::NextLevel,
 				NextLevelButton,
 				InteractionPalette {

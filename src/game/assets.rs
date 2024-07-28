@@ -15,6 +15,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_asset_loader::<PlainTextLoader>();
 	app.init_asset::<PlainText>();
 	app.init_resource::<HandleMap<LevelID>>();
+
+	app.init_resource::<GlobalFont>();
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
@@ -187,6 +189,17 @@ impl FromWorld for HandleMap<LevelID> {
 			(Rubik, asset_server.load("levels/rubik.txt")),
 		]
 		.into()
+	}
+}
+
+/// The font to be used for rendering all text
+#[derive(Resource, Debug)]
+pub struct GlobalFont(pub Handle<Font>);
+
+impl FromWorld for GlobalFont {
+	fn from_world(world: &mut World) -> Self {
+		let asset_server = world.resource::<AssetServer>();
+		Self(asset_server.load("fonts/Comfortaa-SemiBold.ttf"))
 	}
 }
 

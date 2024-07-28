@@ -17,12 +17,12 @@ pub(super) fn plugin(app: &mut App) {
 	);
 }
 
-fn enter_loading(mut commands: Commands) {
+fn enter_loading(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::Loading))
 		.with_children(|children| {
-			children.label("Loading...");
+			children.label("Loading...", font.0.clone_weak());
 		});
 }
 
@@ -32,11 +32,13 @@ fn all_assets_loaded(
 	sfx_handles: Res<HandleMap<SfxKey>>,
 	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
 	level_handles: Res<HandleMap<LevelID>>,
+	font: Res<GlobalFont>,
 ) -> bool {
 	image_handles.all_loaded(&asset_server)
 		&& sfx_handles.all_loaded(&asset_server)
 		&& soundtrack_handles.all_loaded(&asset_server)
 		&& level_handles.all_loaded(&asset_server)
+		&& asset_server.is_loaded_with_dependencies(font.0.id())
 }
 
 fn continue_to_title(mut next_screen: ResMut<NextState<Screen>>) {
