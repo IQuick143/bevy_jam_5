@@ -2,7 +2,7 @@
 #![cfg_attr(not(feature = "dev"), windows_subsystem = "windows")]
 
 use bevy::prelude::*;
-use bevy_quickstart::AppPlugin;
+use bevy_cycle_permutation_puzzle::AppPlugin;
 
 fn main() -> AppExit {
 	App::new().add_plugins(AppPlugin).run()

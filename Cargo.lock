@@ -483,6 +483,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_cycle_permutation_puzzle"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "itertools 0.13.0",
+ "log",
+ "rand",
+ "regex",
+]
+
+[[package]]
 name = "bevy_derive"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -822,17 +833,6 @@ name = "bevy_ptr"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c115c97a5c8a263bd0aa7001b999772c744ac5ba797d07c86f25734ce381ea69"
-
-[[package]]
-name = "bevy_quickstart"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "itertools 0.13.0",
- "log",
- "rand",
- "regex",
-]
 
 [[package]]
 name = "bevy_reflect"
