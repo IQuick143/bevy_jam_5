@@ -22,6 +22,7 @@ pub enum ImageKey {
 	Object(ThingType),
 	CycleCenter(CycleTurnability),
 	CycleRotationArrow,
+	Background,
 }
 
 impl AssetKey for ImageKey {
@@ -63,6 +64,10 @@ impl FromWorld for HandleMap<ImageKey> {
 			(
 				ImageKey::CycleRotationArrow,
 				asset_server.load("images/cycle-rot.png"),
+			),
+			(
+				ImageKey::Background,
+				asset_server.load("images/background.png"),
 			),
 		]
 		.into()

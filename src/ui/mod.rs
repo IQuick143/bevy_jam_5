@@ -7,6 +7,7 @@ pub mod hover;
 pub mod interaction;
 pub mod palette;
 pub mod screen_fade;
+pub mod background;
 mod widgets;
 
 pub mod prelude {
@@ -20,5 +21,5 @@ pub mod prelude {
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_plugins((interaction::plugin, screen_fade::plugin, hover::plugin));
+	app.add_plugins((interaction::plugin, screen_fade::plugin, hover::plugin, background::plugin));
 }
