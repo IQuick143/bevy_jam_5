@@ -9,7 +9,10 @@ mod title;
 
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-use crate::ui::{freeze::{ui_not_frozen, FreezeUi}, screen_fade::Fader};
+use crate::ui::{
+	freeze::{ui_not_frozen, FreezeUi},
+	screen_fade::Fader,
+};
 
 pub use playing::PlayingLevel;
 
@@ -29,7 +32,10 @@ pub(super) fn plugin(app: &mut App) {
 	));
 
 	app.add_systems(Update, process_enqueued_transitions::<Screen>);
-	app.add_systems(Update, go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and_then(ui_not_frozen)));
+	app.add_systems(
+		Update,
+		go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and_then(ui_not_frozen)),
+	);
 }
 
 fn go_to_return_screen(
