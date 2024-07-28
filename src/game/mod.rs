@@ -29,6 +29,7 @@ pub enum LevelID {
 	Boxes,
 	Manual,
 	Sync,
+	Sync2,
 	Bicycle,
 	Swap,
 	Sort,
@@ -66,6 +67,7 @@ impl LevelID {
 			Self::Boxes => "Boxes",
 			Self::Manual => "Manual",
 			Self::Sync => "Sync",
+			Self::Sync2 => "Sync 2",
 			Self::Bicycle => "Bicycle",
 			Self::Swap => "Swap",
 			Self::Sort => "Sort",
@@ -85,12 +87,13 @@ impl LevelID {
 	}
 
 	/// The canonical level order
-	pub const LEVEL_ORDER: [LevelID; 20] = [
+	pub const LEVEL_ORDER: [LevelID; 21] = [
 		Self::Intro,
 		Self::Transfer,
 		Self::Boxes,
 		Self::Manual,
 		Self::Sync,
+		Self::Sync2,
 		Self::Bicycle,
 		Self::Swap,
 		Self::Sort,

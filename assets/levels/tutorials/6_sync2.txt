@@ -1,0 +1,16 @@
+VERTEX a b c d e f g h i j k l m n
+
+CYCLE main a b c d e f g
+CYCLE spin b a
+CYCLE[STILL] side h i j k l m n
+
+OBJECT[PLAYER] e
+OBJECT[FLAG] c
+OBJECT[BOX] j
+OBJECT[BUTTON] l
+
+LINK main side
+
+PLACE main 0 0 100
+PLACE spin -110 0 40
+PLACE side 200 0 60
