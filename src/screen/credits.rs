@@ -30,7 +30,7 @@ fn enter_credits(mut commands: Commands) {
 			children.header("Made by");
 			children.label("IQuick 143 - Game design, Programming, Visual direction, Level design");
 			children.label("IWonderWhatThisAPIDoes - Programming, Art, Level Design");
-			children.label("Soy - Level Design");
+			children.label("SoysCodingCafe - Level Design");
 
 			children.header("Assets");
 			children.label("Bevy logo - All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.");
