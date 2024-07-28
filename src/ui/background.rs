@@ -35,7 +35,11 @@ fn spawn_background(mut commands: Commands, images: Res<HandleMap<ImageKey>>) {
 					visibility: Visibility::Visible,
 					..Default::default()
 				},
-				ImageScaleMode::Tiled { tile_x: true, tile_y: true, stretch_value: BACKGROUND_TILING / 512.0 },
+				ImageScaleMode::Tiled {
+					tile_x: true,
+					tile_y: true,
+					stretch_value: BACKGROUND_TILING / 512.0,
+				},
 				Background,
 			));
 		});

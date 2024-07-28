@@ -125,7 +125,7 @@ impl LevelID {
 		Self::Transfer,
 		Self::Boxes,
 		Self::Manual,
-//		Self::Colors,
+		//		Self::Colors,
 		Self::Bicycle,
 		Self::Swap,
 		Self::Sort,
