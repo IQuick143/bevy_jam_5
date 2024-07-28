@@ -20,7 +20,8 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn cycle_inputs_system(
-	input: Res<ButtonInput<MouseButton>>,
+	input_mouse: Res<ButtonInput<MouseButton>>,
+	input_key: Res<ButtonInput<KeyCode>>,
 	window_q: Query<&Window>,
 	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut cycles_q: Query<(
@@ -31,8 +32,8 @@ fn cycle_inputs_system(
 		&mut CycleInteraction,
 	)>,
 ) {
-	let lmb = input.just_pressed(MouseButton::Left);
-	let rmb = input.just_pressed(MouseButton::Right);
+	let lmb = input_mouse.just_pressed(MouseButton::Left) || input_key.just_pressed(KeyCode::KeyD);
+	let rmb = input_mouse.just_pressed(MouseButton::Right) || input_key.just_pressed(KeyCode::KeyA);
 	let new_interaction = match (lmb, rmb) {
 		(true, true) => CycleInteraction::Hover,
 		(true, false) => CycleInteraction::LeftClick,
