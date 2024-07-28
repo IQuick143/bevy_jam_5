@@ -120,30 +120,30 @@ impl LevelID {
 	}
 
 	/// The canonical level order
-	pub const LEVEL_ORDER: [LevelID; 23] = [
+	pub const LEVEL_ORDER: [LevelID; 21] = [
 		Self::Intro,
 		Self::Transfer,
 		Self::Boxes,
 		Self::Manual,
-		Self::Sync,
-		Self::Sync2,
-		Self::Colors,
+//		Self::Colors,
 		Self::Bicycle,
 		Self::Swap,
 		Self::Sort,
+		Self::Lotus,
+		Self::Olympic,
 		Self::Tricycle,
 		Self::CargoTricycle,
 		Self::CargoSinglePlayer,
-		Self::Lotus,
 		Self::ThreeInARowSimple,
-		Self::Olympic,
+		Self::Sync,
+		Self::Sync2,
 		Self::Disrupt,
 		Self::Send,
 		Self::Teamwork,
 		Self::Sort2,
 		Self::ThreeInARow,
 		Self::Car,
-		Self::Rubik,
+		//Self::Rubik,
 	];
 }
 
