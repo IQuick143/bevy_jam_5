@@ -9,6 +9,6 @@ pub const HEADER_TEXT: Color = BUTTON_TEXT;
 
 pub const NODE_BACKGROUND: Color = Color::Srgba(SLATE_400);
 
-pub const NEXT_LEVEL_BUTTON_BACKGROUND: Color = Color::Srgba(GREEN_600);
-pub const NEXT_LEVEL_BUTTON_HOVER: Color = Color::Srgba(GREEN_700);
-pub const NEXT_LEVEL_BUTTON_PRESS: Color = Color::Srgba(GREEN_500);
+pub const NEXT_LEVEL_BUTTON_BACKGROUND: Color = Color::Srgba(GREEN_500);
+pub const NEXT_LEVEL_BUTTON_HOVER: Color = Color::Srgba(GREEN_600);
+pub const NEXT_LEVEL_BUTTON_PRESS: Color = Color::Srgba(GREEN_400);

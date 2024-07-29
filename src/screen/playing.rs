@@ -75,8 +75,8 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 			Style {
 				width: Val::Percent(100.0),
 				height: Val::Percent(100.0),
-				justify_content: JustifyContent::Start,
 				align_items: AlignItems::Start,
+				justify_content: JustifyContent::Start,
 				flex_direction: FlexDirection::Row,
 				column_gap: Val::Px(10.0),
 				margin: UiRect::all(Val::Px(10.0)),
@@ -85,20 +85,22 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		))
 		.with_children(|parent| {
 			parent
-				.button("Back", font.0.clone_weak())
+				.tool_button("Back", font.0.clone_weak())
 				.insert(GameUiAction::Back);
 			parent
-				.button("Reset", font.0.clone_weak())
+				.tool_button("Reset", font.0.clone_weak())
 				.insert(GameUiAction::Reset);
-			parent.button("Next Level", font.0.clone_weak()).insert((
-				GameUiAction::NextLevel,
-				NextLevelButton,
-				InteractionPalette {
-					none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
-					hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
-					pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
-				},
-			));
+			parent
+				.tool_button("Next Level", font.0.clone_weak())
+				.insert((
+					GameUiAction::NextLevel,
+					NextLevelButton,
+					InteractionPalette {
+						none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
+						hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
+						pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
+					},
+				));
 		});
 }
 
