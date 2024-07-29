@@ -25,6 +25,7 @@ pub enum ImageKey {
 	CycleCenter(CycleTurnability),
 	CycleRotationArrow,
 	Background,
+	Title,
 }
 
 impl AssetKey for ImageKey {
@@ -71,10 +72,17 @@ impl FromWorld for HandleMap<ImageKey> {
 				ImageKey::Background,
 				asset_server.load("images/background.png"),
 			),
+			(
+				ImageKey::Title,
+				asset_server.load("images/title.png"),
+			),
 		]
 		.into()
 	}
 }
+
+/// How much bigger is the title image than its viewport
+pub const TITLE_IMAGE_OVERFLOW: f32 = 1.2;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum SfxKey {

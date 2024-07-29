@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use super::*;
-use crate::{game::assets::GlobalFont, ui::prelude::*};
+use crate::{game::{self, assets::{self, GlobalFont, HandleMap, ImageKey}}, ui::prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
@@ -25,12 +25,23 @@ enum TitleAction {
 	Exit,
 }
 
-fn enter_title(mut commands: Commands, font: Res<GlobalFont>) {
+fn enter_title(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	image_handles: Res<HandleMap<ImageKey>>,
+) {
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::Title))
 		.with_children(|children| {
-			children.header("Ptolemy's Epicycles", font.0.clone_weak());
+			// Invisible spacer node to bring the menu lower
+			children.spawn(NodeBundle {
+				style: Style {
+					height: Val::Px(200.0),
+					..default()
+				},
+				..default()
+			});
 			children
 				.button("Play", font.0.clone_weak())
 				.insert(TitleAction::Play);
@@ -43,6 +54,18 @@ fn enter_title(mut commands: Commands, font: Res<GlobalFont>) {
 				.button("Exit", font.0.clone_weak())
 				.insert(TitleAction::Exit);
 		});
+	commands.spawn((
+		StateScoped(Screen::Title),
+		SpriteBundle {
+			sprite: Sprite {
+				custom_size: Some(game::graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
+				..default()
+			},
+			texture: image_handles[&ImageKey::Title].clone_weak(),
+			transform: Transform::from_translation(Vec2::ZERO.extend(-10.0)),
+			..default()
+		}
+	));
 }
 
 fn handle_title_action(
