@@ -1,4 +1,7 @@
-use bevy::{audio::{PlaybackMode, Volume}, prelude::*};
+use bevy::{
+	audio::{PlaybackMode, Volume},
+	prelude::*,
+};
 
 use crate::game::assets::{HandleMap, SoundtrackKey};
 
