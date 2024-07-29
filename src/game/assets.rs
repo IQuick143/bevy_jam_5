@@ -80,6 +80,8 @@ impl FromWorld for HandleMap<ImageKey> {
 pub enum SfxKey {
 	ButtonHover,
 	ButtonPress,
+	Transition,
+	LevelComplete,
 }
 
 impl AssetKey for SfxKey {
@@ -98,6 +100,14 @@ impl FromWorld for HandleMap<SfxKey> {
 				SfxKey::ButtonPress,
 				asset_server.load("audio/sfx/button_press.ogg"),
 			),
+			(
+				SfxKey::Transition,
+				asset_server.load("audio/sfx/transition.ogg"),
+			),
+			(
+				SfxKey::LevelComplete,
+				asset_server.load("audio/sfx/level_complete.ogg"),
+			),
 		]
 		.into()
 	}
@@ -114,13 +124,11 @@ impl AssetKey for SoundtrackKey {
 
 impl FromWorld for HandleMap<SoundtrackKey> {
 	fn from_world(world: &mut World) -> Self {
-		let _asset_server = world.resource::<AssetServer>();
-		[
-			//(
-			//	SoundtrackKey::Gameplay,
-			//	Handle::default() //TODO asset_server.load("audio/soundtracks/Fluffing A Duck.ogg"),
-			//),
-		]
+		let asset_server = world.resource::<AssetServer>();
+		[(
+			SoundtrackKey::Gameplay,
+			asset_server.load("audio/soundtracks/blorbitality.ogg"),
+		)]
 		.into()
 	}
 }
