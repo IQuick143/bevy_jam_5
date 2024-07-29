@@ -1,12 +1,12 @@
 use bevy::math::bounding::{Aabb2d, BoundingVolume};
 
 pub const BOX: &str = "A box. Can be moved around and placed onto buttons.";
-pub const BUTTON: &str = "A button. Push a box onto it before going to the flag.";
-pub const FLAG: &str = "A flag. Stand here to clear the level.";
+pub const BUTTON: &str = "A button, needs a box.";
+pub const FLAG: &str = "A flag, needs a player.";
 pub const PLAYER: &str = "It's a you!";
-pub const CYCLE_MANUAL: &str = "This ring can only be turned when you stand on it.";
-pub const CYCLE_AUTOMATIC: &str = "This ring can be turned by left/right clicking it.";
-pub const CYCLE_STILL: &str = "This ring cannot be turned on its own.";
+pub const CYCLE_MANUAL: &str = "This cycle can only be turned while you stand on it.";
+pub const CYCLE_AUTOMATIC: &str = "This cycle can be turned by left/right clicking its center.";
+pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 
 pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if you hover on it!";
 
