@@ -1,16 +1,12 @@
 use bevy::math::bounding::{Aabb2d, BoundingVolume};
 
-pub const BOX: &str = "A box, mostly uninteresting, can be moved around and placed onto buttons.";
-pub const BUTTON: &str = "A button, to clear the level, all buttons need a box.";
-pub const FLAG: &str = "A flag, to clear the level, all flags need a player.";
-pub const PLAYER: &str =
-	"A player, enables rotating player-powered cycles, can be placed on a flag.";
-
-//pub const CYCLE_MANUAL_UNPOWERED: &'static str = "An unpowered player-powered cycle, to use it, one must first place a player on its permiter.";
-//pub const CYCLE_MANUAL_POWERED: &'static str = "A powered player-powered cycle, rotate it by clicking with left/right mouse button in the clockwise/counterclockwise direction.";
-pub const CYCLE_MANUAL: &str = "A player-powered cycle, usable only with a player on it, rotate it by clicking with left/right mouse button in the clockwise/counterclockwise direction.";
-pub const CYCLE_AUTOMATIC: &str = "An always-powered cycle, rotate it by clicking with left/right mouse button in the clockwise/counterclockwise direction.";
-pub const CYCLE_STILL: &str = "A still cycle, can only be rotated if it is linked to another cycle";
+pub const BOX: &str = "A box. Can be moved around and placed onto buttons.";
+pub const BUTTON: &str = "A button. Push a box onto it before going to the flag.";
+pub const FLAG: &str = "A flag. Stand here to clear the level.";
+pub const PLAYER: &str = "It's a you!";
+pub const CYCLE_MANUAL: &str = "This ring can only be turned when you stand on it.";
+pub const CYCLE_AUTOMATIC: &str = "This ring can be turned by left/right clicking it.";
+pub const CYCLE_STILL: &str = "This ring cannot be turned on its own.";
 
 pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if you hover on it!";
 

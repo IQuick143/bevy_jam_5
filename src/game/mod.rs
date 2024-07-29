@@ -112,7 +112,7 @@ impl LevelID {
 			Self::ThreeInARow => Some("I hope you enjoyed Grid."),
 			Self::Car => Some("Fun fact: Originally this level was thought to be impossible!"),
 			Self::Olympic => Some("Tip: In levels with a single player and manual cycles, it's helpful to think about the player's routes through the crossings."),
-			Self::Disrupt => Some("So close, yet so far... Tip: Modular arithmetic."),
+			Self::Disrupt => Some("So close, yet so far... Tip: Least common multiple."),
 			Self::Send => None,
 			Self::Teamwork => Some("Fact: Teamwork makes the dream work, sometimes."),
 			Self::Sort2 => None,
