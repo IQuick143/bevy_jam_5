@@ -1,4 +1,4 @@
-use bevy::{audio::PlaybackMode, prelude::*};
+use bevy::{audio::{PlaybackMode, Volume}, prelude::*};
 
 use crate::game::assets::{HandleMap, SoundtrackKey};
 
@@ -26,6 +26,7 @@ fn play_soundtrack(
 			source: soundtrack_handles[&soundtrack_key].clone_weak(),
 			settings: PlaybackSettings {
 				mode: PlaybackMode::Loop,
+				volume: Volume::new(5.0),
 				..default()
 			},
 		},
