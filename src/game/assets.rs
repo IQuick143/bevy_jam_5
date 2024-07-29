@@ -114,11 +114,11 @@ impl FromWorld for HandleMap<SfxKey> {
 			),
 			(
 				SfxKey::Victory,
-				asset_server.load("audio/sfx/victory royale.ogg"),
+				asset_server.load("audio/sfx/level_complete.ogg"),
 			),
 			(
 				SfxKey::GoalComplete,
-				asset_server.load("audio/sfx/goal complete.ogg"),
+				asset_server.load("audio/sfx/transition.ogg"),
 			),
 		]
 		.into()
