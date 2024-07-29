@@ -80,6 +80,20 @@ impl FromWorld for HandleMap<ImageKey> {
 pub enum SfxKey {
 	ButtonHover,
 	ButtonPress,
+	Victory,
+	GoalComplete,
+}
+
+impl SfxKey {
+	pub fn volume_multiplier(self) -> f32 {
+		match self {
+			// These sounds are just too loud by default
+			Self::ButtonHover | Self::ButtonPress => 0.3,
+			// This one cannot be quieter than GoalComplete
+			Self::Victory => 1.5,
+			_ => 1.0,
+		}
+	}
 }
 
 impl AssetKey for SfxKey {
@@ -98,6 +112,14 @@ impl FromWorld for HandleMap<SfxKey> {
 				SfxKey::ButtonPress,
 				asset_server.load("audio/sfx/button_press.ogg"),
 			),
+			(
+				SfxKey::Victory,
+				asset_server.load("audio/sfx/victory royale.ogg"),
+			),
+			(
+				SfxKey::GoalComplete,
+				asset_server.load("audio/sfx/goal complete.ogg"),
+			),
 		]
 		.into()
 	}
@@ -114,13 +136,11 @@ impl AssetKey for SoundtrackKey {
 
 impl FromWorld for HandleMap<SoundtrackKey> {
 	fn from_world(world: &mut World) -> Self {
-		let _asset_server = world.resource::<AssetServer>();
-		[
-			//(
-			//	SoundtrackKey::Gameplay,
-			//	Handle::default() //TODO asset_server.load("audio/soundtracks/Fluffing A Duck.ogg"),
-			//),
-		]
+		let asset_server = world.resource::<AssetServer>();
+		[(
+			SoundtrackKey::Gameplay,
+			asset_server.load("audio/soundtracks/blorbitality.ogg"),
+		)]
 		.into()
 	}
 }

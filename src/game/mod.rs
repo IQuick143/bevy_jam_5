@@ -5,6 +5,7 @@ pub mod assets;
 pub mod audio;
 pub mod components;
 pub mod events;
+mod game_sfx;
 pub mod graphics;
 pub mod inputs;
 pub mod level;
@@ -156,6 +157,7 @@ pub(super) fn plugin(app: &mut App) {
 		animation::plugin,
 		resources::plugin,
 		inputs::plugin,
+		game_sfx::plugin,
 	));
 	app.add_event::<events::GameLayoutChanged>();
 	app.add_event::<events::RotateCycleGroup>();

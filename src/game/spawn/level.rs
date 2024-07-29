@@ -30,6 +30,7 @@ fn spawn_level(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut is_level_completed: ResMut<IsLevelCompleted>,
+	mut is_goal_unlocked: ResMut<IsGoalUnlocked>,
 	cycle_material: ResMut<RingMaterial>,
 	link_material: Res<LinkMaterial>,
 	palette: ResMut<ThingPalette>,
@@ -129,6 +130,7 @@ fn spawn_level(
 	}
 
 	is_level_completed.0 = false;
+	is_goal_unlocked.0 = false;
 	events.send(GameLayoutChanged);
 
 	hint_text.hint_text = level_id.level_hint();

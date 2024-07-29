@@ -1,4 +1,7 @@
-use bevy::{audio::PlaybackMode, prelude::*};
+use bevy::{
+	audio::{PlaybackMode, Volume},
+	prelude::*,
+};
 
 use crate::game::assets::{HandleMap, SfxKey};
 
@@ -18,6 +21,7 @@ fn play_sfx(
 		source: sfx_handles[&sfx_key].clone_weak(),
 		settings: PlaybackSettings {
 			mode: PlaybackMode::Despawn,
+			volume: Volume::new(sfx_key.volume_multiplier()),
 			..default()
 		},
 	});
