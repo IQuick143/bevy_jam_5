@@ -19,7 +19,10 @@ pub(super) fn plugin(app: &mut App) {
 		.init_resource::<PendingTransition<PlayingLevel>>()
 		.add_event::<QueueScreenTransition<PlayingLevel>>()
 		.enable_state_scoped_entities::<PlayingLevel>()
-		.add_systems(OnEnter(Screen::Playing), (load_level, spawn_game_ui))
+		.add_systems(
+			OnEnter(Screen::Playing),
+			(spawn_game_ui, load_level).chain(),
+		)
 		.add_systems(OnExit(Screen::Playing), clear_playing_level_state)
 		.add_systems(
 			Update,
@@ -49,6 +52,10 @@ pub struct PlayingLevel(pub Option<LevelID>);
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct NextLevelButton;
 
+/// Marker component for the level name label
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct LevelNameBox;
+
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
@@ -69,38 +76,86 @@ fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
-		.ui_root()
-		.insert((
-			StateScoped(Screen::Playing),
-			Style {
-				width: Val::Percent(100.0),
-				height: Val::Percent(100.0),
-				align_items: AlignItems::Start,
-				justify_content: JustifyContent::Start,
-				flex_direction: FlexDirection::Row,
-				column_gap: Val::Px(10.0),
-				margin: UiRect::all(Val::Px(10.0)),
-				..default()
-			},
-		))
+		.ui_root_justified(JustifyContent::Start)
+		.insert(StateScoped(Screen::Playing))
 		.with_children(|parent| {
 			parent
-				.tool_button("Back", font.0.clone_weak())
-				.insert(GameUiAction::Back);
-			parent
-				.tool_button("Reset", font.0.clone_weak())
-				.insert(GameUiAction::Reset);
-			parent
-				.tool_button("Next Level", font.0.clone_weak())
-				.insert((
-					GameUiAction::NextLevel,
-					NextLevelButton,
-					InteractionPalette {
-						none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
-						hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
-						pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
+				.spawn(NodeBundle {
+					style: Style {
+						width: Val::Percent(100.0),
+						flex_direction: FlexDirection::Row,
+						column_gap: Val::Px(10.0),
+						padding: UiRect::all(Val::Px(10.0)),
+						align_items: AlignItems::Start,
+						justify_content: JustifyContent::Start,
+						..default()
 					},
-				));
+					..default()
+				})
+				.with_children(|parent| {
+					parent
+						.tool_button("Back", font.0.clone_weak())
+						.insert(GameUiAction::Back);
+					parent
+						.tool_button("Reset", font.0.clone_weak())
+						.insert(GameUiAction::Reset);
+				});
+			parent
+				.spawn(NodeBundle {
+					style: Style {
+						width: Val::Percent(100.0),
+						flex_direction: FlexDirection::Row,
+						column_gap: Val::Px(10.0),
+						padding: UiRect::all(Val::Px(10.0)),
+						align_items: AlignItems::Start,
+						justify_content: JustifyContent::End,
+						position_type: PositionType::Absolute,
+						..default()
+					},
+					..default()
+				})
+				.with_children(|parent| {
+					parent
+						.tool_button("Next Level", font.0.clone_weak())
+						.insert((
+							GameUiAction::NextLevel,
+							NextLevelButton,
+							InteractionPalette {
+								none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
+								hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
+								pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
+							},
+						));
+				});
+			parent
+				.spawn(NodeBundle {
+					style: Style {
+						width: Val::Percent(100.0),
+						height: Val::Px(50.0),
+						margin: UiRect::all(Val::Px(10.0)),
+						position_type: PositionType::Absolute,
+						justify_content: JustifyContent::Center,
+						align_items: AlignItems::Center,
+						..default()
+					},
+					..default()
+				})
+				.with_children(|parent| {
+					parent.spawn((
+						LevelNameBox,
+						TextBundle {
+							text: Text::from_section(
+								"", /* Will be set by load_level */
+								TextStyle {
+									font: font.0.clone_weak(),
+									font_size: 35.0,
+									color: ui_palette::LABEL_TEXT,
+								},
+							),
+							..default()
+						},
+					));
+				});
 		});
 }
 
@@ -174,6 +229,7 @@ fn load_level(
 	level_handles: Res<HandleMap<LevelID>>,
 	level_assets: Res<Assets<PlainText>>,
 	playing_level: Res<State<PlayingLevel>>,
+	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
 ) {
 	let level_id = playing_level
@@ -187,6 +243,8 @@ fn load_level(
 	let level_data = level_assets
 		.get(level_handle)
 		.expect("Handle should have been created by insertion into this");
+
+	level_name_q.single_mut().sections[0].value = level_id.level_name().to_owned();
 
 	fn prepare_level(level_data: &str) -> Result<(ValidLevelData, LevelLayout), ()> {
 		let level_file = level::parser::parse(level_data)
