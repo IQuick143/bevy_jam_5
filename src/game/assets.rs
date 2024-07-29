@@ -81,7 +81,7 @@ pub enum SfxKey {
 	ButtonHover,
 	ButtonPress,
 	Victory,
-	GoalComplete,
+	EnterLevel,
 }
 
 impl SfxKey {
@@ -117,7 +117,7 @@ impl FromWorld for HandleMap<SfxKey> {
 				asset_server.load("audio/sfx/level_complete.ogg"),
 			),
 			(
-				SfxKey::GoalComplete,
+				SfxKey::EnterLevel,
 				asset_server.load("audio/sfx/transition.ogg"),
 			),
 		]

@@ -140,7 +140,6 @@ fn level_completion_check_system(
 	glyphs_q: Query<(Option<&Goal>, Option<&BoxSlot>, Option<&LogicalColor>), With<Glyph>>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
-	mut is_goal_unlocked: ResMut<IsGoalUnlocked>,
 ) {
 	let mut new_completion = LevelCompletionConditions {
 		buttons_present: 0,
@@ -184,10 +183,6 @@ fn level_completion_check_system(
 		// This stays true until a different level is loaded
 		is_completed.set_if_neq(IsLevelCompleted(true));
 	}
-
-	// Lock this to true once the level is unlocked
-	let goal_unlocked = is_completed.0 || new_completion.is_goal_unlocked();
-	is_goal_unlocked.set_if_neq(IsGoalUnlocked(goal_unlocked));
 
 	*completion = new_completion;
 }

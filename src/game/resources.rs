@@ -5,7 +5,6 @@ use super::{level::LOGICAL_COLORS, prelude::*};
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
 		.init_resource::<IsLevelCompleted>()
-		.init_resource::<IsGoalUnlocked>()
 		.init_resource::<RingMaterial>()
 		.init_resource::<LinkMaterial>()
 		.init_resource::<ThingPalette>();
@@ -37,11 +36,6 @@ impl LevelCompletionConditions {
 /// in this session (making moves after completion does not matter)
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct IsLevelCompleted(pub bool);
-
-/// Reflects the value of [`LevelCompletionConditions::is_goal_unlocked`].
-/// Once the level is completed, locks to true.
-#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub struct IsGoalUnlocked(pub bool);
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
