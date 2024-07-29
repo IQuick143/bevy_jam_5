@@ -90,8 +90,9 @@ impl SfxKey {
 			// These sounds are just too loud by default
 			Self::ButtonHover | Self::ButtonPress => 0.3,
 			// This one cannot be quieter than GoalComplete
-			Self::Victory => 1.5,
-			_ => 1.0,
+			Self::Victory => 3.0,
+			Self::EnterLevel => 1.5,
+			//_ => 1.0,
 		}
 	}
 }

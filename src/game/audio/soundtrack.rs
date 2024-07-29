@@ -29,7 +29,7 @@ fn play_soundtrack(
 			source: soundtrack_handles[&soundtrack_key].clone_weak(),
 			settings: PlaybackSettings {
 				mode: PlaybackMode::Loop,
-				volume: Volume::new(5.0),
+				volume: Volume::new(3.5),
 				..default()
 			},
 		},
