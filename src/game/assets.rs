@@ -72,10 +72,7 @@ impl FromWorld for HandleMap<ImageKey> {
 				ImageKey::Background,
 				asset_server.load("images/background.png"),
 			),
-			(
-				ImageKey::Title,
-				asset_server.load("images/title.png"),
-			),
+			(ImageKey::Title, asset_server.load("images/title.png")),
 		]
 		.into()
 	}

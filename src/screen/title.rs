@@ -3,7 +3,13 @@
 use bevy::prelude::*;
 
 use super::*;
-use crate::{game::{self, assets::{self, GlobalFont, HandleMap, ImageKey}}, ui::prelude::*};
+use crate::{
+	game::{
+		self,
+		assets::{self, GlobalFont, HandleMap, ImageKey},
+	},
+	ui::prelude::*,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
@@ -64,7 +70,7 @@ fn enter_title(
 			texture: image_handles[&ImageKey::Title].clone_weak(),
 			transform: Transform::from_translation(Vec2::ZERO.extend(-10.0)),
 			..default()
-		}
+		},
 	));
 }
 
