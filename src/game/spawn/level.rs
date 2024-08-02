@@ -132,7 +132,7 @@ fn spawn_level(
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation))
-					.with_translation((position + offset).extend(-400.0)),
+					.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
 				material: link_material.clone_weak(),
 				..default()
 			},
@@ -142,7 +142,7 @@ fn spawn_level(
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
-					.with_translation((position - offset).extend(-400.0)),
+					.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
 				material: link_material.clone_weak(),
 				..default()
 			},
@@ -180,7 +180,7 @@ fn spawn_vertex(
 	commands.spawn((
 		StateScoped(PlayingLevel(Some(level_id))),
 		ColorMesh2dBundle {
-			transform: Transform::from_translation(position.extend(-100.0)),
+			transform: Transform::from_translation(position.extend(layers::CYCLE_NODES)),
 			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 			material: base_material,
 			..default()
@@ -204,7 +204,7 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(-10.0)),
+					transform: Transform::from_translation(position.extend(layers::OBJECT_SPRITES)),
 					..Default::default()
 				},
 				AnimatedObject::default(),
@@ -234,7 +234,7 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(-10.0)),
+					transform: Transform::from_translation(position.extend(layers::OBJECT_SPRITES)),
 					..Default::default()
 				},
 				AnimatedObject::default(),
@@ -277,7 +277,7 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(-50.0)),
+					transform: Transform::from_translation(position.extend(layers::GLYPH_SPRITES)),
 					..Default::default()
 				},
 				Hoverable {
@@ -303,7 +303,7 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(-50.0)),
+					transform: Transform::from_translation(position.extend(layers::GLYPH_SPRITES)),
 					..Default::default()
 				},
 				Hoverable {
@@ -375,7 +375,9 @@ fn spawn_cycle(
 					},
 					texture: image_handles[&ImageKey::CycleCenter(data.cycle_turnability)]
 						.clone_weak(),
-					transform: Transform::from_translation(Vec2::ZERO.extend(-300.0)),
+					transform: Transform::from_translation(
+						Vec2::ZERO.extend(layers::CYCLE_CENTER_SPRITES),
+					),
 					..default()
 				},
 				JumpTurnAnimation::default(),
@@ -400,7 +402,7 @@ fn spawn_cycle(
 						..default()
 					},
 					texture: image_handles[&ImageKey::CycleRotationArrow].clone_weak(),
-					transform: Transform::from_translation(Vec3::Z * -250.0),
+					transform: Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_ARROWS),
 					..default()
 				},
 				SpinAnimation {
@@ -411,7 +413,7 @@ fn spawn_cycle(
 			parent.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 				material,
-				transform: Transform::from_translation(Vec2::ZERO.extend(-200.0)),
+				transform: Transform::from_translation(Vec2::ZERO.extend(layers::CYCLE_RINGS)),
 				..default()
 			});
 		})

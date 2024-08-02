@@ -42,3 +42,17 @@ pub const FADE_COLOUR: Color = Color::WHITE;
 pub const BACKGROUND_VELOCITY: Vec2 = Vec2::new(16.0, -8.0 * f32::consts::SQRT_2);
 /// Velocity of the background in local background coordinates
 pub const BACKGROUND_TILING: f32 = 400.0;
+
+/// Defines Z depth of various objects to layer them properly
+pub mod layers {
+	pub const TITLE_IMAGE: f32 = -10.0;
+	pub const OBJECT_SPRITES: f32 = -10.0;
+	pub const GLYPH_SPRITES: f32 = -50.0;
+	pub const HINT_TEXT_PANEL: f32 = -100.0;
+	pub const CYCLE_NODES: f32 = -100.0;
+	pub const CYCLE_RINGS: f32 = -200.0;
+	pub const CYCLE_CENTER_ARROWS: f32 = -250.0;
+	pub const CYCLE_CENTER_SPRITES: f32 = -300.0;
+	pub const CYCLE_LINKS: f32 = -400.0;
+	pub const BACKGROUND: f32 = -550.0;
+}

@@ -68,7 +68,9 @@ fn enter_title(
 				..default()
 			},
 			texture: image_handles[&ImageKey::Title].clone_weak(),
-			transform: Transform::from_translation(Vec2::ZERO.extend(-10.0)),
+			transform: Transform::from_translation(
+				Vec2::ZERO.extend(game::graphics::layers::TITLE_IMAGE),
+			),
 			..default()
 		},
 	));

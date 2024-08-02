@@ -13,7 +13,7 @@ pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if 
 use crate::{
 	game::{
 		assets::GlobalFont,
-		graphics::{GAME_AREA, HINT_TEXT_SIZE},
+		graphics::{layers, GAME_AREA, HINT_TEXT_SIZE},
 		prelude::*,
 	},
 	screen::Screen,
@@ -26,7 +26,6 @@ pub fn plugin(app: &mut App) {
 }
 
 fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
-	let text_box_z = -100.0;
 	let margin = 10.0;
 	//	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
 	commands.spawn((
@@ -40,7 +39,7 @@ fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
 			transform: Transform::from_xyz(
 				0.0,
 				-GAME_AREA.y / 2.0 + HINT_TEXT_SIZE.y / 2.0,
-				text_box_z,
+				layers::HINT_TEXT_PANEL,
 			),
 			text_anchor: bevy::sprite::Anchor::Center,
 			text: Text::from_section("", get_text_style(&font)).with_justify(JustifyText::Left),

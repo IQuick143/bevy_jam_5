@@ -4,7 +4,7 @@ use bevy::color::palettes;
 
 use crate::game::{
 	assets::{HandleMap, ImageKey},
-	graphics::{BACKGROUND_TILING, BACKGROUND_VELOCITY},
+	graphics::{layers, BACKGROUND_TILING, BACKGROUND_VELOCITY},
 	prelude::*,
 };
 
@@ -31,7 +31,7 @@ fn spawn_background(mut commands: Commands, images: Res<HandleMap<ImageKey>>) {
 						..default()
 					},
 					texture: images[&ImageKey::Background].clone_weak(),
-					transform: Transform::from_translation(Vec2::ZERO.extend(-550.0)),
+					transform: Transform::from_translation(Vec2::ZERO.extend(layers::BACKGROUND)),
 					visibility: Visibility::Visible,
 					..Default::default()
 				},
