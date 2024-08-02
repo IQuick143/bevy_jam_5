@@ -97,20 +97,41 @@ fn spawn_level(
 	for link in &data.linkages {
 		let a = layout.cycles[link.cycle_a_index].position;
 		let b = layout.cycles[link.cycle_b_index].position;
+		let d_sq = a.distance_squared(b);
+		if d_sq <= CYCLE_LINK_SPACING.powi(2) {
+			// The link cannot be rendered if the cycles are too close
+			log::warn!("Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}", d_sq.sqrt());
+			continue;
+		}
+		let connector_length = match link.direction {
+			LinkedCycleDirection::Coincident => a.distance(b),
+			LinkedCycleDirection::Inverse => (d_sq - CYCLE_LINK_SPACING.powi(2)).sqrt(),
+		};
 		let mesh = primitives::Rectangle::from_size(Vec2::new(
-			a.distance(b) - CYCLE_LINK_END_CUT,
+			connector_length - CYCLE_LINK_END_CUT,
 			CYCLE_LINK_WIDTH,
 		))
 		.mesh();
 		let mesh = meshes.add(mesh);
-		let rotation = Quat::from_axis_angle(Vec3::Z, -(a - b).angle_between(Vec2::X));
+		let dir_from_a_to_b = (a - b).normalize();
+		let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_from_a_to_b);
 		let position = a.lerp(b, 0.5);
-		let offset = (a - b).normalize_or_zero().perp() * CYCLE_LINK_SPACING / 2.0;
+		let offset = match link.direction {
+			LinkedCycleDirection::Coincident => dir_from_a_to_b.perp() * CYCLE_LINK_SPACING / 2.0,
+			LinkedCycleDirection::Inverse => Vec2::ZERO,
+		};
+		let extra_rotation = match link.direction {
+			LinkedCycleDirection::Coincident => Quat::IDENTITY,
+			LinkedCycleDirection::Inverse => Quat::from_rotation_arc_2d(
+				Vec2::X,
+				Vec2::new(d_sq.sqrt(), CYCLE_LINK_SPACING).normalize(),
+			),
+		};
 		commands.spawn((
 			StateScoped(PlayingLevel(Some(level_id))),
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
-				transform: Transform::from_rotation(rotation)
+				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation))
 					.with_translation((position + offset).extend(-400.0)),
 				material: link_material.clone_weak(),
 				..default()
@@ -120,7 +141,7 @@ fn spawn_level(
 			StateScoped(PlayingLevel(Some(level_id))),
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh),
-				transform: Transform::from_rotation(rotation)
+				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
 					.with_translation((position - offset).extend(-400.0)),
 				material: link_material.clone_weak(),
 				..default()
