@@ -1,3 +1,5 @@
+Name=Sort
+
 VERTEX a b c d e f g h x y
 
 CYCLE main a b c d e f g h x y

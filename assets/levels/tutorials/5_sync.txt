@@ -1,3 +1,6 @@
+Name=Sync
+Hint=Linkages make cycles move in Sync!
+
 VERTEX a b c d e f g h i j k l m n
 
 CYCLE main a b c d e f g h

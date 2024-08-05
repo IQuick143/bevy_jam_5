@@ -1,3 +1,5 @@
+NAME=Transfer
+
 VERTEX a b c d e f g h i j
 
 CYCLE A a b c d e f

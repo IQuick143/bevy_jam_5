@@ -6,6 +6,7 @@ use regex::Regex;
 
 #[derive(Clone, Debug)]
 pub struct LevelFile {
+	pub metadata: HashMap<String, String>,
 	pub data: LevelData,
 	pub layout: Vec<layout::DeclaredPlacement>,
 }
@@ -30,23 +31,38 @@ enum ObjectKind {
 	Glyph(GlyphType),
 }
 
-#[allow(dead_code)]
-pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
+pub fn parse(level_file: &str) -> Result<LevelFile, LevelParsingError> {
 	let lines = level_file.split('\n').map(&str::trim).enumerate();
 	let lines = lines.filter(|(_line_index, line)| !(line.starts_with('#') || line.is_empty()));
 
+	let metadata_regex = Regex::new(r"^(?<KEY>[a-zA-Z0-9_]+)=(?<VALUE>.+)$")
+		.expect("I expected to be able to write a valid regex.");
 	let statement_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>[\w\:]+)\])?(?<VALUES>.+)?$")
 		.expect("I expected to be able to write a valid regex.");
 	let mut raw_statements: Vec<(usize, RawStatement)> = Vec::new();
 
+	let mut metadata = HashMap::new();
+
 	for (line_id, line) in lines {
 		if !line.is_ascii() {
 			// TODO: Line number
-			return Err(ParsingError::NonAsciiLine);
+			return Err(LevelParsingError::NonAsciiLine);
+		}
+		if let Some(captures) = metadata_regex.captures(line) {
+			let key = captures
+				.name("KEY")
+				.expect("KEY clause should always be present")
+				.as_str()
+				.to_ascii_lowercase();
+			let value = captures
+				.name("VALUE")
+				.expect("VALUE clause should always be present")
+				.as_str();
+			metadata.insert(key, value.to_string()); // TODO: check for duplicate keywords
+			continue;
 		}
 		let Some(captures) = statement_regex.captures(line) else {
-			// TODO: Line number
-			return Err(ParsingError::MalformedStatement(line_id));
+			return Err(LevelParsingError::MalformedStatement(line_id));
 		};
 		raw_statements.push((
 			line_id,
@@ -81,7 +97,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 						Some("MANUAL") => CycleTurnability::WithPlayer,
 						Some("ENGINE") => CycleTurnability::Always,
 						Some("STILL") => CycleTurnability::Never,
-						Some(m) => return Err(ParsingError::InvalidModifier(m.to_string())),
+						Some(m) => return Err(LevelParsingError::InvalidModifier(m.to_string())),
 					};
 					Statement::Cycle(turnability, raw_statement.values)
 				}
@@ -90,13 +106,13 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 						None => LinkedCycleDirection::Coincident,
 						Some("STRAIGHT") => LinkedCycleDirection::Coincident,
 						Some("CROSSED") => LinkedCycleDirection::Inverse,
-						Some(m) => return Err(ParsingError::InvalidModifier(m.to_string())),
+						Some(m) => return Err(LevelParsingError::InvalidModifier(m.to_string())),
 					};
 					Statement::Link(flip, raw_statement.values)
 				}
 				"OBJECT" => {
 					let Some(modifier) = raw_statement.modifier else {
-						return Err(ParsingError::MalformedStatement(line_id));
+						return Err(LevelParsingError::MalformedStatement(line_id));
 					};
 					let (object_kind, color) = modifier.split_once(':').unwrap_or((modifier, ""));
 					let kind = match object_kind {
@@ -104,20 +120,20 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 						"PLAYER" => ObjectKind::Object(ObjectType::Player),
 						"BUTTON" => ObjectKind::Glyph(GlyphType::Button),
 						"FLAG" => ObjectKind::Glyph(GlyphType::Flag),
-						_ => return Err(ParsingError::InvalidModifier(modifier.to_string())),
+						_ => return Err(LevelParsingError::InvalidModifier(modifier.to_string())),
 					};
 					let color_id = if color.is_empty() {
 						None
 					} else if let Ok(color_id) = color.parse() {
 						Some(LogicalColor(color_id))
 					} else {
-						return Err(ParsingError::InvalidModifier(modifier.to_string()));
+						return Err(LevelParsingError::InvalidModifier(modifier.to_string()));
 					};
 					Statement::Object(kind, color_id, raw_statement.values)
 				}
 				"PLACE" => Statement::Place(raw_statement.values),
 				"PLACE_VERT" => Statement::PlaceVertex(raw_statement.values),
-				k => return Err(ParsingError::InvalidKeyword(k.to_string())), // TODO: line number
+				k => return Err(LevelParsingError::InvalidKeyword(k.to_string())), // TODO: line number
 			},
 		));
 	}
@@ -152,11 +168,11 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 		if let Statement::Cycle(turnability, names) = statement {
 			if vertex_names.len() < 3 {
 				// TODO: better error
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			}
 			let cycle_name = *names.first().unwrap();
 			if cycle_names.contains_key(cycle_name) {
-				return Err(ParsingError::RedefinedCycle(cycle_name.to_string()));
+				return Err(LevelParsingError::RedefinedCycle(cycle_name.to_string()));
 			}
 			let mut cycle = CycleData {
 				vertex_indices: Vec::new(),
@@ -166,7 +182,9 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 				if let Some(vertex_id) = vertex_names.get(*vertex_name) {
 					cycle.vertex_indices.push(*vertex_id);
 				} else {
-					return Err(ParsingError::UnknownVertexName(vertex_name.to_string()));
+					return Err(LevelParsingError::UnknownVertexName(
+						vertex_name.to_string(),
+					));
 				}
 			}
 			let new_id = cycles.len();
@@ -181,7 +199,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 		if let Statement::Link(flip, linked_cycle_names) = statement {
 			if linked_cycle_names.len() < 2 {
 				// TODO: better error
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			}
 			let mut last_cycle = None;
 			for cycle_name in linked_cycle_names {
@@ -195,7 +213,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 					}
 					last_cycle = Some(*cycle_id);
 				} else {
-					return Err(ParsingError::UnknownCycleName(cycle_name.to_string()));
+					return Err(LevelParsingError::UnknownCycleName(cycle_name.to_string()));
 				}
 			}
 		}
@@ -212,7 +230,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 					match kind {
 						ObjectKind::Object(object) => {
 							if vertex.object.is_some() {
-								return Err(ParsingError::ObjectCollision(name.to_string()));
+								return Err(LevelParsingError::ObjectCollision(name.to_string()));
 							}
 							vertex.object = Some(ObjectData {
 								object_type: *object,
@@ -221,7 +239,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 						}
 						ObjectKind::Glyph(glyph) => {
 							if vertex.glyph.is_some() {
-								return Err(ParsingError::ObjectCollision(name.to_string()));
+								return Err(LevelParsingError::ObjectCollision(name.to_string()));
 							}
 							vertex.glyph = Some(GlyphData {
 								glyph_type: *glyph,
@@ -230,7 +248,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 						}
 					}
 				} else {
-					return Err(ParsingError::UnknownVertexName(name.to_string()));
+					return Err(LevelParsingError::UnknownVertexName(name.to_string()));
 				}
 			}
 		}
@@ -242,23 +260,23 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 	for (line_id, statement) in statements.iter() {
 		if let Statement::Place(data) = statement {
 			if data.len() < 4 {
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			}
 			let cycle_name = data[0];
 			let x_str = data[1].replace(',', ".");
 			let y_str = data[2].replace(',', ".");
 			let r_str = data[3].replace(',', ".");
 			let Some(cycle_id) = cycle_names.get(cycle_name) else {
-				return Err(ParsingError::UnknownCycleName(cycle_name.to_string()));
+				return Err(LevelParsingError::UnknownCycleName(cycle_name.to_string()));
 			};
 			let Ok(x) = x_str.parse::<f32>() else {
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			};
 			let Ok(y) = y_str.parse::<f32>() else {
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			};
 			let Ok(r) = r_str.parse::<f32>() else {
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			};
 			let hints = data[4..]
 				.iter()
@@ -266,7 +284,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 					vertex_names
 						.get(*name)
 						.copied()
-						.ok_or(ParsingError::UnknownVertexName(name.to_string()))
+						.ok_or(LevelParsingError::UnknownVertexName(name.to_string()))
 				})
 				.collect::<Result<_, _>>()?;
 			cycle_layout[*cycle_id] = Some((
@@ -280,7 +298,7 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 	}
 
 	if !cycle_layout.iter().all(Option::is_some) {
-		return Err(ParsingError::MissingCycleLayout);
+		return Err(LevelParsingError::MissingCycleLayout);
 	}
 
 	let mut layout: Vec<DeclaredPlacement> = cycle_layout
@@ -300,25 +318,26 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 	for (line_id, statement) in statements.iter() {
 		if let Statement::PlaceVertex(data) = statement {
 			if data.len() < 2 {
-				return Err(ParsingError::MalformedStatement(*line_id));
+				return Err(LevelParsingError::MalformedStatement(*line_id));
 			}
 			let vertex_name = data[0];
 			let angle_str = data[1].replace(',', ".");
 			if let Some(vertex_id) = vertex_names.get(vertex_name) {
 				let Ok(angle) = angle_str.parse::<f32>() else {
-					return Err(ParsingError::MalformedStatement(*line_id));
+					return Err(LevelParsingError::MalformedStatement(*line_id));
 				};
 				layout.push(DeclaredPlacement::Vertex(DeclaredVertexPlacement {
 					vertex_index: *vertex_id,
 					relative_angle: angle,
 				}))
 			} else {
-				return Err(ParsingError::UnknownCycleName(vertex_name.to_string()));
+				return Err(LevelParsingError::UnknownCycleName(vertex_name.to_string()));
 			}
 		}
 	}
 
 	Ok(LevelFile {
+		metadata,
 		data: LevelData {
 			vertices,
 			cycles,
@@ -331,6 +350,9 @@ pub fn parse(level_file: &str) -> Result<LevelFile, ParsingError> {
 #[test]
 fn basic_test() {
 	let data = r"
+TEST6=?!#_AAA 648
+HINT=This should parse correctly!
+
 # Here we declare all the vertex names
 # Just list them after the VERTEX, separating by space
 VERTEX a b c x 1 2 3 k l m
@@ -371,7 +393,7 @@ PLACE cycle_extra -100 100 50
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub enum ParsingError {
+pub enum LevelParsingError {
 	InvalidKeyword(String),
 	InvalidModifier(String),
 	UnknownVertexName(String),
@@ -383,36 +405,36 @@ pub enum ParsingError {
 	MissingCycleLayout,
 }
 
-impl std::error::Error for ParsingError {}
+impl std::error::Error for LevelParsingError {}
 
-impl std::fmt::Display for ParsingError {
+impl std::fmt::Display for LevelParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			ParsingError::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
-			ParsingError::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
-			ParsingError::UnknownVertexName(name) => write!(
+			LevelParsingError::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
+			LevelParsingError::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
+			LevelParsingError::UnknownVertexName(name) => write!(
 				f,
 				"A vertex with name {} was referenced, but not defined.",
 				name
 			)?,
-			ParsingError::UnknownCycleName(name) => write!(
+			LevelParsingError::UnknownCycleName(name) => write!(
 				f,
 				"A cycle with name {} was referenced, but not defined.",
 				name
 			)?,
-			ParsingError::RedefinedCycle(name) => {
+			LevelParsingError::RedefinedCycle(name) => {
 				write!(f, "A cycle with name {} was defined multiple times.", name)?
 			}
-			ParsingError::ObjectCollision(vertex) => write!(
+			LevelParsingError::ObjectCollision(vertex) => write!(
 				f,
 				"Too many objects were placed onto vertex with name {}",
 				vertex
 			)?,
-			ParsingError::NonAsciiLine => write!(f, "Non-ASCII characters in input")?,
-			ParsingError::MalformedStatement(line_id) => {
+			LevelParsingError::NonAsciiLine => write!(f, "Non-ASCII characters in input")?,
+			LevelParsingError::MalformedStatement(line_id) => {
 				write!(f, "Line {} contains a malformed statement.", line_id + 1)?
 			}
-			ParsingError::MissingCycleLayout => {
+			LevelParsingError::MissingCycleLayout => {
 				write!(f, "Some cycles don't have a position specified")?
 			}
 		}

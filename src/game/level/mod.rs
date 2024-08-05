@@ -39,26 +39,26 @@ pub enum ThingType {
 	Glyph(GlyphType),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct CycleData {
 	pub vertex_indices: Vec<usize>,
 	pub cycle_turnability: CycleTurnability,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Reflect)]
 pub struct LinkageData {
 	pub cycle_a_index: usize,
 	pub cycle_b_index: usize,
 	pub direction: LinkedCycleDirection,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Reflect)]
 pub struct VertexData {
 	pub object: Option<ObjectData>,
 	pub glyph: Option<GlyphData>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Reflect)]
 pub struct LevelData {
 	pub vertices: Vec<VertexData>,
 	pub cycles: Vec<CycleData>,
@@ -80,7 +80,7 @@ pub enum LevelDataValidationError {
 
 /// A sanitized [`LevelData`] instance.
 /// It is read-only to ensure that it truly remains valid
-#[derive(Debug, Clone, TypePath)]
+#[derive(Debug, Clone, Reflect)]
 pub struct ValidLevelData {
 	/// The contained level data. Guaranteed to be sanitized
 	inner: LevelData,

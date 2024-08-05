@@ -1,3 +1,5 @@
+Name=Colors
+
 VERTEX a b c d e f g h i j k
 
 CYCLE player a b c d e

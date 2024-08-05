@@ -1,3 +1,6 @@
+Name=Car
+Hint=Fun fact: Originally this level was thought to be impossible!
+
 VERTEX a b c d e f g h i j k l m n o p
 
 CYCLE[MANUAL] left a b h m l f

@@ -1,3 +1,5 @@
+Name=Tricycle
+
 VERTEX b1 b2 b3 bgi bgo bri bro r1 r2 r3 rgi rgo g1 g2 g3
 
 CYCLE blue b1 b2 b3 bgo bri bgi bro

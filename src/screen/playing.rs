@@ -4,9 +4,8 @@ use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::{
 	game::{
-		assets::{GlobalFont, HandleMap, PlainText},
+		assets::{GlobalFont, LevelAsset},
 		events::SpawnLevel,
-		level::{self, layout::LevelLayout, ValidLevelData},
 		prelude::*,
 	},
 	ui::prelude::*,
@@ -45,8 +44,8 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// Complementary state variable for [`Screen::Playing`]
-#[derive(States, Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
-pub struct PlayingLevel(pub Option<LevelID>);
+#[derive(States, Clone, PartialEq, Eq, Debug, Hash, Default)]
+pub struct PlayingLevel(pub Option<Handle<LevelAsset>>);
 
 /// Marker component for the next level button
 #[derive(Component, Clone, Copy, Debug, Default)]
@@ -67,7 +66,7 @@ fn reload_level(
 	state: Res<State<PlayingLevel>>,
 	mut transition: EventWriter<QueueScreenTransition<PlayingLevel>>,
 ) {
-	transition.send(QueueScreenTransition::fade(*state.get()));
+	transition.send(QueueScreenTransition::fade(state.get().clone()));
 }
 
 fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
@@ -174,18 +173,19 @@ fn game_ui_input_system(
 				next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
 			}
 			GameUiAction::Reset => {
-				next_level.send(QueueScreenTransition::fade(*playing_level.get()));
+				next_level.send(QueueScreenTransition::fade(playing_level.get().clone()));
 			}
 			GameUiAction::NextLevel => {
-				let playing_level = playing_level
-					.get()
-					.0
-					.expect("When in Screen::Playing state, PlayingLevel must also be set");
-				if let Some(next) = playing_level.next_level() {
-					next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(next))));
-				} else {
-					log::warn!("NextLevel action received on the last level");
-				}
+				// TODO:
+				//let playing_level = playing_level
+				//	.get()
+				//	.0
+				//	.expect("When in Screen::Playing state, PlayingLevel must also be set");
+				//if let Some(next) = playing_level.next_level() {
+				//	next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(next))));
+				//} else {
+				log::warn!("NextLevel action received on the last level");
+				//}
 			}
 		}
 	}
@@ -193,15 +193,16 @@ fn game_ui_input_system(
 
 fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
-	playing_level: Res<State<PlayingLevel>>,
+	//	playing_level: Res<State<PlayingLevel>>,
 	mut query: Query<&mut Style, With<NextLevelButton>>,
 ) {
-	let is_last_level = playing_level
-		.get()
-		.0
-		.expect("When in Screen::Playing state, PlayingLevel must also be set")
-		.next_level()
-		.is_none();
+	let is_last_level = true; //TODO
+						  /*playing_level
+						  .get()
+						  .0
+						  .expect("When in Screen::Playing state, PlayingLevel must also be set")
+						  .next_level()
+						  .is_none();*/
 	let display = if is_level_completed.0 && !is_last_level {
 		Display::DEFAULT
 	} else {
@@ -226,51 +227,30 @@ fn despawn_level_state_scoped(
 
 fn load_level(
 	mut commands: Commands,
-	level_handles: Res<HandleMap<LevelID>>,
-	level_assets: Res<Assets<PlainText>>,
+	level_assets: Res<Assets<LevelAsset>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
-	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+	//	next_screen: EventWriter<QueueScreenTransition<Screen>>,
 ) {
-	let level_id = playing_level
-		.get()
-		.0
-		.expect("Systems that transition into Screen::Playing must also set PlayingLevel state");
+	let level_handle =
+		playing_level.get().0.as_ref().expect(
+			"Systems that transition into Screen::Playing must also set PlayingLevel state",
+		);
 
-	let level_handle = level_handles
-		.get(&level_id)
-		.expect("All level IDs should be assigned a level");
 	let level_data = level_assets
 		.get(level_handle)
-		.expect("Handle should have been created by insertion into this");
+		.expect("All level handles should be valid");
 
-	level_name_q.single_mut().sections[0].value = level_id.level_name().to_owned();
+	// Spawn the level
+	level_name_q.single_mut().sections[0]
+		.value
+		.clone_from(&level_data.name);
+	commands.trigger(SpawnLevel(level_data.clone()));
 
-	fn prepare_level(level_data: &str) -> Result<(ValidLevelData, LevelLayout), ()> {
-		let level_file = level::parser::parse(level_data)
-			.map_err(|err| log::error!("Failed to parse level file: {err}"))?;
-		let level = level_file
-			.data
-			.try_into()
-			.map_err(|err| log::error!("Level file validation failed: {err}"))?;
-		let mut layout_builder = level::layout::LevelLayoutBuilder::new(&level);
-		for placement in level_file.layout {
-			layout_builder
-				.add_placement(placement)
-				.map_err(|err| log::error!("Level layout could not be applied: {err}"))?;
-		}
-		let level_layout = layout_builder
-			.build()
-			.map_err(|err| log::error!("Level layout could not be applied: {err}"))?;
-		Ok((level, level_layout))
-	}
-
-	if let Ok((level, level_layout)) = prepare_level(level_data) {
-		// Spawn the level
-		commands.trigger(SpawnLevel(level_id, level, level_layout));
-	} else {
-		// If the level could not be loaded, go back to level select screen
-		// (errors have already been reported)
-		next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
-	}
+	// { //TODO
+	// 	todo!();
+	// 	// If the level could not be loaded, go back to level select screen
+	// 	// (errors have already been reported)
+	// 	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+	// }
 }

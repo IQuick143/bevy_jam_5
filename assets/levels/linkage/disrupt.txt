@@ -1,3 +1,6 @@
+Name=Disrupt
+Hint=So close, yet so far... Tip: Least common multiple.
+
 VERTEX a1 a2 a3 ab1 ab2 b1 b2 b3 b4 c1 c2 c3 c4 c5 d1 d2 d3 d4 d5 d6
 
 CYCLE[MANUAL] a a1 a2 a3 ab1 ab2

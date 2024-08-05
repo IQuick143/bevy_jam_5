@@ -7,7 +7,7 @@ use super::Screen;
 use crate::{
 	game::{
 		assets::{self, *},
-		audio, LevelID,
+		audio,
 	},
 	ui::prelude::*,
 };
@@ -34,13 +34,11 @@ fn all_assets_loaded(
 	image_handles: Res<HandleMap<ImageKey>>,
 	sfx_handles: Res<HandleMap<SfxKey>>,
 	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
-	level_handles: Res<HandleMap<LevelID>>,
 	font: Res<GlobalFont>,
 ) -> bool {
 	image_handles.all_loaded(&asset_server)
 		&& sfx_handles.all_loaded(&asset_server)
 		&& soundtrack_handles.all_loaded(&asset_server)
-		&& level_handles.all_loaded(&asset_server)
 		&& asset_server.is_loaded_with_dependencies(font.0.id())
 }
 

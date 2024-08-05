@@ -40,7 +40,7 @@ pub enum DeclaredPlacement {
 }
 
 /// Computed placement of a cycle
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Reflect)]
 pub struct CyclePlacement {
 	/// Position of the center point of the cycle
 	pub position: Vec2,
@@ -49,7 +49,7 @@ pub struct CyclePlacement {
 }
 
 /// Describes the layout of all objects in a level
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Reflect)]
 pub struct LevelLayout {
 	/// Positions of vertices in the level
 	pub vertices: Vec<Vec2>,

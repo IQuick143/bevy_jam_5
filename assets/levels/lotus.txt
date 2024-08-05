@@ -1,3 +1,6 @@
+Name=Lotus
+Hint=In compliance with the Aperture Science regulatory body, I am legally forced to inform you, this level is looking kinda good.
+
 VERTEX n e s w n1 n2 n3 e1 e2 e3 s1 s2 s3 w1 w2 w3
 
 CYCLE[MANUAL] center n e s w

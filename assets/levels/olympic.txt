@@ -1,3 +1,6 @@
+Name=Olympic
+Hint=Tip: In levels with a single player and manual cycles, it's helpful to think about the player's routes through the crossings.
+
 VERTEX a b c d e f g h i j k l m n o p q r s t u v
 
 CYCLE[MANUAL] blue a b h n m g

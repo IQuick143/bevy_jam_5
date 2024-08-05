@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use super::*;
 use crate::{
-	game::{assets::GlobalFont, LevelID},
+	game::assets::{GlobalFont, LevelAsset, LevelList},
 	ui::prelude::*,
 };
 
@@ -15,13 +15,18 @@ pub(super) fn plugin(app: &mut App) {
 		);
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Component, Clone, PartialEq, Eq, Debug)]
 enum LevelSelectAction {
 	Back,
-	PlayLevel(LevelID),
+	PlayLevel(Handle<LevelAsset>),
 }
 
-fn spawn_screen(mut commands: Commands, font: Res<GlobalFont>) {
+fn spawn_screen(
+	mut commands: Commands,
+	levels: Res<LevelList>,
+	font: Res<GlobalFont>,
+	level_assets: Res<Assets<LevelAsset>>,
+) {
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::LevelSelect))
@@ -41,10 +46,12 @@ fn spawn_screen(mut commands: Commands, font: Res<GlobalFont>) {
 					..default()
 				})
 				.with_children(|parent| {
-					for level_id in &LevelID::LEVEL_ORDER {
-						parent
-							.small_button(level_id.level_name(), font.0.clone_weak())
-							.insert(LevelSelectAction::PlayLevel(*level_id));
+					for level_id in levels.iter() {
+						if let Some(level) = level_assets.get(level_id) {
+							parent
+								.small_button(level.name.clone(), font.0.clone_weak())
+								.insert(LevelSelectAction::PlayLevel(level_id.clone_weak()));
+						}
 					}
 				});
 			parent
@@ -67,7 +74,7 @@ fn handle_level_select_screen_action(
 				next_screen.send(QueueScreenTransition::fade(Screen::Title));
 			}
 			LevelSelectAction::PlayLevel(id) => {
-				next_level.set(PlayingLevel(Some(*id)));
+				next_level.set(PlayingLevel(Some(id.clone_weak())));
 				next_screen.send(QueueScreenTransition::fade(Screen::Playing));
 			}
 		}

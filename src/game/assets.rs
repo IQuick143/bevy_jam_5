@@ -1,6 +1,13 @@
 use bevy::{asset::AsyncReadExt, prelude::*, utils::HashMap};
 
-use super::{level::ThingType, prelude::CycleTurnability, LevelID};
+use super::{
+	level::{
+		layout::{LevelLayoutBuilder, LevelLayoutError},
+		parser::{parse, LevelParsingError},
+		LevelDataValidationError, ThingType, ValidLevelData,
+	},
+	prelude::CycleTurnability,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<ImageKey>>();
@@ -14,7 +21,9 @@ pub(super) fn plugin(app: &mut App) {
 
 	app.init_asset_loader::<PlainTextLoader>();
 	app.init_asset::<PlainText>();
-	app.init_resource::<HandleMap<LevelID>>();
+	app.init_asset_loader::<LevelLoader>();
+	app.init_asset::<LevelAsset>();
+	app.init_resource::<LevelList>();
 
 	app.init_resource::<GlobalFont>();
 }
@@ -180,41 +189,148 @@ impl bevy::asset::AssetLoader for PlainTextLoader {
 	}
 }
 
-impl AssetKey for LevelID {
-	type Asset = PlainText;
+#[derive(Asset, Clone, Debug, Reflect)]
+pub struct LevelAsset {
+	pub name: String,
+	pub hint: Option<String>,
+	pub data: super::level::ValidLevelData,
+	pub layout: super::level::layout::LevelLayout,
 }
 
-impl FromWorld for HandleMap<LevelID> {
+#[derive(Default)]
+struct LevelLoader;
+
+#[derive(Debug)]
+pub enum LevelLoadingError {
+	IO(std::io::Error),
+	Validation(LevelDataValidationError),
+	Parsing(LevelParsingError),
+	Layout(LevelLayoutError),
+}
+
+impl std::fmt::Display for LevelLoadingError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			LevelLoadingError::IO(e) => f.write_fmt(format_args!(
+				"Level could not be loaded because of an IO error: {}",
+				e
+			)),
+			LevelLoadingError::Validation(e) => f.write_fmt(format_args!(
+				"Level could not be loaded because it is invalid: {}",
+				e
+			)),
+			LevelLoadingError::Parsing(e) => f.write_fmt(format_args!(
+				"Level could not be loaded because of a parsing error: {}",
+				e
+			)),
+			LevelLoadingError::Layout(e) => f.write_fmt(format_args!(
+				"Level could not be loaded because of an error during layout calculations: {}",
+				e
+			)),
+		}
+	}
+}
+
+impl std::error::Error for LevelLoadingError {}
+
+impl From<std::io::Error> for LevelLoadingError {
+	fn from(value: std::io::Error) -> Self {
+		Self::IO(value)
+	}
+}
+
+impl From<LevelDataValidationError> for LevelLoadingError {
+	fn from(value: LevelDataValidationError) -> Self {
+		Self::Validation(value)
+	}
+}
+
+impl From<LevelParsingError> for LevelLoadingError {
+	fn from(value: LevelParsingError) -> Self {
+		Self::Parsing(value)
+	}
+}
+
+impl From<LevelLayoutError> for LevelLoadingError {
+	fn from(value: LevelLayoutError) -> Self {
+		Self::Layout(value)
+	}
+}
+
+impl bevy::asset::AssetLoader for LevelLoader {
+	type Asset = LevelAsset;
+	type Error = LevelLoadingError;
+	type Settings = ();
+
+	fn load<'a>(
+		&'a self,
+		reader: &'a mut bevy::asset::io::Reader,
+		_settings: &'a Self::Settings,
+		_load_context: &'a mut bevy::asset::LoadContext,
+	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
+		async {
+			let mut s = String::new();
+			reader.read_to_string(&mut s).await?;
+			let level_data = parse(&s)?;
+			let validated = ValidLevelData::try_from(level_data.data)?;
+			let layout = {
+				let mut builder = LevelLayoutBuilder::new(&validated);
+				for placement in level_data.layout {
+					builder.add_placement(placement)?;
+				}
+				builder.build()?
+			};
+			Ok(LevelAsset {
+				name: level_data
+					.metadata
+					.get("name")
+					.cloned()
+					.unwrap_or("MISSING_NAME".into()),
+				hint: level_data.metadata.get("hint").cloned(),
+				data: validated,
+				layout,
+			})
+		}
+	}
+
+	fn extensions(&self) -> &[&str] {
+		&["txt"]
+	}
+}
+
+#[derive(Resource, Reflect, Deref, DerefMut)]
+#[reflect(Resource)]
+pub struct LevelList(Vec<Handle<LevelAsset>>);
+
+impl FromWorld for LevelList {
 	#[rustfmt::skip]
 	fn from_world(world: &mut World) -> Self {
-		use LevelID::*;
 		let asset_server = world.resource::<AssetServer>();
-		[
-			(Intro, asset_server.load("levels/tutorials/1_intro.txt")),
-			(Transfer, asset_server.load("levels/tutorials/2_transfer.txt")),
-			(Boxes, asset_server.load("levels/tutorials/3_boxes.txt")),
-			(Manual, asset_server.load("levels/tutorials/4_manual.txt")),
-			(Sync, asset_server.load("levels/tutorials/5_sync.txt")),
-			(Sync2, asset_server.load("levels/tutorials/6_sync2.txt")),
-			(Colors, asset_server.load("levels/tutorials/7_colors.txt")),
-			(Swap, asset_server.load("levels/1_swap.txt")),
-			(Sort, asset_server.load("levels/2_sort.txt")),
-			(Bicycle, asset_server.load("levels/bicycle.txt")),
-			(Tricycle, asset_server.load("levels/tricycle.txt")),
-			(CargoTricycle, asset_server.load("levels/cargo.txt")),
-			(CargoSinglePlayer, asset_server.load("levels/cargo-single.txt")),
-			(Lotus, asset_server.load("levels/lotus.txt")),
-			(ThreeInARowSimple, asset_server.load("levels/three-row-simple.txt")),
-			(ThreeInARow, asset_server.load("levels/three-row.txt")),
-			(Car, asset_server.load("levels/car.txt")),
-			(Olympic, asset_server.load("levels/olympic.txt")),
-			(Disrupt, asset_server.load("levels/linkage/disrupt.txt")),
-			(Send, asset_server.load("levels/linkage/send.txt")),
-			(Teamwork, asset_server.load("levels/teamwork.txt")),
-			(Sort2, asset_server.load("levels/linkage/linked_sort.txt")),
-			(Rubik, asset_server.load("levels/rubik.txt")),
-		]
-		.into()
+		LevelList(vec![
+			asset_server.load("levels/tutorials/1_intro.txt"),
+			asset_server.load("levels/tutorials/2_transfer.txt"),
+			asset_server.load("levels/tutorials/3_boxes.txt"),
+			asset_server.load("levels/tutorials/4_manual.txt"),
+			asset_server.load("levels/tutorials/5_sync.txt"),
+			asset_server.load("levels/tutorials/6_sync2.txt"),
+			asset_server.load("levels/tutorials/7_colors.txt"),
+			asset_server.load("levels/1_swap.txt"),
+			asset_server.load("levels/2_sort.txt"),
+			asset_server.load("levels/bicycle.txt"),
+			asset_server.load("levels/tricycle.txt"),
+			asset_server.load("levels/cargo.txt"),
+			asset_server.load("levels/cargo-single.txt"),
+			asset_server.load("levels/lotus.txt"),
+			asset_server.load("levels/three-row-simple.txt"),
+			asset_server.load("levels/three-row.txt"),
+			asset_server.load("levels/car.txt"),
+			asset_server.load("levels/olympic.txt"),
+			asset_server.load("levels/linkage/disrupt.txt"),
+			asset_server.load("levels/linkage/send.txt"),
+			asset_server.load("levels/teamwork.txt"),
+			asset_server.load("levels/linkage/linked_sort.txt"),
+			asset_server.load("levels/rubik.txt"),
+		])
 	}
 }
 

@@ -1,13 +1,9 @@
-use super::components::LinkedCycleDirection;
+use super::{assets::LevelAsset, components::LinkedCycleDirection};
 use bevy::prelude::*;
 
 /// Trigger event that spawns the content entities of a level
 #[derive(Event, Debug)]
-pub struct SpawnLevel(
-	pub super::LevelID,
-	pub super::level::ValidLevelData,
-	pub super::level::layout::LevelLayout,
-);
+pub struct SpawnLevel(pub LevelAsset);
 
 /// Enumerates directions in which a cycle can turn
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

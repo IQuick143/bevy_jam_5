@@ -1,3 +1,6 @@
+NAME=Intro
+HINT=Left/Right click a cycle center to turn it!
+
 VERTEX a b c d e f g
 
 CYCLE cycle a b c d e f g

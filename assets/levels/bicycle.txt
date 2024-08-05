@@ -1,3 +1,5 @@
+Name=Bicycle
+
 VERTEX a b c d e f g h
 
 CYCLE[ENGINE] back_wheel a b c d

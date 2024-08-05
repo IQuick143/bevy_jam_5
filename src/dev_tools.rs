@@ -5,7 +5,7 @@ use crate::{
 		graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 		prelude::*,
 	},
-	screen::{PlayingLevel, QueueScreenTransition},
+	screen::PlayingLevel,
 };
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
@@ -21,7 +21,6 @@ pub(super) fn plugin(app: &mut App) {
 		(
 			log_transitions::<Screen>,
 			log_transitions::<PlayingLevel>,
-			switch_level,
 			//gizmo_draw,
 			draw_layout,
 			draw_hover_boxes,
@@ -57,31 +56,6 @@ fn draw_layout(mut gizmos: Gizmos) {
 		LEVEL_AREA_WIDTH,
 		palettes::basic::NAVY,
 	);
-}
-
-fn switch_level(
-	keyboard: Res<ButtonInput<KeyCode>>,
-	mut next_screen: EventWriter<QueueScreenTransition<PlayingLevel>>,
-) {
-	const SWITCH_INPUTS: [KeyCode; 10] = [
-		KeyCode::Digit1,
-		KeyCode::Digit2,
-		KeyCode::Digit3,
-		KeyCode::Digit4,
-		KeyCode::Digit5,
-		KeyCode::Digit6,
-		KeyCode::Digit7,
-		KeyCode::Digit8,
-		KeyCode::Digit9,
-		KeyCode::Digit0,
-	];
-
-	for (key, level_id) in SWITCH_INPUTS.iter().zip(LevelID::LEVEL_ORDER) {
-		if keyboard.just_pressed(*key) {
-			next_screen.send(QueueScreenTransition::fade(PlayingLevel(Some(level_id))));
-			return;
-		}
-	}
 }
 
 pub fn _debug_inputs(

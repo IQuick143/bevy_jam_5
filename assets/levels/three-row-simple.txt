@@ -1,3 +1,6 @@
+Name=Grid
+Hint=Tip: Think about the paths the player can take and plan them ahead.
+
 VERTEX a b c d e f g h i j k l m n o p q r s t u v w x
 
 CYCLE[MANUAL] top_left a e h d

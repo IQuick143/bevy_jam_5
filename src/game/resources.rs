@@ -38,10 +38,10 @@ impl LevelCompletionConditions {
 pub struct IsLevelCompleted(pub bool);
 
 /// Contains an overview of conditions that are needed to complete the level
-#[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
+#[derive(Resource, Debug, Clone, Reflect, Default)]
 pub struct HintText {
-	pub hover_text: Option<&'static str>,
-	pub hint_text: Option<&'static str>,
+	pub hover_text: Option<String>,
+	pub hint_text: Option<String>,
 }
 
 /// Contains a handle to the material used for rendering the cycle rings

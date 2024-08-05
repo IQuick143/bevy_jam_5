@@ -109,7 +109,7 @@ fn update_hover(
 		}
 		if let Some(target_hover) = closest_hoverable {
 			if let Ok((_, hoverable, _)) = query.get(target_hover) {
-				hint_text.hover_text = Some(hoverable.hover_text);
+				hint_text.hover_text = Some(hoverable.hover_text.into());
 			}
 		} else {
 			hint_text.hover_text = None;
@@ -125,7 +125,7 @@ fn update_hover_text(
 ) {
 	let should_be_visible = *state.get() == Screen::Playing;
 
-	let chosen_text = match *hint_text {
+	let chosen_text = match hint_text.clone() {
 		HintText {
 			hover_text: Some(hover),
 			hint_text: _,
@@ -134,13 +134,13 @@ fn update_hover_text(
 			hover_text: None,
 			hint_text: Some(hint),
 		} => hint,
-		_ => "",
+		_ => "".into(),
 	};
 	for (mut text, mut visibility) in text_query.iter_mut() {
 		*visibility = match should_be_visible {
 			true => Visibility::Visible,
 			false => Visibility::Hidden,
 		};
-		text.sections = vec![TextSection::new(chosen_text, get_text_style(&font))];
+		text.sections = vec![TextSection::new(chosen_text.clone(), get_text_style(&font))];
 	}
 }

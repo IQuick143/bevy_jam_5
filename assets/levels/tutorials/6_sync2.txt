@@ -1,3 +1,5 @@
+Name=Sync2
+
 VERTEX a b c d e f g h i j k l m n
 
 CYCLE main a b c d e f g

@@ -6,9 +6,8 @@ use crate::{
 		graphics::*,
 		level::{layout::CyclePlacement, CycleData, GlyphType, ObjectType, ThingType, VertexData},
 		prelude::*,
-		LevelID,
 	},
-	screen::PlayingLevel,
+	screen::Screen,
 	ui::hover,
 };
 
@@ -37,10 +36,10 @@ fn spawn_level(
 	mut hint_text: ResMut<HintText>,
 ) {
 	println!("Spawning!"); //TODO: debug
-	let level_id = trigger.event().0;
-	let data = &trigger.event().1;
+	let SpawnLevel(level) = trigger.event();
+	let data = &level.data;
 	let layout = &{
-		let mut layout = trigger.event().2.clone();
+		let mut layout = level.layout.clone();
 		layout.recompute_to_fit(LEVEL_AREA_WIDTH / 2.0, LEVEL_AREA_CENTER);
 		layout
 	};
@@ -52,7 +51,6 @@ fn spawn_level(
 		.map(|(data, pos)| {
 			spawn_vertex(
 				commands.reborrow(),
-				level_id,
 				data,
 				*pos,
 				meshes.reborrow(),
@@ -70,7 +68,6 @@ fn spawn_level(
 		.map(|(data, pos)| {
 			spawn_cycle(
 				commands.reborrow(),
-				level_id,
 				meshes.reborrow(),
 				cycle_material.0.clone(),
 				&palette,
@@ -128,7 +125,7 @@ fn spawn_level(
 			),
 		};
 		commands.spawn((
-			StateScoped(PlayingLevel(Some(level_id))),
+			StateScoped(Screen::Playing),
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation))
@@ -138,7 +135,7 @@ fn spawn_level(
 			},
 		));
 		commands.spawn((
-			StateScoped(PlayingLevel(Some(level_id))),
+			StateScoped(Screen::Playing),
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
@@ -152,12 +149,11 @@ fn spawn_level(
 	is_level_completed.0 = false;
 	events.send(GameLayoutChanged);
 
-	hint_text.hint_text = level_id.level_hint();
+	hint_text.hint_text.clone_from(&level.hint);
 }
 
 fn spawn_vertex(
 	mut commands: Commands,
-	level_id: LevelID,
 	data: &VertexData,
 	position: Vec2,
 	mut meshes: Mut<Assets<Mesh>>,
@@ -170,7 +166,7 @@ fn spawn_vertex(
 	let vertex_id = commands
 		.spawn((
 			Vertex,
-			StateScoped(PlayingLevel(Some(level_id))),
+			StateScoped(Screen::Playing),
 			PlacedGlyph(None),
 			PlacedObject(None),
 			transform,
@@ -178,7 +174,7 @@ fn spawn_vertex(
 		.id();
 	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
-		StateScoped(PlayingLevel(Some(level_id))),
+		StateScoped(Screen::Playing),
 		ColorMesh2dBundle {
 			transform: Transform::from_translation(position.extend(layers::CYCLE_NODES)),
 			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
@@ -191,7 +187,7 @@ fn spawn_vertex(
 		let thing_type = ThingType::Object(object_type);
 		let mut entity = match object_type {
 			ObjectType::Player => commands.spawn((
-				StateScoped(PlayingLevel(Some(level_id))),
+				StateScoped(Screen::Playing),
 				Object,
 				Player,
 				VertexPosition(vertex_id),
@@ -218,7 +214,7 @@ fn spawn_vertex(
 				},
 			)),
 			ObjectType::Box => commands.spawn((
-				StateScoped(PlayingLevel(Some(level_id))),
+				StateScoped(Screen::Playing),
 				Object,
 				Box,
 				VertexPosition(vertex_id),
@@ -261,7 +257,7 @@ fn spawn_vertex(
 		let thing_type = ThingType::Glyph(glyph_type);
 		let mut entity = match glyph_type {
 			GlyphType::Button => commands.spawn((
-				StateScoped(PlayingLevel(Some(level_id))),
+				StateScoped(Screen::Playing),
 				Glyph,
 				BoxSlot,
 				VertexPosition(vertex_id),
@@ -290,7 +286,7 @@ fn spawn_vertex(
 				},
 			)),
 			GlyphType::Flag => commands.spawn((
-				StateScoped(PlayingLevel(Some(level_id))),
+				StateScoped(Screen::Playing),
 				Glyph,
 				Goal,
 				VertexPosition(vertex_id),
@@ -330,7 +326,6 @@ fn spawn_vertex(
 
 fn spawn_cycle(
 	mut commands: Commands,
-	level_id: LevelID,
 	mut meshes: Mut<Assets<Mesh>>,
 	material: Handle<ColorMaterial>,
 	palette: &ThingPalette,
@@ -350,7 +345,7 @@ fn spawn_cycle(
 	commands
 		.spawn((
 			data.cycle_turnability,
-			StateScoped(PlayingLevel(Some(level_id))),
+			StateScoped(Screen::Playing),
 			ComputedCycleTurnability(true),
 			CycleVertices(
 				data.vertex_indices
