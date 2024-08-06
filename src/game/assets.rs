@@ -19,8 +19,6 @@ pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<SoundtrackKey>>();
 	app.init_resource::<HandleMap<SoundtrackKey>>();
 
-	app.init_asset_loader::<PlainTextLoader>();
-	app.init_asset::<PlainText>();
 	app.init_asset_loader::<LevelLoader>();
 	app.init_asset::<LevelAsset>();
 	app.init_resource::<LevelList>();
@@ -157,35 +155,6 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 			asset_server.load("audio/soundtracks/blorbitality.ogg"),
 		)]
 		.into()
-	}
-}
-
-#[derive(Asset, Clone, Deref, DerefMut, Debug, Reflect)]
-pub struct PlainText(pub String);
-
-#[derive(Default)]
-struct PlainTextLoader;
-
-impl bevy::asset::AssetLoader for PlainTextLoader {
-	type Asset = PlainText;
-	type Error = std::io::Error;
-	type Settings = ();
-
-	fn load<'a>(
-		&'a self,
-		reader: &'a mut bevy::asset::io::Reader,
-		_settings: &'a Self::Settings,
-		_load_context: &'a mut bevy::asset::LoadContext,
-	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
-		async {
-			let mut s = String::new();
-			reader.read_to_string(&mut s).await?;
-			Ok(PlainText(s))
-		}
-	}
-
-	fn extensions(&self) -> &[&str] {
-		&["txt"]
 	}
 }
 
