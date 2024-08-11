@@ -32,9 +32,7 @@ pub enum LexError {
 	MalformedStatement(usize),
 }
 
-pub fn parse(
-	raw_data: &str,
-) -> impl Iterator<Item = Result<(usize, RawStatement), LexError>> {
+pub fn parse(raw_data: &str) -> impl Iterator<Item = Result<(usize, RawStatement), LexError>> {
 	let assignment_regex = Regex::new(r"^(?<KEY>[a-zA-Z0-9_]+)=(?<VALUE>.+)$")
 		.expect("I expected to be able to write a valid regex.");
 	let action_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>[\w\:]+)\])?(?<VALUES>.+)?$")
