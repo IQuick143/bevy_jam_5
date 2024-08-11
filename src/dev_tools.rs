@@ -7,7 +7,8 @@ use crate::{
 	ui::hover::Hoverable,
 };
 use bevy::{
-	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,
+	color::palettes, dev_tools::states::log_transitions,
+	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
 	utils::hashbrown::HashMap,
 };
 
@@ -20,11 +21,20 @@ pub(super) fn plugin(app: &mut App) {
 		(
 			log_transitions::<Screen>,
 			log_transitions::<PlayingLevel>,
-			//gizmo_draw,
-			draw_layout,
-			draw_hover_boxes,
+			draw_layout.run_if(resource_equals(RenderOutlines(true))),
+			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
+			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 		),
 	);
+	app.init_resource::<RenderOutlines>();
+}
+
+/// Whether hover and layout boxes should be drawn
+#[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
+struct RenderOutlines(pub bool);
+
+fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
+	render.0 = !render.0;
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
