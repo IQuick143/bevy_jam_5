@@ -2,7 +2,8 @@ use bevy::prelude::*;
 
 use super::*;
 use crate::{
-	game::assets::{GlobalFont, LevelAsset, LevelList},
+	assets::{GlobalFont, LevelList},
+	game::level::LevelAsset,
 	ui::prelude::*,
 };
 

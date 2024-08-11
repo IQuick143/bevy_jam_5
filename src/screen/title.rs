@@ -4,10 +4,8 @@ use bevy::prelude::*;
 
 use super::*;
 use crate::{
-	game::{
-		self,
-		assets::{self, GlobalFont, HandleMap, ImageKey},
-	},
+	assets::{self, GlobalFont, HandleMap, ImageKey},
+	graphics,
 	ui::prelude::*,
 };
 
@@ -64,12 +62,12 @@ fn enter_title(
 		StateScoped(Screen::Title),
 		SpriteBundle {
 			sprite: Sprite {
-				custom_size: Some(game::graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
+				custom_size: Some(graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
 				..default()
 			},
 			texture: image_handles[&ImageKey::Title].clone_weak(),
 			transform: Transform::from_translation(
-				Vec2::ZERO.extend(game::graphics::layers::TITLE_IMAGE),
+				Vec2::ZERO.extend(graphics::layers::TITLE_IMAGE),
 			),
 			..default()
 		},

@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use super::*;
-use crate::{game::assets::GlobalFont, ui::prelude::*};
+use crate::{assets::GlobalFont, ui::prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Credits), enter_credits);

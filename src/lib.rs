@@ -1,6 +1,9 @@
+mod assets;
+mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod game;
+mod graphics;
 mod screen;
 mod ui;
 
@@ -10,7 +13,7 @@ use bevy::{
 	prelude::*,
 	render::camera::ScalingMode,
 };
-use game::graphics::GAME_AREA;
+use graphics::GAME_AREA;
 
 pub struct AppPlugin;
 
@@ -57,7 +60,13 @@ impl Plugin for AppPlugin {
 		);
 
 		// Add other plugins.
-		app.add_plugins((game::plugin, screen::plugin, ui::plugin));
+		app.add_plugins((
+			game::plugin,
+			screen::plugin,
+			ui::plugin,
+			audio::plugin,
+			assets::plugin,
+		));
 
 		// Enable dev tools for dev builds.
 		#[cfg(feature = "dev")]

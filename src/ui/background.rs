@@ -1,11 +1,10 @@
 use std::f32::consts::PI;
 
-use bevy::color::palettes;
+use bevy::{color::palettes, prelude::*};
 
-use crate::game::{
+use crate::{
 	assets::{HandleMap, ImageKey},
 	graphics::{layers, BACKGROUND_TILING, BACKGROUND_VELOCITY},
-	prelude::*,
 };
 
 use super::palette;
@@ -14,6 +13,10 @@ pub fn plugin(app: &mut App) {
 	app.add_systems(Startup, spawn_background)
 		.add_systems(Update, update_background);
 }
+
+/// Background visuals
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+struct Background;
 
 fn spawn_background(mut commands: Commands, images: Res<HandleMap<ImageKey>>) {
 	commands

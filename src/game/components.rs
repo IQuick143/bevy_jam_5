@@ -2,10 +2,7 @@
 
 use std::f32::consts::TAU;
 
-use bevy::{
-	math::bounding::{Aabb2d, BoundingCircle},
-	prelude::*,
-};
+use bevy::prelude::*;
 
 use super::{events::CycleTurningDirection, level::ThingType};
 
@@ -110,16 +107,6 @@ pub enum CycleInteraction {
 	Hover,
 	LeftClick,
 	RightClick,
-}
-
-#[derive(Component, Clone, Copy, Debug, Reflect)]
-pub struct HoverText;
-
-#[derive(Component, Clone, Debug, Reflect)]
-pub struct Hoverable {
-	pub hover_text: &'static str,
-	pub hover_bounding_circle: Option<BoundingCircle>,
-	pub hover_bounding_box: Option<Aabb2d>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Reflect)]
@@ -270,7 +257,3 @@ impl Default for JumpTurnAnimation {
 		}
 	}
 }
-
-/// Background visuals
-#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct Background;

@@ -5,10 +5,8 @@ use bevy::prelude::*;
 
 use super::Screen;
 use crate::{
-	game::{
-		assets::{self, *},
-		audio,
-	},
+	assets::{self, *},
+	audio,
 	ui::prelude::*,
 };
 

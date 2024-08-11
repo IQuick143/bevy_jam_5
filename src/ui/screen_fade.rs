@@ -1,6 +1,6 @@
 //! An overlay which changes opacity in order to create a fading in/out effect for the game for screen transitions.
 
-use crate::game::graphics::FADE_COLOUR;
+use crate::graphics::FADE_COLOUR;
 
 use super::*;
 

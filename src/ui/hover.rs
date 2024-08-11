@@ -1,4 +1,7 @@
-use bevy::math::bounding::{Aabb2d, BoundingVolume};
+use bevy::{
+	math::bounding::{Aabb2d, BoundingCircle, BoundingVolume},
+	prelude::*,
+};
 
 pub const BOX: &str = "A box. Can be moved around and placed onto buttons.";
 pub const BUTTON: &str = "A button, needs a box.";
@@ -11,13 +14,27 @@ pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if you hover on it!";
 
 use crate::{
-	game::{
-		assets::GlobalFont,
-		graphics::{layers, GAME_AREA, HINT_TEXT_SIZE},
-		prelude::*,
-	},
+	assets::GlobalFont,
+	graphics::{layers, GAME_AREA, HINT_TEXT_SIZE},
 	screen::Screen,
 };
+
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct HoverText;
+
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct Hoverable {
+	pub hover_text: &'static str,
+	pub hover_bounding_circle: Option<BoundingCircle>,
+	pub hover_bounding_box: Option<Aabb2d>,
+}
+
+/// Contains an overview of conditions that are needed to complete the level
+#[derive(Resource, Debug, Clone, Reflect, Default)]
+pub struct HintText {
+	pub hover_text: Option<String>,
+	pub hint_text: Option<String>,
+}
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<HintText>()

@@ -1,14 +1,11 @@
 //! Spawn the main level by triggering other observers.
 
 use crate::{
-	game::{
-		assets::{HandleMap, ImageKey},
-		graphics::*,
-		level::{layout::CyclePlacement, CycleData, GlyphType, ObjectType, ThingType, VertexData},
-		prelude::*,
-	},
+	assets::{HandleMap, ImageKey},
+	game::{level::*, prelude::*},
+	graphics::*,
 	screen::Screen,
-	ui::hover,
+	ui::hover::{self, HintText, Hoverable},
 };
 
 use bevy::math::{
@@ -28,6 +25,7 @@ fn spawn_level(
 	mut events: EventWriter<GameLayoutChanged>,
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
+	levels: Res<Assets<LevelAsset>>,
 	mut is_level_completed: ResMut<IsLevelCompleted>,
 	cycle_material: ResMut<RingMaterial>,
 	link_material: Res<LinkMaterial>,
@@ -37,6 +35,9 @@ fn spawn_level(
 ) {
 	println!("Spawning!"); //TODO: debug
 	let SpawnLevel(level) = trigger.event();
+	let level = levels
+		.get(level)
+		.expect("Got an invalid handle to a level asset");
 	let data = &level.data;
 	let layout = &{
 		let mut layout = level.layout.clone();
@@ -331,7 +332,7 @@ fn spawn_cycle(
 	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
 	data: &CycleData,
-	placement: CyclePlacement,
+	placement: layout::CyclePlacement,
 	vertex_entities: &[Entity],
 ) -> Entity {
 	let mesh = primitives::Annulus::new(

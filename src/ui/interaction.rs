@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::game::{assets::SfxKey, audio::sfx::PlaySfx};
+use crate::{assets::SfxKey, audio::sfx::PlaySfx};
 
 use super::freeze::ui_not_frozen;
 

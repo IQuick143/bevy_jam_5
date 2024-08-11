@@ -1,6 +1,7 @@
 //! This module deals with playing sound effects for in-game events
 
-use super::{assets, audio, prelude::*};
+use super::prelude::*;
+use crate::{assets, audio};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(

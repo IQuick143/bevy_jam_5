@@ -1,12 +1,11 @@
-use bevy::{asset::AsyncReadExt, prelude::*, utils::HashMap};
+use bevy::{prelude::*, utils::HashMap};
 
-use super::{
+use crate::game::{
+	components::CycleTurnability,
 	level::{
-		layout::{LevelLayoutBuilder, LevelLayoutError},
-		parser::{parse, LevelParsingError},
-		LevelDataValidationError, ThingType, ValidLevelData,
+		asset::{plugin as level_asset_plugin, LevelAsset},
+		GlyphType, ObjectType, ThingType,
 	},
-	prelude::CycleTurnability,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -19,8 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.register_type::<HandleMap<SoundtrackKey>>();
 	app.init_resource::<HandleMap<SoundtrackKey>>();
 
-	app.init_asset_loader::<LevelLoader>();
-	app.init_asset::<LevelAsset>();
+	app.add_plugins(level_asset_plugin);
 	app.init_resource::<LevelList>();
 
 	app.init_resource::<GlobalFont>();
@@ -44,19 +42,19 @@ impl FromWorld for HandleMap<ImageKey> {
 		let asset_server = world.resource::<AssetServer>();
 		[
 			(
-				ImageKey::Object(ThingType::Object(super::level::ObjectType::Box)),
+				ImageKey::Object(ThingType::Object(ObjectType::Box)),
 				asset_server.load("images/box.png"),
 			),
 			(
-				ImageKey::Object(ThingType::Object(super::level::ObjectType::Player)),
+				ImageKey::Object(ThingType::Object(ObjectType::Player)),
 				asset_server.load("images/player.png"),
 			),
 			(
-				ImageKey::Object(ThingType::Glyph(super::level::GlyphType::Button)),
+				ImageKey::Object(ThingType::Glyph(GlyphType::Button)),
 				asset_server.load("images/button.png"),
 			),
 			(
-				ImageKey::Object(ThingType::Glyph(super::level::GlyphType::Flag)),
+				ImageKey::Object(ThingType::Glyph(GlyphType::Flag)),
 				asset_server.load("images/flag.png"),
 			),
 			(
@@ -155,115 +153,6 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 			asset_server.load("audio/soundtracks/blorbitality.ogg"),
 		)]
 		.into()
-	}
-}
-
-#[derive(Asset, Clone, Debug, Reflect)]
-pub struct LevelAsset {
-	pub name: String,
-	pub hint: Option<String>,
-	pub data: super::level::ValidLevelData,
-	pub layout: super::level::layout::LevelLayout,
-}
-
-#[derive(Default)]
-struct LevelLoader;
-
-#[derive(Debug)]
-pub enum LevelLoadingError {
-	IO(std::io::Error),
-	Validation(LevelDataValidationError),
-	Parsing(LevelParsingError),
-	Layout(LevelLayoutError),
-}
-
-impl std::fmt::Display for LevelLoadingError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			LevelLoadingError::IO(e) => f.write_fmt(format_args!(
-				"Level could not be loaded because of an IO error: {}",
-				e
-			)),
-			LevelLoadingError::Validation(e) => f.write_fmt(format_args!(
-				"Level could not be loaded because it is invalid: {}",
-				e
-			)),
-			LevelLoadingError::Parsing(e) => f.write_fmt(format_args!(
-				"Level could not be loaded because of a parsing error: {}",
-				e
-			)),
-			LevelLoadingError::Layout(e) => f.write_fmt(format_args!(
-				"Level could not be loaded because of an error during layout calculations: {}",
-				e
-			)),
-		}
-	}
-}
-
-impl std::error::Error for LevelLoadingError {}
-
-impl From<std::io::Error> for LevelLoadingError {
-	fn from(value: std::io::Error) -> Self {
-		Self::IO(value)
-	}
-}
-
-impl From<LevelDataValidationError> for LevelLoadingError {
-	fn from(value: LevelDataValidationError) -> Self {
-		Self::Validation(value)
-	}
-}
-
-impl From<LevelParsingError> for LevelLoadingError {
-	fn from(value: LevelParsingError) -> Self {
-		Self::Parsing(value)
-	}
-}
-
-impl From<LevelLayoutError> for LevelLoadingError {
-	fn from(value: LevelLayoutError) -> Self {
-		Self::Layout(value)
-	}
-}
-
-impl bevy::asset::AssetLoader for LevelLoader {
-	type Asset = LevelAsset;
-	type Error = LevelLoadingError;
-	type Settings = ();
-
-	fn load<'a>(
-		&'a self,
-		reader: &'a mut bevy::asset::io::Reader,
-		_settings: &'a Self::Settings,
-		_load_context: &'a mut bevy::asset::LoadContext,
-	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
-		async {
-			let mut s = String::new();
-			reader.read_to_string(&mut s).await?;
-			let level_data = parse(&s)?;
-			let validated = ValidLevelData::try_from(level_data.data)?;
-			let layout = {
-				let mut builder = LevelLayoutBuilder::new(&validated);
-				for placement in level_data.layout {
-					builder.add_placement(placement)?;
-				}
-				builder.build()?
-			};
-			Ok(LevelAsset {
-				name: level_data
-					.metadata
-					.get("name")
-					.cloned()
-					.unwrap_or("MISSING_NAME".into()),
-				hint: level_data.metadata.get("hint").cloned(),
-				data: validated,
-				layout,
-			})
-		}
-	}
-
-	fn extensions(&self) -> &[&str] {
-		&["txt"]
 	}
 }
 

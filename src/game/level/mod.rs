@@ -1,9 +1,12 @@
 use itertools::Itertools;
 
-use crate::game::prelude::*;
+use super::prelude::*;
 
+pub mod asset;
 pub mod layout;
 pub mod parser;
+
+pub use asset::LevelAsset;
 
 /// How many colors we can paint objects in
 pub const LOGICAL_COLORS: usize = 6;

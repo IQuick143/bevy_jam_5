@@ -3,7 +3,7 @@ use bevy::{
 	prelude::*,
 };
 
-use crate::game::assets::{HandleMap, SfxKey};
+use crate::assets::{HandleMap, SfxKey};
 
 pub(super) fn plugin(app: &mut App) {
 	app.observe(play_sfx);

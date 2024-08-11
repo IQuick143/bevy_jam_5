@@ -3,7 +3,7 @@ use bevy::{
 	prelude::*,
 };
 
-use crate::game::assets::{HandleMap, SoundtrackKey};
+use crate::assets::{HandleMap, SoundtrackKey};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<IsSoundtrack>();

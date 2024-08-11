@@ -1,11 +1,10 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::{
-		graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
-		prelude::*,
-	},
+	game::prelude::*,
+	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
+	ui::hover::Hoverable,
 };
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions, math::bounding::BoundingVolume,

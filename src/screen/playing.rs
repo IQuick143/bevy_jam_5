@@ -3,11 +3,8 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::{
-	game::{
-		assets::{GlobalFont, LevelAsset},
-		events::SpawnLevel,
-		prelude::*,
-	},
+	assets::GlobalFont,
+	game::{events::SpawnLevel, level::LevelAsset, prelude::*},
 	ui::prelude::*,
 };
 
@@ -230,7 +227,6 @@ fn load_level(
 	level_assets: Res<Assets<LevelAsset>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
-	//	next_screen: EventWriter<QueueScreenTransition<Screen>>,
 ) {
 	let level_handle =
 		playing_level.get().0.as_ref().expect(
@@ -245,12 +241,5 @@ fn load_level(
 	level_name_q.single_mut().sections[0]
 		.value
 		.clone_from(&level_data.name);
-	commands.trigger(SpawnLevel(level_data.clone()));
-
-	// { //TODO
-	// 	todo!();
-	// 	// If the level could not be loaded, go back to level select screen
-	// 	// (errors have already been reported)
-	// 	next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
-	// }
+	commands.trigger(SpawnLevel(level_handle.clone_weak()));
 }
