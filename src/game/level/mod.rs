@@ -4,6 +4,7 @@ use super::prelude::*;
 
 pub mod asset;
 pub mod layout;
+mod lex;
 pub mod parser;
 
 pub use asset::LevelAsset;

@@ -1,20 +1,14 @@
 use super::*;
 
+use super::lex::*;
 use bevy::utils::hashbrown::HashMap;
 use layout::{CyclePlacement, DeclaredCyclePlacement, DeclaredPlacement, DeclaredVertexPlacement};
-use regex::Regex;
 
 #[derive(Clone, Debug)]
 pub struct LevelFile {
 	pub metadata: HashMap<String, String>,
 	pub data: LevelData,
 	pub layout: Vec<layout::DeclaredPlacement>,
-}
-
-struct RawStatement<'a> {
-	verb: &'a str,
-	modifier: Option<&'a str>,
-	values: Vec<&'a str>,
 }
 
 enum Statement<'a> {
@@ -32,56 +26,21 @@ enum ObjectKind {
 }
 
 pub fn parse(level_file: &str) -> Result<LevelFile, LevelParsingError> {
-	let lines = level_file.split('\n').map(&str::trim).enumerate();
-	let lines = lines.filter(|(_line_index, line)| !(line.starts_with('#') || line.is_empty()));
-
-	let metadata_regex = Regex::new(r"^(?<KEY>[a-zA-Z0-9_]+)=(?<VALUE>.+)$")
-		.expect("I expected to be able to write a valid regex.");
-	let statement_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>[\w\:]+)\])?(?<VALUES>.+)?$")
-		.expect("I expected to be able to write a valid regex.");
-	let mut raw_statements: Vec<(usize, RawStatement)> = Vec::new();
-
+	let mut raw_statements: Vec<(usize, RawActionStatement)> = Vec::new();
 	let mut metadata = HashMap::new();
 
-	for (line_id, line) in lines {
-		if !line.is_ascii() {
-			// TODO: Line number
-			return Err(LevelParsingError::NonAsciiLine);
+	for line in lex::parse(level_file) {
+		let (line_id, statement) = line?;
+		match statement {
+			RawStatement::Assignment(statement) => {
+				let key = statement.key.to_ascii_lowercase();
+				let value = statement.value.to_owned();
+				metadata.insert(key, value); // TODO: check for duplicate keywords
+			}
+			RawStatement::Action(statement) => {
+				raw_statements.push((line_id, statement));
+			}
 		}
-		if let Some(captures) = metadata_regex.captures(line) {
-			let key = captures
-				.name("KEY")
-				.expect("KEY clause should always be present")
-				.as_str()
-				.to_ascii_lowercase();
-			let value = captures
-				.name("VALUE")
-				.expect("VALUE clause should always be present")
-				.as_str();
-			metadata.insert(key, value.to_string()); // TODO: check for duplicate keywords
-			continue;
-		}
-		let Some(captures) = statement_regex.captures(line) else {
-			return Err(LevelParsingError::MalformedStatement(line_id));
-		};
-		raw_statements.push((
-			line_id,
-			RawStatement {
-				verb: captures
-					.name("VERB")
-					.expect("VERB clause should always be present")
-					.as_str(),
-				modifier: captures.name("MODIFIER").map(|x| x.as_str()),
-				values: match captures.name("VALUES") {
-					None => Vec::new(),
-					Some(m) => m
-						.as_str()
-						.split_ascii_whitespace()
-						.filter(|x| !x.is_empty())
-						.collect(),
-				},
-			},
-		))
 	}
 
 	let mut statements = Vec::new();
@@ -400,9 +359,15 @@ pub enum LevelParsingError {
 	UnknownCycleName(String),
 	RedefinedCycle(String),
 	ObjectCollision(String),
-	NonAsciiLine,
+	LexError(LexError),
 	MalformedStatement(usize),
 	MissingCycleLayout,
+}
+
+impl From<LexError> for LevelParsingError {
+	fn from(value: LexError) -> Self {
+		Self::LexError(value)
+	}
 }
 
 impl std::error::Error for LevelParsingError {}
@@ -430,7 +395,7 @@ impl std::fmt::Display for LevelParsingError {
 				"Too many objects were placed onto vertex with name {}",
 				vertex
 			)?,
-			LevelParsingError::NonAsciiLine => write!(f, "Non-ASCII characters in input")?,
+			LevelParsingError::LexError(e) => e.fmt(f)?,
 			LevelParsingError::MalformedStatement(line_id) => {
 				write!(f, "Line {} contains a malformed statement.", line_id + 1)?
 			}
