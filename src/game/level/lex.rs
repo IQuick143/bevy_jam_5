@@ -2,7 +2,7 @@
 
 use regex::Regex;
 
-/// Line in the form verb[modifier] values...
+/// Line in the form `verb[modifier] values...`
 #[derive(Clone, Debug)]
 pub struct RawActionStatement<'a> {
 	pub verb: &'a str,
@@ -10,7 +10,7 @@ pub struct RawActionStatement<'a> {
 	pub values: Vec<&'a str>,
 }
 
-/// Line in the form key=value
+/// Line in the form `key=value`
 #[derive(Clone, Copy, Debug)]
 pub struct RawAssignmentStatement<'a> {
 	pub key: &'a str,
@@ -32,9 +32,9 @@ pub enum LexError {
 	MalformedStatement(usize),
 }
 
-pub fn parse<'a>(
-	raw_data: &'a str,
-) -> impl Iterator<Item = Result<(usize, RawStatement<'a>), LexError>> {
+pub fn parse(
+	raw_data: &str,
+) -> impl Iterator<Item = Result<(usize, RawStatement), LexError>> {
 	let assignment_regex = Regex::new(r"^(?<KEY>[a-zA-Z0-9_]+)=(?<VALUE>.+)$")
 		.expect("I expected to be able to write a valid regex.");
 	let action_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>[\w\:]+)\])?(?<VALUES>.+)?$")
