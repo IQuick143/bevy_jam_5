@@ -213,10 +213,7 @@ fn update_next_level_button_display(
 /// Custom handler for despawning level-scoped entities
 /// Unlike the built-in despawner, this despawns everything
 /// in all transitions, including identity transitions
-fn despawn_level_state_scoped(
-	mut commands: Commands,
-	query: Query<Entity, With<StateScoped<PlayingLevel>>>,
-) {
+fn despawn_level_state_scoped(mut commands: Commands, query: Query<Entity, With<LevelScoped>>) {
 	for e in &query {
 		commands.entity(e).despawn_recursive();
 	}

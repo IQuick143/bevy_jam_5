@@ -6,6 +6,10 @@ use bevy::prelude::*;
 
 use super::{events::CycleTurningDirection, level::ThingType};
 
+/// Marker component for entities that belong to a single level
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+pub struct LevelScoped;
+
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Player;

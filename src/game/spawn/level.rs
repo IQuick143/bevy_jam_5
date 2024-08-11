@@ -127,6 +127,7 @@ fn spawn_level(
 		};
 		commands.spawn((
 			StateScoped(Screen::Playing),
+			LevelScoped,
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation))
@@ -137,6 +138,7 @@ fn spawn_level(
 		));
 		commands.spawn((
 			StateScoped(Screen::Playing),
+			LevelScoped,
 			ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(mesh),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
@@ -168,6 +170,7 @@ fn spawn_vertex(
 		.spawn((
 			Vertex,
 			StateScoped(Screen::Playing),
+			LevelScoped,
 			PlacedGlyph(None),
 			PlacedObject(None),
 			transform,
@@ -176,6 +179,7 @@ fn spawn_vertex(
 	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
 		StateScoped(Screen::Playing),
+		LevelScoped,
 		ColorMesh2dBundle {
 			transform: Transform::from_translation(position.extend(layers::CYCLE_NODES)),
 			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
@@ -189,6 +193,7 @@ fn spawn_vertex(
 		let mut entity = match object_type {
 			ObjectType::Player => commands.spawn((
 				StateScoped(Screen::Playing),
+				LevelScoped,
 				Object,
 				Player,
 				VertexPosition(vertex_id),
@@ -216,6 +221,7 @@ fn spawn_vertex(
 			)),
 			ObjectType::Box => commands.spawn((
 				StateScoped(Screen::Playing),
+				LevelScoped,
 				Object,
 				Box,
 				VertexPosition(vertex_id),
@@ -259,6 +265,7 @@ fn spawn_vertex(
 		let mut entity = match glyph_type {
 			GlyphType::Button => commands.spawn((
 				StateScoped(Screen::Playing),
+				LevelScoped,
 				Glyph,
 				BoxSlot,
 				VertexPosition(vertex_id),
@@ -288,6 +295,7 @@ fn spawn_vertex(
 			)),
 			GlyphType::Flag => commands.spawn((
 				StateScoped(Screen::Playing),
+				LevelScoped,
 				Glyph,
 				Goal,
 				VertexPosition(vertex_id),
@@ -347,6 +355,7 @@ fn spawn_cycle(
 		.spawn((
 			data.cycle_turnability,
 			StateScoped(Screen::Playing),
+			LevelScoped,
 			ComputedCycleTurnability(true),
 			CycleVertices(
 				data.vertex_indices
