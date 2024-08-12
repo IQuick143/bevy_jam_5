@@ -33,11 +33,14 @@ fn all_assets_loaded(
 	sfx_handles: Res<HandleMap<SfxKey>>,
 	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
 	font: Res<GlobalFont>,
+	// This resource gets initialized later, so it needs to be optional
+	level_list: Option<Res<LoadedLevelList>>,
 ) -> bool {
 	image_handles.all_loaded(&asset_server)
 		&& sfx_handles.all_loaded(&asset_server)
 		&& soundtrack_handles.all_loaded(&asset_server)
 		&& asset_server.is_loaded_with_dependencies(font.0.id())
+		&& level_list.is_some_and(|list| list.all_loaded(&asset_server))
 }
 
 fn continue_to_title(mut commands: Commands, mut next_screen: ResMut<NextState<Screen>>) {

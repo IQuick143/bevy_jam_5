@@ -3,7 +3,7 @@
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::{
-	assets::GlobalFont,
+	assets::{GlobalFont, LoadedLevelList},
 	game::{events::SpawnLevel, level::LevelAsset, prelude::*},
 	ui::prelude::*,
 };
@@ -41,8 +41,9 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// Complementary state variable for [`Screen::Playing`]
+/// Stores the index of the currently-played level in the level list
 #[derive(States, Clone, PartialEq, Eq, Debug, Hash, Default)]
-pub struct PlayingLevel(pub Option<Handle<LevelAsset>>);
+pub struct PlayingLevel(pub Option<usize>);
 
 /// Marker component for the next level button
 #[derive(Component, Clone, Copy, Debug, Default)]
@@ -221,15 +222,19 @@ fn despawn_level_state_scoped(mut commands: Commands, query: Query<Entity, With<
 
 fn load_level(
 	mut commands: Commands,
+	level_list: Res<LoadedLevelList>,
 	level_assets: Res<Assets<LevelAsset>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 ) {
-	let level_handle =
-		playing_level.get().0.as_ref().expect(
-			"Systems that transition into Screen::Playing must also set PlayingLevel state",
-		);
-
+	let level_index = playing_level
+		.get()
+		.0
+		.expect("Systems that transition into Screen::Playing must also set PlayingLevel state");
+	let level_handle = level_list
+		.levels
+		.get(level_index)
+		.expect("PlayingLevel is out of range");
 	let level_data = level_assets
 		.get(level_handle)
 		.expect("All level handles should be valid");

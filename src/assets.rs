@@ -4,6 +4,8 @@ use crate::game::{
 	components::CycleTurnability,
 	level::{
 		asset::{plugin as level_asset_plugin, LevelAsset},
+		list::LevelList,
+		list_asset::{plugin as level_list_asset_plugin, LevelListAsset},
 		GlyphType, ObjectType, ThingType,
 	},
 };
@@ -19,7 +21,12 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<HandleMap<SoundtrackKey>>();
 
 	app.add_plugins(level_asset_plugin);
-	app.init_resource::<LevelList>();
+	app.add_plugins(level_list_asset_plugin);
+	app.init_resource::<LoadingLevelList>();
+	app.add_systems(
+		Update,
+		proceed_with_level_list_loading.run_if(primary_level_list_loaded),
+	);
 
 	app.init_resource::<GlobalFont>();
 }
@@ -156,40 +163,62 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 	}
 }
 
-#[derive(Resource, Reflect, Deref, DerefMut)]
-#[reflect(Resource)]
-pub struct LevelList(Vec<Handle<LevelAsset>>);
+/// Intermediate handle to a loading level list asset
+/// The resource will be removed when the asset is loaded
+#[derive(Resource, Debug)]
+struct LoadingLevelList(pub Handle<LevelListAsset>);
 
-impl FromWorld for LevelList {
-	#[rustfmt::skip]
+impl FromWorld for LoadingLevelList {
 	fn from_world(world: &mut World) -> Self {
 		let asset_server = world.resource::<AssetServer>();
-		LevelList(vec![
-			asset_server.load("levels/tutorials/1_intro.txt"),
-			asset_server.load("levels/tutorials/2_transfer.txt"),
-			asset_server.load("levels/tutorials/3_boxes.txt"),
-			asset_server.load("levels/tutorials/4_manual.txt"),
-			asset_server.load("levels/tutorials/5_sync.txt"),
-			asset_server.load("levels/tutorials/6_sync2.txt"),
-			asset_server.load("levels/tutorials/7_colors.txt"),
-			asset_server.load("levels/1_swap.txt"),
-			asset_server.load("levels/2_sort.txt"),
-			asset_server.load("levels/bicycle.txt"),
-			asset_server.load("levels/tricycle.txt"),
-			asset_server.load("levels/cargo.txt"),
-			asset_server.load("levels/cargo-single.txt"),
-			asset_server.load("levels/lotus.txt"),
-			asset_server.load("levels/three-row-simple.txt"),
-			asset_server.load("levels/three-row.txt"),
-			asset_server.load("levels/car.txt"),
-			asset_server.load("levels/olympic.txt"),
-			asset_server.load("levels/linkage/disrupt.txt"),
-			asset_server.load("levels/linkage/send.txt"),
-			asset_server.load("levels/teamwork.txt"),
-			asset_server.load("levels/linkage/linked_sort.txt"),
-			asset_server.load("levels/rubik.txt"),
-		])
+		Self(asset_server.load("levels/levels.txt"))
 	}
+}
+
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
+pub struct LoadedLevelList {
+	pub list: LevelList,
+	pub levels: Vec<Handle<LevelAsset>>,
+}
+
+impl FromWorld for LoadedLevelList {
+	fn from_world(world: &mut World) -> Self {
+		let asset_server = world.resource::<AssetServer>();
+		let level_lists = world.resource::<Assets<LevelListAsset>>();
+		let loading_level_list = world.resource::<LoadingLevelList>();
+		let level_list = level_lists
+			.get(&loading_level_list.0)
+			.expect("Got invalid handle to loading level list asset");
+		Self {
+			list: level_list.list.clone(),
+			levels: level_list
+				.slugs
+				.iter()
+				.map(|slug| asset_server.load(&format!("levels/{slug}.txt")))
+				.collect(),
+		}
+	}
+}
+
+impl LoadedLevelList {
+	pub fn all_loaded(&self, asset_server: &AssetServer) -> bool {
+		self.levels
+			.iter()
+			.all(|h| asset_server.is_loaded_with_dependencies(h))
+	}
+}
+
+fn primary_level_list_loaded(
+	asset_server: Res<AssetServer>,
+	loading_list: Option<Res<LoadingLevelList>>,
+) -> bool {
+	loading_list.is_some_and(|list| asset_server.is_loaded_with_dependencies(&list.0))
+}
+
+fn proceed_with_level_list_loading(mut commands: Commands) {
+	commands.init_resource::<LoadedLevelList>();
+	commands.remove_resource::<LoadingLevelList>();
 }
 
 /// The font to be used for rendering all text
