@@ -64,7 +64,7 @@ fn reload_level(
 	state: Res<State<PlayingLevel>>,
 	mut transition: EventWriter<QueueScreenTransition<PlayingLevel>>,
 ) {
-	transition.send(QueueScreenTransition::fade(state.get().clone()));
+	transition.send(QueueScreenTransition::fade(*state.get()));
 }
 
 fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
