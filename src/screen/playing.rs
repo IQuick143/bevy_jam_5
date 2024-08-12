@@ -42,7 +42,7 @@ pub(super) fn plugin(app: &mut App) {
 
 /// Complementary state variable for [`Screen::Playing`]
 /// Stores the index of the currently-played level in the level list
-#[derive(States, Clone, PartialEq, Eq, Debug, Hash, Default)]
+#[derive(States, Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub struct PlayingLevel(pub Option<usize>);
 
 /// Marker component for the next level button
@@ -171,19 +171,16 @@ fn game_ui_input_system(
 				next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
 			}
 			GameUiAction::Reset => {
-				next_level.send(QueueScreenTransition::fade(playing_level.get().clone()));
+				next_level.send(QueueScreenTransition::fade(*playing_level.get()));
 			}
 			GameUiAction::NextLevel => {
-				// TODO:
-				//let playing_level = playing_level
-				//	.get()
-				//	.0
-				//	.expect("When in Screen::Playing state, PlayingLevel must also be set");
-				//if let Some(next) = playing_level.next_level() {
-				//	next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(next))));
-				//} else {
-				log::warn!("NextLevel action received on the last level");
-				//}
+				let playing_level = playing_level
+					.get()
+					.0
+					.expect("When in Screen::Playing state, PlayingLevel must also be set");
+				next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(
+					playing_level + 1,
+				))));
 			}
 		}
 	}
@@ -191,16 +188,15 @@ fn game_ui_input_system(
 
 fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
-	//	playing_level: Res<State<PlayingLevel>>,
+	playing_level: Res<State<PlayingLevel>>,
+	level_list: Res<LoadedLevelList>,
 	mut query: Query<&mut Style, With<NextLevelButton>>,
 ) {
-	let is_last_level = true; //TODO
-						  /*playing_level
-						  .get()
-						  .0
-						  .expect("When in Screen::Playing state, PlayingLevel must also be set")
-						  .next_level()
-						  .is_none();*/
+	let level_index = playing_level
+		.get()
+		.0
+		.expect("When in Screen::Playing state, PlayingLevel must also be set");
+	let is_last_level = level_index + 1 == level_list.levels.len();
 	let display = if is_level_completed.0 && !is_last_level {
 		Display::DEFAULT
 	} else {
