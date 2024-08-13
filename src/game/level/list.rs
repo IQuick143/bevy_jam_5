@@ -49,6 +49,7 @@ impl LevelListBuilder {
 	}
 
 	pub fn begin_section(&mut self, _section_id: Option<&str>) -> Result<(), LevelListBuildError> {
+		self.end_section_if_any();
 		self.list.sections.push(LevelListSection {
 			name: None,
 			level_indices: self.level_count..self.level_count,
@@ -80,7 +81,17 @@ impl LevelListBuilder {
 	}
 
 	pub fn build(self) -> Result<LevelList, LevelListBuildError> {
+		self.end_section_if_any();
 		Ok(self.list)
+	}
+
+	/// Helper method that is called when the latest level list section is considered completed
+	fn end_section_if_any(&self) {
+		if let Some(current_section) = self.list.sections.last() {
+			if current_section.level_indices.is_empty() {
+				bevy::log::warn!("A level list section was declared without any levels");
+			}
+		}
 	}
 }
 
