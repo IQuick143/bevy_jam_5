@@ -29,10 +29,6 @@ pub(super) fn plugin(app: &mut App) {
 		inputs::plugin,
 		game_sfx::plugin,
 		history::plugin,
+		events::plugin,
 	));
-	app.add_event::<events::GameLayoutChanged>();
-	app.add_event::<events::RotateCycleGroup>();
-	app.add_event::<events::RotateSingleCycle>();
-	app.add_event::<events::RecordCycleGroupRotation>();
-	app.add_event::<events::UndoMove>();
 }

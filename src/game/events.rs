@@ -1,6 +1,14 @@
 use super::{components::LinkedCycleDirection, level::asset::LevelAsset};
 use bevy::prelude::*;
 
+pub(super) fn plugin(app: &mut App) {
+	app.add_event::<GameLayoutChanged>();
+	app.add_event::<RotateCycleGroup>();
+	app.add_event::<RotateSingleCycle>();
+	app.add_event::<RecordCycleGroupRotation>();
+	app.add_event::<UndoMove>();
+}
+
 /// Trigger event that spawns the content entities of a level
 #[derive(Event, Debug)]
 pub struct SpawnLevel(pub Handle<LevelAsset>);
