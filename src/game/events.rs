@@ -34,10 +34,19 @@ pub struct RotateSingleCycle(pub RotateCycle);
 #[derive(Event, Clone, Copy, Debug)]
 pub struct RotateCycleGroup(pub RotateCycle);
 
+/// Event sent together with a [`RotateCycleGroup`] event
+/// if that rotation is eligible for being recorded in move history
+#[derive(Event, Clone, Copy, Debug)]
+pub struct RecordCycleGroupRotation(pub RotateCycle);
+
 /// Event that is sent when state of the game map changes,
 /// usually by turning a cycle
 #[derive(Event, Debug)]
 pub struct GameLayoutChanged;
+
+/// Event that is sent to signal that a move should be rewound
+#[derive(Event, Debug)]
+pub struct UndoMove;
 
 impl std::ops::Mul<LinkedCycleDirection> for CycleTurningDirection {
 	type Output = Self;

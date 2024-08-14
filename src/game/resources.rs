@@ -7,7 +7,8 @@ pub(super) fn plugin(app: &mut App) {
 		.init_resource::<IsLevelCompleted>()
 		.init_resource::<RingMaterial>()
 		.init_resource::<LinkMaterial>()
-		.init_resource::<ThingPalette>();
+		.init_resource::<ThingPalette>()
+		.init_resource::<MoveHistory>();
 }
 
 /// Contains an overview of conditions that are needed to complete the level
@@ -53,6 +54,10 @@ impl FromWorld for RingMaterial {
 		}))
 	}
 }
+
+/// Records the history of moves within a single session of a level
+#[derive(Resource, Deref, DerefMut, Clone, Debug, Default)]
+pub struct MoveHistory(pub Vec<RotateCycle>);
 
 /// Contains a handle to the material used for rendering cycle links
 #[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]

@@ -27,6 +27,7 @@ fn spawn_level(
 	mut meshes: ResMut<Assets<Mesh>>,
 	levels: Res<Assets<LevelAsset>>,
 	mut is_level_completed: ResMut<IsLevelCompleted>,
+	mut move_history: ResMut<MoveHistory>,
 	cycle_material: ResMut<RingMaterial>,
 	link_material: Res<LinkMaterial>,
 	palette: ResMut<ThingPalette>,
@@ -150,6 +151,7 @@ fn spawn_level(
 	}
 
 	is_level_completed.0 = false;
+	move_history.clear();
 	events.send(GameLayoutChanged);
 
 	hint_text.hint_text.clone_from(&level.hint);

@@ -33,6 +33,10 @@ pub(super) fn plugin(app: &mut App) {
 						input_just_pressed(KeyCode::KeyN)
 							.and_then(resource_equals(IsLevelCompleted(true))),
 					),
+					send_event(GameUiAction::Undo).run_if(
+						input_just_pressed(KeyCode::KeyZ)
+							.and_then(|history: Res<MoveHistory>| !history.is_empty()),
+					),
 					game_ui_input_recording_system,
 				)
 					.run_if(ui_not_frozen)
@@ -67,6 +71,7 @@ enum GameUiAction {
 	Back,
 	Reset,
 	NextLevel,
+	Undo,
 }
 
 fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
@@ -174,6 +179,7 @@ fn game_ui_input_processing_system(
 	playing_level: Res<State<PlayingLevel>>,
 	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
 	mut next_level: EventWriter<QueueScreenTransition<PlayingLevel>>,
+	mut undo_commands: EventWriter<UndoMove>,
 ) {
 	if let Some(action) = events.read().last() {
 		match action {
@@ -191,6 +197,9 @@ fn game_ui_input_processing_system(
 				next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(
 					playing_level + 1,
 				))));
+			}
+			GameUiAction::Undo => {
+				undo_commands.send(UndoMove);
 			}
 		}
 	}

@@ -7,9 +7,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			cycle_inputs_system.in_set(AppSet::RecordInput),
-			cycle_rotation_with_inputs_system
-				.after(AppSet::RecordInput)
-				.before(AppSet::GameLogic),
+			cycle_rotation_with_inputs_system.in_set(AppSet::ExecuteInput),
 		)
 			.run_if(ui_not_frozen),
 	);
@@ -82,7 +80,8 @@ fn cycle_inputs_system(
 
 fn cycle_rotation_with_inputs_system(
 	query: Query<(Entity, &CycleInteraction), Changed<CycleInteraction>>,
-	mut events: EventWriter<RotateCycleGroup>,
+	mut rot_events: EventWriter<RotateCycleGroup>,
+	mut record_events: EventWriter<RecordCycleGroupRotation>,
 ) {
 	for (id, interaction) in &query {
 		let direction = match interaction {
@@ -90,9 +89,11 @@ fn cycle_rotation_with_inputs_system(
 			CycleInteraction::RightClick => CycleTurningDirection::Reverse,
 			_ => return,
 		};
-		events.send(RotateCycleGroup(RotateCycle {
+		let rotation = RotateCycle {
 			target_cycle: id,
 			direction,
-		}));
+		};
+		rot_events.send(RotateCycleGroup(rotation));
+		record_events.send(RecordCycleGroupRotation(rotation));
 	}
 }

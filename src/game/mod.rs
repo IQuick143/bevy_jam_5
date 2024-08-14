@@ -4,6 +4,7 @@ pub mod animation;
 pub mod components;
 pub mod events;
 mod game_sfx;
+mod history;
 pub mod inputs;
 pub mod level;
 pub mod logic;
@@ -27,8 +28,11 @@ pub(super) fn plugin(app: &mut App) {
 		resources::plugin,
 		inputs::plugin,
 		game_sfx::plugin,
+		history::plugin,
 	));
 	app.add_event::<events::GameLayoutChanged>();
 	app.add_event::<events::RotateCycleGroup>();
 	app.add_event::<events::RotateSingleCycle>();
+	app.add_event::<events::RecordCycleGroupRotation>();
+	app.add_event::<events::UndoMove>();
 }
