@@ -22,7 +22,13 @@ impl Plugin for AppPlugin {
 		// Order new `AppStep` variants by adding them here:
 		app.configure_sets(
 			Update,
-			(AppSet::TickTimers, AppSet::RecordInput, AppSet::Update).chain(),
+			(
+				AppSet::TickTimers,
+				AppSet::RecordInput,
+				AppSet::ExecuteInput,
+				AppSet::Update,
+			)
+				.chain(),
 		);
 
 		// Spawn the main camera.
@@ -83,8 +89,19 @@ enum AppSet {
 	TickTimers,
 	/// Record player input.
 	RecordInput,
+	/// Process inputs that correspond to one-shot actions rather than lasting state
+	/// (that should be pretty much all inputs in this particular game)
+	ExecuteInput,
 	/// Do everything else (consider splitting this into further variants).
 	Update,
+}
+
+/// System that sends an event every time it runs.
+/// Use together with input-based run conditions to send input events
+fn send_event<E: Event + Clone>(event: E) -> impl Fn(EventWriter<E>) {
+	move |mut events| {
+		events.send(event.clone());
+	}
 }
 
 fn spawn_camera(mut commands: Commands) {

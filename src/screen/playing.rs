@@ -5,7 +5,9 @@ use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
 	game::{events::SpawnLevel, level::LevelAsset, prelude::*},
+	send_event,
 	ui::prelude::*,
+	AppSet,
 };
 
 use super::*;
@@ -15,6 +17,7 @@ pub(super) fn plugin(app: &mut App) {
 		.init_resource::<PendingTransition<PlayingLevel>>()
 		.add_event::<QueueScreenTransition<PlayingLevel>>()
 		.enable_state_scoped_entities::<PlayingLevel>()
+		.add_event::<GameUiAction>()
 		.add_systems(
 			OnEnter(Screen::Playing),
 			(spawn_game_ui, load_level).chain(),
@@ -25,10 +28,16 @@ pub(super) fn plugin(app: &mut App) {
 			(
 				process_enqueued_transitions::<PlayingLevel>,
 				(
-					reload_level.run_if(input_just_pressed(KeyCode::KeyR)),
-					game_ui_input_system,
+					send_event(GameUiAction::Reset).run_if(input_just_pressed(KeyCode::KeyR)),
+					send_event(GameUiAction::NextLevel).run_if(
+						input_just_pressed(KeyCode::KeyN)
+							.and_then(resource_equals(IsLevelCompleted(true))),
+					),
+					game_ui_input_recording_system,
 				)
-					.run_if(ui_not_frozen),
+					.run_if(ui_not_frozen)
+					.in_set(AppSet::RecordInput),
+				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
 				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 			)
@@ -53,18 +62,11 @@ struct NextLevelButton;
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct LevelNameBox;
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Event, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
 	Reset,
 	NextLevel,
-}
-
-fn reload_level(
-	state: Res<State<PlayingLevel>>,
-	mut transition: EventWriter<QueueScreenTransition<PlayingLevel>>,
-) {
-	transition.send(QueueScreenTransition::fade(*state.get()));
 }
 
 fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
@@ -156,16 +158,24 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		});
 }
 
-fn game_ui_input_system(
+fn game_ui_input_recording_system(
 	query: InteractionQuery<&GameUiAction>,
+	mut events: EventWriter<GameUiAction>,
+) {
+	for (interaction, action) in &query {
+		if *interaction == Interaction::Pressed {
+			events.send(*action);
+		}
+	}
+}
+
+fn game_ui_input_processing_system(
+	mut events: EventReader<GameUiAction>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
 	mut next_level: EventWriter<QueueScreenTransition<PlayingLevel>>,
 ) {
-	for (interaction, action) in &query {
-		if *interaction != Interaction::Pressed {
-			continue;
-		}
+	if let Some(action) = events.read().last() {
 		match action {
 			GameUiAction::Back => {
 				next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
