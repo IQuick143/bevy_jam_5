@@ -4,7 +4,7 @@
 
 use crate::game::prelude::*;
 
-pub mod level;
+mod level;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_plugins(level::plugin);

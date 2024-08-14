@@ -1,15 +1,15 @@
 //! Game mechanics and content.
 
-pub mod animation;
+mod animation;
 pub mod components;
 pub mod events;
 mod game_sfx;
 mod history;
-pub mod inputs;
+mod inputs;
 pub mod level;
-pub mod logic;
+mod logic;
 pub mod resources;
-pub mod spawn;
+mod spawn;
 
 pub mod prelude {
 	pub use super::components::*;
