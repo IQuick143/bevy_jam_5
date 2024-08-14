@@ -18,7 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			tick_fade_in_out.in_set(AppSet::TickTimers),
-			apply_fade_in_out.in_set(AppSet::Update),
+			apply_fade_in_out.in_set(AppSet::UpdateVisuals),
 		)
 			.run_if(in_state(Screen::Splash)),
 	);
@@ -31,7 +31,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			tick_splash_timer.in_set(AppSet::TickTimers),
-			check_splash_timer.in_set(AppSet::Update),
+			check_splash_timer.in_set(AppSet::UpdateVisuals),
 		)
 			.run_if(in_state(Screen::Splash)),
 	);

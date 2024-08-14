@@ -26,7 +26,8 @@ impl Plugin for AppPlugin {
 				AppSet::TickTimers,
 				AppSet::RecordInput,
 				AppSet::ExecuteInput,
-				AppSet::Update,
+				AppSet::GameLogic,
+				AppSet::UpdateVisuals,
 			)
 				.chain(),
 		);
@@ -92,8 +93,10 @@ enum AppSet {
 	/// Process inputs that correspond to one-shot actions rather than lasting state
 	/// (that should be pretty much all inputs in this particular game)
 	ExecuteInput,
-	/// Do everything else (consider splitting this into further variants).
-	Update,
+	/// Evaluate in-game logic
+	GameLogic,
+	/// Update visual representation of internal state
+	UpdateVisuals,
 }
 
 /// System that sends an event every time it runs.

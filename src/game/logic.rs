@@ -1,7 +1,5 @@
 use super::prelude::*;
-
-#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LogicSystemSet;
+use crate::AppSet;
 
 pub fn plugin(app: &mut App) {
 	app.add_systems(
@@ -16,7 +14,7 @@ pub fn plugin(app: &mut App) {
 				.run_if(on_event::<GameLayoutChanged>()),
 		)
 			.chain()
-			.in_set(LogicSystemSet),
+			.in_set(AppSet::GameLogic),
 	);
 }
 

@@ -1,8 +1,7 @@
 use bevy::utils::hashbrown::HashMap;
 
-use crate::game::prelude::*;
-
-use super::logic;
+use super::{logic, prelude::*};
+use crate::AppSet;
 
 pub fn plugin(app: &mut App) {
 	app.add_systems(
@@ -21,7 +20,7 @@ pub fn plugin(app: &mut App) {
 				cycle_center_interaction_visuals_update_system,
 				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>()),
 			)
-				.after(logic::LogicSystemSet),
+				.in_set(AppSet::UpdateVisuals),
 			spin_animation_system,
 			jump_turn_animation_system,
 		),

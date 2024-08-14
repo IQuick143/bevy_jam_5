@@ -1,19 +1,15 @@
-use crate::ui::freeze::ui_not_frozen;
+use crate::{ui::freeze::ui_not_frozen, AppSet};
 
-use super::{logic::LogicSystemSet, prelude::*};
-
-/// System set that updates [`CycleInteraction`] components
-#[derive(SystemSet, Clone, Copy, PartialEq, Eq, Debug, Hash)]
-pub struct InputsUpdateSet;
+use super::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			cycle_inputs_system.in_set(InputsUpdateSet),
+			cycle_inputs_system.in_set(AppSet::RecordInput),
 			cycle_rotation_with_inputs_system
-				.after(InputsUpdateSet)
-				.before(LogicSystemSet),
+				.after(AppSet::RecordInput)
+				.before(AppSet::GameLogic),
 		)
 			.run_if(ui_not_frozen),
 	);
