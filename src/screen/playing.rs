@@ -42,14 +42,12 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
-				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
+				(despawn_level_state_scoped, load_level)
+					.chain()
+					.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 			)
 				.run_if(in_state(Screen::Playing)),
-		)
-		.add_systems(
-			Update,
-			despawn_level_state_scoped.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 		);
 }
 
