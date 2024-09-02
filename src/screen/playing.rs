@@ -46,6 +46,7 @@ pub(super) fn plugin(app: &mut App) {
 					.chain()
 					.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
+				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
 		);
@@ -59,6 +60,10 @@ pub struct PlayingLevel(pub Option<usize>);
 /// Marker component for the next level button
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct NextLevelButton;
+
+/// Marker component for the undo button
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct UndoButton;
 
 /// Marker component for the level name label
 #[derive(Component, Clone, Copy, Debug, Default)]
@@ -101,6 +106,9 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 					parent
 						.tool_button("Reset", font.0.clone_weak())
 						.insert(GameUiAction::Reset);
+					parent
+						.tool_button("Undo", font.0.clone_weak())
+						.insert((GameUiAction::Undo, UndoButton));
 				});
 			parent
 				.spawn(NodeBundle {
@@ -218,6 +226,20 @@ fn update_next_level_button_display(
 		Display::DEFAULT
 	} else {
 		Display::None
+	};
+	for mut style in &mut query {
+		style.display = display;
+	}
+}
+
+fn update_undo_button_display(
+	history: Res<MoveHistory>,
+	mut query: Query<&mut Style, With<UndoButton>>,
+) {
+	let display = if history.is_empty() {
+		Display::None
+	} else {
+		Display::DEFAULT
 	};
 	for mut style in &mut query {
 		style.display = display;
