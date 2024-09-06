@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::level::LevelAsset,
+	game::level::LevelData,
 	ui::prelude::*,
 };
 
@@ -26,7 +26,7 @@ fn spawn_screen(
 	mut commands: Commands,
 	levels: Res<LoadedLevelList>,
 	font: Res<GlobalFont>,
-	level_assets: Res<Assets<LevelAsset>>,
+	level_assets: Res<Assets<LevelData>>,
 ) {
 	commands
 		.ui_root()

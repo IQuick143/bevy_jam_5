@@ -4,7 +4,7 @@ use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::{events::SpawnLevel, level::LevelAsset, prelude::*},
+	game::{events::SpawnLevel, level::LevelData, prelude::*},
 	send_event,
 	ui::prelude::*,
 	AppSet,
@@ -258,7 +258,7 @@ fn despawn_level_state_scoped(mut commands: Commands, query: Query<Entity, With<
 fn load_level(
 	mut commands: Commands,
 	level_list: Res<LoadedLevelList>,
-	level_assets: Res<Assets<LevelAsset>>,
+	level_assets: Res<Assets<LevelData>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 ) {

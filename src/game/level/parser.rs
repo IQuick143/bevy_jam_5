@@ -1,315 +1,196 @@
-use super::*;
-
-use super::lex::*;
+use super::{builder::*, lex::*, *};
 use bevy::utils::hashbrown::HashMap;
-use layout::{CyclePlacement, DeclaredCyclePlacement, DeclaredPlacement, DeclaredVertexPlacement};
+use itertools::Itertools as _;
 
-#[derive(Clone, Debug)]
-pub struct LevelFile {
-	pub metadata: HashMap<String, String>,
-	pub data: LevelData,
-	pub layout: Vec<layout::DeclaredPlacement>,
-}
-
-enum Statement<'a> {
-	Vertex(Vec<&'a str>),
-	Cycle(CycleTurnability, Vec<&'a str>),
-	Link(LinkedCycleDirection, Vec<&'a str>),
-	Object(ObjectKind, Option<LogicalColor>, Vec<&'a str>),
-	Place(Vec<&'a str>),
-	PlaceVertex(Vec<&'a str>),
-}
-
-enum ObjectKind {
-	Object(ObjectType),
-	Glyph(GlyphType),
-}
-
-pub fn parse(level_file: &str) -> Result<LevelFile, LevelParsingError> {
-	let mut raw_statements: Vec<(usize, RawActionStatement)> = Vec::new();
-	let mut metadata = HashMap::new();
+pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
+	let mut builder = LevelBuilder::new();
+	let mut vertex_names = HashMap::new();
+	let mut cycle_names = HashMap::new();
 
 	for line in lex::parse(level_file) {
 		let (line_id, statement) = line?;
 		match statement {
 			RawStatement::Assignment(statement) => {
-				let key = statement.key.to_ascii_lowercase();
-				let value = statement.value.to_owned();
-				metadata.insert(key, value); // TODO: check for duplicate keywords
+				match statement.key.to_ascii_lowercase().as_str() {
+					"name" => builder.set_level_name(statement.value.to_owned())?,
+					"hint" => builder.set_level_hint(statement.value.to_owned())?,
+					other => return Err(LevelParsingError::InvalidMetaVariable(other.to_owned())),
+				}
 			}
 			RawStatement::Action(statement) => {
-				raw_statements.push((line_id, statement));
-			}
-		}
-	}
-
-	let mut statements = Vec::new();
-
-	for (line_id, raw_statement) in raw_statements {
-		statements.push((
-			line_id,
-			match raw_statement.verb {
-				"VERTEX" => Statement::Vertex(raw_statement.values),
-				"CYCLE" => {
-					let turnability = match raw_statement.modifier {
-						None => CycleTurnability::Always,
-						Some("MANUAL") => CycleTurnability::WithPlayer,
-						Some("ENGINE") => CycleTurnability::Always,
-						Some("STILL") => CycleTurnability::Never,
-						Some(m) => return Err(LevelParsingError::InvalidModifier(m.to_string())),
-					};
-					Statement::Cycle(turnability, raw_statement.values)
-				}
-				"LINK" => {
-					let flip = match raw_statement.modifier {
-						None => LinkedCycleDirection::Coincident,
-						Some("STRAIGHT") => LinkedCycleDirection::Coincident,
-						Some("CROSSED") => LinkedCycleDirection::Inverse,
-						Some(m) => return Err(LevelParsingError::InvalidModifier(m.to_string())),
-					};
-					Statement::Link(flip, raw_statement.values)
-				}
-				"OBJECT" => {
-					let Some(modifier) = raw_statement.modifier else {
-						return Err(LevelParsingError::MalformedStatement(line_id));
-					};
-					let (object_kind, color) = modifier.split_once(':').unwrap_or((modifier, ""));
-					let kind = match object_kind {
-						"BOX" => ObjectKind::Object(ObjectType::Box),
-						"PLAYER" => ObjectKind::Object(ObjectType::Player),
-						"BUTTON" => ObjectKind::Glyph(GlyphType::Button),
-						"FLAG" => ObjectKind::Glyph(GlyphType::Flag),
-						_ => return Err(LevelParsingError::InvalidModifier(modifier.to_string())),
-					};
-					let color_id = if color.is_empty() {
-						None
-					} else if let Ok(color_id) = color.parse() {
-						Some(LogicalColor(color_id))
-					} else {
-						return Err(LevelParsingError::InvalidModifier(modifier.to_string()));
-					};
-					Statement::Object(kind, color_id, raw_statement.values)
-				}
-				"PLACE" => Statement::Place(raw_statement.values),
-				"PLACE_VERT" => Statement::PlaceVertex(raw_statement.values),
-				k => return Err(LevelParsingError::InvalidKeyword(k.to_string())), // TODO: line number
-			},
-		));
-	}
-
-	let mut vertices = Vec::new();
-	let mut vertex_names = HashMap::new();
-
-	for (_, statement) in statements.iter() {
-		if let Statement::Vertex(names) = statement {
-			if names.is_empty() {
-				// TODO: warn
-			}
-			for name in names {
-				if vertex_names.contains_key(*name) {
-					// TODO: warn
-				} else {
-					let new_id = vertices.len();
-					vertices.push(VertexData {
-						object: None,
-						glyph: None,
-					});
-					vertex_names.insert(name.to_string(), new_id);
-				}
-			}
-		}
-	}
-
-	let mut cycles = Vec::new();
-	let mut cycle_names = HashMap::new();
-
-	for (line_id, statement) in statements.iter() {
-		if let Statement::Cycle(turnability, names) = statement {
-			if vertex_names.len() < 3 {
-				// TODO: better error
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			}
-			let cycle_name = *names.first().unwrap();
-			if cycle_names.contains_key(cycle_name) {
-				return Err(LevelParsingError::RedefinedCycle(cycle_name.to_string()));
-			}
-			let mut cycle = CycleData {
-				vertex_indices: Vec::new(),
-				cycle_turnability: *turnability,
-			};
-			for vertex_name in names.iter().skip(1) {
-				if let Some(vertex_id) = vertex_names.get(*vertex_name) {
-					cycle.vertex_indices.push(*vertex_id);
-				} else {
-					return Err(LevelParsingError::UnknownVertexName(
-						vertex_name.to_string(),
-					));
-				}
-			}
-			let new_id = cycles.len();
-			cycles.push(cycle);
-			cycle_names.insert(cycle_name.to_string(), new_id);
-		}
-	}
-
-	let mut linkages: Vec<LinkageData> = Vec::new();
-
-	for (line_id, statement) in statements.iter() {
-		if let Statement::Link(flip, linked_cycle_names) = statement {
-			if linked_cycle_names.len() < 2 {
-				// TODO: better error
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			}
-			let mut last_cycle = None;
-			for cycle_name in linked_cycle_names {
-				if let Some(cycle_id) = cycle_names.get(*cycle_name) {
-					if let Some(previous_cycle_id) = last_cycle {
-						linkages.push(LinkageData {
-							cycle_a_index: previous_cycle_id,
-							cycle_b_index: *cycle_id,
-							direction: *flip,
-						});
-					}
-					last_cycle = Some(*cycle_id);
-				} else {
-					return Err(LevelParsingError::UnknownCycleName(cycle_name.to_string()));
-				}
-			}
-		}
-	}
-
-	for (_, statement) in statements.iter() {
-		if let Statement::Object(kind, color, placed_vertex_names) = statement {
-			if placed_vertex_names.is_empty() {
-				// TODO: warn
-			}
-			for name in placed_vertex_names {
-				if let Some(vertex_id) = vertex_names.get(*name) {
-					let vertex = vertices.get_mut(*vertex_id).unwrap();
-					match kind {
-						ObjectKind::Object(object) => {
-							if vertex.object.is_some() {
-								return Err(LevelParsingError::ObjectCollision(name.to_string()));
-							}
-							vertex.object = Some(ObjectData {
-								object_type: *object,
-								color: *color,
-							});
-						}
-						ObjectKind::Glyph(glyph) => {
-							if vertex.glyph.is_some() {
-								return Err(LevelParsingError::ObjectCollision(name.to_string()));
-							}
-							vertex.glyph = Some(GlyphData {
-								glyph_type: *glyph,
-								color: *color,
-							});
+				match statement.verb {
+					"VERTEX" => {
+						for name in statement.values {
+							let vertex = builder.add_vertex()?;
+							vertex_names.insert(name.to_owned(), vertex);
 						}
 					}
-				} else {
-					return Err(LevelParsingError::UnknownVertexName(name.to_string()));
+					"CYCLE" => {
+						let turnability = match statement.modifier {
+							None => CycleTurnability::Always,
+							Some("MANUAL") => CycleTurnability::WithPlayer,
+							Some("ENGINE") => CycleTurnability::Always,
+							Some("STILL") => CycleTurnability::Never,
+							Some(m) => {
+								return Err(LevelParsingError::InvalidModifier(m.to_string()))
+							}
+						};
+						let mut values = statement.values.into_iter();
+						let name = values
+							.next()
+							.ok_or(LevelParsingError::NotEnoughArguments(1, 0))?;
+						let vertices = values
+							.map(|name| {
+								vertex_names.get(name).copied().ok_or_else(|| {
+									LevelParsingError::UnknownVertexName(name.to_owned())
+								})
+							})
+							.collect::<Result<Vec<_>, _>>()?;
+						let cycle = builder.add_cycle(turnability, vertices)?;
+						cycle_names.insert(name.to_owned(), cycle);
+					}
+					"LINK" => {
+						let direction = match statement.modifier {
+							None => LinkedCycleDirection::Coincident,
+							Some("STRAIGHT") => LinkedCycleDirection::Coincident,
+							Some("CROSSED") => LinkedCycleDirection::Inverse,
+							Some(m) => {
+								return Err(LevelParsingError::InvalidModifier(m.to_string()))
+							}
+						};
+						let cycles = statement
+							.values
+							.into_iter()
+							.map(|name| {
+								cycle_names.get(name).copied().ok_or_else(|| {
+									LevelParsingError::UnknownVertexName(name.to_owned())
+								})
+							})
+							.collect::<Result<Vec<_>, _>>()?;
+						if cycles.len() < 2 {
+							return Err(LevelParsingError::NotEnoughArguments(2, cycles.len()));
+						}
+						for (source, dest) in cycles.into_iter().tuple_windows() {
+							builder.link_cycles(source, dest, direction)?;
+						}
+					}
+					"OBJECT" => {
+						let Some(modifier) = statement.modifier else {
+							return Err(LevelParsingError::MalformedStatement(line_id));
+						};
+						let (object_kind, color) =
+							modifier.split_once(':').unwrap_or((modifier, ""));
+						let _color_id = if color.is_empty() {
+							None
+						} else if let Ok(color_id) = color.parse() {
+							Some(LogicalColor(color_id))
+						} else {
+							return Err(LevelParsingError::InvalidModifier(modifier.to_string()));
+						};
+						let thing_type = match object_kind {
+							"BOX" => ThingType::Object(ObjectType::Box),
+							"PLAYER" => ThingType::Object(ObjectType::Player),
+							"BUTTON" => ThingType::Glyph(GlyphType::Button),
+							"FLAG" => ThingType::Glyph(GlyphType::Flag),
+							_ => {
+								return Err(LevelParsingError::InvalidModifier(
+									modifier.to_string(),
+								))
+							}
+						};
+						for vertex_name in statement.values {
+							let Some(vertex) = vertex_names.get(vertex_name).copied() else {
+								return Err(LevelParsingError::UnknownVertexName(
+									vertex_name.to_owned(),
+								));
+							};
+							// TODO: Bring back colors
+							match thing_type {
+								ThingType::Object(object_type) => builder.add_object(
+									vertex,
+									ObjectData {
+										object_type,
+										color: None,
+									},
+								)?,
+								ThingType::Glyph(glyph_type) => builder.add_glyph(
+									vertex,
+									GlyphData {
+										glyph_type,
+										color: None,
+									},
+								)?,
+							}
+						}
+					}
+					"PLACE" => {
+						if statement.values.len() < 4 {
+							return Err(LevelParsingError::NotEnoughArguments(
+								4,
+								statement.values.len(),
+							));
+						}
+						let cycle_name = statement.values[0];
+						let x_str = statement.values[1].replace(',', ".");
+						let y_str = statement.values[2].replace(',', ".");
+						let r_str = statement.values[3].replace(',', ".");
+						let Some(cycle_id) = cycle_names.get(cycle_name).copied() else {
+							return Err(LevelParsingError::UnknownCycleName(
+								cycle_name.to_string(),
+							));
+						};
+						let Ok(x) = x_str.parse::<f32>() else {
+							return Err(LevelParsingError::MalformedStatement(line_id));
+						};
+						let Ok(y) = y_str.parse::<f32>() else {
+							return Err(LevelParsingError::MalformedStatement(line_id));
+						};
+						let Ok(r) = r_str.parse::<f32>() else {
+							return Err(LevelParsingError::MalformedStatement(line_id));
+						};
+						let hints = statement.values[4..]
+							.iter()
+							.map(|name| {
+								vertex_names
+									.get(*name)
+									.copied()
+									.ok_or(LevelParsingError::UnknownVertexName(name.to_string()))
+							})
+							.collect::<Result<Vec<_>, _>>()?;
+						builder.place_cycle(cycle_id, Vec2::new(x, y), r, &hints)?;
+					}
+					"PLACE_VERT" => {
+						if statement.values.len() < 2 {
+							return Err(LevelParsingError::NotEnoughArguments(
+								2,
+								statement.values.len(),
+							));
+						}
+						let vertex_name = statement.values[0];
+						let angle_str = statement.values[1].replace(',', ".");
+						let Some(vertex_id) = vertex_names.get(vertex_name).copied() else {
+							return Err(LevelParsingError::UnknownCycleName(
+								vertex_name.to_string(),
+							));
+						};
+						let Ok(angle) = angle_str.parse::<f32>() else {
+							return Err(LevelParsingError::MalformedStatement(line_id));
+						};
+						builder.place_vertex(vertex_id, angle)?;
+					}
+					other => return Err(LevelParsingError::InvalidKeyword(other.to_owned())),
 				}
 			}
 		}
 	}
 
-	let mut cycle_layout: Vec<Option<(CyclePlacement, Vec<usize>)>> =
-		(0..cycles.len()).map(|_| None).collect();
-
-	for (line_id, statement) in statements.iter() {
-		if let Statement::Place(data) = statement {
-			if data.len() < 4 {
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			}
-			let cycle_name = data[0];
-			let x_str = data[1].replace(',', ".");
-			let y_str = data[2].replace(',', ".");
-			let r_str = data[3].replace(',', ".");
-			let Some(cycle_id) = cycle_names.get(cycle_name) else {
-				return Err(LevelParsingError::UnknownCycleName(cycle_name.to_string()));
-			};
-			let Ok(x) = x_str.parse::<f32>() else {
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			};
-			let Ok(y) = y_str.parse::<f32>() else {
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			};
-			let Ok(r) = r_str.parse::<f32>() else {
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			};
-			let hints = data[4..]
-				.iter()
-				.map(|name| {
-					vertex_names
-						.get(*name)
-						.copied()
-						.ok_or(LevelParsingError::UnknownVertexName(name.to_string()))
-				})
-				.collect::<Result<_, _>>()?;
-			cycle_layout[*cycle_id] = Some((
-				CyclePlacement {
-					position: Vec2::new(x, y),
-					radius: r,
-				},
-				hints,
-			));
-		}
-	}
-
-	if !cycle_layout.iter().all(Option::is_some) {
-		return Err(LevelParsingError::MissingCycleLayout);
-	}
-
-	let mut layout: Vec<DeclaredPlacement> = cycle_layout
-		.into_iter()
-		.enumerate()
-		.map(|(i, x)| {
-			let (placement, hints) = x.unwrap();
-			DeclaredPlacement::Cycle(DeclaredCyclePlacement {
-				cycle_index: i,
-				position: placement.position,
-				radius: placement.radius,
-				double_intersection_hints: hints,
-			})
-		})
-		.collect();
-
-	for (line_id, statement) in statements.iter() {
-		if let Statement::PlaceVertex(data) = statement {
-			if data.len() < 2 {
-				return Err(LevelParsingError::MalformedStatement(*line_id));
-			}
-			let vertex_name = data[0];
-			let angle_str = data[1].replace(',', ".");
-			if let Some(vertex_id) = vertex_names.get(vertex_name) {
-				let Ok(angle) = angle_str.parse::<f32>() else {
-					return Err(LevelParsingError::MalformedStatement(*line_id));
-				};
-				layout.push(DeclaredPlacement::Vertex(DeclaredVertexPlacement {
-					vertex_index: *vertex_id,
-					relative_angle: angle,
-				}))
-			} else {
-				return Err(LevelParsingError::UnknownCycleName(vertex_name.to_string()));
-			}
-		}
-	}
-
-	Ok(LevelFile {
-		metadata,
-		data: LevelData {
-			vertices,
-			cycles,
-			linkages,
-		},
-		layout,
-	})
+	Ok(builder.build()?)
 }
 
 #[test]
 fn basic_test() {
 	let data = r"
-TEST6=?!#_AAA 648
+NAME=?!#_AAA 648
 HINT=This should parse correctly!
 
 # Here we declare all the vertex names
@@ -362,11 +243,20 @@ pub enum LevelParsingError {
 	LexError(LexError),
 	MalformedStatement(usize),
 	MissingCycleLayout,
+	InvalidMetaVariable(String),
+	BuilderError(LevelBuilderError),
+	NotEnoughArguments(usize, usize),
 }
 
 impl From<LexError> for LevelParsingError {
 	fn from(value: LexError) -> Self {
 		Self::LexError(value)
+	}
+}
+
+impl From<LevelBuilderError> for LevelParsingError {
+	fn from(value: LevelBuilderError) -> Self {
+		Self::BuilderError(value)
 	}
 }
 
@@ -402,6 +292,14 @@ impl std::fmt::Display for LevelParsingError {
 			LevelParsingError::MissingCycleLayout => {
 				write!(f, "Some cycles don't have a position specified")?
 			}
+			LevelParsingError::InvalidMetaVariable(name) => {
+				write!(f, "{name} is not a valid meta variable name")?
+			}
+			LevelParsingError::BuilderError(e) => e.fmt(f)?,
+			LevelParsingError::NotEnoughArguments(needed, got) => write!(
+				f,
+				"Statement found {got} arguments, needs at least {needed}."
+			)?,
 		}
 		Ok(())
 	}

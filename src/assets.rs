@@ -3,10 +3,10 @@ use bevy::{prelude::*, utils::HashMap};
 use crate::game::{
 	components::CycleTurnability,
 	level::{
-		asset::{plugin as level_asset_plugin, LevelAsset},
+		asset::plugin as level_asset_plugin,
 		list::LevelList,
 		list_asset::{plugin as level_list_asset_plugin, LevelListAsset},
-		GlyphType, ObjectType, ThingType,
+		GlyphType, LevelData, ObjectType, ThingType,
 	},
 };
 
@@ -179,7 +179,7 @@ impl FromWorld for LoadingLevelList {
 #[reflect(Resource)]
 pub struct LoadedLevelList {
 	pub list: LevelList,
-	pub levels: Vec<Handle<LevelAsset>>,
+	pub levels: Vec<Handle<LevelData>>,
 }
 
 impl FromWorld for LoadedLevelList {

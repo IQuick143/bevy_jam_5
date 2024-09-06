@@ -1,117 +1,30 @@
 use std::f32::consts::PI;
 
-use bevy::math::bounding::Aabb2d;
+use bevy::math::bounding::{Aabb2d, BoundingVolume};
+use itertools::Itertools as _;
 
 use super::*;
+use crate::graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH};
 
-/// Declarative specification of the placement of a lone cycle
-#[derive(Clone, Debug)]
-pub struct DeclaredCyclePlacement {
-	/// Index of the cycle being laid out
-	pub cycle_index: usize,
-	/// Position of the center point of the cycle
-	pub position: Vec2,
-	/// Radius of the cycle
-	pub radius: f32,
-	/// Indices of vertices that should prefer their second
-	/// option for placement instead of the first
-	pub double_intersection_hints: Vec<usize>,
-}
-
-/// Declarative specification of the placement of a vertex
-/// that does not lie in the intersection of multiple cycles
-#[derive(Clone, Copy, Debug)]
-pub struct DeclaredVertexPlacement {
-	/// Index of the vertex being laid out
-	pub vertex_index: usize,
-	/// Angle of the vector from the centerpoint of the cycle that
-	/// owns the vertex to the vertex
-	pub relative_angle: f32,
-}
-
-/// Declarative specification of the placement of a game object
-#[derive(Clone, Debug)]
-pub enum DeclaredPlacement {
-	/// Place a cycle that does not intersects any already-placed cycles
-	Cycle(DeclaredCyclePlacement),
-	/// Place a vertex that belongs to exactly one already-placed cycle
-	/// and does not yet have a fixed position
-	Vertex(DeclaredVertexPlacement),
-}
-
-/// Computed placement of a cycle
-#[derive(Clone, Copy, PartialEq, Debug, Reflect)]
-pub struct CyclePlacement {
-	/// Position of the center point of the cycle
-	pub position: Vec2,
-	/// Radius of the cycle
-	pub radius: f32,
-}
-
-/// Describes the layout of all objects in a level
-#[derive(Clone, Debug, Reflect)]
-pub struct LevelLayout {
-	/// Positions of vertices in the level
-	pub vertices: Vec<Vec2>,
-	/// Placements of cycles in the level
-	pub cycles: Vec<CyclePlacement>,
-}
-
-impl LevelLayout {
-	/// Returns a bounding box that narrowly contains
-	pub fn get_bounding_box(&self) -> Aabb2d {
-		let mut maximum = Vec2::MIN;
-		let mut minimum = Vec2::MAX;
-
-		for &vertex in self.vertices.iter() {
-			maximum = maximum.max(vertex);
-			minimum = minimum.min(vertex);
-		}
-
-		for &circle in self.cycles.iter() {
-			// I'm assuming that the radius is positive, pls
-			maximum = maximum.max(circle.position + Vec2::splat(circle.radius));
-			minimum = minimum.min(circle.position - Vec2::splat(circle.radius));
-		}
-		Aabb2d {
-			min: minimum,
-			max: maximum,
-		}
-	}
-
-	pub fn recompute_to_fit(&mut self, half_extents: Vec2, center: Vec2) {
-		let Aabb2d { min, max } = self.get_bounding_box();
-		let own_half_extents = (max - min) / 2.0;
-		let own_center = (max + min) / 2.0;
-		let x_scale = half_extents.x / own_half_extents.x;
-		let y_scale = half_extents.y / own_half_extents.y;
-		let scale_factor = f32::min(x_scale, y_scale);
-
-		for vertex in self.vertices.iter_mut() {
-			*vertex = scale_factor * (*vertex - own_center) + center;
-		}
-
-		for circle in self.cycles.iter_mut() {
-			circle.position = scale_factor * (circle.position - own_center) + center;
-			circle.radius *= scale_factor;
-		}
-	}
-}
-
-/// Helper object for constructing a [`LevelLayout`]
+/// Helper object for constructing a valid [`LevelData`]
 #[derive(Debug)]
-pub struct LevelLayoutBuilder<'w> {
-	level: &'w ValidLevelData,
+pub struct LevelBuilder {
+	/// Name of the level, if already set
+	name: Option<String>,
+	/// Hint or comment on the level, if already set
+	hint: Option<String>,
 	/// Placements of vertices, if they have been placed yet
-	vertices: Vec<IntermediateVertexPosition>,
+	vertices: Vec<IntermediateVertexData>,
 	/// Placements of cycles, if they have been placed yet
-	cycles: Vec<Option<CyclePlacement>>,
+	cycles: Vec<IntermediateCycleData>,
+	/// Cycle links that have been explicitly added (no symmetry or transitivity)
+	declared_links: Vec<DeclaredLinkData>,
 }
 
-/// Error data for [`LevelLayoutError::CycleDoesNotContainVertex`]
+/// Error data for [`LevelBuilderError::CycleDoesNotContainVertex`]
 #[derive(Clone, Copy, Debug)]
 pub struct CycleDoesNotContainVertexError {
-	/// Index of the cycle whose being attempted placement failed
+	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
 	/// Placement that was requested for the cycle
 	requested_placement: CyclePlacement,
@@ -122,10 +35,10 @@ pub struct CycleDoesNotContainVertexError {
 	vertex_position: Vec2,
 }
 
-/// Error data for [`LevelLayoutError::CyclesDoNotIntersect`]
+/// Error data for [`LevelBuilderError::CyclesDoNotIntersect`]
 #[derive(Clone, Copy, Debug)]
 pub struct CyclesDoNotIntersectError {
-	/// Index of the cycle whose being attempted placement failed
+	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
 	/// Placement that was requested for the cycle
 	requested_placement: CyclePlacement,
@@ -139,10 +52,10 @@ pub struct CyclesDoNotIntersectError {
 	failing_vertex: usize,
 }
 
-/// Error data for [`LevelLayoutError::CyclesDoNotIntersectTwice`]
+/// Error data for [`LevelBuilderError::CyclesDoNotIntersectTwice`]
 #[derive(Clone, Copy, Debug)]
 pub struct CyclesDoNotIntersectTwiceError {
-	/// Index of the cycle whose being attempted placement failed
+	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
 	/// Placement that was requested for the cycle
 	requested_placement: CyclePlacement,
@@ -161,20 +74,59 @@ pub struct CyclesDoNotIntersectTwiceError {
 	failing_vertex: usize,
 }
 
+/// Error data for [`LevelBuilderError::TooManyVerticesInCycleIntersection`]
+#[derive(Clone, Copy, Debug)]
+pub struct TooManyVerticesInCycleIntersectionError {
+	/// Index of the cycle whose attempted placement failed
+	placed_cycle: usize,
+	/// Index of the already-placed cycle that shared
+	/// several vertices with the one being placed
+	existing_cycle: usize,
+	/// Indices of three of the vertices that are shared by the cycles
+	shared_vertices: [usize; 3],
+}
+
+/// Error data for [`LevelBuilderError::OverlappedLinkedCycles`]
+#[derive(Clone, Copy, Debug)]
+pub struct OverlappedLinkedCyclesError {
+	/// Index of the cycle where a (possibly transitive) link starts
+	source_cycle: usize,
+	/// Index of the cycle where a link ends
+	dest_cycle: usize,
+	/// Index of the vertex shared by the two cycles
+	shared_vertex: usize,
+}
+
 #[derive(Clone, Copy, Debug)]
 #[allow(dead_code)]
-pub enum LevelLayoutError {
+pub enum LevelBuilderError {
+	/// [`set_level_name`](LevelBuilder::set_level_name)
+	/// was called more than once
+	LevelNameAlreadySet,
+	/// [`set_level_hint`](LevelBuilder::set_level_hint)
+	/// was called more than once
+	LevelHintAlreadySet,
 	/// An out-of-range index was used to reference a cycle
 	CycleIndexOutOfRange(usize),
 	/// An out-of-range index was used to reference a vertex
 	VertexIndexOutOfRange(usize),
-	/// [`build`](LevelLayoutBuilder::build) was called
+	/// A vertex shows up multiple times in the same cycle
+	RepeatingVertexInCycle(usize),
+	/// [`add_object`](LevelBuilder::add_object) was called
+	/// more than once on the same vertex
+	VertexAlreadyHasObject(usize),
+	/// [`add_glyph`](LevelBuilder::add_glyph) was called
+	/// more than once on the same vertex
+	VertexAlreadyHasGlyph(usize),
+	/// A cycle has been explicitly assigned negative radius
+	CycleRadiusNotPositive(usize, f32),
+	/// [`build`](LevelBuilder::build) was called
 	/// while a cycle had not been placed yet
 	UnplacedCycle(usize),
-	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
+	/// [`place_cycle`](LevelBuilder::place_cycle) was called
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
-	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
+	/// [`place_cycle`](LevelBuilder::place_cycle) was called
 	/// on a cycle that contains a vertex that has already been definitively placed,
 	/// and it would not lie on the cycle as being placed
 	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
@@ -183,15 +135,45 @@ pub enum LevelLayoutError {
 	/// Cycles that share two vertices have been placed in a way that they
 	/// only intersect tangentially (only enough space for one shared vertex)
 	CyclesDoNotIntersectTwice(CyclesDoNotIntersectTwiceError),
-	/// [`place_vertex`](LevelLayoutBuilder::place_vertex) was called
+	/// Two cycles share more than two vertices
+	TooManyVerticesInCycleIntersection(TooManyVerticesInCycleIntersectionError),
+	/// [`place_vertex`](LevelBuilder::place_vertex) was called
 	/// on a vertex that already has a fixed placement
 	VertexAlreadyPlaced(usize),
-	/// [`place_vertex`](LevelLayoutBuilder::place_vertex) was called
+	/// [`place_vertex`](LevelBuilder::place_vertex) was called
 	/// on a vertex that already has not yet been partially placed
 	VertexNotPartiallyPlaced(usize),
-	/// [`add_placement`](LevelLayoutBuilder::add_placement) was called
+	/// [`place_cycle`](LevelBuilder::place_cycle) or
+	/// [`place_vertex`](LevelBuilder::place_vertex) was called
 	/// in a way that would place vertices around a cycle out of their rotation order
 	VertexOrderViolationOnCycle(usize),
+	/// Two cycles are linked, but they share a vertex
+	OverlappedLinkedCycles(OverlappedLinkedCyclesError),
+	/// There is a loop in cycle links, and their directions are contradicting
+	CycleLinkageConflict(usize, usize),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct IntermediateVertexData {
+	/// Position of the vertex, if it has been placed yet
+	pub position: IntermediateVertexPosition,
+	/// Object that lies on the vertex, if any
+	pub object: Option<ObjectData>,
+	/// Glyph that lies on the vertex, if any
+	pub glyph: Option<GlyphData>,
+}
+
+#[derive(Clone, Debug)]
+struct IntermediateCycleData {
+	/// Placement of the cycle, if it has been placed yet
+	pub placement: Option<CyclePlacement>,
+	/// Indices into [`LevelData::vertices`]
+	/// that identify the vertices that lie on the cycle, in clockwise order
+	pub vertex_indices: Vec<usize>,
+	/// When the cycle can be turned
+	pub turnability: CycleTurnability,
+	/// How other cycles turn together with this one
+	pub link_matrix: Vec<Option<LinkedCycleDirection>>,
 }
 
 /// Placement of a vertex while the layout is being built
@@ -246,12 +228,6 @@ impl<T> OneTwo<T> {
 			One(x) | Two(x, _) => x,
 		}
 	}
-
-	fn last(self) -> T {
-		match self {
-			One(x) | Two(_, x) => x,
-		}
-	}
 }
 
 impl<T> IntoIterator for OneTwo<T> {
@@ -265,25 +241,140 @@ impl<T> IntoIterator for OneTwo<T> {
 	}
 }
 
-impl<'w> LevelLayoutBuilder<'w> {
-	pub fn new(level: &'w ValidLevelData) -> Self {
+impl LevelBuilder {
+	pub const PLACEHOLDER_LEVEL_NAME: &'static str = "NAME_MISSING";
+
+	pub fn new() -> Self {
 		Self {
-			level,
-			vertices: vec![IntermediateVertexPosition::Free; level.vertices.len()],
-			cycles: vec![None; level.cycles.len()],
+			name: None,
+			hint: None,
+			vertices: Vec::new(),
+			cycles: Vec::new(),
+			declared_links: Vec::new(),
 		}
 	}
 
-	pub fn add_placement(&mut self, placement: DeclaredPlacement) -> Result<(), LevelLayoutError> {
-		match placement {
-			DeclaredPlacement::Cycle(p) => self.place_cycle(
-				p.cycle_index,
-				p.position,
-				p.radius,
-				&p.double_intersection_hints,
-			),
-			DeclaredPlacement::Vertex(p) => self.place_vertex(p.vertex_index, p.relative_angle),
+	pub fn set_level_name(&mut self, name: String) -> Result<(), LevelBuilderError> {
+		if self.name.is_some() {
+			return Err(LevelBuilderError::LevelNameAlreadySet);
 		}
+		self.name = Some(name);
+		Ok(())
+	}
+
+	pub fn set_level_hint(&mut self, hint: String) -> Result<(), LevelBuilderError> {
+		if self.hint.is_some() {
+			return Err(LevelBuilderError::LevelHintAlreadySet);
+		}
+		self.hint = Some(hint);
+		Ok(())
+	}
+
+	pub fn add_vertex(&mut self) -> Result<usize, LevelBuilderError> {
+		self.vertices.push(IntermediateVertexData {
+			position: IntermediateVertexPosition::Free,
+			object: None,
+			glyph: None,
+		});
+		Ok(self.vertices.len() - 1)
+	}
+
+	pub fn add_cycle(
+		&mut self,
+		turnability: CycleTurnability,
+		vertex_indices: impl IntoIterator<Item = usize>,
+	) -> Result<usize, LevelBuilderError> {
+		let vertex_indices = vertex_indices.into_iter().collect::<Vec<_>>();
+		if let Some(i) = vertex_indices.iter().duplicates().next() {
+			return Err(LevelBuilderError::RepeatingVertexInCycle(*i));
+		}
+		if let Some(i) = vertex_indices
+			.iter()
+			.copied()
+			.find(|&i| i >= self.vertices.len())
+		{
+			return Err(LevelBuilderError::VertexIndexOutOfRange(i));
+		}
+		// Add the cycle entry
+		self.cycles.push(IntermediateCycleData {
+			placement: None,
+			vertex_indices,
+			turnability,
+			link_matrix: vec![None; self.cycles.len()],
+		});
+		// Extend all existing link matrices, they must cross-reference the new cycle
+		for cycle in self.cycles.iter_mut() {
+			cycle.link_matrix.push(None);
+		}
+		// The link matrix has to be reflective by definition
+		// It is our responsibility to fill in that one new disgonal tile
+		let new_reflective = self
+			.cycles
+			.last_mut()
+			.expect("A cycle has just been inserted")
+			.link_matrix
+			.last_mut()
+			.expect("The link matrix has just been extended");
+		*new_reflective = Some(LinkedCycleDirection::Coincident);
+		Ok(self.cycles.len() - 1)
+	}
+
+	pub fn add_object(
+		&mut self,
+		vertex_index: usize,
+		object: ObjectData,
+	) -> Result<(), LevelBuilderError> {
+		if vertex_index >= self.vertices.len() {
+			return Err(LevelBuilderError::VertexIndexOutOfRange(vertex_index));
+		}
+		if self.vertices[vertex_index].object.is_some() {
+			return Err(LevelBuilderError::VertexAlreadyHasObject(vertex_index));
+		}
+		self.vertices[vertex_index].object = Some(object);
+		Ok(())
+	}
+
+	pub fn add_glyph(
+		&mut self,
+		vertex_index: usize,
+		glyph: GlyphData,
+	) -> Result<(), LevelBuilderError> {
+		if vertex_index >= self.vertices.len() {
+			return Err(LevelBuilderError::VertexIndexOutOfRange(vertex_index));
+		}
+		if self.vertices[vertex_index].glyph.is_some() {
+			return Err(LevelBuilderError::VertexAlreadyHasGlyph(vertex_index));
+		}
+		self.vertices[vertex_index].glyph = Some(glyph);
+		Ok(())
+	}
+
+	/// Links two cycles. The link is both symmetric and transitive.
+	/// ## Notes
+	/// This function only has basic safety guarantee.
+	/// If it fails, the two cycles may become partially linked.
+	/// The builder as a whole should remain in a valid state.
+	pub fn link_cycles(
+		&mut self,
+		source_cycle: usize,
+		dest_cycle: usize,
+		direction: LinkedCycleDirection,
+	) -> Result<(), LevelBuilderError> {
+		if source_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(source_cycle));
+		}
+		if dest_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(dest_cycle));
+		}
+		// Add the link symmetrically, in both directions
+		self.add_asymmetric_cycle_link(source_cycle, dest_cycle, direction)?;
+		self.add_asymmetric_cycle_link(dest_cycle, source_cycle, direction)?;
+		self.declared_links.push(DeclaredLinkData {
+			source_cycle,
+			dest_cycle,
+			direction,
+		});
+		Ok(())
 	}
 
 	pub fn place_cycle(
@@ -292,12 +383,18 @@ impl<'w> LevelLayoutBuilder<'w> {
 		center: Vec2,
 		radius: f32,
 		double_intersection_hints: &[usize],
-	) -> Result<(), LevelLayoutError> {
+	) -> Result<(), LevelBuilderError> {
 		if target_cycle >= self.cycles.len() {
-			return Err(LevelLayoutError::CycleIndexOutOfRange(target_cycle));
+			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
 		}
-		if self.cycles[target_cycle].is_some() {
-			return Err(LevelLayoutError::CycleAlreadyPlaced(target_cycle));
+		if self.cycles[target_cycle].placement.is_some() {
+			return Err(LevelBuilderError::CycleAlreadyPlaced(target_cycle));
+		}
+		if !(radius > 0.0) {
+			return Err(LevelBuilderError::CycleRadiusNotPositive(
+				target_cycle,
+				radius,
+			));
 		}
 		let placement = CyclePlacement {
 			position: center,
@@ -307,14 +404,14 @@ impl<'w> LevelLayoutBuilder<'w> {
 		let mut placements_after = Vec::new();
 		// This will be filled with vertices that are already partially placed
 		let mut new_fixed_points = std::collections::BTreeMap::new();
-		let vertex_indices = &self.level.cycles[target_cycle].vertex_indices;
+		let vertex_indices = &self.cycles[target_cycle].vertex_indices;
 		for (j, &i) in vertex_indices.iter().enumerate() {
-			match self.vertices[i] {
+			match self.vertices[i].position {
 				IntermediateVertexPosition::Fixed(pos) => {
 					// Fixed vertex cannot be moved, we can only proceed if
 					// it already lies on the cycle being placed
 					if !approx_eq(center.distance_squared(pos), radius.powi(2)) {
-						return Err(LevelLayoutError::CycleDoesNotContainVertex(
+						return Err(LevelBuilderError::CycleDoesNotContainVertex(
 							CycleDoesNotContainVertexError {
 								placed_cycle: target_cycle,
 								requested_placement: placement,
@@ -328,6 +425,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 				IntermediateVertexPosition::Partial(p) => {
 					// Partially placed vertex will be fixed at an intersection of the two cycles
 					let owner_placement = self.cycles[p.owner_cycle]
+						.placement
 						.expect("Owner cycle of a partially placed vertex should also be placed");
 					// Find one intersection of the two cycles, if it exists
 					let intersection = intersect_circles(
@@ -343,7 +441,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 								new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
 							// Fail if there is already a vertex there
 							if let Some(existing_vertices) = replaced {
-								return Err(LevelLayoutError::CyclesDoNotIntersectTwice(
+								return Err(LevelBuilderError::CyclesDoNotIntersectTwice(
 									CyclesDoNotIntersectTwiceError {
 										placed_cycle: target_cycle,
 										requested_placement: placement,
@@ -367,32 +465,43 @@ impl<'w> LevelLayoutBuilder<'w> {
 							// that the two shared vertices are split over the start/end of the
 							// vertex list as declared), `double_intersection_hints` can be used
 							// to express this intent
-							let new_pos = new_fixed_points.entry(p.owner_cycle)
-								.and_modify(|val| {
-									let new_pos = if double_intersection_hints.contains(&val.first().0) {
-										default_pos
-									}
-									else {
-										alt_pos
-									};
-									*val = val.add_to_one((i, new_pos))
-										.expect("More than two vertices in intersection of two cycles, should have been caught by sanitizer")
-								})
-								.or_insert_with(|| {
+							let new_pos = match new_fixed_points.entry(p.owner_cycle) {
+								std::collections::btree_map::Entry::Occupied(mut e) => {
+									let val = e.get_mut();
+									let new_pos =
+										if double_intersection_hints.contains(&val.first().0) {
+											default_pos
+										} else {
+											alt_pos
+										};
+									*val = val.add_to_one((i, new_pos)).map_err(
+										|((a, _), (b, _), (c, _))| {
+											LevelBuilderError::TooManyVerticesInCycleIntersection(
+												TooManyVerticesInCycleIntersectionError {
+													placed_cycle: target_cycle,
+													existing_cycle: p.owner_cycle,
+													shared_vertices: [a, b, c],
+												},
+											)
+										},
+									)?;
+									new_pos
+								}
+								std::collections::btree_map::Entry::Vacant(e) => {
 									let new_pos = if double_intersection_hints.contains(&i) {
 										alt_pos
-									}
-									else {
+									} else {
 										default_pos
 									};
-									One((i, new_pos))
-								})
-								.last().1;
+									e.insert(One((i, new_pos)));
+									new_pos
+								}
+							};
 							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
 						}
 						None => {
 							// Fail if the cycles do not intersect
-							return Err(LevelLayoutError::CyclesDoNotIntersect(
+							return Err(LevelBuilderError::CyclesDoNotIntersect(
 								CyclesDoNotIntersectError {
 									placed_cycle: target_cycle,
 									requested_placement: placement,
@@ -418,19 +527,19 @@ impl<'w> LevelLayoutBuilder<'w> {
 		// All fixed points on the cycle must be in cycle order
 		let fixed_points_after = placements_after.iter().filter_map(|p| p.get_fixed());
 		if !Self::are_points_in_cyclic_order(center, fixed_points_after) {
-			return Err(LevelLayoutError::VertexOrderViolationOnCycle(target_cycle));
+			return Err(LevelBuilderError::VertexOrderViolationOnCycle(target_cycle));
 		}
 		// Newly fixed points on other cycles must also work with those cycles
 		for (cycle_index, placement) in new_fixed_points {
 			if !self.verify_materialization_against_cycle(cycle_index, placement.into_iter()) {
-				return Err(LevelLayoutError::VertexOrderViolationOnCycle(cycle_index));
+				return Err(LevelBuilderError::VertexOrderViolationOnCycle(cycle_index));
 			}
 		}
 		// We are done verifying that the placement is valid, now we can commit to it
 		for (&i, new_pos) in vertex_indices.iter().zip_eq(placements_after) {
-			self.vertices[i] = new_pos;
+			self.vertices[i].position = new_pos;
 		}
-		self.cycles[target_cycle] = Some(placement);
+		self.cycles[target_cycle].placement = Some(placement);
 		Ok(())
 	}
 
@@ -443,19 +552,20 @@ impl<'w> LevelLayoutBuilder<'w> {
 		&mut self,
 		target_vertex: usize,
 		clock_angle: f32,
-	) -> Result<(), LevelLayoutError> {
+	) -> Result<(), LevelBuilderError> {
 		if target_vertex >= self.vertices.len() {
-			return Err(LevelLayoutError::VertexIndexOutOfRange(target_vertex));
+			return Err(LevelBuilderError::VertexIndexOutOfRange(target_vertex));
 		}
-		match self.vertices[target_vertex] {
+		match self.vertices[target_vertex].position {
 			IntermediateVertexPosition::Free => {
-				Err(LevelLayoutError::VertexNotPartiallyPlaced(target_vertex))
+				Err(LevelBuilderError::VertexNotPartiallyPlaced(target_vertex))
 			}
 			IntermediateVertexPosition::Fixed(_) => {
-				Err(LevelLayoutError::VertexAlreadyPlaced(target_vertex))
+				Err(LevelBuilderError::VertexAlreadyPlaced(target_vertex))
 			}
 			IntermediateVertexPosition::Partial(p) => {
 				let owner_placement = self.cycles[p.owner_cycle]
+					.placement
 					.expect("Owner cycle of a partially placed vertex should also be placed");
 				// Recalculate from clock angle to angle of the actual vertor space
 				let real_angle = PI / 2.0 - clock_angle;
@@ -465,37 +575,92 @@ impl<'w> LevelLayoutBuilder<'w> {
 					p.owner_cycle,
 					std::iter::once((target_vertex, new_pos)),
 				) {
-					return Err(LevelLayoutError::VertexOrderViolationOnCycle(p.owner_cycle));
+					return Err(LevelBuilderError::VertexOrderViolationOnCycle(
+						p.owner_cycle,
+					));
 				}
-				self.vertices[target_vertex] = IntermediateVertexPosition::Fixed(new_pos);
+				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(new_pos);
 				Ok(())
 			}
 		}
 	}
 
-	/// Checks that the level layout is complete and assembles it
-	pub fn build(mut self) -> Result<LevelLayout, LevelLayoutError> {
+	/// Checks that the level data is complete and assembles it
+	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
+		self.validate_before_build()?;
+		self.materialize_partial_vertex_placements();
+		self.fit_to_viewport(Aabb2d::new(LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH / 2.0));
 		let cycles = self
 			.cycles
-			.iter()
-			.enumerate()
-			.map(|(i, placement)| placement.ok_or(LevelLayoutError::UnplacedCycle(i)))
-			.collect::<Result<_, _>>()?;
-		self.materialize_partial_vertex_placements();
+			.into_iter()
+			.map(Self::build_cycle_data)
+			.collect();
 		let vertices = self
 			.vertices
 			.into_iter()
-			.map(|placement| match placement {
-				IntermediateVertexPosition::Fixed(pos) => pos,
-				// This is technically possible, since a vertex can belong to no cycle
-				IntermediateVertexPosition::Free => Vec2::ZERO,
-				// Prevented by [`materialize_all_partial_vertex_placements`]
-				IntermediateVertexPosition::Partial(_) => {
-					panic!("Partially placed vertex in build phase, should have been materialized")
-				}
-			})
+			.map(Self::build_vertex_data)
 			.collect();
-		Ok(LevelLayout { vertices, cycles })
+		Ok(LevelData {
+			name: self
+				.name
+				.unwrap_or_else(|| Self::PLACEHOLDER_LEVEL_NAME.to_owned()),
+			hint: self.hint,
+			vertices,
+			cycles,
+			declared_links: self.declared_links,
+		})
+	}
+
+	/// Asserts that a vertex data object is complete and assembles it
+	/// ## Panics
+	/// Panics if the vertex is partially placed
+	fn build_vertex_data(intermediate: IntermediateVertexData) -> VertexData {
+		let position = match intermediate.position {
+			IntermediateVertexPosition::Fixed(pos) => pos,
+			// This is technically possible, since a vertex can belong to no cycle
+			IntermediateVertexPosition::Free => Vec2::ZERO,
+			// Prevented by [`materialize_all_partial_vertex_placements`]
+			IntermediateVertexPosition::Partial(_) => {
+				panic!("Partially placed vertex in build phase, should have been materialized")
+			}
+		};
+		VertexData {
+			position,
+			object: intermediate.object,
+			glyph: intermediate.glyph,
+		}
+	}
+
+	/// Asserts that a cycle data object is complete and assembles it
+	/// ## Panics
+	/// Panics if the cycle has not been placed
+	fn build_cycle_data(intermediate: IntermediateCycleData) -> CycleData {
+		let placement = intermediate
+			.placement
+			.expect("Unplaced cycle in build phase, should have been detected earlier");
+		let link_closure = intermediate
+			.link_matrix
+			.into_iter()
+			.enumerate()
+			.filter_map(|(i, dir)| dir.map(|dir| (i, dir)))
+			.collect();
+		CycleData {
+			placement,
+			vertex_indices: intermediate.vertex_indices,
+			turnability: intermediate.turnability,
+			link_closure,
+		}
+	}
+
+	/// Verifies that the level data is complete and ready to be built without an error
+	fn validate_before_build(&self) -> Result<(), LevelBuilderError> {
+		// All cycles must be placed
+		for (i, cycle) in self.cycles.iter().enumerate() {
+			if cycle.placement.is_none() {
+				return Err(LevelBuilderError::UnplacedCycle(i));
+			}
+		}
+		Ok(())
 	}
 
 	/// Iterates through all cycles and materializes all vertices
@@ -509,9 +674,12 @@ impl<'w> LevelLayoutBuilder<'w> {
 			.cycles
 			.iter()
 			.enumerate()
-			.zip_eq(&self.level.cycles)
-			.filter_map(|((i, placement), data)| {
-				placement.as_ref().map(|placement| (i, placement, data))
+			.zip_eq(&self.cycles)
+			.filter_map(|((i, cycle), data)| {
+				cycle
+					.placement
+					.as_ref()
+					.map(|placement| (i, placement, data))
 			});
 		for (cycle_index, cycle_placement, cycle_data) in cycles {
 			// Vertices that already have fixed placement split the cycle
@@ -520,7 +688,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 				.vertex_indices
 				.iter()
 				.enumerate()
-				.filter_map(|(i, &j)| self.vertices[j].get_fixed().map(|pos| (i, pos)))
+				.filter_map(|(i, &j)| self.vertices[j].position.get_fixed().map(|pos| (i, pos)))
 				// Collect and cast back into iterator so we can modify [`self.vertices`]
 				.collect::<Vec<_>>()
 				.into_iter();
@@ -544,7 +712,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 								-segment_angle * (j + 1) as f32 / vertex_count as f32,
 							));
 						Self::checked_materialize(
-							&mut self.vertices[target_vertex],
+							&mut self.vertices[target_vertex].position,
 							new_pos,
 							cycle_index,
 							i,
@@ -577,7 +745,7 @@ impl<'w> LevelLayoutBuilder<'w> {
 							-segment_angle * (j + 1) as f32 / vertex_count as f32,
 						));
 					Self::checked_materialize(
-						&mut self.vertices[target_vertex],
+						&mut self.vertices[target_vertex].position,
 						new_pos,
 						cycle_index,
 						i,
@@ -592,7 +760,12 @@ impl<'w> LevelLayoutBuilder<'w> {
 							* Vec2::from_angle(
 								PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32,
 							);
-					Self::checked_materialize(&mut self.vertices[j], new_pos, cycle_index, i);
+					Self::checked_materialize(
+						&mut self.vertices[j].position,
+						new_pos,
+						cycle_index,
+						i,
+					);
 				}
 			}
 		}
@@ -634,16 +807,17 @@ impl<'w> LevelLayoutBuilder<'w> {
 		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
 	) -> bool {
 		let cycle_center = self.cycles[cycle_index]
+			.placement
 			.expect("Partial materialization checks can only be run on placed cycles")
 			.position;
-		let fixed_points = self.level.cycles[cycle_index]
+		let fixed_points = self.cycles[cycle_index]
 			.vertex_indices
 			.iter()
 			.filter_map(|&i| {
 				points_to_materialize
 					.clone()
 					.find_map(|(j, p)| if i == j { Some(p) } else { None })
-					.or_else(|| self.vertices[i].get_fixed())
+					.or_else(|| self.vertices[i].position.get_fixed())
 			});
 		Self::are_points_in_cyclic_order(cycle_center, fixed_points)
 	}
@@ -669,25 +843,132 @@ impl<'w> LevelLayoutBuilder<'w> {
 			true
 		}
 	}
-}
 
-impl std::fmt::Display for CyclePlacement {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"[x={} y={} r={}]",
-			self.position.x, self.position.y, self.radius
-		)
+	/// Links two cycles asymmetrically (the link only goes from source to destination)
+	/// The link is transitive.
+	fn add_asymmetric_cycle_link(
+		&mut self,
+		source_cycle: usize,
+		dest_cycle: usize,
+		direction: LinkedCycleDirection,
+	) -> Result<(), LevelBuilderError> {
+		for i in 0..self.cycles.len() {
+			// If a cycle is linked to the source, it is now by transitivity also linked to destination
+			if let Some(old_link_direction) = self.cycles[i].link_matrix[source_cycle] {
+				self.add_nontransitive_cycle_link(i, dest_cycle, old_link_direction * direction)?;
+			}
+			// If destination is linked to a cycle, source is now by transitivity also linked to that cycle
+			if let Some(old_link_direction) = self.cycles[dest_cycle].link_matrix[i] {
+				self.add_nontransitive_cycle_link(source_cycle, i, old_link_direction * direction)?;
+			}
+		}
+		Ok(())
+	}
+
+	/// Links two cycles atomically. Only these two cycles will be linked,
+	/// it is not symmetric or transitive.
+	fn add_nontransitive_cycle_link(
+		&mut self,
+		source_cycle: usize,
+		dest_cycle: usize,
+		direction: LinkedCycleDirection,
+	) -> Result<(), LevelBuilderError> {
+		if let Some(existing_link_direction) = self.cycles[source_cycle].link_matrix[dest_cycle] {
+			// The cycles are already linked
+			// We must verify that they have the same direction
+			if existing_link_direction != direction {
+				return Err(LevelBuilderError::CycleLinkageConflict(
+					source_cycle,
+					dest_cycle,
+				));
+			}
+		} else {
+			// The cycles are not yet linked
+			// We must verify that they do not have a vertex in common
+			let maybe_shared_vertex = self.cycles[source_cycle]
+				.vertex_indices
+				.iter()
+				.chain(self.cycles[dest_cycle].vertex_indices.iter())
+				.duplicates()
+				.copied()
+				.next();
+			if let Some(shared_vertex) = maybe_shared_vertex {
+				return Err(LevelBuilderError::OverlappedLinkedCycles(
+					OverlappedLinkedCyclesError {
+						source_cycle,
+						dest_cycle,
+						shared_vertex,
+					},
+				));
+			}
+			// Now link them together
+			self.cycles[source_cycle].link_matrix[dest_cycle] = Some(direction);
+		}
+		Ok(())
+	}
+
+	/// Calculates the bounding box of all currently placed cycles
+	fn get_bounding_box(&self) -> Aabb2d {
+		let min = self
+			.cycles
+			.iter()
+			.filter_map(|cycle| cycle.placement.map(|p| p.position - Vec2::splat(p.radius)))
+			.fold(Vec2::INFINITY, Vec2::min);
+		let max = self
+			.cycles
+			.iter()
+			.filter_map(|cycle| cycle.placement.map(|p| p.position + Vec2::splat(p.radius)))
+			.fold(Vec2::NEG_INFINITY, Vec2::max);
+		let center = (max + min) / 2.0;
+		let mut half = (max - min) / 2.0;
+		// Prevent zero-size bounding boxes
+		if half.x <= 0.0 {
+			half.x = 1.0;
+			log::warn!("Level bounding box has zero width.");
+		}
+		if half.y <= 0.0 {
+			half.y = 1.0;
+			log::warn!("Level bounding box has zero height.");
+		}
+		Aabb2d::new(center, half)
+	}
+
+	/// Resizes all currently placed objects to fit a bounding box
+	fn fit_to_viewport(&mut self, viewport: Aabb2d) {
+		let bounds = self.get_bounding_box();
+		let scale = viewport.half_size() / bounds.half_size();
+		// Scaling must be equal in both directions
+		let scale = scale.x.min(scale.y);
+		let viewport_center = viewport.center();
+		let bounds_center = bounds.center();
+
+		for vertex in &mut self.vertices {
+			if let IntermediateVertexPosition::Fixed(p) = &mut vertex.position {
+				*p = (*p - bounds_center) * scale + viewport_center;
+			}
+		}
+		for cycle in &mut self.cycles {
+			if let Some(p) = &mut cycle.placement {
+				p.position = (p.position - bounds_center) * scale + viewport_center;
+				p.radius *= scale;
+			}
+		}
 	}
 }
 
-impl std::error::Error for LevelLayoutError {}
+impl std::error::Error for LevelBuilderError {}
 
-impl std::fmt::Display for LevelLayoutError {
+impl std::fmt::Display for LevelBuilderError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::VertexIndexOutOfRange(i) => write!(f, "Cannot place vertex {i} because there are not that many vertices."),
-			Self::CycleIndexOutOfRange(i) => write!(f, "Cannot place cycle {i} because there are not that many cycles."),
+			Self::LevelNameAlreadySet => write!(f, "Level name has been set multiple times."),
+			Self::LevelHintAlreadySet => write!(f, "Level hint has been set multiple times."),
+			Self::VertexIndexOutOfRange(i) => write!(f, "Vertex {i} has been referenced, but there are not that many vertices."),
+			Self::CycleIndexOutOfRange(i) => write!(f, "Cycle {i} has been referenced, but there are not that many cycles."),
+			Self::RepeatingVertexInCycle(i) => write!(f, "Cannot create cycle that contains vertex {i} multiple times."),
+			Self::VertexAlreadyHasObject(i) => write!(f, "Cannot place object at vertex {i} because an object is already there."),
+			Self::VertexAlreadyHasGlyph(i) => write!(f, "Cannot place glyph at vertex {i} because a glyph is already there."),
+			Self::CycleRadiusNotPositive(i, r) => write!(f, "Radius of cycle {i} is not positive ({r})"),
 			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
 			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
 			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
@@ -720,7 +1001,18 @@ impl std::fmt::Display for LevelLayoutError {
 				e.existing_placement,
 				e.vertex_position
 			),
-			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order.")
+			Self::TooManyVerticesInCycleIntersection(e) => write!(
+				f,
+				"Cycles {} and {} cannot be placed because they sharemore than two vertices: {}, {}, {}.",
+				e.placed_cycle,
+				e.existing_cycle,
+				e.shared_vertices[0],
+				e.shared_vertices[1],
+				e.shared_vertices[2],
+			),
+			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order."),
+			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
+			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
 		}
 	}
 }
