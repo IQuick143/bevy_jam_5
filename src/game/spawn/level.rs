@@ -76,11 +76,9 @@ fn spawn_level(
 			.iter()
 			.map(|&(j, dir)| (cycle_ids[j], dir))
 			.collect::<Vec<_>>();
-		if !linked_cycles.is_empty() {
-			commands
-				.entity(cycle_id)
-				.insert(LinkedCycles(linked_cycles));
-		}
+		commands
+			.entity(cycle_id)
+			.insert(LinkedCycles(linked_cycles));
 	}
 
 	for link in &level.declared_links {
