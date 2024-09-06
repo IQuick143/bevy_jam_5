@@ -14,13 +14,20 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 				match statement.key.to_ascii_lowercase().as_str() {
 					"name" => builder.set_level_name(statement.value.to_owned())?,
 					"hint" => builder.set_level_hint(statement.value.to_owned())?,
-					other => return Err(LevelParsingError::InvalidMetaVariable(other.to_owned())),
+					_ => {
+						return Err(LevelParsingError::InvalidMetaVariable(
+							statement.key.to_owned(),
+						))
+					}
 				}
 			}
 			RawStatement::Action(statement) => {
 				match statement.verb {
 					"VERTEX" => {
 						for name in statement.values {
+							if vertex_names.contains_key(name) {
+								continue;
+							}
 							let vertex = builder.add_vertex()?;
 							vertex_names.insert(name.to_owned(), vertex);
 						}
@@ -39,6 +46,9 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 						let name = values
 							.next()
 							.ok_or(LevelParsingError::NotEnoughArguments(1, 0))?;
+						if cycle_names.contains_key(name) {
+							return Err(LevelParsingError::RedefinedCycle(name.to_owned()));
+						}
 						let vertices = values
 							.map(|name| {
 								vertex_names.get(name).copied().ok_or_else(|| {
@@ -63,13 +73,10 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 							.into_iter()
 							.map(|name| {
 								cycle_names.get(name).copied().ok_or_else(|| {
-									LevelParsingError::UnknownVertexName(name.to_owned())
+									LevelParsingError::UnknownCycleName(name.to_owned())
 								})
 							})
 							.collect::<Result<Vec<_>, _>>()?;
-						if cycles.len() < 2 {
-							return Err(LevelParsingError::NotEnoughArguments(2, cycles.len()));
-						}
 						for (source, dest) in cycles.into_iter().tuple_windows() {
 							builder.link_cycles(source, dest, direction)?;
 						}
@@ -169,7 +176,7 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 						let vertex_name = statement.values[0];
 						let angle_str = statement.values[1].replace(',', ".");
 						let Some(vertex_id) = vertex_names.get(vertex_name).copied() else {
-							return Err(LevelParsingError::UnknownCycleName(
+							return Err(LevelParsingError::UnknownVertexName(
 								vertex_name.to_string(),
 							));
 						};
@@ -185,50 +192,6 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 	}
 
 	Ok(builder.build()?)
-}
-
-#[test]
-fn basic_test() {
-	let data = r"
-NAME=?!#_AAA 648
-HINT=This should parse correctly!
-
-# Here we declare all the vertex names
-# Just list them after the VERTEX, separating by space
-VERTEX a b c x 1 2 3 k l m
-
-# Here we declare cycles
-# First one declares a cycle, with a modifier specifying whether it needs a player
-# Leaving the modifier out defaults to an automatic playerless cycle
-# Next comes an identifier for the cycle itself and then a list of vertices which lie on the circle
-# in a clockwise order.
-CYCLE[MANUAL] cycle_a a b c x
-CYCLE[ENGINE] cycle_b x 1 2 3
-
-# To place objects we use OBJECT directives, specifying the desired object in the modifier
-# Then we list the vertices upon which the objects should get placed
-OBJECT[BOX] x a
-OBJECT[FLAG] 2
-OBJECT[PLAYER] b
-OBJECT[BUTTON] b
-
-# Oops, we forgot a cycle, let's add one
-# This defaults to an automatic cycle
-CYCLE cycle_extra k l m
-
-# Cycles can be linked together
-LINK cycle_a cycle_extra
-
-# We have to position the cycles with x y radius data
-PLACE cycle_a -100 0.0 100
-PLACE cycle_b +100 0,0 100
-
-PLACE cycle_extra -100 100 50
-";
-	let parsed = parse(data);
-	println!("{:?}", parsed);
-	assert!(parsed.is_ok());
-	println!("{:?}", parsed.unwrap());
 }
 
 #[derive(Debug, PartialEq)]
@@ -293,5 +256,304 @@ impl std::fmt::Display for LevelParsingError {
 			)?,
 		}
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use super::{
+		parse, LevelBuilderError, LevelParsingError, LexError, OverlappedLinkedCyclesError,
+	};
+
+	macro_rules! assert_err_eq {
+		($left:expr, $right:expr) => {
+			let left = $left;
+			let right = $right;
+			let err = left.expect_err("Negative test sample parrsed without error!");
+			assert_eq!(err, right);
+		};
+	}
+
+	#[test]
+	fn basic_test() {
+		let data = r"
+NAME=?!#_AAA 648
+HINT=This should parse correctly!
+
+# Here we declare all the vertex names
+# Just list them after the VERTEX, separating by space
+VERTEX a b c x 1 2 3 k l m
+
+# Here we declare cycles
+# First one declares a cycle, with a modifier specifying whether it needs a player
+# Leaving the modifier out defaults to an automatic playerless cycle
+# Next comes an identifier for the cycle itself and then a list of vertices which lie on the circle
+# in a clockwise order.
+CYCLE[MANUAL] cycle_a a b c x
+CYCLE[ENGINE] cycle_b x 1 2 3
+
+# To place objects we use OBJECT directives, specifying the desired object in the modifier
+# Then we list the vertices upon which the objects should get placed
+OBJECT[BOX] x a
+OBJECT[FLAG] 2
+OBJECT[PLAYER] b
+OBJECT[BUTTON] b
+
+# Oops, we forgot a cycle, let's add one
+# This defaults to an automatic cycle
+CYCLE cycle_extra k l m
+
+# Cycles can be linked together
+LINK cycle_a cycle_extra
+
+# We have to position the cycles with x y radius data
+PLACE cycle_a -100 0.0 100
+PLACE cycle_b +100 0,0 100
+
+PLACE cycle_extra -100 100 50
+";
+		let level = parse(data).expect("Test sample did not parse correctly!");
+		assert_eq!(level.name, "?!#_AAA 648");
+	}
+
+	#[test]
+	fn undeclared_identifiers_test() {
+		let data = r"
+# Undeclared vertex in cycle definition. This should not parse.
+CYCLE a b c
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::UnknownVertexName("b".to_owned())
+		);
+
+		let data = r"
+# Undeclared vertex in object definition. This should not parse.
+OBJECT[BOX] a b c
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::UnknownVertexName("a".to_owned())
+		);
+
+		let data = r"
+# Undeclared vertex in place command. This should not parse.
+PLACE_VERT a 1
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::UnknownVertexName("a".to_owned())
+		);
+
+		let data = r"
+# Undeclared vertex in cycle placement hint. This should not parse.
+VERTEX a b c
+CYCLE k a b c
+PLACE k 0 0 100 b d
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::UnknownVertexName("d".to_owned())
+		);
+
+		let data = r"
+# Undeclared cycle in link definition. This should not parse.
+LINK a b c
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::UnknownCycleName("a".to_owned())
+		);
+
+		let data = r"
+# Undeclared cycle in place command. This should not parse.
+PLACE a 0 0 100
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::UnknownCycleName("a".to_owned())
+		);
+	}
+
+	#[test]
+	fn garbage_test() {
+		let data = "InvalidKeyword";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::InvalidKeyword("InvalidKeyword".to_owned())
+		);
+
+		let data = "OBJECT[InvalidModifier]";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::InvalidModifier("InvalidModifier".to_owned())
+		);
+
+		let data = "InvalidMetaVariable=";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::InvalidMetaVariable("InvalidMetaVariable".to_owned())
+		);
+
+		let data = "\u{202e}";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::LexError(LexError::NonAsciiLine(0))
+		);
+
+		let data = "@";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::LexError(LexError::MalformedStatement(0))
+		);
+	}
+
+	#[test]
+	fn redefined_identifiers_test() {
+		let data = r"
+VERTEX a b c
+CYCLE k a b c
+# Define the cycle again. This should not parse.
+CYCLE k a b
+";
+		assert_err_eq!(
+			parse(data),
+			LevelParsingError::RedefinedCycle("k".to_owned())
+		);
+
+		let data = r"
+# Use the same vertex name multiple times.
+# This is fine, but it should not create a new vertex.
+VERTEX a a b a c
+VERTEX a
+";
+		let level = parse(data).expect("Test sample did not parse correctly!");
+		assert_eq!(level.vertices.len(), 3);
+	}
+
+	#[test]
+	fn bad_command_syntax_test() {
+		let test_cases = r"
+# Cycle is missing a name
+CYCLE
+
+# Place command is missing a vertex
+PLACE_VERT
+
+# Place command is missing a value
+VERTEX a
+CYCLE k a
+PLACE k 0 0 100
+PLACE_VERT a
+
+# Place command is missing a cycle
+PLACE
+
+# Place command is missing a value
+VERTEX a
+CYCLE k a
+PLACE k 0 0
+
+# Object without explicit type is not valid
+VERTEX a
+OBJECT a
+
+# Placement is not a number
+VERTEX a
+CYCLE k a
+PLACE k 0 0 100
+PLACE_VERT a b
+
+# Placement is not a number
+VERTEX a
+CYCLE k a
+PLACE k a b c
+";
+		let expected_results = [
+			LevelParsingError::NotEnoughArguments(1, 0),
+			LevelParsingError::NotEnoughArguments(2, 0),
+			LevelParsingError::NotEnoughArguments(2, 1),
+			LevelParsingError::NotEnoughArguments(4, 0),
+			LevelParsingError::NotEnoughArguments(4, 3),
+			LevelParsingError::MissingModifier,
+			LevelParsingError::ArgumentIsNotANumber("b".to_owned()),
+			LevelParsingError::ArgumentIsNotANumber("a".to_owned()),
+		];
+
+		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
+			assert_err_eq!(parse(data), expected);
+		}
+	}
+
+	#[test]
+	fn test_structural_validation() {
+		let test_cases = r"
+# Linking a cycle to itself is already weird, but legal.
+# The link, however, cannot be inverted.
+VERTEX a b
+CYCLE 1 a b
+LINK[CROSSED] 1 1
+
+# Intersecting cycles cannot be linked.
+VERTEX a b c
+CYCLE 1 a b
+CYCLE 2 a c
+LINK 1 2
+
+# Two (declared) links between the same two cycles may exist as well,
+# but they cannot be conflicting like this.
+VERTEX a b c d
+CYCLE 1 a b
+CYCLE 2 c d
+LINK 1 2
+LINK[CROSSED] 2 1
+
+# Three cycles linked in a triangle.
+# Again, this is legal, but the links must be compatible.
+VERTEX a b c d e f
+CYCLE 1 a b
+CYCLE 2 c d
+CYCLE 3 e f
+LINK 1 2 3
+LINK[CROSSED] 1 3
+
+# Same with four cycles
+VERTEX a b c d e f g h
+CYCLE 1 a b
+CYCLE 2 c d
+CYCLE 3 e f
+CYCLE 4 g h
+LINK 1 2 3 4
+LINK[CROSSED] 1 4
+
+# Cycles 1 and 3 share a vertex.
+# They are not linked directly, but the links connect them transitively.
+VERTEX a b c d e
+CYCLE 1 a b
+CYCLE 2 c d
+CYCLE 3 e a
+LINK 1 2 3
+";
+
+		let expected_results = [
+			LevelBuilderError::CycleLinkageConflict(0, 0),
+			LevelBuilderError::OverlappedLinkedCycles(OverlappedLinkedCyclesError {
+				source_cycle: 0,
+				dest_cycle: 1,
+				shared_vertex: 0,
+			}),
+			LevelBuilderError::CycleLinkageConflict(0, 0),
+			LevelBuilderError::CycleLinkageConflict(0, 2),
+			LevelBuilderError::CycleLinkageConflict(0, 3),
+			LevelBuilderError::OverlappedLinkedCycles(OverlappedLinkedCyclesError {
+				source_cycle: 0,
+				dest_cycle: 2,
+				shared_vertex: 0,
+			}),
+		];
+
+		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
+			assert_err_eq!(parse(data), expected.into());
+		}
 	}
 }
