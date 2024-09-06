@@ -25,76 +25,76 @@ pub struct LevelBuilder {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CycleDoesNotContainVertexError {
 	/// Index of the cycle whose attempted placement failed
-	placed_cycle: usize,
+	pub placed_cycle: usize,
 	/// Placement that was requested for the cycle
-	requested_placement: CyclePlacement,
+	pub requested_placement: CyclePlacement,
 	/// Index of the vertex with fixed position
 	/// that would not lie on the cycle as placed
-	failing_vertex: usize,
+	pub failing_vertex: usize,
 	/// Position of the failing vertex
-	vertex_position: Vec2,
+	pub vertex_position: Vec2,
 }
 
 /// Error data for [`LevelBuilderError::CyclesDoNotIntersect`]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CyclesDoNotIntersectError {
 	/// Index of the cycle whose attempted placement failed
-	placed_cycle: usize,
+	pub placed_cycle: usize,
 	/// Placement that was requested for the cycle
-	requested_placement: CyclePlacement,
+	pub requested_placement: CyclePlacement,
 	/// Index of the already-placed cycle that shared a vertex
 	/// with the one being placed
-	existing_cycle: usize,
+	pub existing_cycle: usize,
 	/// Placement of the already-placed cycle
-	existing_placement: CyclePlacement,
+	pub existing_placement: CyclePlacement,
 	/// Index of the vertex that the cycles share
 	/// that could not be placed because the cycles do not intersect
-	failing_vertex: usize,
+	pub failing_vertex: usize,
 }
 
 /// Error data for [`LevelBuilderError::CyclesDoNotIntersectTwice`]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CyclesDoNotIntersectTwiceError {
 	/// Index of the cycle whose attempted placement failed
-	placed_cycle: usize,
+	pub placed_cycle: usize,
 	/// Placement that was requested for the cycle
-	requested_placement: CyclePlacement,
+	pub requested_placement: CyclePlacement,
 	/// Index of the already-placed cycle that shared
 	/// two vertices with the one being placed
-	existing_cycle: usize,
+	pub existing_cycle: usize,
 	/// Placement of the already-placed cycle
-	existing_placement: CyclePlacement,
+	pub existing_placement: CyclePlacement,
 	/// Index of the vertex that has already been placed at the only
 	/// intersection between the cycles
-	existing_vertex: usize,
+	pub existing_vertex: usize,
 	/// Position of the intersection (and the already-placed vertex)
-	vertex_position: Vec2,
+	pub vertex_position: Vec2,
 	/// Index of the vertex that the cycles share
 	/// that could not be placed because the cycles only intersect once
-	failing_vertex: usize,
+	pub failing_vertex: usize,
 }
 
 /// Error data for [`LevelBuilderError::TooManyVerticesInCycleIntersection`]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TooManyVerticesInCycleIntersectionError {
 	/// Index of the cycle whose attempted placement failed
-	placed_cycle: usize,
+	pub placed_cycle: usize,
 	/// Index of the already-placed cycle that shared
 	/// several vertices with the one being placed
-	existing_cycle: usize,
+	pub existing_cycle: usize,
 	/// Indices of three of the vertices that are shared by the cycles
-	shared_vertices: [usize; 3],
+	pub shared_vertices: [usize; 3],
 }
 
 /// Error data for [`LevelBuilderError::OverlappedLinkedCycles`]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct OverlappedLinkedCyclesError {
 	/// Index of the cycle where a (possibly transitive) link starts
-	source_cycle: usize,
+	pub source_cycle: usize,
 	/// Index of the cycle where a link ends
-	dest_cycle: usize,
+	pub dest_cycle: usize,
 	/// Index of the vertex shared by the two cycles
-	shared_vertex: usize,
+	pub shared_vertex: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
