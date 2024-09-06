@@ -195,7 +195,7 @@ impl FromWorld for LoadedLevelList {
 			levels: level_list
 				.slugs
 				.iter()
-				.map(|slug| asset_server.load(&format!("levels/{slug}.txt")))
+				.map(|slug| asset_server.load(format!("levels/{slug}.txt")))
 				.collect(),
 		}
 	}

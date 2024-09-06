@@ -389,7 +389,7 @@ impl LevelBuilder {
 		if self.cycles[target_cycle].placement.is_some() {
 			return Err(LevelBuilderError::CycleAlreadyPlaced(target_cycle));
 		}
-		if !(radius > 0.0) {
+		if radius.is_nan() || radius <= 0.0 {
 			return Err(LevelBuilderError::CycleRadiusNotPositive(
 				target_cycle,
 				radius,
