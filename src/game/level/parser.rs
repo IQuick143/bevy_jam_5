@@ -8,7 +8,7 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 	let mut cycle_names = HashMap::new();
 
 	for line in lex::parse(level_file) {
-		let (line_id, statement) = line?;
+		let (_, statement) = line?;
 		match statement {
 			RawStatement::Assignment(statement) => {
 				match statement.key.to_ascii_lowercase().as_str() {
@@ -76,7 +76,7 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 					}
 					"OBJECT" => {
 						let Some(modifier) = statement.modifier else {
-							return Err(LevelParsingError::MalformedStatement(line_id));
+							return Err(LevelParsingError::MissingModifier);
 						};
 						let (object_kind, color) =
 							modifier.split_once(':').unwrap_or((modifier, ""));
@@ -140,13 +140,13 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 							));
 						};
 						let Ok(x) = x_str.parse::<f32>() else {
-							return Err(LevelParsingError::MalformedStatement(line_id));
+							return Err(LevelParsingError::ArgumentIsNotANumber(x_str));
 						};
 						let Ok(y) = y_str.parse::<f32>() else {
-							return Err(LevelParsingError::MalformedStatement(line_id));
+							return Err(LevelParsingError::ArgumentIsNotANumber(y_str));
 						};
 						let Ok(r) = r_str.parse::<f32>() else {
-							return Err(LevelParsingError::MalformedStatement(line_id));
+							return Err(LevelParsingError::ArgumentIsNotANumber(r_str));
 						};
 						let hints = statement.values[4..]
 							.iter()
@@ -174,7 +174,7 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 							));
 						};
 						let Ok(angle) = angle_str.parse::<f32>() else {
-							return Err(LevelParsingError::MalformedStatement(line_id));
+							return Err(LevelParsingError::ArgumentIsNotANumber(angle_str));
 						};
 						builder.place_vertex(vertex_id, angle)?;
 					}
@@ -231,7 +231,6 @@ PLACE cycle_extra -100 100 50
 	println!("{:?}", parsed.unwrap());
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub enum LevelParsingError {
 	InvalidKeyword(String),
@@ -239,10 +238,9 @@ pub enum LevelParsingError {
 	UnknownVertexName(String),
 	UnknownCycleName(String),
 	RedefinedCycle(String),
-	ObjectCollision(String),
 	LexError(LexError),
-	MalformedStatement(usize),
-	MissingCycleLayout,
+	MissingModifier,
+	ArgumentIsNotANumber(String),
 	InvalidMetaVariable(String),
 	BuilderError(LevelBuilderError),
 	NotEnoughArguments(usize, usize),
@@ -280,17 +278,10 @@ impl std::fmt::Display for LevelParsingError {
 			LevelParsingError::RedefinedCycle(name) => {
 				write!(f, "A cycle with name {} was defined multiple times.", name)?
 			}
-			LevelParsingError::ObjectCollision(vertex) => write!(
-				f,
-				"Too many objects were placed onto vertex with name {}",
-				vertex
-			)?,
 			LevelParsingError::LexError(e) => e.fmt(f)?,
-			LevelParsingError::MalformedStatement(line_id) => {
-				write!(f, "Line {} contains a malformed statement.", line_id + 1)?
-			}
-			LevelParsingError::MissingCycleLayout => {
-				write!(f, "Some cycles don't have a position specified")?
+			LevelParsingError::MissingModifier => write!(f, "Statement is missing a modifier.")?,
+			LevelParsingError::ArgumentIsNotANumber(arg) => {
+				write!(f, "Expected a numeric argument, got {arg}.")?
 			}
 			LevelParsingError::InvalidMetaVariable(name) => {
 				write!(f, "{name} is not a valid meta variable name")?
