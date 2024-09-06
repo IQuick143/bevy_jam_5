@@ -22,7 +22,7 @@ pub struct LevelBuilder {
 }
 
 /// Error data for [`LevelBuilderError::CycleDoesNotContainVertex`]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CycleDoesNotContainVertexError {
 	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
@@ -36,7 +36,7 @@ pub struct CycleDoesNotContainVertexError {
 }
 
 /// Error data for [`LevelBuilderError::CyclesDoNotIntersect`]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CyclesDoNotIntersectError {
 	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
@@ -53,7 +53,7 @@ pub struct CyclesDoNotIntersectError {
 }
 
 /// Error data for [`LevelBuilderError::CyclesDoNotIntersectTwice`]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CyclesDoNotIntersectTwiceError {
 	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
@@ -75,7 +75,7 @@ pub struct CyclesDoNotIntersectTwiceError {
 }
 
 /// Error data for [`LevelBuilderError::TooManyVerticesInCycleIntersection`]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct TooManyVerticesInCycleIntersectionError {
 	/// Index of the cycle whose attempted placement failed
 	placed_cycle: usize,
@@ -87,7 +87,7 @@ pub struct TooManyVerticesInCycleIntersectionError {
 }
 
 /// Error data for [`LevelBuilderError::OverlappedLinkedCycles`]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct OverlappedLinkedCyclesError {
 	/// Index of the cycle where a (possibly transitive) link starts
 	source_cycle: usize,
@@ -97,8 +97,7 @@ pub struct OverlappedLinkedCyclesError {
 	shared_vertex: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
-#[allow(dead_code)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LevelBuilderError {
 	/// [`set_level_name`](LevelBuilder::set_level_name)
 	/// was called more than once

@@ -24,7 +24,7 @@ pub enum RawStatement<'a> {
 	Assignment(RawAssignmentStatement<'a>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LexError {
 	/// A line contains non-ascii characters
 	NonAsciiLine(usize),

@@ -231,7 +231,7 @@ PLACE cycle_extra -100 100 50
 	println!("{:?}", parsed.unwrap());
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LevelParsingError {
 	InvalidKeyword(String),
 	InvalidModifier(String),
