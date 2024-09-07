@@ -104,7 +104,7 @@ pub enum ThingType {
 pub enum CycleTurnability {
 	/// Cycle may be turned anytime
 	Always,
-	/// Cycle may be turned when a [`Player`] entity lies on one of its vertices
+	/// Cycle may be turned when an [`ObjectType::Player`] object lies on one of its vertices
 	WithPlayer,
 	/// Cycle may never be turned directly
 	Never,
