@@ -30,17 +30,15 @@ fn parse_statement(
 	cycle_names: &mut HashMap<String, usize>,
 ) -> Result<(), LevelParsingErrorCode> {
 	match statement {
-		RawStatement::Assignment(statement) => {
-			match statement.key.to_ascii_lowercase().as_str() {
-				"name" => builder.set_level_name(statement.value.to_owned())?,
-				"hint" => builder.set_level_hint(statement.value.to_owned())?,
-				_ => {
-					return Err(LevelParsingErrorCode::InvalidMetaVariable(
-						statement.key.to_owned(),
-					));
-				}
+		RawStatement::Assignment(statement) => match statement.key.to_ascii_lowercase().as_str() {
+			"name" => builder.set_level_name(statement.value.to_owned())?,
+			"hint" => builder.set_level_hint(statement.value.to_owned())?,
+			_ => {
+				return Err(LevelParsingErrorCode::InvalidMetaVariable(
+					statement.key.to_owned(),
+				));
 			}
-		}
+		},
 		RawStatement::Action(statement) => {
 			match statement.verb {
 				"VERTEX" => {
@@ -105,8 +103,7 @@ fn parse_statement(
 					let Some(modifier) = statement.modifier else {
 						return Err(LevelParsingErrorCode::MissingModifier);
 					};
-					let (object_kind, color) =
-						modifier.split_once(':').unwrap_or((modifier, ""));
+					let (object_kind, color) = modifier.split_once(':').unwrap_or((modifier, ""));
 					let _color_id = if color.is_empty() {
 						None
 					} else if let Ok(color_id) = color.parse() {
@@ -193,16 +190,20 @@ fn parse_statement(
 					if let Some(modifier) = statement.modifier {
 						return Err(LevelParsingErrorCode::InvalidModifier(modifier.to_owned()));
 					}
-					if statement.values.len() < 2 {
-						return Err(LevelParsingErrorCode::NotEnoughArguments(
-							2,
-							statement.values.len(),
-						));
-					} else if statement.values.len() > 2 {
-						return Err(LevelParsingErrorCode::ExtraneousArguments(
-							2,
-							statement.values.len(),
-						));
+					match statement.values.len().cmp(&2) {
+						std::cmp::Ordering::Less => {
+							return Err(LevelParsingErrorCode::NotEnoughArguments(
+								2,
+								statement.values.len(),
+							))
+						}
+						std::cmp::Ordering::Greater => {
+							return Err(LevelParsingErrorCode::ExtraneousArguments(
+								2,
+								statement.values.len(),
+							))
+						}
+						std::cmp::Ordering::Equal => {}
 					}
 					let vertex_name = statement.values[0];
 					let angle_str = statement.values[1].replace(',', ".");
@@ -247,7 +248,10 @@ pub struct LevelParsingError {
 
 impl LevelParsingErrorCode {
 	pub fn at_line(self, line_number: usize) -> LevelParsingError {
-		LevelParsingError { code: self, line_number }
+		LevelParsingError {
+			code: self,
+			line_number,
+		}
 	}
 }
 
@@ -321,7 +325,9 @@ mod test {
 		($left:expr, $right:expr) => {
 			let left = $left;
 			let right = $right;
-			let err = left.expect_err("Negative test sample parrsed without error!").code;
+			let err = left
+				.expect_err("Negative test sample parrsed without error!")
+				.code;
 			assert_eq!(err, right);
 		};
 	}

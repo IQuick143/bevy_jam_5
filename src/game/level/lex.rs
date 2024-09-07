@@ -92,7 +92,10 @@ pub fn parse(raw_data: &str) -> impl Iterator<Item = Result<(usize, RawStatement
 
 impl LexErrorCode {
 	pub fn at_line(self, line_number: usize) -> LexError {
-		LexError { code: self, line_number }
+		LexError {
+			code: self,
+			line_number,
+		}
 	}
 }
 
