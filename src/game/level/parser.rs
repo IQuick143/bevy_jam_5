@@ -131,6 +131,9 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 						}
 					}
 					"PLACE" => {
+						if let Some(modifier) = statement.modifier {
+							return Err(LevelParsingError::InvalidModifier(modifier.to_owned()));
+						}
 						if statement.values.len() < 4 {
 							return Err(LevelParsingError::NotEnoughArguments(
 								4,
@@ -167,8 +170,16 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 						builder.place_cycle(cycle_id, Vec2::new(x, y), r, &hints)?;
 					}
 					"PLACE_VERT" => {
+						if let Some(modifier) = statement.modifier {
+							return Err(LevelParsingError::InvalidModifier(modifier.to_owned()));
+						}
 						if statement.values.len() < 2 {
 							return Err(LevelParsingError::NotEnoughArguments(
+								2,
+								statement.values.len(),
+							));
+						} else if statement.values.len() > 2 {
+							return Err(LevelParsingError::ExtraneousArguments(
 								2,
 								statement.values.len(),
 							));
@@ -207,6 +218,7 @@ pub enum LevelParsingError {
 	InvalidMetaVariable(String),
 	BuilderError(LevelBuilderError),
 	NotEnoughArguments(usize, usize),
+	ExtraneousArguments(usize, usize),
 }
 
 impl From<LexError> for LevelParsingError {
@@ -253,6 +265,10 @@ impl std::fmt::Display for LevelParsingError {
 			LevelParsingError::NotEnoughArguments(needed, got) => write!(
 				f,
 				"Statement found {got} arguments, needs at least {needed}."
+			)?,
+			LevelParsingError::ExtraneousArguments(expected, got) => write!(
+				f,
+				"Statement found {got} arguments, expected at most {expected}."
 			)?,
 		}
 		Ok(())
@@ -468,6 +484,23 @@ PLACE_VERT a b
 VERTEX a
 CYCLE k a
 PLACE k a b c
+
+# Place command cannot take modifiers
+VERTEX a
+CYCLE k a
+PLACE[InvalidModifier] k 0 0 100
+
+# Place command cannot take modifiers
+VERTEX a
+CYCLE k a
+PLACE k 0 0 100
+PLACE_VERT[InvalidModifier] a 0
+
+# Vertex placement command cannot have more arguments
+VERTEX a
+CYCLE k a
+PLACE k 0 0 100
+PLACE_VERT a 0 0
 ";
 		let expected_results = [
 			LevelParsingError::NotEnoughArguments(1, 0),
@@ -478,6 +511,9 @@ PLACE k a b c
 			LevelParsingError::MissingModifier,
 			LevelParsingError::ArgumentIsNotANumber("b".to_owned()),
 			LevelParsingError::ArgumentIsNotANumber("a".to_owned()),
+			LevelParsingError::InvalidModifier("InvalidModifier".to_owned()),
+			LevelParsingError::InvalidModifier("InvalidModifier".to_owned()),
+			LevelParsingError::ExtraneousArguments(2, 3),
 		];
 
 		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
