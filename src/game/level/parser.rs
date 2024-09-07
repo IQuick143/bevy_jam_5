@@ -6,213 +6,231 @@ pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
 	let mut builder = LevelBuilder::new();
 	let mut vertex_names = HashMap::new();
 	let mut cycle_names = HashMap::new();
+	let mut last_line_number = 0;
 
 	for line in lex::parse(level_file) {
-		let (_, statement) = line?;
-		match statement {
-			RawStatement::Assignment(statement) => {
-				match statement.key.to_ascii_lowercase().as_str() {
-					"name" => builder.set_level_name(statement.value.to_owned())?,
-					"hint" => builder.set_level_hint(statement.value.to_owned())?,
-					_ => {
-						return Err(LevelParsingError::InvalidMetaVariable(
-							statement.key.to_owned(),
-						))
-					}
-				}
-			}
-			RawStatement::Action(statement) => {
-				match statement.verb {
-					"VERTEX" => {
-						for name in statement.values {
-							if vertex_names.contains_key(name) {
-								continue;
-							}
-							let vertex = builder.add_vertex()?;
-							vertex_names.insert(name.to_owned(), vertex);
-						}
-					}
-					"CYCLE" => {
-						let turnability = match statement.modifier {
-							None => CycleTurnability::Always,
-							Some("MANUAL") => CycleTurnability::WithPlayer,
-							Some("ENGINE") => CycleTurnability::Always,
-							Some("STILL") => CycleTurnability::Never,
-							Some(m) => {
-								return Err(LevelParsingError::InvalidModifier(m.to_string()))
-							}
-						};
-						let mut values = statement.values.into_iter();
-						let name = values
-							.next()
-							.ok_or(LevelParsingError::NotEnoughArguments(1, 0))?;
-						if cycle_names.contains_key(name) {
-							return Err(LevelParsingError::RedefinedCycle(name.to_owned()));
-						}
-						let vertices = values
-							.map(|name| {
-								vertex_names.get(name).copied().ok_or_else(|| {
-									LevelParsingError::UnknownVertexName(name.to_owned())
-								})
-							})
-							.collect::<Result<Vec<_>, _>>()?;
-						let cycle = builder.add_cycle(turnability, vertices)?;
-						cycle_names.insert(name.to_owned(), cycle);
-					}
-					"LINK" => {
-						let direction = match statement.modifier {
-							None => LinkedCycleDirection::Coincident,
-							Some("STRAIGHT") => LinkedCycleDirection::Coincident,
-							Some("CROSSED") => LinkedCycleDirection::Inverse,
-							Some(m) => {
-								return Err(LevelParsingError::InvalidModifier(m.to_string()))
-							}
-						};
-						let cycles = statement
-							.values
-							.into_iter()
-							.map(|name| {
-								cycle_names.get(name).copied().ok_or_else(|| {
-									LevelParsingError::UnknownCycleName(name.to_owned())
-								})
-							})
-							.collect::<Result<Vec<_>, _>>()?;
-						for (source, dest) in cycles.into_iter().tuple_windows() {
-							builder.link_cycles(source, dest, direction)?;
-						}
-					}
-					"OBJECT" => {
-						let Some(modifier) = statement.modifier else {
-							return Err(LevelParsingError::MissingModifier);
-						};
-						let (object_kind, color) =
-							modifier.split_once(':').unwrap_or((modifier, ""));
-						let _color_id = if color.is_empty() {
-							None
-						} else if let Ok(color_id) = color.parse() {
-							Some(LogicalColor(color_id))
-						} else {
-							return Err(LevelParsingError::InvalidModifier(modifier.to_string()));
-						};
-						let thing_type = match object_kind {
-							"BOX" => ThingType::Object(ObjectType::Box),
-							"PLAYER" => ThingType::Object(ObjectType::Player),
-							"BUTTON" => ThingType::Glyph(GlyphType::Button),
-							"FLAG" => ThingType::Glyph(GlyphType::Flag),
-							_ => {
-								return Err(LevelParsingError::InvalidModifier(
-									modifier.to_string(),
-								))
-							}
-						};
-						for vertex_name in statement.values {
-							let Some(vertex) = vertex_names.get(vertex_name).copied() else {
-								return Err(LevelParsingError::UnknownVertexName(
-									vertex_name.to_owned(),
-								));
-							};
-							// TODO: Bring back colors
-							match thing_type {
-								ThingType::Object(object_type) => builder.add_object(
-									vertex,
-									ObjectData {
-										object_type,
-										color: None,
-									},
-								)?,
-								ThingType::Glyph(glyph_type) => builder.add_glyph(
-									vertex,
-									GlyphData {
-										glyph_type,
-										color: None,
-									},
-								)?,
-							}
-						}
-					}
-					"PLACE" => {
-						if let Some(modifier) = statement.modifier {
-							return Err(LevelParsingError::InvalidModifier(modifier.to_owned()));
-						}
-						if statement.values.len() < 4 {
-							return Err(LevelParsingError::NotEnoughArguments(
-								4,
-								statement.values.len(),
-							));
-						}
-						let cycle_name = statement.values[0];
-						let x_str = statement.values[1].replace(',', ".");
-						let y_str = statement.values[2].replace(',', ".");
-						let r_str = statement.values[3].replace(',', ".");
-						let Some(cycle_id) = cycle_names.get(cycle_name).copied() else {
-							return Err(LevelParsingError::UnknownCycleName(
-								cycle_name.to_string(),
-							));
-						};
-						let Ok(x) = x_str.parse::<f32>() else {
-							return Err(LevelParsingError::ArgumentIsNotANumber(x_str));
-						};
-						let Ok(y) = y_str.parse::<f32>() else {
-							return Err(LevelParsingError::ArgumentIsNotANumber(y_str));
-						};
-						let Ok(r) = r_str.parse::<f32>() else {
-							return Err(LevelParsingError::ArgumentIsNotANumber(r_str));
-						};
-						let hints = statement.values[4..]
-							.iter()
-							.map(|name| {
-								vertex_names
-									.get(*name)
-									.copied()
-									.ok_or(LevelParsingError::UnknownVertexName(name.to_string()))
-							})
-							.collect::<Result<Vec<_>, _>>()?;
-						builder.place_cycle(cycle_id, Vec2::new(x, y), r, &hints)?;
-					}
-					"PLACE_VERT" => {
-						if let Some(modifier) = statement.modifier {
-							return Err(LevelParsingError::InvalidModifier(modifier.to_owned()));
-						}
-						if statement.values.len() < 2 {
-							return Err(LevelParsingError::NotEnoughArguments(
-								2,
-								statement.values.len(),
-							));
-						} else if statement.values.len() > 2 {
-							return Err(LevelParsingError::ExtraneousArguments(
-								2,
-								statement.values.len(),
-							));
-						}
-						let vertex_name = statement.values[0];
-						let angle_str = statement.values[1].replace(',', ".");
-						let Some(vertex_id) = vertex_names.get(vertex_name).copied() else {
-							return Err(LevelParsingError::UnknownVertexName(
-								vertex_name.to_string(),
-							));
-						};
-						let Ok(angle) = angle_str.parse::<f32>() else {
-							return Err(LevelParsingError::ArgumentIsNotANumber(angle_str));
-						};
-						builder.place_vertex(vertex_id, angle)?;
-					}
-					other => return Err(LevelParsingError::InvalidKeyword(other.to_owned())),
-				}
-			}
+		let (line_number, statement) = line?;
+		last_line_number = line_number;
+		let result = parse_statement(statement, &mut builder, &mut vertex_names, &mut cycle_names);
+		if let Err(err) = result {
+			return Err(err.at_line(line_number));
 		}
 	}
 
-	Ok(builder.build()?)
+	match builder.build() {
+		Ok(level) => Ok(level),
+		Err(err) => Err(LevelParsingErrorCode::BuilderError(err).at_line(last_line_number)),
+	}
+}
+
+fn parse_statement(
+	statement: RawStatement,
+	builder: &mut LevelBuilder,
+	vertex_names: &mut HashMap<String, usize>,
+	cycle_names: &mut HashMap<String, usize>,
+) -> Result<(), LevelParsingErrorCode> {
+	match statement {
+		RawStatement::Assignment(statement) => {
+			match statement.key.to_ascii_lowercase().as_str() {
+				"name" => builder.set_level_name(statement.value.to_owned())?,
+				"hint" => builder.set_level_hint(statement.value.to_owned())?,
+				_ => {
+					return Err(LevelParsingErrorCode::InvalidMetaVariable(
+						statement.key.to_owned(),
+					));
+				}
+			}
+		}
+		RawStatement::Action(statement) => {
+			match statement.verb {
+				"VERTEX" => {
+					for name in statement.values {
+						if vertex_names.contains_key(name) {
+							continue;
+						}
+						let vertex = builder.add_vertex()?;
+						vertex_names.insert(name.to_owned(), vertex);
+					}
+				}
+				"CYCLE" => {
+					let turnability = match statement.modifier {
+						None => CycleTurnability::Always,
+						Some("MANUAL") => CycleTurnability::WithPlayer,
+						Some("ENGINE") => CycleTurnability::Always,
+						Some("STILL") => CycleTurnability::Never,
+						Some(m) => {
+							return Err(LevelParsingErrorCode::InvalidModifier(m.to_string()))
+						}
+					};
+					let mut values = statement.values.into_iter();
+					let name = values
+						.next()
+						.ok_or(LevelParsingErrorCode::NotEnoughArguments(1, 0))?;
+					if cycle_names.contains_key(name) {
+						return Err(LevelParsingErrorCode::RedefinedCycle(name.to_owned()));
+					}
+					let vertices = values
+						.map(|name| {
+							vertex_names.get(name).copied().ok_or_else(|| {
+								LevelParsingErrorCode::UnknownVertexName(name.to_owned())
+							})
+						})
+						.collect::<Result<Vec<_>, _>>()?;
+					let cycle = builder.add_cycle(turnability, vertices)?;
+					cycle_names.insert(name.to_owned(), cycle);
+				}
+				"LINK" => {
+					let direction = match statement.modifier {
+						None => LinkedCycleDirection::Coincident,
+						Some("STRAIGHT") => LinkedCycleDirection::Coincident,
+						Some("CROSSED") => LinkedCycleDirection::Inverse,
+						Some(m) => {
+							return Err(LevelParsingErrorCode::InvalidModifier(m.to_string()))
+						}
+					};
+					let cycles = statement
+						.values
+						.into_iter()
+						.map(|name| {
+							cycle_names.get(name).copied().ok_or_else(|| {
+								LevelParsingErrorCode::UnknownCycleName(name.to_owned())
+							})
+						})
+						.collect::<Result<Vec<_>, _>>()?;
+					for (source, dest) in cycles.into_iter().tuple_windows() {
+						builder.link_cycles(source, dest, direction)?;
+					}
+				}
+				"OBJECT" => {
+					let Some(modifier) = statement.modifier else {
+						return Err(LevelParsingErrorCode::MissingModifier);
+					};
+					let (object_kind, color) =
+						modifier.split_once(':').unwrap_or((modifier, ""));
+					let _color_id = if color.is_empty() {
+						None
+					} else if let Ok(color_id) = color.parse() {
+						Some(LogicalColor(color_id))
+					} else {
+						return Err(LevelParsingErrorCode::InvalidModifier(modifier.to_string()));
+					};
+					let thing_type = match object_kind {
+						"BOX" => ThingType::Object(ObjectType::Box),
+						"PLAYER" => ThingType::Object(ObjectType::Player),
+						"BUTTON" => ThingType::Glyph(GlyphType::Button),
+						"FLAG" => ThingType::Glyph(GlyphType::Flag),
+						_ => {
+							return Err(LevelParsingErrorCode::InvalidModifier(
+								modifier.to_string(),
+							))
+						}
+					};
+					for vertex_name in statement.values {
+						let Some(vertex) = vertex_names.get(vertex_name).copied() else {
+							return Err(LevelParsingErrorCode::UnknownVertexName(
+								vertex_name.to_owned(),
+							));
+						};
+						// TODO: Bring back colors
+						match thing_type {
+							ThingType::Object(object_type) => builder.add_object(
+								vertex,
+								ObjectData {
+									object_type,
+									color: None,
+								},
+							)?,
+							ThingType::Glyph(glyph_type) => builder.add_glyph(
+								vertex,
+								GlyphData {
+									glyph_type,
+									color: None,
+								},
+							)?,
+						}
+					}
+				}
+				"PLACE" => {
+					if let Some(modifier) = statement.modifier {
+						return Err(LevelParsingErrorCode::InvalidModifier(modifier.to_owned()));
+					}
+					if statement.values.len() < 4 {
+						return Err(LevelParsingErrorCode::NotEnoughArguments(
+							4,
+							statement.values.len(),
+						));
+					}
+					let cycle_name = statement.values[0];
+					let x_str = statement.values[1].replace(',', ".");
+					let y_str = statement.values[2].replace(',', ".");
+					let r_str = statement.values[3].replace(',', ".");
+					let Some(cycle_id) = cycle_names.get(cycle_name).copied() else {
+						return Err(LevelParsingErrorCode::UnknownCycleName(
+							cycle_name.to_string(),
+						));
+					};
+					let Ok(x) = x_str.parse::<f32>() else {
+						return Err(LevelParsingErrorCode::ArgumentIsNotANumber(x_str));
+					};
+					let Ok(y) = y_str.parse::<f32>() else {
+						return Err(LevelParsingErrorCode::ArgumentIsNotANumber(y_str));
+					};
+					let Ok(r) = r_str.parse::<f32>() else {
+						return Err(LevelParsingErrorCode::ArgumentIsNotANumber(r_str));
+					};
+					let hints = statement.values[4..]
+						.iter()
+						.map(|name| {
+							vertex_names
+								.get(*name)
+								.copied()
+								.ok_or(LevelParsingErrorCode::UnknownVertexName(name.to_string()))
+						})
+						.collect::<Result<Vec<_>, _>>()?;
+					builder.place_cycle(cycle_id, Vec2::new(x, y), r, &hints)?;
+				}
+				"PLACE_VERT" => {
+					if let Some(modifier) = statement.modifier {
+						return Err(LevelParsingErrorCode::InvalidModifier(modifier.to_owned()));
+					}
+					if statement.values.len() < 2 {
+						return Err(LevelParsingErrorCode::NotEnoughArguments(
+							2,
+							statement.values.len(),
+						));
+					} else if statement.values.len() > 2 {
+						return Err(LevelParsingErrorCode::ExtraneousArguments(
+							2,
+							statement.values.len(),
+						));
+					}
+					let vertex_name = statement.values[0];
+					let angle_str = statement.values[1].replace(',', ".");
+					let Some(vertex_id) = vertex_names.get(vertex_name).copied() else {
+						return Err(LevelParsingErrorCode::UnknownVertexName(
+							vertex_name.to_string(),
+						));
+					};
+					let Ok(angle) = angle_str.parse::<f32>() else {
+						return Err(LevelParsingErrorCode::ArgumentIsNotANumber(angle_str));
+					};
+					builder.place_vertex(vertex_id, angle)?;
+				}
+				other => return Err(LevelParsingErrorCode::InvalidKeyword(other.to_owned())),
+			}
+		}
+	}
+	Ok(())
 }
 
 #[derive(Debug, PartialEq)]
-pub enum LevelParsingError {
+pub enum LevelParsingErrorCode {
 	InvalidKeyword(String),
 	InvalidModifier(String),
 	UnknownVertexName(String),
 	UnknownCycleName(String),
 	RedefinedCycle(String),
-	LexError(LexError),
+	LexError(LexErrorCode),
 	MissingModifier,
 	ArgumentIsNotANumber(String),
 	InvalidMetaVariable(String),
@@ -221,13 +239,25 @@ pub enum LevelParsingError {
 	ExtraneousArguments(usize, usize),
 }
 
-impl From<LexError> for LevelParsingError {
-	fn from(value: LexError) -> Self {
-		Self::LexError(value)
+#[derive(Debug, PartialEq)]
+pub struct LevelParsingError {
+	pub code: LevelParsingErrorCode,
+	pub line_number: usize,
+}
+
+impl LevelParsingErrorCode {
+	pub fn at_line(self, line_number: usize) -> LevelParsingError {
+		LevelParsingError { code: self, line_number }
 	}
 }
 
-impl From<LevelBuilderError> for LevelParsingError {
+impl From<LexError> for LevelParsingError {
+	fn from(value: LexError) -> Self {
+		LevelParsingErrorCode::LexError(value.code).at_line(value.line_number)
+	}
+}
+
+impl From<LevelBuilderError> for LevelParsingErrorCode {
 	fn from(value: LevelBuilderError) -> Self {
 		Self::BuilderError(value)
 	}
@@ -235,38 +265,38 @@ impl From<LevelBuilderError> for LevelParsingError {
 
 impl std::error::Error for LevelParsingError {}
 
-impl std::fmt::Display for LevelParsingError {
+impl std::fmt::Display for LevelParsingErrorCode {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			LevelParsingError::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
-			LevelParsingError::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
-			LevelParsingError::UnknownVertexName(name) => write!(
+			Self::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
+			Self::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
+			Self::UnknownVertexName(name) => write!(
 				f,
 				"A vertex with name {} was referenced, but not defined.",
 				name
 			)?,
-			LevelParsingError::UnknownCycleName(name) => write!(
+			Self::UnknownCycleName(name) => write!(
 				f,
 				"A cycle with name {} was referenced, but not defined.",
 				name
 			)?,
-			LevelParsingError::RedefinedCycle(name) => {
+			Self::RedefinedCycle(name) => {
 				write!(f, "A cycle with name {} was defined multiple times.", name)?
 			}
-			LevelParsingError::LexError(e) => e.fmt(f)?,
-			LevelParsingError::MissingModifier => write!(f, "Statement is missing a modifier.")?,
-			LevelParsingError::ArgumentIsNotANumber(arg) => {
+			Self::LexError(e) => e.fmt(f)?,
+			Self::MissingModifier => write!(f, "Statement is missing a modifier.")?,
+			Self::ArgumentIsNotANumber(arg) => {
 				write!(f, "Expected a numeric argument, got {arg}.")?
 			}
-			LevelParsingError::InvalidMetaVariable(name) => {
+			Self::InvalidMetaVariable(name) => {
 				write!(f, "{name} is not a valid meta variable name")?
 			}
-			LevelParsingError::BuilderError(e) => e.fmt(f)?,
-			LevelParsingError::NotEnoughArguments(needed, got) => write!(
+			Self::BuilderError(e) => e.fmt(f)?,
+			Self::NotEnoughArguments(needed, got) => write!(
 				f,
 				"Statement found {got} arguments, needs at least {needed}."
 			)?,
-			LevelParsingError::ExtraneousArguments(expected, got) => write!(
+			Self::ExtraneousArguments(expected, got) => write!(
 				f,
 				"Statement found {got} arguments, expected at most {expected}."
 			)?,
@@ -275,17 +305,23 @@ impl std::fmt::Display for LevelParsingError {
 	}
 }
 
+impl std::fmt::Display for LevelParsingError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "Line {}: {}", self.line_number + 1, self.code)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use super::{
-		parse, LevelBuilderError, LevelParsingError, LexError, OverlappedLinkedCyclesError,
+		parse, LevelBuilderError, LevelParsingErrorCode, LexErrorCode, OverlappedLinkedCyclesError,
 	};
 
 	macro_rules! assert_err_eq {
 		($left:expr, $right:expr) => {
 			let left = $left;
 			let right = $right;
-			let err = left.expect_err("Negative test sample parrsed without error!");
+			let err = left.expect_err("Negative test sample parrsed without error!").code;
 			assert_eq!(err, right);
 		};
 	}
@@ -340,7 +376,7 @@ CYCLE a b c
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::UnknownVertexName("b".to_owned())
+			LevelParsingErrorCode::UnknownVertexName("b".to_owned())
 		);
 
 		let data = r"
@@ -349,7 +385,7 @@ OBJECT[BOX] a b c
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::UnknownVertexName("a".to_owned())
+			LevelParsingErrorCode::UnknownVertexName("a".to_owned())
 		);
 
 		let data = r"
@@ -358,7 +394,7 @@ PLACE_VERT a 1
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::UnknownVertexName("a".to_owned())
+			LevelParsingErrorCode::UnknownVertexName("a".to_owned())
 		);
 
 		let data = r"
@@ -369,7 +405,7 @@ PLACE k 0 0 100 b d
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::UnknownVertexName("d".to_owned())
+			LevelParsingErrorCode::UnknownVertexName("d".to_owned())
 		);
 
 		let data = r"
@@ -378,7 +414,7 @@ LINK a b c
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::UnknownCycleName("a".to_owned())
+			LevelParsingErrorCode::UnknownCycleName("a".to_owned())
 		);
 
 		let data = r"
@@ -387,7 +423,7 @@ PLACE a 0 0 100
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::UnknownCycleName("a".to_owned())
+			LevelParsingErrorCode::UnknownCycleName("a".to_owned())
 		);
 	}
 
@@ -396,31 +432,31 @@ PLACE a 0 0 100
 		let data = "InvalidKeyword";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::InvalidKeyword("InvalidKeyword".to_owned())
+			LevelParsingErrorCode::InvalidKeyword("InvalidKeyword".to_owned())
 		);
 
 		let data = "OBJECT[InvalidModifier]";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::InvalidModifier("InvalidModifier".to_owned())
+			LevelParsingErrorCode::InvalidModifier("InvalidModifier".to_owned())
 		);
 
 		let data = "InvalidMetaVariable=";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::InvalidMetaVariable("InvalidMetaVariable".to_owned())
+			LevelParsingErrorCode::InvalidMetaVariable("InvalidMetaVariable".to_owned())
 		);
 
 		let data = "\u{202e}";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::LexError(LexError::NonAsciiLine(0))
+			LevelParsingErrorCode::LexError(LexErrorCode::NonAsciiLine)
 		);
 
 		let data = "@";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::LexError(LexError::MalformedStatement(0))
+			LevelParsingErrorCode::LexError(LexErrorCode::MalformedStatement)
 		);
 	}
 
@@ -434,7 +470,7 @@ CYCLE k a b
 ";
 		assert_err_eq!(
 			parse(data),
-			LevelParsingError::RedefinedCycle("k".to_owned())
+			LevelParsingErrorCode::RedefinedCycle("k".to_owned())
 		);
 
 		let data = r"
@@ -503,17 +539,17 @@ PLACE k 0 0 100
 PLACE_VERT a 0 0
 ";
 		let expected_results = [
-			LevelParsingError::NotEnoughArguments(1, 0),
-			LevelParsingError::NotEnoughArguments(2, 0),
-			LevelParsingError::NotEnoughArguments(2, 1),
-			LevelParsingError::NotEnoughArguments(4, 0),
-			LevelParsingError::NotEnoughArguments(4, 3),
-			LevelParsingError::MissingModifier,
-			LevelParsingError::ArgumentIsNotANumber("b".to_owned()),
-			LevelParsingError::ArgumentIsNotANumber("a".to_owned()),
-			LevelParsingError::InvalidModifier("InvalidModifier".to_owned()),
-			LevelParsingError::InvalidModifier("InvalidModifier".to_owned()),
-			LevelParsingError::ExtraneousArguments(2, 3),
+			LevelParsingErrorCode::NotEnoughArguments(1, 0),
+			LevelParsingErrorCode::NotEnoughArguments(2, 0),
+			LevelParsingErrorCode::NotEnoughArguments(2, 1),
+			LevelParsingErrorCode::NotEnoughArguments(4, 0),
+			LevelParsingErrorCode::NotEnoughArguments(4, 3),
+			LevelParsingErrorCode::MissingModifier,
+			LevelParsingErrorCode::ArgumentIsNotANumber("b".to_owned()),
+			LevelParsingErrorCode::ArgumentIsNotANumber("a".to_owned()),
+			LevelParsingErrorCode::InvalidModifier("InvalidModifier".to_owned()),
+			LevelParsingErrorCode::InvalidModifier("InvalidModifier".to_owned()),
+			LevelParsingErrorCode::ExtraneousArguments(2, 3),
 		];
 
 		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
