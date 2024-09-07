@@ -1,6 +1,6 @@
 use crate::{ui::freeze::ui_not_frozen, AppSet};
 
-use super::prelude::*;
+use super::{logic::*, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -11,6 +11,18 @@ pub(super) fn plugin(app: &mut App) {
 		)
 			.run_if(ui_not_frozen),
 	);
+}
+
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct CycleInterationRadius(pub f32);
+
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect, Default)]
+pub enum CycleInteraction {
+	#[default]
+	None,
+	Hover,
+	LeftClick,
+	RightClick,
 }
 
 fn cycle_inputs_system(

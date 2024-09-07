@@ -1,22 +1,98 @@
-use super::prelude::*;
+use super::{components::*, level::*, prelude::*};
 use crate::AppSet;
 
 pub fn plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
-			cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>()),
-			cycle_rotation_system.run_if(on_event::<RotateSingleCycle>()),
+	app.init_resource::<LevelCompletionConditions>()
+		.init_resource::<IsLevelCompleted>()
+		.add_event::<GameLayoutChanged>()
+		.add_event::<RotateCycleGroup>()
+		.add_event::<RotateSingleCycle>()
+		.add_event::<RecordCycleGroupRotation>()
+		.add_systems(
+			Update,
 			(
-				level_completion_check_system,
-				cycle_turnability_update_system,
+				cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>()),
+				cycle_rotation_system.run_if(on_event::<RotateSingleCycle>()),
+				(
+					level_completion_check_system,
+					cycle_turnability_update_system,
+				)
+					.run_if(on_event::<GameLayoutChanged>()),
 			)
-				.run_if(on_event::<GameLayoutChanged>()),
-		)
-			.chain()
-			.in_set(AppSet::GameLogic),
-	);
+				.chain()
+				.in_set(AppSet::GameLogic),
+		);
 }
+
+/// Determines whether a cycle may be turned at any given moment
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct ComputedCycleTurnability(pub bool);
+
+/// Enumerates directions in which a cycle can turn
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CycleTurningDirection {
+	/// Rotate in nominal direction of the cycle
+	Nominal,
+	/// Rotate in reverse direction of the cycle
+	Reverse,
+}
+
+/// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
+#[derive(Clone, Copy, Debug)]
+pub struct RotateCycle {
+	/// Id of the cycle entity to rotate
+	pub target_cycle: Entity,
+	/// Direction in which the cycle should turn
+	pub direction: CycleTurningDirection,
+}
+
+/// Internal event sent to a cycle entity to rotate [`super::components::Object`]
+/// entities that lie on the cycle, ignores linkages.
+#[derive(Event, Clone, Copy, Debug)]
+pub struct RotateSingleCycle(pub RotateCycle);
+
+/// Event sent to a cycle entity to rotate [`super::components::Object`]
+/// entities that lie on the cycle and all cycles linked to it
+/// Should be sent only if it is valid to rotate the given cycle.
+#[derive(Event, Clone, Copy, Debug)]
+pub struct RotateCycleGroup(pub RotateCycle);
+
+/// Event sent together with a [`RotateCycleGroup`] event
+/// if that rotation is eligible for being recorded in move history
+#[derive(Event, Clone, Copy, Debug)]
+pub struct RecordCycleGroupRotation(pub RotateCycle);
+
+/// Event that is sent when state of the game map changes,
+/// usually by turning a cycle
+#[derive(Event, Debug)]
+pub struct GameLayoutChanged;
+
+/// Contains an overview of conditions that are needed to complete the level
+#[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
+pub struct LevelCompletionConditions {
+	pub buttons_present: u32,
+	pub buttons_triggered: u32,
+	pub flags_present: u32,
+	pub flags_occupied: u32,
+}
+
+impl LevelCompletionConditions {
+	/// Whether the level has been completed
+	pub fn is_level_completed(&self) -> bool {
+		self.is_goal_unlocked() && self.flags_occupied == self.flags_present
+	}
+
+	/// Whether all secondary completion criteria have been met,
+	/// and the level will be completed as soon as all players travel to a goal
+	pub fn is_goal_unlocked(&self) -> bool {
+		self.buttons_present == self.buttons_triggered
+	}
+}
+
+/// Contains an information whether the level being played has been completed
+/// in this session (making moves after completion does not matter)
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct IsLevelCompleted(pub bool);
 
 /// Relays rotation events on a cycle group to the individual cycles
 fn cycle_group_rotation_relay_system(
@@ -180,4 +256,24 @@ fn level_completion_check_system(
 	}
 
 	*completion = new_completion;
+}
+
+impl std::ops::Mul<LinkedCycleDirection> for CycleTurningDirection {
+	type Output = Self;
+	fn mul(self, rhs: LinkedCycleDirection) -> Self::Output {
+		match rhs {
+			LinkedCycleDirection::Coincident => self,
+			LinkedCycleDirection::Inverse => -self,
+		}
+	}
+}
+
+impl std::ops::Neg for CycleTurningDirection {
+	type Output = Self;
+	fn neg(self) -> Self::Output {
+		match self {
+			CycleTurningDirection::Nominal => CycleTurningDirection::Reverse,
+			CycleTurningDirection::Reverse => CycleTurningDirection::Nominal,
+		}
+	}
 }

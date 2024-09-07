@@ -2,7 +2,10 @@
 
 use crate::{
 	assets::{HandleMap, ImageKey},
-	game::{level::*, prelude::*},
+	game::{
+		animation::*, components::*, drawing::*, inputs::*, level::*,
+		logic::ComputedCycleTurnability, prelude::*,
+	},
 	graphics::*,
 	screen::Screen,
 	ui::hover::{self, HintText, Hoverable},
@@ -18,6 +21,10 @@ use rand::Rng;
 pub(super) fn plugin(app: &mut App) {
 	app.observe(spawn_level);
 }
+
+/// Trigger event that spawns the content entities of a level
+#[derive(Event, Debug)]
+pub struct SpawnLevel(pub Handle<LevelData>);
 
 fn spawn_level(
 	trigger: Trigger<SpawnLevel>,
@@ -186,7 +193,7 @@ fn spawn_vertex(
 				Object,
 				Player,
 				VertexPosition(vertex_id),
-				ObjectKind(thing_type),
+				thing_type,
 				SpriteBundle {
 					sprite: Sprite {
 						color: palette.player,
@@ -216,7 +223,7 @@ fn spawn_vertex(
 				Object,
 				Box,
 				VertexPosition(vertex_id),
-				ObjectKind(thing_type),
+				thing_type,
 				SpriteBundle {
 					sprite: Sprite {
 						color: object_data
@@ -262,7 +269,7 @@ fn spawn_vertex(
 				Glyph,
 				BoxSlot,
 				VertexPosition(vertex_id),
-				ObjectKind(thing_type),
+				thing_type,
 				SpriteBundle {
 					sprite: Sprite {
 						color: glyph_data
@@ -294,7 +301,7 @@ fn spawn_vertex(
 				Glyph,
 				Goal,
 				VertexPosition(vertex_id),
-				ObjectKind(thing_type),
+				thing_type,
 				SpriteBundle {
 					sprite: Sprite {
 						color: palette.goal_closed,

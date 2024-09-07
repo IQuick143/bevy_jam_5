@@ -4,7 +4,7 @@ use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::{events::SpawnLevel, level::LevelData, prelude::*},
+	game::prelude::*,
 	send_event,
 	ui::prelude::*,
 	AppSet,

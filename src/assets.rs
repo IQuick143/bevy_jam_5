@@ -1,13 +1,10 @@
 use bevy::{prelude::*, utils::HashMap};
 
-use crate::game::{
-	components::CycleTurnability,
-	level::{
-		asset::plugin as level_asset_plugin,
-		list::LevelList,
-		list_asset::{plugin as level_list_asset_plugin, LevelListAsset},
-		GlyphType, LevelData, ObjectType, ThingType,
-	},
+use crate::game::level::{
+	asset::plugin as level_asset_plugin,
+	list::LevelList,
+	list_asset::{plugin as level_list_asset_plugin, LevelListAsset},
+	CycleTurnability, GlyphType, LevelData, ObjectType, ThingType,
 };
 
 pub(super) fn plugin(app: &mut App) {

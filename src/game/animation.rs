@@ -1,6 +1,8 @@
+use std::f32::consts::TAU;
+
 use bevy::utils::hashbrown::HashMap;
 
-use super::{logic, prelude::*};
+use super::{components::*, logic::*, prelude::*};
 use crate::AppSet;
 
 pub fn plugin(app: &mut App) {
@@ -9,15 +11,6 @@ pub fn plugin(app: &mut App) {
 		(
 			(
 				(listen_for_moves, move_objects).chain(),
-				goal_unlock_animation_system
-					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
-				(
-					button_trigger_animation_system,
-					cycle_center_turnability_visuals_update_system
-						.before(cycle_center_interaction_visuals_update_system),
-				)
-					.run_if(on_event::<GameLayoutChanged>()),
-				cycle_center_interaction_visuals_update_system,
 				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>()),
 			)
 				.in_set(AppSet::UpdateVisuals),
@@ -25,6 +18,155 @@ pub fn plugin(app: &mut App) {
 			jump_turn_animation_system,
 		),
 	);
+}
+
+#[derive(Debug, Clone, Copy, Default, Reflect)]
+pub enum RotationDirection {
+	#[default]
+	Clockwise,
+	CounterClockwise,
+}
+
+impl From<CycleTurningDirection> for RotationDirection {
+	fn from(value: CycleTurningDirection) -> Self {
+		match value {
+			CycleTurningDirection::Nominal => RotationDirection::Clockwise,
+			CycleTurningDirection::Reverse => RotationDirection::CounterClockwise,
+		}
+	}
+}
+
+/// Component for enabling animation behaviour
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct AnimatedObject {
+	/// Which way the slerp should go.
+	pub rotation_direction: RotationDirection,
+	/// <0.0-1.0> percentage of the animation progress
+	pub progress: f32,
+	/// Center of rotation
+	pub cycle_center: Vec3,
+	/// The direction we're starting from, if None, the animation skips to the end
+	pub start_direction: Option<Dir2>,
+	pub start_magnitude: f32,
+	/// The direction we're ending on, if None, the animation cannot play
+	pub final_direction: Option<Dir2>,
+	pub final_magnitude: f32,
+}
+
+impl AnimatedObject {
+	pub fn sample(&self) -> Option<Vec3> {
+		let target = self.final_direction?;
+		Some(if let Some(source) = self.start_direction {
+			let t = animation_easing_function(self.progress).clamp(0.0, 1.0);
+			let dir = {
+				let mut angle = Vec2::angle_between(*source, *target);
+				match self.rotation_direction {
+					RotationDirection::Clockwise => {
+						if angle > 0.0 {
+							angle -= TAU
+						}
+					}
+					RotationDirection::CounterClockwise => {
+						if angle < 0.0 {
+							angle += TAU
+						}
+					}
+				}
+				Rot2::radians(angle * t) * source
+			};
+			let magnitude = f32::lerp(self.start_magnitude, self.final_magnitude, t);
+			self.cycle_center + (magnitude * dir).extend(0.0)
+		} else {
+			self.cycle_center + (self.final_magnitude * target).extend(0.0)
+		})
+	}
+}
+
+fn animation_easing_function(t: f32) -> f32 {
+	// Quadratic ease-out.
+	// Looks better that a flat rotation, but is easier
+	// to chain like we do that a double-ended easing function
+	if t > 0.5 {
+		1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
+	} else {
+		t * 4.0 / 3.0
+	}
+}
+
+/// A component that causes an entity to rotate steadily
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct SpinAnimation {
+	pub frequency: f32,
+	pub current_phase: f32,
+}
+
+impl SpinAnimation {
+	pub fn progress(&mut self, delta_seconds: f32) {
+		self.current_phase -= delta_seconds * self.frequency;
+		if self.current_phase < 0.0 {
+			self.current_phase += TAU;
+		}
+	}
+
+	pub fn sample(&self) -> f32 {
+		self.current_phase
+	}
+
+	pub const DEFAULT_FREQUENCY: f32 = 0.3;
+}
+
+impl Default for SpinAnimation {
+	fn default() -> Self {
+		Self {
+			frequency: Self::DEFAULT_FREQUENCY,
+			current_phase: 0.0,
+		}
+	}
+}
+
+/// A component that lets an entity rotate quickly
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct JumpTurnAnimation {
+	pub current_phase: f32,
+	pub jump_animation_progress: f32,
+	pub jump_animation_time: f32,
+	pub jump_animation_magitude: f32,
+}
+
+impl JumpTurnAnimation {
+	pub fn progress(&mut self, delta_seconds: f32) {
+		if self.jump_animation_progress < 1.0 {
+			self.jump_animation_progress += delta_seconds / self.jump_animation_time;
+		}
+	}
+
+	pub fn make_jump(&mut self, magnitude: f32, animation_time: f32) {
+		self.current_phase = self.sample() + magnitude;
+		self.jump_animation_time = animation_time;
+		self.jump_animation_magitude = magnitude;
+		self.jump_animation_progress = 0.0;
+	}
+
+	pub fn sample(&self) -> f32 {
+		if self.jump_animation_progress >= 1.0 {
+			self.current_phase
+		} else {
+			self.current_phase
+				- (1.0 - animation_easing_function(self.jump_animation_progress))
+					* self.jump_animation_magitude
+		}
+	}
+}
+
+impl Default for JumpTurnAnimation {
+	fn default() -> Self {
+		Self {
+			current_phase: 0.0,
+			jump_animation_progress: 0.0,
+			jump_animation_magitude: 0.0,
+			jump_animation_time: 0.0,
+		}
+	}
 }
 
 const ANIMATION_TIME: f32 = 0.5;
@@ -46,7 +188,7 @@ fn listen_for_moves(
 			continue;
 		};
 		let location = transform.translation();
-		let mut vertex_loop = logic::get_flipped_wrapped_iterator(&vertices.0, event.0.direction);
+		let mut vertex_loop = get_flipped_wrapped_iterator(&vertices.0, event.0.direction);
 		let Some(mut last_id) = vertex_loop.next() else {
 			continue;
 		};
@@ -121,160 +263,6 @@ fn move_objects(mut objects: Query<(&mut Transform, &mut AnimatedObject)>, time:
 		if let Some(goal) = animation.sample() {
 			transform.translation.x = goal.x;
 			transform.translation.y = goal.y;
-		}
-	}
-}
-
-fn goal_unlock_animation_system(
-	mut query: Query<&mut Sprite, With<Goal>>,
-	palette: Res<ThingPalette>,
-	completion: Res<LevelCompletionConditions>,
-) {
-	let color = if completion.is_goal_unlocked() {
-		palette.goal_open
-	} else {
-		palette.goal_closed
-	};
-	for mut sprite in &mut query {
-		sprite.color = color;
-	}
-}
-
-fn button_trigger_animation_system(
-	mut buttons_q: Query<(&mut Sprite, Option<&LogicalColor>), With<BoxSlot>>,
-	mut boxes_q: Query<
-		(&mut Sprite, Option<&LogicalColor>),
-		(
-			With<Box>,
-			Without<BoxSlot>, /* To guarantee memory aliasing */
-		),
-	>,
-	nodes_q: Query<(&PlacedGlyph, &PlacedObject)>,
-	palette: Res<ThingPalette>,
-) {
-	for (glyph_id, object_id) in &nodes_q {
-		let button = glyph_id.0.and_then(|id| buttons_q.get_mut(id).ok());
-		let object = object_id.0.and_then(|id| boxes_q.get_mut(id).ok());
-		// Use trigger color if both things are at the same place
-		// and are of the same logical color, otherwise use base color
-		match (button, object) {
-			(Some(mut button), Some(mut object)) => {
-				let colors_compatible = object
-					.1
-					.and_then(|object_color| {
-						button.1.map(|glyph_color| *object_color == *glyph_color)
-					})
-					// If either thing is colorless, they are considered compatible
-					.unwrap_or(true);
-				if colors_compatible {
-					button.0.color = button
-						.1
-						.map(|c| palette.colored_trigger[c.0])
-						.unwrap_or(palette.button_trigger);
-					object.0.color = object
-						.1
-						.map(|c| palette.colored_trigger[c.0])
-						.unwrap_or(palette.box_trigger);
-				} else {
-					button.0.color = button
-						.1
-						.map(|c| palette.colored_base[c.0])
-						.unwrap_or(palette.button_base);
-					object.0.color = object
-						.1
-						.map(|c| palette.colored_base[c.0])
-						.unwrap_or(palette.box_base);
-				}
-			}
-			(Some(mut button), None) => {
-				button.0.color = button
-					.1
-					.map(|c| palette.colored_base[c.0])
-					.unwrap_or(palette.button_base);
-			}
-			(None, Some(mut object)) => {
-				object.0.color = object
-					.1
-					.map(|c| palette.colored_base[c.0])
-					.unwrap_or(palette.box_base);
-			}
-			(None, None) => {}
-		}
-	}
-}
-
-fn cycle_center_turnability_visuals_update_system(
-	cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
-	mut sprites_q: Query<&mut Sprite, With<JumpTurnAnimation>>,
-	mut arrows_q: Query<&mut Visibility, With<SpinAnimation>>,
-	palette: Res<ThingPalette>,
-) {
-	for (is_turnable, children) in &cycles_q {
-		let Ok(mut sprite) = sprites_q.get_mut(children[0]) else {
-			log::warn!(
-				"Child of cycle entity does not have JumpTurnAnimation and Sprite components"
-			);
-			continue;
-		};
-		let Ok(mut arrow_visibility) = arrows_q.get_mut(children[1]) else {
-			log::warn!(
-				"Child of cycle entity does not have SpinAnimation and Visibility components"
-			);
-			continue;
-		};
-		if is_turnable.0 {
-			*arrow_visibility = default();
-			sprite.color = palette.cycle_ready;
-		} else {
-			*arrow_visibility = Visibility::Hidden;
-			sprite.color = palette.cycle_disabled;
-		}
-	}
-}
-
-fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<
-		(
-			&CycleInteraction,
-			&ComputedCycleTurnability,
-			Option<&LinkedCycles>,
-			&Children,
-		),
-		Changed<CycleInteraction>,
-	>,
-	all_cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
-	mut sprites_q: Query<&mut Sprite, With<JumpTurnAnimation>>,
-	palette: Res<ThingPalette>,
-) {
-	for (interaction, is_turnable, links, children) in &cycles_q {
-		let target_sprites = std::iter::once((children[0], is_turnable.0)).chain(
-			links
-				.into_iter()
-				.flat_map(|links| &links.0)
-				.filter_map(|&(id, _)| {
-					all_cycles_q
-						.get(id)
-						.inspect_err(|e| {
-							log::warn!("LinkedCycles refers to a non-cycle entity {e}")
-						})
-						.ok()
-						.map(|(turnable, children)| (children[0], turnable.0))
-				}),
-		);
-		for (id, is_turnable) in target_sprites {
-			let Ok(mut sprite) = sprites_q.get_mut(id) else {
-				log::warn!(
-					"Child of cycle entity does not have JumpTurnAnimation and Sprite components"
-				);
-				continue;
-			};
-			sprite.color = if *interaction != CycleInteraction::None {
-				palette.cycle_trigger
-			} else if is_turnable {
-				palette.cycle_ready
-			} else {
-				palette.cycle_disabled
-			};
 		}
 	}
 }

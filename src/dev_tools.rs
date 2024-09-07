@@ -1,7 +1,12 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::prelude::*,
+	game::{
+		components::*,
+		level::{CycleTurnability, LinkedCycleDirection},
+		logic::*,
+		prelude::*,
+	},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
 	ui::hover::Hoverable,

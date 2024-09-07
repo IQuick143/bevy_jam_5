@@ -1,4 +1,4 @@
-use super::prelude::*;
+use bevy::prelude::*;
 
 pub mod asset;
 mod builder;
@@ -93,11 +93,36 @@ pub struct GlyphData {
 }
 
 /// Type describing any gameplay object
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum ThingType {
 	Object(ObjectType),
 	Glyph(GlyphType),
 }
+
+/// Defines conditions under which a cycle may be turned
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+pub enum CycleTurnability {
+	/// Cycle may be turned anytime
+	Always,
+	/// Cycle may be turned when a [`Player`] entity lies on one of its vertices
+	WithPlayer,
+	/// Cycle may never be turned directly
+	Never,
+}
+
+/// Relative direction of two cycles that are to turn together
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+pub enum LinkedCycleDirection {
+	/// The cycles will turn in the same direction
+	Coincident,
+	/// The cycles will turn in opposite directions
+	Inverse,
+}
+
+/// Logical color of a box or a button.
+/// Colored buttons require a box of the same color
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+pub struct LogicalColor(pub usize);
 
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -106,5 +131,16 @@ impl std::fmt::Display for CyclePlacement {
 			"[x={} y={} r={}]",
 			self.position.x, self.position.y, self.radius
 		)
+	}
+}
+
+impl std::ops::Mul for LinkedCycleDirection {
+	type Output = Self;
+	fn mul(self, rhs: Self) -> Self::Output {
+		if self == rhs {
+			LinkedCycleDirection::Coincident
+		} else {
+			LinkedCycleDirection::Inverse
+		}
 	}
 }

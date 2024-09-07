@@ -2,19 +2,26 @@
 
 mod animation;
 pub mod components;
-pub mod events;
+mod drawing;
 mod game_sfx;
-mod history;
+pub mod history;
 mod inputs;
 pub mod level;
-mod logic;
-pub mod resources;
-mod spawn;
+pub mod logic;
+pub mod spawn;
 
 pub mod prelude {
-	pub use super::components::*;
-	pub use super::events::*;
-	pub use super::resources::*;
+	#[allow(unused_imports)]
+	pub use super::{
+		components::LevelScoped,
+		history::{MoveHistory, UndoMove},
+		level::LevelData,
+		logic::{
+			CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, LevelCompletionConditions,
+			RotateCycle,
+		},
+		spawn::level::SpawnLevel,
+	};
 	pub use bevy::prelude::*;
 }
 
@@ -25,10 +32,9 @@ pub(super) fn plugin(app: &mut App) {
 		spawn::plugin,
 		logic::plugin,
 		animation::plugin,
-		resources::plugin,
+		drawing::plugin,
 		inputs::plugin,
 		game_sfx::plugin,
 		history::plugin,
-		events::plugin,
 	));
 }
