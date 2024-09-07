@@ -57,9 +57,6 @@ impl FromWorld for LinkMaterial {
 	}
 }
 
-// TODO: Delete this when we remove color-coding from logical colors
-const LOGICAL_COLORS: usize = 6;
-
 /// Contains colors used for rendering objects and glyphs
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct ThingPalette {
@@ -73,8 +70,6 @@ pub struct ThingPalette {
 	pub cycle_disabled: Color,
 	pub cycle_ready: Color,
 	pub cycle_trigger: Color,
-	pub colored_base: [Color; LOGICAL_COLORS],
-	pub colored_trigger: [Color; LOGICAL_COLORS],
 }
 
 impl Default for ThingPalette {
@@ -91,22 +86,6 @@ impl Default for ThingPalette {
 			cycle_disabled: p::SLATE_200.into(),
 			cycle_ready: p::SLATE_300.into(),
 			cycle_trigger: p::SLATE_400.into(),
-			colored_base: [
-				p::ROSE_700.into(),
-				p::YELLOW_700.into(),
-				p::INDIGO_700.into(),
-				p::FUCHSIA_700.into(),
-				p::SLATE_500.into(),
-				p::GREEN_700.into(),
-			],
-			colored_trigger: [
-				p::ROSE_500.into(),
-				p::YELLOW_500.into(),
-				p::INDIGO_500.into(),
-				p::FUCHSIA_500.into(),
-				p::SLATE_100.into(),
-				p::GREEN_500.into(),
-			],
 		}
 	}
 }
@@ -153,36 +132,18 @@ fn button_trigger_animation_system(
 					// If either thing is colorless, they are considered compatible
 					.unwrap_or(true);
 				if colors_compatible {
-					button.0.color = button
-						.1
-						.map(|c| palette.colored_trigger[c.0])
-						.unwrap_or(palette.button_trigger);
-					object.0.color = object
-						.1
-						.map(|c| palette.colored_trigger[c.0])
-						.unwrap_or(palette.box_trigger);
+					button.0.color = palette.button_trigger;
+					object.0.color = palette.box_trigger;
 				} else {
-					button.0.color = button
-						.1
-						.map(|c| palette.colored_base[c.0])
-						.unwrap_or(palette.button_base);
-					object.0.color = object
-						.1
-						.map(|c| palette.colored_base[c.0])
-						.unwrap_or(palette.box_base);
+					button.0.color = palette.button_base;
+					object.0.color = palette.box_base;
 				}
 			}
-			(Some(mut button), None) => {
-				button.0.color = button
-					.1
-					.map(|c| palette.colored_base[c.0])
-					.unwrap_or(palette.button_base);
+			(Some((mut button, _)), None) => {
+				button.color = palette.button_base;
 			}
-			(None, Some(mut object)) => {
-				object.0.color = object
-					.1
-					.map(|c| palette.colored_base[c.0])
-					.unwrap_or(palette.box_base);
+			(None, Some((mut object, _))) => {
+				object.color = palette.box_base;
 			}
 			(None, None) => {}
 		}

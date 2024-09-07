@@ -226,10 +226,7 @@ fn spawn_vertex(
 				thing_type,
 				SpriteBundle {
 					sprite: Sprite {
-						color: object_data
-							.color
-							.map(|c| palette.colored_base[c.0])
-							.unwrap_or(palette.box_base),
+						color: palette.box_base,
 						custom_size: Some(SPRITE_SIZE),
 						anchor: Custom(Vec2::new(0.0, -0.25)),
 						..default()
@@ -272,10 +269,7 @@ fn spawn_vertex(
 				thing_type,
 				SpriteBundle {
 					sprite: Sprite {
-						color: glyph_data
-							.color
-							.map(|c| palette.colored_base[c.0])
-							.unwrap_or(palette.button_base),
+						color: palette.button_base,
 						custom_size: Some(SPRITE_SIZE),
 						anchor: Custom(Vec2::new(0.0, -0.25)),
 						..default()
