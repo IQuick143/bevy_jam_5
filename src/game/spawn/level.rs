@@ -13,7 +13,6 @@ use bevy::math::{
 	primitives,
 };
 use bevy::sprite::Anchor::Custom;
-use itertools::Itertools;
 use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
@@ -25,7 +24,7 @@ fn spawn_level(
 	mut events: EventWriter<GameLayoutChanged>,
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	levels: Res<Assets<LevelAsset>>,
+	levels: Res<Assets<LevelData>>,
 	mut is_level_completed: ResMut<IsLevelCompleted>,
 	mut move_history: ResMut<MoveHistory>,
 	cycle_material: ResMut<RingMaterial>,
@@ -39,22 +38,14 @@ fn spawn_level(
 	let level = levels
 		.get(level)
 		.expect("Got an invalid handle to a level asset");
-	let data = &level.data;
-	let layout = &{
-		let mut layout = level.layout.clone();
-		layout.recompute_to_fit(LEVEL_AREA_WIDTH / 2.0, LEVEL_AREA_CENTER);
-		layout
-	};
 
-	let vertices: Vec<Entity> = data
+	let vertices: Vec<Entity> = level
 		.vertices
 		.iter()
-		.zip_eq(&layout.vertices)
-		.map(|(data, pos)| {
+		.map(|data| {
 			spawn_vertex(
 				commands.reborrow(),
 				data,
-				*pos,
 				meshes.reborrow(),
 				cycle_material.0.clone(),
 				palette.as_ref(),
@@ -63,11 +54,10 @@ fn spawn_level(
 		})
 		.collect();
 
-	let cycle_ids = data
+	let cycle_ids = level
 		.cycles
 		.iter()
-		.zip_eq(&layout.cycles)
-		.map(|(data, pos)| {
+		.map(|data| {
 			spawn_cycle(
 				commands.reborrow(),
 				meshes.reborrow(),
@@ -75,27 +65,25 @@ fn spawn_level(
 				&palette,
 				&image_handles,
 				data,
-				*pos,
 				&vertices,
 			)
 		})
 		.collect::<Vec<_>>();
 
 	for (i, cycle_id) in cycle_ids.iter().copied().enumerate() {
-		let linked_cycles = data
-			.cycles_linked_to(i)
-			.map(|(j, dir)| (cycle_ids[j], dir))
+		let linked_cycles = level.cycles[i]
+			.link_closure
+			.iter()
+			.map(|&(j, dir)| (cycle_ids[j], dir))
 			.collect::<Vec<_>>();
-		if !linked_cycles.is_empty() {
-			commands
-				.entity(cycle_id)
-				.insert(LinkedCycles(linked_cycles));
-		}
+		commands
+			.entity(cycle_id)
+			.insert(LinkedCycles(linked_cycles));
 	}
 
-	for link in &data.linkages {
-		let a = layout.cycles[link.cycle_a_index].position;
-		let b = layout.cycles[link.cycle_b_index].position;
+	for link in &level.declared_links {
+		let a = level.cycles[link.source_cycle].placement.position;
+		let b = level.cycles[link.dest_cycle].placement.position;
 		let d_sq = a.distance_squared(b);
 		if d_sq <= CYCLE_LINK_SPACING.powi(2) {
 			// The link cannot be rendered if the cycles are too close
@@ -160,14 +148,13 @@ fn spawn_level(
 fn spawn_vertex(
 	mut commands: Commands,
 	data: &VertexData,
-	position: Vec2,
 	mut meshes: Mut<Assets<Mesh>>,
 	base_material: Handle<ColorMaterial>,
 	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
 ) -> Entity {
 	let transform =
-		TransformBundle::from_transform(Transform::from_translation(position.extend(0.0)));
+		TransformBundle::from_transform(Transform::from_translation(data.position.extend(0.0)));
 	let vertex_id = commands
 		.spawn((
 			Vertex,
@@ -183,7 +170,7 @@ fn spawn_vertex(
 		StateScoped(Screen::Playing),
 		LevelScoped,
 		ColorMesh2dBundle {
-			transform: Transform::from_translation(position.extend(layers::CYCLE_NODES)),
+			transform: Transform::from_translation(data.position.extend(layers::CYCLE_NODES)),
 			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 			material: base_material,
 			..default()
@@ -208,7 +195,9 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(layers::OBJECT_SPRITES)),
+					transform: Transform::from_translation(
+						data.position.extend(layers::OBJECT_SPRITES),
+					),
 					..Default::default()
 				},
 				AnimatedObject::default(),
@@ -239,7 +228,9 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(layers::OBJECT_SPRITES)),
+					transform: Transform::from_translation(
+						data.position.extend(layers::OBJECT_SPRITES),
+					),
 					..Default::default()
 				},
 				AnimatedObject::default(),
@@ -283,7 +274,9 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(layers::GLYPH_SPRITES)),
+					transform: Transform::from_translation(
+						data.position.extend(layers::GLYPH_SPRITES),
+					),
 					..Default::default()
 				},
 				Hoverable {
@@ -310,7 +303,9 @@ fn spawn_vertex(
 						..default()
 					},
 					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(position.extend(layers::GLYPH_SPRITES)),
+					transform: Transform::from_translation(
+						data.position.extend(layers::GLYPH_SPRITES),
+					),
 					..Default::default()
 				},
 				Hoverable {
@@ -342,12 +337,11 @@ fn spawn_cycle(
 	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
 	data: &CycleData,
-	placement: layout::CyclePlacement,
 	vertex_entities: &[Entity],
 ) -> Entity {
 	let mesh = primitives::Annulus::new(
-		placement.radius - RING_HALF_WIDTH,
-		placement.radius + RING_HALF_WIDTH,
+		data.placement.radius - RING_HALF_WIDTH,
+		data.placement.radius + RING_HALF_WIDTH,
 	)
 	.mesh()
 	.resolution(64)
@@ -355,7 +349,7 @@ fn spawn_cycle(
 
 	commands
 		.spawn((
-			data.cycle_turnability,
+			data.turnability,
 			StateScoped(Screen::Playing),
 			LevelScoped,
 			ComputedCycleTurnability(true),
@@ -365,10 +359,10 @@ fn spawn_cycle(
 					.map(|i| *vertex_entities.get(*i).unwrap())
 					.collect(),
 			),
-			CycleInterationRadius(placement.radius),
+			CycleInterationRadius(data.placement.radius),
 			CycleInteraction::default(),
 			TransformBundle::from_transform(Transform::from_translation(
-				placement.position.extend(0.0),
+				data.placement.position.extend(0.0),
 			)),
 			VisibilityBundle::default(),
 		))
@@ -380,8 +374,7 @@ fn spawn_cycle(
 						color: palette.cycle_ready,
 						..default()
 					},
-					texture: image_handles[&ImageKey::CycleCenter(data.cycle_turnability)]
-						.clone_weak(),
+					texture: image_handles[&ImageKey::CycleCenter(data.turnability)].clone_weak(),
 					transform: Transform::from_translation(
 						Vec2::ZERO.extend(layers::CYCLE_CENTER_SPRITES),
 					),
@@ -389,7 +382,7 @@ fn spawn_cycle(
 				},
 				JumpTurnAnimation::default(),
 				Hoverable {
-					hover_text: match data.cycle_turnability {
+					hover_text: match data.turnability {
 						CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
 						CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
 						CycleTurnability::Never => hover::CYCLE_STILL,

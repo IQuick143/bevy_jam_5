@@ -24,7 +24,7 @@ pub enum RawStatement<'a> {
 	Assignment(RawAssignmentStatement<'a>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LexError {
 	/// A line contains non-ascii characters
 	NonAsciiLine(usize),
@@ -33,7 +33,7 @@ pub enum LexError {
 }
 
 pub fn parse(raw_data: &str) -> impl Iterator<Item = Result<(usize, RawStatement), LexError>> {
-	let assignment_regex = Regex::new(r"^(?<KEY>[a-zA-Z0-9_]+)=(?<VALUE>.+)$")
+	let assignment_regex = Regex::new(r"^(?<KEY>[a-zA-Z0-9_]+)=(?<VALUE>.*)$")
 		.expect("I expected to be able to write a valid regex.");
 	let action_regex = Regex::new(r"^(?<VERB>\w+)(\[(?<MODIFIER>[\w\:]+)\])?(?<VALUES>.+)?$")
 		.expect("I expected to be able to write a valid regex.");

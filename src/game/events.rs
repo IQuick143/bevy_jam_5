@@ -1,4 +1,4 @@
-use super::{components::LinkedCycleDirection, level::asset::LevelAsset};
+use super::{components::LinkedCycleDirection, level::LevelData};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -11,7 +11,7 @@ pub(super) fn plugin(app: &mut App) {
 
 /// Trigger event that spawns the content entities of a level
 #[derive(Event, Debug)]
-pub struct SpawnLevel(pub Handle<LevelAsset>);
+pub struct SpawnLevel(pub Handle<LevelData>);
 
 /// Enumerates directions in which a cycle can turn
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

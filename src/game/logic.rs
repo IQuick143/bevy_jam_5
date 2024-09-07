@@ -29,17 +29,14 @@ fn cycle_group_rotation_relay_system(
 		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
 		update_event.send(GameLayoutChanged);
 		single_events.send_batch(
-			std::iter::once(group_rotation.0)
-				.chain(
-					cycles_q
-						.get(group_rotation.0.target_cycle)
-						.into_iter()
-						.flat_map(|links| &links.0)
-						.map(|&(id, relative_direction)| RotateCycle {
-							target_cycle: id,
-							direction: group_rotation.0.direction * relative_direction,
-						}),
-				)
+			cycles_q
+				.get(group_rotation.0.target_cycle)
+				.into_iter()
+				.flat_map(|links| &links.0)
+				.map(|&(id, relative_direction)| RotateCycle {
+					target_cycle: id,
+					direction: group_rotation.0.direction * relative_direction,
+				})
 				.map(RotateSingleCycle),
 		);
 	}

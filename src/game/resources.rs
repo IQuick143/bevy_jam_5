@@ -1,6 +1,6 @@
 use bevy::color::palettes;
 
-use super::{level::LOGICAL_COLORS, prelude::*};
+use super::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
@@ -75,6 +75,9 @@ impl FromWorld for LinkMaterial {
 		}))
 	}
 }
+
+// TODO: Delete this when we remove color-coding from logical colors
+const LOGICAL_COLORS: usize = 6;
 
 /// Contains colors used for rendering objects and glyphs
 #[derive(Resource, Debug, Clone, Reflect)]
