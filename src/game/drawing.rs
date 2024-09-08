@@ -3,8 +3,7 @@ use crate::AppSet;
 use bevy::color::palettes;
 
 pub(super) fn plugin(app: &mut App) {
-	app.init_resource::<RingMaterial>()
-		.init_resource::<LinkMaterial>()
+	app.init_resource::<GameObjectMaterials>()
 		.init_resource::<ThingPalette>()
 		.add_systems(
 			Update,
@@ -12,48 +11,56 @@ pub(super) fn plugin(app: &mut App) {
 				goal_unlock_animation_system
 					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
 				(
-					button_trigger_animation_system,
+					button_trigger_animation_system.before(sprite_color_propagation_system),
 					cycle_center_turnability_visuals_update_system
 						.before(cycle_center_interaction_visuals_update_system),
 				)
 					.run_if(on_event::<GameLayoutChanged>()),
 				cycle_center_interaction_visuals_update_system,
+				sprite_color_propagation_system,
 			)
 				.in_set(AppSet::UpdateVisuals),
 		);
 }
 
-/// Contains a handle to the material used for rendering the cycle rings
-#[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
-pub struct RingMaterial(pub Handle<ColorMaterial>);
+/// Marker component for sprites that should copy the sprite color of their parent sprite.
+/// This only goes one layer deep. Sprite color is not inherited recursively.
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+pub struct InheritSpriteColor;
 
-impl FromWorld for RingMaterial {
-	fn from_world(world: &mut World) -> Self {
-		let mut materials = world
-			.get_resource_mut::<Assets<ColorMaterial>>()
-			.expect("I'd expect materials to exist pretty please.");
-
-		RingMaterial(materials.add(ColorMaterial {
-			color: palettes::tailwind::SLATE_400.into(),
-			..default()
-		}))
-	}
+/// Contains handles to the materials used to render game objects that are visualized by meshes
+#[derive(Resource, Debug, Clone, Reflect)]
+pub struct GameObjectMaterials {
+	/// Material for cycle rings and vertex dots
+	pub cycle_rings: Handle<ColorMaterial>,
+	/// Material for lines that represent links between cycles
+	pub link_lines: Handle<ColorMaterial>,
+	/// Meterial for labels that show logical color of buttons
+	pub colored_button_labels: Handle<ColorMaterial>,
 }
 
-/// Contains a handle to the material used for rendering cycle links
-#[derive(Resource, Deref, DerefMut, Debug, Clone, Reflect)]
-pub struct LinkMaterial(pub Handle<ColorMaterial>);
-
-impl FromWorld for LinkMaterial {
+impl FromWorld for GameObjectMaterials {
 	fn from_world(world: &mut World) -> Self {
-		let mut materials = world
-			.get_resource_mut::<Assets<ColorMaterial>>()
-			.expect("I'd expect materials to exist pretty please.");
+		let mut materials = world.resource_mut::<Assets<ColorMaterial>>();
 
-		LinkMaterial(materials.add(ColorMaterial {
+		let cycle_rings = materials.add(ColorMaterial {
+			color: palettes::tailwind::SLATE_400.into(),
+			..default()
+		});
+		let link_lines = materials.add(ColorMaterial {
 			color: palettes::tailwind::SLATE_300.into(),
 			..default()
-		}))
+		});
+		let colored_button_labels = materials.add(ColorMaterial {
+			color: Color::BLACK,
+			..default()
+		});
+
+		Self {
+			cycle_rings,
+			link_lines,
+			colored_button_labels,
+		}
 	}
 }
 
@@ -216,6 +223,19 @@ fn cycle_center_interaction_visuals_update_system(
 			} else {
 				palette.cycle_disabled
 			};
+		}
+	}
+}
+
+fn sprite_color_propagation_system(
+	parents_q: Query<(&Sprite, &Children), (Changed<Sprite>, Without<InheritSpriteColor>)>,
+	mut children_q: Query<&mut Sprite, With<InheritSpriteColor>>,
+) {
+	for (parent, children) in &parents_q {
+		for child_id in children {
+			if let Ok(mut child) = children_q.get_mut(*child_id) {
+				child.color = parent.color;
+			}
 		}
 	}
 }

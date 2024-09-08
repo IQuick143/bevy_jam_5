@@ -25,6 +25,7 @@ pub(super) fn plugin(app: &mut App) {
 		proceed_with_level_list_loading.run_if(primary_level_list_loaded),
 	);
 
+	app.init_resource::<BoxColorSpriteAtlasLayout>();
 	app.init_resource::<GlobalFont>();
 }
 
@@ -33,6 +34,7 @@ pub enum ImageKey {
 	Object(ThingType),
 	CycleCenter(CycleTurnability),
 	CycleRotationArrow,
+	BoxSpriteAtlas,
 	Background,
 	Title,
 }
@@ -81,9 +83,36 @@ impl FromWorld for HandleMap<ImageKey> {
 				ImageKey::Background,
 				asset_server.load("images/background.png"),
 			),
+			(
+				ImageKey::BoxSpriteAtlas,
+				asset_server.load("images/box-sprites.png"),
+			),
 			(ImageKey::Title, asset_server.load("images/title.png")),
 		]
 		.into()
+	}
+}
+
+/// Texture atlas layout for the box sprites.
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
+pub struct BoxColorSpriteAtlasLayout(pub Handle<TextureAtlasLayout>);
+
+/// Index into the box color sprite sheet where pictograms start
+pub const BOX_COLOR_SPRITE_PICTOGRAM_OFFSET: usize = 10;
+
+impl FromWorld for BoxColorSpriteAtlasLayout {
+	fn from_world(world: &mut World) -> Self {
+		let mut layouts = world.resource_mut::<Assets<TextureAtlasLayout>>();
+		let layout = TextureAtlasLayout::from_grid(
+			UVec2::splat(136),
+			10,
+			10,
+			Some(UVec2::splat(15)),
+			Some(UVec2::splat(15)),
+		);
+		let handle = layouts.add(layout);
+		Self(handle)
 	}
 }
 

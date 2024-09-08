@@ -81,22 +81,28 @@ pub enum GlyphType {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
-pub struct ObjectData {
-	pub object_type: ObjectType,
-	pub color: Option<LogicalColor>,
+pub enum ObjectData {
+	Box(Option<LogicalColor>),
+	Player,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
-pub struct GlyphData {
-	pub glyph_type: GlyphType,
-	pub color: Option<LogicalColor>,
+pub enum GlyphData {
+	Button(Option<LogicalColor>),
+	Flag,
 }
 
-/// Type describing any gameplay object
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum ThingType {
 	Object(ObjectType),
 	Glyph(GlyphType),
+}
+
+/// Type describing any gameplay object
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+pub enum ThingData {
+	Object(ObjectData),
+	Glyph(GlyphData),
 }
 
 /// Defines conditions under which a cycle may be turned
@@ -122,7 +128,26 @@ pub enum LinkedCycleDirection {
 /// Logical color of a box or a button.
 /// Colored buttons require a box of the same color
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
-pub struct LogicalColor(pub usize);
+pub struct LogicalColor {
+	/// Index of the color.
+	/// For pictogram colors, this is the ID of the pictogram.
+	/// For numeric colors, this is the numeric value.
+	pub color_index: usize,
+	/// True to use a pictogram color, false to use a numeric color.
+	///
+	/// The pictogram or number is intended to be displayed inside the box
+	/// and on a label next to the button.
+	///
+	/// Pictogram and numeric color with the same [`color_index`](Self::color_index)
+	/// are entirely different colors.
+	///
+	/// The reason pictogram colors are identified by index (rather than using
+	/// an enum to list all possible pictograms) is to allow for quickly expanding
+	/// the pictogram list with minimal changes to the code.
+	/// Out-of-range pictogram indices will not render properly, but they
+	/// are not a hard error.
+	pub is_pictogram: bool,
+}
 
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -141,6 +166,33 @@ impl std::ops::Mul for LinkedCycleDirection {
 			LinkedCycleDirection::Coincident
 		} else {
 			LinkedCycleDirection::Inverse
+		}
+	}
+}
+
+impl From<ObjectData> for ObjectType {
+	fn from(value: ObjectData) -> Self {
+		match value {
+			ObjectData::Box(_) => Self::Box,
+			ObjectData::Player => Self::Player,
+		}
+	}
+}
+
+impl From<GlyphData> for GlyphType {
+	fn from(value: GlyphData) -> Self {
+		match value {
+			GlyphData::Button(_) => Self::Button,
+			GlyphData::Flag => Self::Flag,
+		}
+	}
+}
+
+impl From<ThingData> for ThingType {
+	fn from(value: ThingData) -> Self {
+		match value {
+			ThingData::Glyph(g) => Self::Glyph(g.into()),
+			ThingData::Object(o) => Self::Object(o.into()),
 		}
 	}
 }

@@ -35,6 +35,19 @@ pub const CYCLE_LINK_END_CUT: f32 = SPRITE_LENGTH / 2.0;
 /// See [`SPRITE_LENGTH`]
 pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
 
+/// How big logical color labels for buttons should be
+pub const COLOR_LABEL_SIZE: f32 = SPRITE_LENGTH * 0.3828125;
+/// How big logical color sprites should be
+pub const COLOR_SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH * 0.265625);
+/// How logical color sprites on boxes should be offset vertically from the parent sprite
+pub const COLOR_SPRITE_OFFSET: f32 = SPRITE_LENGTH * 0.111328125;
+/// How much of the width of a sprite is actually taken up by digits other than 1
+pub const DIGIT_SPRITE_WIDTH: f32 = 0.8;
+/// How much of the width of a sprite is taken up by the digit 1
+pub const DIGIT_ONE_SPRITE_WIDTH: f32 = 0.4;
+/// Spacing of digit sprites, relative to full width of a sprite
+pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
+
 /// Colour into which the screen fades during transitions
 pub const FADE_COLOUR: Color = Color::WHITE;
 
@@ -55,4 +68,7 @@ pub mod layers {
 	pub const CYCLE_CENTER_SPRITES: f32 = -300.0;
 	pub const CYCLE_LINKS: f32 = -400.0;
 	pub const BACKGROUND: f32 = -550.0;
+	pub const BOX_COLOR_SPRITES: f32 = 2.0; // Relative to the box sprite
+	pub const BUTTON_COLOR_LABELS: f32 = 1.0; // Relative to the button sprite
+	pub const BUTTON_COLOR_SPRITES: f32 = 2.0; // Relative to the button sprite
 }
