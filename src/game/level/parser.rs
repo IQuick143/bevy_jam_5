@@ -3,32 +3,50 @@ use bevy::utils::hashbrown::HashMap;
 use itertools::Itertools as _;
 
 pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
-	let mut builder = LevelBuilder::new();
-	let mut vertex_names = HashMap::new();
-	let mut cycle_names = HashMap::new();
+	let mut state = ParserState::new();
 	let mut last_line_number = 0;
 
 	for line in lex::parse(level_file) {
 		let (line_number, statement) = line?;
 		last_line_number = line_number;
-		let result = parse_statement(statement, &mut builder, &mut vertex_names, &mut cycle_names);
+		let result = parse_statement(statement, &mut state);
 		if let Err(err) = result {
 			return Err(err.at_line(line_number));
 		}
 	}
 
-	match builder.build() {
+	match state.builder.build() {
 		Ok(level) => Ok(level),
 		Err(err) => Err(LevelParsingErrorCode::BuilderError(err).at_line(last_line_number)),
 	}
 }
 
+/// Global state of the parser, to avoid making functions with many parameters
+struct ParserState {
+	builder: LevelBuilder,
+	vertex_names: HashMap<String, usize>,
+	cycle_names: HashMap<String, usize>,
+}
+
+impl ParserState {
+	fn new() -> Self {
+		Self {
+			builder: LevelBuilder::new(),
+			vertex_names: HashMap::new(),
+			cycle_names: HashMap::new(),
+		}
+	}
+}
+
 fn parse_statement(
 	statement: RawStatement,
-	builder: &mut LevelBuilder,
-	vertex_names: &mut HashMap<String, usize>,
-	cycle_names: &mut HashMap<String, usize>,
+	state: &mut ParserState,
 ) -> Result<(), LevelParsingErrorCode> {
+	let ParserState {
+		builder,
+		vertex_names,
+		cycle_names,
+	} = state;
 	match statement {
 		RawStatement::Assignment(statement) => match statement.key.to_ascii_lowercase().as_str() {
 			"name" => builder.set_level_name(statement.value.to_owned())?,
