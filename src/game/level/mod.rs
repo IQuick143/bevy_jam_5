@@ -149,6 +149,22 @@ pub struct LogicalColor {
 	pub is_pictogram: bool,
 }
 
+impl LogicalColor {
+	pub fn new(color_index: usize) -> Self {
+		Self {
+			color_index,
+			is_pictogram: false,
+		}
+	}
+
+	pub fn pictogram(color_index: usize) -> Self {
+		Self {
+			color_index,
+			is_pictogram: true,
+		}
+	}
+}
+
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(

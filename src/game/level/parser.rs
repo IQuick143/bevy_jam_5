@@ -26,6 +26,9 @@ struct ParserState {
 	builder: LevelBuilder,
 	vertex_names: HashMap<String, usize>,
 	cycle_names: HashMap<String, usize>,
+	override_palette: Vec<LogicalColor>,
+	default_box_color: Option<LogicalColor>,
+	default_button_color: Option<LogicalColor>,
 }
 
 impl ParserState {
@@ -34,6 +37,9 @@ impl ParserState {
 			builder: LevelBuilder::new(),
 			vertex_names: HashMap::new(),
 			cycle_names: HashMap::new(),
+			override_palette: Vec::new(),
+			default_box_color: None,
+			default_button_color: None,
 		}
 	}
 }
@@ -46,6 +52,9 @@ fn parse_statement(
 		builder,
 		vertex_names,
 		cycle_names,
+		override_palette,
+		default_box_color,
+		default_button_color,
 	} = state;
 	match statement {
 		RawStatement::Assignment(statement) => match statement.key.to_ascii_lowercase().as_str() {
@@ -132,19 +141,21 @@ fn parse_statement(
 				}
 			}
 			"OBJECT" => {
-				let Some(object_kind) = statement.modifier.first().copied() else {
-					return Err(LevelParsingErrorCode::MissingModifier);
+				let object_kind = match statement.modifier.first().copied() {
+					Some("BOX") => ThingType::Object(ObjectType::Box),
+					Some("PLAYER") => ThingType::Object(ObjectType::Player),
+					Some("BUTTON") => ThingType::Glyph(GlyphType::Button),
+					Some("FLAG") => ThingType::Glyph(GlyphType::Flag),
+					Some(other) => {
+						return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
+					}
+					None => return Err(LevelParsingErrorCode::MissingModifier),
 				};
 				let expected_modifiers = match object_kind {
-					"BOX" => 2,
-					"PLAYER" => 1,
-					"BUTTON" => 2,
-					"FLAG" => 1,
-					_ => {
-						return Err(LevelParsingErrorCode::InvalidModifier(
-							object_kind.to_owned(),
-						))
-					}
+					ThingType::Object(ObjectType::Box) => 2,
+					ThingType::Object(ObjectType::Player) => 1,
+					ThingType::Glyph(GlyphType::Button) => 2,
+					ThingType::Glyph(GlyphType::Flag) => 1,
 				};
 				if statement.modifier.len() > expected_modifiers {
 					return Err(LevelParsingErrorCode::ExtraneousModifier(
@@ -152,41 +163,39 @@ fn parse_statement(
 						statement.modifier.len(),
 					));
 				}
-				let color = if let Some(color_name) = statement.modifier.get(1) {
-					let color_name = color_name.to_ascii_lowercase();
-					if color_name.is_empty() {
-						None
-					} else if let Ok(color_index) = color_name.parse() {
-						Some(LogicalColor {
-							color_index,
-							is_pictogram: false,
-						})
-					} else if let Some(Ok(color_index)) =
-						color_name.strip_prefix('p').map(str::parse)
-					{
-						Some(LogicalColor {
-							color_index,
-							is_pictogram: true,
-						})
-					} else if let Ok(color_index) = pictogram_name_to_id(&color_name) {
-						Some(LogicalColor {
-							color_index,
-							is_pictogram: true,
+				let color = if let Some(color_name) = statement.modifier.get(1).copied() {
+					if let Ok(color) = parse_logical_color(&color_name.to_ascii_lowercase()) {
+						color.map(|color| {
+							// Override numeric color by palette if present
+							if !color.is_pictogram && color.color_index > 0 {
+								override_palette
+									.get(color.color_index - 1)
+									.copied()
+									.unwrap_or(color)
+							} else {
+								color
+							}
 						})
 					} else {
-						return Err(LevelParsingErrorCode::InvalidModifier(
+						return Err(LevelParsingErrorCode::UnknownColorName(
 							color_name.to_owned(),
 						));
 					}
 				} else {
-					None
+					// If no color is specified, use the default for the given object type
+					match object_kind {
+						ThingType::Object(ObjectType::Box) => *default_box_color,
+						ThingType::Glyph(GlyphType::Button) => *default_button_color,
+						_ => None,
+					}
 				};
 				let to_insert = match object_kind {
-					"BOX" => ThingData::Object(ObjectData::Box(color)),
-					"PLAYER" => ThingData::Object(ObjectData::Player),
-					"BUTTON" => ThingData::Glyph(GlyphData::Button(color)),
-					"FLAG" => ThingData::Glyph(GlyphData::Flag),
-					_ => unreachable!("Already checked"),
+					ThingType::Object(ObjectType::Box) => ThingData::Object(ObjectData::Box(color)),
+					ThingType::Object(ObjectType::Player) => ThingData::Object(ObjectData::Player),
+					ThingType::Glyph(GlyphType::Button) => {
+						ThingData::Glyph(GlyphData::Button(color))
+					}
+					ThingType::Glyph(GlyphType::Flag) => ThingData::Glyph(GlyphData::Flag),
 				};
 				for vertex_name in statement.values {
 					let Some(vertex) = vertex_names.get(vertex_name).copied() else {
@@ -276,10 +285,59 @@ fn parse_statement(
 				};
 				builder.place_vertex(vertex_id, angle)?;
 			}
+			"PALETTE" => {
+				if statement.modifier.len() > 1 {
+					return Err(LevelParsingErrorCode::ExtraneousModifier(
+						1,
+						statement.modifier.len(),
+					));
+				}
+				let colors = statement
+					.values
+					.into_iter()
+					.map(|color_name| {
+						parse_logical_color(&color_name.to_ascii_lowercase())
+							.map(|color| {
+								color.expect("Lexer ensures that no empty strings are passed")
+							})
+							.map_err(|_| {
+								LevelParsingErrorCode::UnknownColorName(color_name.to_owned())
+							})
+					})
+					.collect::<Result<Vec<_>, _>>()?;
+				match statement.modifier.first().copied() {
+					None => {}
+					Some("DEFAULT_BOX") => *default_box_color = colors.first().copied(),
+					Some("DEFAULT_BUTTON") => *default_button_color = colors.first().copied(),
+					Some("DEFAULT") => {
+						let new_default = colors.first().copied();
+						*default_box_color = new_default;
+						*default_button_color = new_default;
+					}
+					Some(other) => {
+						return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
+					}
+				}
+				*override_palette = colors;
+			}
 			other => return Err(LevelParsingErrorCode::InvalidKeyword(other.to_owned())),
 		},
 	}
 	Ok(())
+}
+
+fn parse_logical_color(key: &str) -> Result<Option<LogicalColor>, ()> {
+	if key.is_empty() {
+		Ok(None)
+	} else if let Ok(color_index) = key.parse() {
+		Ok(Some(LogicalColor::new(color_index)))
+	} else if let Some(Ok(color_index)) = key.strip_prefix('p').map(str::parse) {
+		Ok(Some(LogicalColor::pictogram(color_index)))
+	} else if let Ok(color_index) = pictogram_name_to_id(key) {
+		Ok(Some(LogicalColor::pictogram(color_index)))
+	} else {
+		Err(())
+	}
 }
 
 fn pictogram_name_to_id(name: &str) -> Result<usize, ()> {
@@ -353,6 +411,7 @@ pub enum LevelParsingErrorCode {
 	NotEnoughArguments(usize, usize),
 	ExtraneousArguments(usize, usize),
 	ExtraneousModifier(usize, usize),
+	UnknownColorName(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -423,6 +482,7 @@ impl std::fmt::Display for LevelParsingErrorCode {
 				f,
 				"Statement found {got} modifiers, expected at most {expected}."
 			)?,
+			Self::UnknownColorName(name) => write!(f, "{name} is not a valid color name.")?,
 		}
 		Ok(())
 	}
@@ -437,7 +497,8 @@ impl std::fmt::Display for LevelParsingError {
 #[cfg(test)]
 mod test {
 	use super::{
-		parse, LevelBuilderError, LevelParsingErrorCode, LexErrorCode, OverlappedLinkedCyclesError,
+		parse, LevelBuilderError, LevelParsingErrorCode, LexErrorCode, LogicalColor,
+		OverlappedLinkedCyclesError,
 	};
 
 	macro_rules! assert_err_eq {
@@ -777,6 +838,86 @@ LINK 1 2 3
 
 		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
 			assert_err_eq!(parse(data), expected.into());
+		}
+	}
+
+	#[test]
+	fn logical_colors_test() {
+		let data = r"
+VERTEX a b c d e f g h i j k l m n
+
+# Default, with no color
+OBJECT[BOX] a
+
+# Numeric colors are specified with numbers
+OBJECT[BOX:42] b
+
+# Pictogram colors are specified by name
+OBJECT[BOX:star] c
+
+# Pictogram colors may also be specified by their id
+OBJECT[BOX:p16] d
+
+# Palette command defines substitutions for numeric color declarations
+PALETTE p3 p4 2048
+OBJECT[BOX:1] e
+
+# Palettes can substitute numeric colors as well
+OBJECT[BOX:3] f
+
+# Anything out of range will remain a number
+OBJECT[BOX:4] g
+
+# ...Including the zero color
+OBJECT[BOX:0] h
+
+# First color of a palette may be set as the default color
+# for when a color specifier is omited
+PALETTE[DEFAULT] p12 3
+OBJECT[BOX] i
+
+# Colorless object can be forced by explicit empty color specifier
+OBJECT[BOX:] j
+
+# Palette commands ignore any pre-existing palettes.
+# The '3', as declared above, is actually the numeric color 3
+OBJECT[BOX:2] k
+
+# Palette is cleared by omiting the arguments
+PALETTE
+OBJECT[BOX:1] l
+
+# This does not affect the default color unless the modifier is used again
+OBJECT[BOX] m
+
+# Empty palette command with modifier clears default color as well
+PALETTE[DEFAULT]
+OBJECT[BOX] n
+";
+
+		let expected_colors = [
+			None,
+			Some(LogicalColor::new(42)),
+			Some(LogicalColor::pictogram(36)),
+			Some(LogicalColor::pictogram(16)),
+			Some(LogicalColor::pictogram(3)),
+			Some(LogicalColor::new(2048)),
+			Some(LogicalColor::new(4)),
+			Some(LogicalColor::new(0)),
+			Some(LogicalColor::pictogram(12)),
+			None,
+			Some(LogicalColor::new(3)),
+			Some(LogicalColor::new(1)),
+			Some(LogicalColor::pictogram(12)),
+			None,
+		];
+
+		let level = parse(data).expect("Test sample did not parse correctly!");
+		for (vertex, expected_color) in level.vertices.iter().zip(expected_colors) {
+			let Some(super::ObjectData::Box(color)) = vertex.object else {
+				panic!("Vertex does not contain a box.");
+			};
+			assert_eq!(color, expected_color);
 		}
 	}
 }
