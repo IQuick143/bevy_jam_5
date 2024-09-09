@@ -167,9 +167,9 @@ fn parse_statement(
 					if let Ok(color) = parse_logical_color(&color_name.to_ascii_lowercase()) {
 						color.map(|color| {
 							// Override numeric color by palette if present
-							if !color.is_pictogram && color.color_index > 0 {
+							if !color.is_pictogram {
 								override_palette
-									.get(color.color_index - 1)
+									.get(color.color_index)
 									.copied()
 									.unwrap_or(color)
 							} else {
@@ -844,7 +844,7 @@ LINK 1 2 3
 	#[test]
 	fn logical_colors_test() {
 		let data = r"
-VERTEX a b c d e f g h i j k l m n
+VERTEX a b c d e f g i j k l m n
 
 # Default, with no color
 OBJECT[BOX] a
@@ -860,28 +860,25 @@ OBJECT[BOX:p16] d
 
 # Palette command defines substitutions for numeric color declarations
 PALETTE p3 p4 2048
-OBJECT[BOX:1] e
+OBJECT[BOX:0] e
 
 # Palettes can substitute numeric colors as well
-OBJECT[BOX:3] f
+OBJECT[BOX:2] f
 
 # Anything out of range will remain a number
-OBJECT[BOX:4] g
-
-# ...Including the zero color
-OBJECT[BOX:0] h
+OBJECT[BOX:3] g
 
 # First color of a palette may be set as the default color
 # for when a color specifier is omited
-PALETTE[DEFAULT] p12 3
+PALETTE[DEFAULT] p12 2
 OBJECT[BOX] i
 
 # Colorless object can be forced by explicit empty color specifier
 OBJECT[BOX:] j
 
 # Palette commands ignore any pre-existing palettes.
-# The '3', as declared above, is actually the numeric color 3
-OBJECT[BOX:2] k
+# The '2', as declared above, is actually the numeric color 2
+OBJECT[BOX:1] k
 
 # Palette is cleared by omiting the arguments
 PALETTE
@@ -902,11 +899,10 @@ OBJECT[BOX] n
 			Some(LogicalColor::pictogram(16)),
 			Some(LogicalColor::pictogram(3)),
 			Some(LogicalColor::new(2048)),
-			Some(LogicalColor::new(4)),
-			Some(LogicalColor::new(0)),
+			Some(LogicalColor::new(3)),
 			Some(LogicalColor::pictogram(12)),
 			None,
-			Some(LogicalColor::new(3)),
+			Some(LogicalColor::new(2)),
 			Some(LogicalColor::new(1)),
 			Some(LogicalColor::pictogram(12)),
 			None,
