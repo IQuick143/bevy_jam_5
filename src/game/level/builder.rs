@@ -150,6 +150,9 @@ pub enum LevelBuilderError {
 	OverlappedLinkedCycles(OverlappedLinkedCyclesError),
 	/// There is a loop in cycle links, and their directions are contradicting
 	CycleLinkageConflict(usize, usize),
+	/// [`set_color_label_appearence`](LevelBuilder::set_color_label_appearence)
+	/// was called on a vertex that does not contain a colored button
+	NoButtonWithColorAtVertex(usize),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -160,6 +163,9 @@ struct IntermediateVertexData {
 	pub object: Option<ObjectData>,
 	/// Glyph that lies on the vertex, if any
 	pub glyph: Option<GlyphData>,
+	/// Appearence of the button color label,
+	/// if any appears on this vertex
+	pub color_label_appearence: IntermediateButtonColorLabelAppearence,
 }
 
 #[derive(Clone, Debug)]
@@ -195,6 +201,13 @@ struct PartiallyBoundVertexPosition {
 	owner_cycle: usize,
 	/// Index of the vertex within the owner cycle's vertex list
 	index_in_owner: usize,
+}
+
+/// Appearence of a button color label relating to a vertex
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum IntermediateButtonColorLabelAppearence {
+	/// Color label appearence is specified explicitly
+	Static(ButtonColorLabelAppearence),
 }
 
 /// Container that holds one or two of something
@@ -274,6 +287,7 @@ impl LevelBuilder {
 			position: IntermediateVertexPosition::Free,
 			object: None,
 			glyph: None,
+			color_label_appearence: IntermediateButtonColorLabelAppearence::Static(default()),
 		});
 		Ok(self.vertices.len() - 1)
 	}
@@ -584,10 +598,32 @@ impl LevelBuilder {
 		}
 	}
 
+	/// Sets the appearence of a button color label at a particular vertex.
+	/// The vertex must have a colored button on it.
+	pub fn set_color_label_appearence(
+		&mut self,
+		target_vertex: usize,
+		appearence: ButtonColorLabelAppearence,
+	) -> Result<(), LevelBuilderError> {
+		if target_vertex >= self.vertices.len() {
+			return Err(LevelBuilderError::VertexIndexOutOfRange(target_vertex));
+		}
+		if !matches!(
+			self.vertices[target_vertex].glyph,
+			Some(GlyphData::Button(Some(_)))
+		) {
+			return Err(LevelBuilderError::NoButtonWithColorAtVertex(target_vertex));
+		}
+		self.vertices[target_vertex].color_label_appearence =
+			IntermediateButtonColorLabelAppearence::Static(appearence);
+		Ok(())
+	}
+
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
 		self.validate_before_build()?;
 		self.materialize_partial_vertex_placements();
+		self.apply_color_label_appearences_to_buttons();
 		self.fit_to_viewport(Aabb2d::new(LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH / 2.0));
 		let cycles = self
 			.cycles
@@ -660,6 +696,20 @@ impl LevelBuilder {
 			}
 		}
 		Ok(())
+	}
+
+	/// Iterates through all vertices and applies their intermediate
+	/// color label position to button objects on them if present.
+	///
+	/// This method expects all vertices to be materialized when it is called.
+	fn apply_color_label_appearences_to_buttons(&mut self) {
+		for vertex in &mut self.vertices {
+			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
+				match vertex.color_label_appearence {
+					IntermediateButtonColorLabelAppearence::Static(a) => *appearence = a,
+				}
+			}
+		}
 	}
 
 	/// Iterates through all cycles and materializes all vertices
@@ -1012,6 +1062,7 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order."),
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
+			Self::NoButtonWithColorAtVertex(i) => write!(f, "Cannot adjust color label at vertex {i} because there is no colored button there."),
 		}
 	}
 }

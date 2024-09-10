@@ -86,9 +86,9 @@ pub enum ObjectData {
 	Player,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[derive(Clone, Copy, Debug, Reflect)]
 pub enum GlyphData {
-	Button(Option<LogicalColor>),
+	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
 	Flag,
 }
 
@@ -99,7 +99,7 @@ pub enum ThingType {
 }
 
 /// Type describing any gameplay object
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub enum ThingData {
 	Object(ObjectData),
 	Glyph(GlyphData),
@@ -147,6 +147,55 @@ pub struct LogicalColor {
 	/// Out-of-range pictogram indices will not render properly, but they
 	/// are not a hard error.
 	pub is_pictogram: bool,
+}
+
+/// Describes how a button with logical color should be labeled.
+///
+/// Logical color on button takes the appearence of a label inside
+/// or near the button. This structure describes the shape and
+/// positioning of the label.
+#[derive(Clone, Copy, PartialEq, Debug, Default, Reflect)]
+pub struct ButtonColorLabelAppearence {
+	/// Position of the label
+	pub position: ButtonColorLabelPosition,
+	/// Whether the label should have an arrow/tag-like shape.
+	/// Otherwise the label is square.
+	///
+	/// This has no effect if position is
+	/// [`Inside`](ButtonColorLabelPosition::Inside).
+	pub has_arrow_tip: bool,
+}
+
+/// Positioning of the label of a button with logical color
+#[derive(Clone, Copy, PartialEq, Debug, Default, Reflect)]
+pub enum ButtonColorLabelPosition {
+	/// The label will be placed inside the button,
+	/// and it will align perfectly with the matching label on the box.
+	/// If a box is present, the label will by obscured by it.
+	#[default]
+	Inside,
+	/// The label will be placed to the left of the button
+	/// and it will be vertically aligned with the button.
+	LeftButton,
+	/// The label will be placed to the right of the button
+	/// and it will be vertically aligned with the button.
+	RightButton,
+	/// The label will be placed somewhere around the box.
+	/// Specify the clock angle (0 = up, positive = clockwise)
+	/// corresponding to the position of the label relative to the box.
+	///
+	/// For some angles, the arrow tip may end up pointing outside the box.
+	AnglePlaced(f32),
+	/// The label will be placed somewhere around the box
+	/// and rotated so that one of its sides (ot its arrow tip, if present)
+	/// is directed towards the center.
+	/// Specify the clock angle (0 = up, positive = clockwise)
+	/// corresponding to the position of the label relative to the box
+	/// and its rotation angle.
+	///
+	/// The whole label is rotated, including the color sprite, so be careful with this
+	/// in combination with rotationally symmetric sprites.
+	AngleRotated(f32),
 }
 
 impl LogicalColor {

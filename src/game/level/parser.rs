@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use super::{builder::*, lex::*, *};
 use bevy::utils::hashbrown::HashMap;
 use itertools::Itertools as _;
@@ -193,7 +195,7 @@ fn parse_statement(
 					ThingType::Object(ObjectType::Box) => ThingData::Object(ObjectData::Box(color)),
 					ThingType::Object(ObjectType::Player) => ThingData::Object(ObjectData::Player),
 					ThingType::Glyph(GlyphType::Button) => {
-						ThingData::Glyph(GlyphData::Button(color))
+						ThingData::Glyph(GlyphData::Button(color.map(|color| (color, default()))))
 					}
 					ThingType::Glyph(GlyphType::Flag) => ThingData::Glyph(GlyphData::Flag),
 				};
@@ -320,6 +322,63 @@ fn parse_statement(
 				}
 				*override_palette = colors;
 			}
+			"COLORLABEL" => match statement.modifier.first().copied() {
+				Some("VERTEX" | "") | None => {
+					if statement.modifier.len() > 3 {
+						return Err(LevelParsingErrorCode::ExtraneousModifier(
+							3,
+							statement.modifier.len(),
+						));
+					}
+					let position = match statement.modifier.get(1).copied() {
+						Some("inside" | "") | None => ButtonColorLabelPosition::Inside,
+						Some("leftbtn") => ButtonColorLabelPosition::LeftButton,
+						Some("rightbtn") => ButtonColorLabelPosition::RightButton,
+						Some("above") => ButtonColorLabelPosition::AnglePlaced(0.0),
+						Some("left") => ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+						Some("below") => ButtonColorLabelPosition::AnglePlaced(PI),
+						Some("right") => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+						Some(other) => {
+							if let Ok(angle) = other.parse::<f32>() {
+								ButtonColorLabelPosition::AnglePlaced(angle * PI / 180.0)
+							} else if let Some(Ok(angle)) =
+								other.strip_prefix('r').map(str::parse::<f32>)
+							{
+								ButtonColorLabelPosition::AngleRotated(angle * PI / 180.0)
+							} else {
+								return Err(LevelParsingErrorCode::InvalidModifier(
+									other.to_owned(),
+								));
+							}
+						}
+					};
+					let has_arrow_tip = match statement.modifier.get(2).copied() {
+						Some("square" | "") | None => false,
+						Some("arrow") => true,
+						Some(other) => {
+							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
+						}
+					};
+					let appearence = ButtonColorLabelAppearence {
+						position,
+						has_arrow_tip,
+					};
+					for vertex_name in statement.values {
+						let Some(vertex) = vertex_names.get(vertex_name).copied() else {
+							return Err(LevelParsingErrorCode::UnknownVertexName(
+								vertex_name.to_owned(),
+							));
+						};
+						builder.set_color_label_appearence(vertex, appearence)?;
+					}
+				}
+				Some("CYCLE") => {
+					todo!()
+				}
+				Some(other) => {
+					return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
+				}
+			},
 			other => return Err(LevelParsingErrorCode::InvalidKeyword(other.to_owned())),
 		},
 	}
@@ -497,9 +556,10 @@ impl std::fmt::Display for LevelParsingError {
 #[cfg(test)]
 mod test {
 	use super::{
-		parse, LevelBuilderError, LevelParsingErrorCode, LexErrorCode, LogicalColor,
-		OverlappedLinkedCyclesError,
+		parse, ButtonColorLabelAppearence, ButtonColorLabelPosition, LevelBuilderError,
+		LevelParsingErrorCode, LexErrorCode, LogicalColor, OverlappedLinkedCyclesError,
 	};
+	use std::f32::consts::PI;
 
 	macro_rules! assert_err_eq {
 		($left:expr, $right:expr) => {
@@ -914,6 +974,100 @@ OBJECT[BOX] n
 				panic!("Vertex does not contain a box.");
 			};
 			assert_eq!(color, expected_color);
+		}
+	}
+
+	#[test]
+	fn color_labels_test() {
+		let data = r"
+PALETTE[DEFAULT] 0
+VERTEX a b c d e f g h i j k l
+OBJECT[BUTTON] a b c d e f g h i j k l
+
+# Color labels can be repositioned to a set of
+# predefined positions
+COLORLABEL[:left] a
+COLORLABEL[:right] b
+COLORLABEL[:above] c
+COLORLABEL[:below] d
+COLORLABEL[:leftbtn] e
+COLORLABEL[:rightbtn] f
+
+# The default position is inside the button.
+# This can also be forced manually
+COLORLABEL[:inside] g
+# (note: vertex h remains at default position)
+
+# Position can be specified manually as rotation
+# (as clock angle in degrees)
+COLORLABEL[:30] i
+
+# Adding the 'r' prefix means the label itself will be
+# rotated, not just positioned
+COLORLABEL[:r60] j
+
+# Finally, any option can be combined with a shape specifier
+# to choose between square label (default) or an arrow-tipped one
+COLORLABEL[:above:square] k
+COLORLABEL[::arrow] l
+";
+		let expected_appearences = [
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(0.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::LeftButton,
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::RightButton,
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::Inside,
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::Inside,
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI / 6.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AngleRotated(PI / 3.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(0.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::Inside,
+				has_arrow_tip: true,
+			},
+		];
+
+		let level = parse(data).expect("Test sample did not parse correctly!");
+		for (vertex, expected_appearence) in level.vertices.iter().zip(expected_appearences) {
+			let Some(super::GlyphData::Button(Some((_, appearence)))) = vertex.glyph else {
+				panic!("Vertex does not contain a colored button.");
+			};
+			assert_eq!(appearence, expected_appearence);
 		}
 	}
 }

@@ -308,7 +308,7 @@ fn spawn_vertex(
 						)),
 					},
 				));
-				if let Some(color) = color {
+				if let Some((color, _label_style)) = color {
 					entity.insert(color);
 					let mesh = primitives::Rectangle::from_length(COLOR_LABEL_SIZE)
 						.mesh()
