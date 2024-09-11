@@ -501,10 +501,12 @@ fn spawn_box_color_sprites(
 ) {
 	box_entity.with_children(|children| {
 		let mut spawn_sprite = |index, x_offset, x_scale| {
-			let mut transform = Transform::from_translation(Vec3::X * x_offset)
-				.with_scale(Vec3::new(x_scale, 1.0, 1.0));
-			transform.rotate_z(rotation);
-			transform.translation += displacement;
+			let transform = Transform::from_translation(displacement)
+				.mul_transform(Transform::from_rotation(Quat::from_rotation_z(rotation)))
+				.mul_transform(
+					Transform::from_translation(Vec3::X * x_offset)
+						.with_scale(Vec3::new(x_scale, 1.0, 1.0)),
+				);
 			children.spawn((
 				InheritSpriteColor,
 				SpriteBundle {
