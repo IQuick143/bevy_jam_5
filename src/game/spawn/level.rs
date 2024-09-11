@@ -8,10 +8,7 @@ use crate::{
 		animation::*, components::*, drawing::*, inputs::*, level::*,
 		logic::ComputedCycleTurnability, prelude::*,
 	},
-	graphics::{
-		primitives::{RoundedPentagonArrow, RoundedRectangle},
-		*,
-	},
+	graphics::*,
 	screen::Screen,
 	ui::hover::{self, HintText, Hoverable},
 };
@@ -42,7 +39,8 @@ fn spawn_level(
 	levels: Res<Assets<LevelData>>,
 	mut is_level_completed: ResMut<IsLevelCompleted>,
 	mut move_history: ResMut<MoveHistory>,
-	materials: ResMut<GameObjectMaterials>,
+	materials: Res<GameObjectMaterials>,
+	common_meshes: Res<GameObjectMeshes>,
 	palette: ResMut<ThingPalette>,
 	image_handles: Res<HandleMap<ImageKey>>,
 	logical_color_atlas_layout: Res<BoxColorSpriteAtlasLayout>,
@@ -61,9 +59,9 @@ fn spawn_level(
 			spawn_vertex(
 				commands.reborrow(),
 				data,
-				meshes.reborrow(),
 				materials.cycle_rings.clone(),
 				materials.colored_button_labels.clone(),
+				&common_meshes,
 				palette.as_ref(),
 				image_handles.as_ref(),
 				&logical_color_atlas_layout,
@@ -165,9 +163,9 @@ fn spawn_level(
 fn spawn_vertex(
 	mut commands: Commands,
 	data: &VertexData,
-	mut meshes: Mut<Assets<Mesh>>,
 	base_material: Handle<ColorMaterial>,
 	colored_button_label_material: Handle<ColorMaterial>,
+	common_meshes: &GameObjectMeshes,
 	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
 	logical_color_atlas_layout: &BoxColorSpriteAtlasLayout,
@@ -184,13 +182,12 @@ fn spawn_vertex(
 			transform,
 		))
 		.id();
-	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
 		StateScoped(Screen::Playing),
 		LevelScoped,
 		ColorMesh2dBundle {
 			transform: Transform::from_translation(data.position.extend(layers::CYCLE_NODES)),
-			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
+			mesh: bevy::sprite::Mesh2dHandle(common_meshes.vertices.clone_weak()),
 			material: base_material,
 			..default()
 		},
@@ -317,28 +314,15 @@ fn spawn_vertex(
 				if let Some((color, label_style)) = color {
 					entity.insert(color);
 					let label_mesh = if label_style.has_arrow_tip {
-						RoundedPentagonArrow::from(primitives::Rectangle::from_length(
-							color_labels::SIZE,
-						))
-						.corner_radius(color_labels::CORNER_RADIUS)
-						.tip_length(color_labels::ARROW_TIP_LENGTH)
-						.mesh()
-						.resolution(color_labels::MESH_RESOLUTION)
-						.build()
+						common_meshes.arrow_labels.clone_weak()
 					} else {
-						RoundedRectangle::from(primitives::Rectangle::from_length(
-							color_labels::SIZE,
-						))
-						.corner_radius(color_labels::CORNER_RADIUS)
-						.mesh()
-						.resolution(color_labels::MESH_RESOLUTION)
-						.build()
+						common_meshes.square_labels.clone_weak()
 					};
 					let (label_displacement, label_rotation, sprite_rotation) =
 						get_button_color_label_placement(&label_style);
 					entity.with_children(|children| {
 						children.spawn(ColorMesh2dBundle {
-							mesh: bevy::sprite::Mesh2dHandle(meshes.add(label_mesh)),
+							mesh: bevy::sprite::Mesh2dHandle(label_mesh),
 							material: colored_button_label_material.clone_weak(),
 							transform: Transform::from_rotation(Quat::from_rotation_z(
 								label_rotation,

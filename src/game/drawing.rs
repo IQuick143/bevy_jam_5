@@ -1,9 +1,17 @@
 use super::{components::*, inputs::CycleInteraction, level::LogicalColor, logic::*, prelude::*};
-use crate::AppSet;
+use crate::{
+	graphics::{
+		color_labels,
+		primitives::{RoundedPentagonArrow, RoundedRectangle},
+		NODE_RADIUS,
+	},
+	AppSet,
+};
 use bevy::color::palettes;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<GameObjectMaterials>()
+		.init_resource::<GameObjectMeshes>()
 		.init_resource::<ThingPalette>()
 		.add_systems(
 			Update,
@@ -60,6 +68,44 @@ impl FromWorld for GameObjectMaterials {
 			cycle_rings,
 			link_lines,
 			colored_button_labels,
+		}
+	}
+}
+
+/// Contains handles to meshes that are commonly used to render game objects
+#[derive(Resource, Debug, Clone, Reflect)]
+pub struct GameObjectMeshes {
+	/// Mesh for vertex nodes
+	pub vertices: Handle<Mesh>,
+	/// Mesh for square labels that show logical colors of buttons
+	pub square_labels: Handle<Mesh>,
+	/// Mesh for arrow-like labels that show logical colors of buttons
+	pub arrow_labels: Handle<Mesh>,
+}
+
+impl FromWorld for GameObjectMeshes {
+	fn from_world(world: &mut World) -> Self {
+		let mut meshes = world.resource_mut::<Assets<Mesh>>();
+
+		let vertices = meshes.add(Circle::new(NODE_RADIUS).mesh());
+		let square_labels = meshes.add(
+			RoundedRectangle::from(Rectangle::from_length(color_labels::SIZE))
+				.corner_radius(color_labels::CORNER_RADIUS)
+				.mesh()
+				.resolution(color_labels::MESH_RESOLUTION),
+		);
+		let arrow_labels = meshes.add(
+			RoundedPentagonArrow::from(Rectangle::from_length(color_labels::SIZE))
+				.corner_radius(color_labels::CORNER_RADIUS)
+				.tip_length(color_labels::ARROW_TIP_LENGTH)
+				.mesh()
+				.resolution(color_labels::MESH_RESOLUTION),
+		);
+
+		Self {
+			vertices,
+			square_labels,
+			arrow_labels,
 		}
 	}
 }
