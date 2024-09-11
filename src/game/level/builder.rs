@@ -21,6 +21,30 @@ pub struct LevelBuilder {
 	declared_links: Vec<DeclaredLinkData>,
 }
 
+/// Enumerates the possible sets of positions
+/// for automatic cycle-bound placement of labels for colored buttons
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CycleBoundColorLabelPositionSet {
+	/// The label can be placed to the left or right of the button
+	LeftRight,
+	/// The label can be placed to the left or right of the button,
+	/// and will be aligned to the button
+	LeftRightButtonAligned,
+	/// The label can be placed above or below the button
+	AboveBelow,
+	/// The label can be placed in any cardinal direction from the button
+	CardinalDirections,
+	/// The label can be placed in any cardinal direction from the button,
+	/// and if it is to the left or right, it will be aligned to the button
+	CardinalDirectionsButtonAligned,
+	/// The label can be placed in any direction from the button,
+	/// and it will be aligned laterally
+	AllDirections,
+	/// Thelabel can be placed in any direction from the button,
+	/// and it will be rotated
+	AllDirectionsRotated,
+}
+
 /// Error data for [`LevelBuilderError::CycleDoesNotContainVertex`]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CycleDoesNotContainVertexError {
@@ -208,6 +232,22 @@ struct PartiallyBoundVertexPosition {
 enum IntermediateButtonColorLabelAppearence {
 	/// Color label appearence is specified explicitly
 	Static(ButtonColorLabelAppearence),
+	/// Color label should be placed with respect to an owning cycle
+	CycleBound(CycleBoundButtonColorLabelAppearence),
+}
+
+/// Placeholder appearence for a button color label that will be
+/// styled with regard to the cycle it is placed on
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct CycleBoundButtonColorLabelAppearence {
+	/// Index of the cycle relative to which the label will be positioned
+	owner_cycle: usize,
+	/// Whether the labels should be oriented away from the cycle instead of towards it
+	place_outside_cycle: bool,
+	/// Whether the labels should be pentagon arrows instead of square
+	has_arrow_tip: bool,
+	/// Set of directions from which the final angle can be picked
+	positions: CycleBoundColorLabelPositionSet,
 }
 
 /// Container that holds one or two of something
@@ -619,6 +659,32 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	pub fn set_color_label_appearences_for_cycle(
+		&mut self,
+		target_cycle: usize,
+		position_set: CycleBoundColorLabelPositionSet,
+		place_outside_cycle: bool,
+		has_arrow_tip: bool,
+	) -> Result<(), LevelBuilderError> {
+		if target_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
+		}
+		for target_vertex in &self.cycles[target_cycle].vertex_indices {
+			let vertex = &mut self.vertices[*target_vertex];
+			if matches!(vertex.glyph, Some(GlyphData::Button(Some(_)))) {
+				vertex.color_label_appearence = IntermediateButtonColorLabelAppearence::CycleBound(
+					CycleBoundButtonColorLabelAppearence {
+						owner_cycle: target_cycle,
+						place_outside_cycle,
+						has_arrow_tip,
+						positions: position_set,
+					},
+				)
+			}
+		}
+		Ok(())
+	}
+
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
 		self.validate_before_build()?;
@@ -707,6 +773,77 @@ impl LevelBuilder {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
 				match vertex.color_label_appearence {
 					IntermediateButtonColorLabelAppearence::Static(a) => *appearence = a,
+					IntermediateButtonColorLabelAppearence::CycleBound(p) => {
+						let vertex_position = vertex.position.get_fixed()
+							.expect("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
+						let owner_cycle_position = self.cycles[p.owner_cycle].placement
+							.expect("Color label appearences cannot be applied before all cycles are placed")
+							.position;
+						let angle_from_owner =
+							-Vec2::Y.angle_between(vertex_position - owner_cycle_position);
+						// Flip target angle if we want the labels inside the cycle
+						let target_angle = if p.place_outside_cycle {
+							angle_from_owner
+						} else {
+							angle_from_owner + PI
+						}
+						.rem_euclid(2.0 * PI);
+						let position = match p.positions {
+							CycleBoundColorLabelPositionSet::LeftRight => match target_angle / PI {
+								0.0..1.0 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
+								1.0..=2.0 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+								_ => unreachable!(),
+							},
+							CycleBoundColorLabelPositionSet::LeftRightButtonAligned => {
+								match target_angle / PI {
+									0.0..1.0 => ButtonColorLabelPosition::RightButton,
+									1.0..=2.0 => ButtonColorLabelPosition::LeftButton,
+									_ => unreachable!(),
+								}
+							}
+							CycleBoundColorLabelPositionSet::AboveBelow => {
+								match target_angle / PI {
+									0.0..0.5 | 1.5..=2.0 => {
+										ButtonColorLabelPosition::AnglePlaced(0.0)
+									}
+									0.5..1.5 => ButtonColorLabelPosition::AnglePlaced(PI),
+									_ => unreachable!(),
+								}
+							}
+							CycleBoundColorLabelPositionSet::CardinalDirections => {
+								match target_angle / PI {
+									0.0..0.25 | 1.75..=2.0 => {
+										ButtonColorLabelPosition::AnglePlaced(0.0)
+									}
+									0.25..0.75 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
+									0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
+									1.25..1.75 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+									_ => unreachable!(),
+								}
+							}
+							CycleBoundColorLabelPositionSet::CardinalDirectionsButtonAligned => {
+								match target_angle / PI {
+									0.0..0.25 | 1.75..=2.0 => {
+										ButtonColorLabelPosition::AnglePlaced(0.0)
+									}
+									0.25..0.75 => ButtonColorLabelPosition::RightButton,
+									0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
+									1.25..1.75 => ButtonColorLabelPosition::LeftButton,
+									_ => unreachable!(),
+								}
+							}
+							CycleBoundColorLabelPositionSet::AllDirections => {
+								ButtonColorLabelPosition::AnglePlaced(target_angle)
+							}
+							CycleBoundColorLabelPositionSet::AllDirectionsRotated => {
+								ButtonColorLabelPosition::AngleRotated(target_angle)
+							}
+						};
+						*appearence = ButtonColorLabelAppearence {
+							position,
+							has_arrow_tip: p.has_arrow_tip,
+						};
+					}
 				}
 			}
 		}

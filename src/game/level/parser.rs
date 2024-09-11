@@ -373,7 +373,54 @@ fn parse_statement(
 					}
 				}
 				Some("CYCLE") => {
-					todo!()
+					if statement.modifier.len() > 4 {
+						return Err(LevelParsingErrorCode::ExtraneousModifier(
+							4,
+							statement.modifier.len(),
+						));
+					}
+					let positions = match statement.modifier.get(1).copied() {
+						Some("lr") => CycleBoundColorLabelPositionSet::LeftRight,
+						Some("lrbtn") => CycleBoundColorLabelPositionSet::LeftRightButtonAligned,
+						Some("tb") => CycleBoundColorLabelPositionSet::AboveBelow,
+						Some("quad") => CycleBoundColorLabelPositionSet::CardinalDirections,
+						Some("quadbtn") => {
+							CycleBoundColorLabelPositionSet::CardinalDirectionsButtonAligned
+						}
+						Some("any") => CycleBoundColorLabelPositionSet::AllDirections,
+						Some("rot") => CycleBoundColorLabelPositionSet::AllDirectionsRotated,
+						Some(other) => {
+							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()));
+						}
+						None => return Err(LevelParsingErrorCode::MissingModifier),
+					};
+					let place_outside_cycle = match statement.modifier.get(2).copied() {
+						Some("out" | "") | None => true,
+						Some("in") => false,
+						Some(other) => {
+							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
+						}
+					};
+					let has_arrow_tip = match statement.modifier.get(3).copied() {
+						Some("square" | "") | None => false,
+						Some("arrow") => true,
+						Some(other) => {
+							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
+						}
+					};
+					for cycle_name in statement.values {
+						let Some(cycle) = cycle_names.get(cycle_name).copied() else {
+							return Err(LevelParsingErrorCode::UnknownVertexName(
+								cycle_name.to_owned(),
+							));
+						};
+						builder.set_color_label_appearences_for_cycle(
+							cycle,
+							positions,
+							place_outside_cycle,
+							has_arrow_tip,
+						)?;
+					}
 				}
 				Some(other) => {
 					return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
@@ -981,8 +1028,14 @@ OBJECT[BOX] n
 	fn color_labels_test() {
 		let data = r"
 PALETTE[DEFAULT] 0
-VERTEX a b c d e f g h i j k l
-OBJECT[BUTTON] a b c d e f g h i j k l
+VERTEX a b c d e f g h i j k l m n o p q r s t
+OBJECT[BUTTON] a b c d e f g h i j k l m n o p q r s
+CYCLE x m n o p
+CYCLE y q r s t
+PLACE x 0 0 100
+PLACE y 0 0 100
+PLACE_VERT m 0.5
+PLACE_VERT q 0.5
 
 # Color labels can be repositioned to a set of
 # predefined positions
@@ -1010,14 +1063,28 @@ COLORLABEL[:r60] j
 # to choose between square label (default) or an arrow-tipped one
 COLORLABEL[:above:square] k
 COLORLABEL[::arrow] l
+
+# Labels can be positioned symmetrically around a cycle,
+# with respect to where they are relative to the cycle center
+COLORLABEL[CYCLE:quad] x
+
+# Cycle-wide label placement may also be done inside the cycle
+# and with arrow labels if desired
+COLORLABEL[CYCLE:lr:in:arrow] y
+
+# Labels can be explicitly overridden at each vertex
+COLORLABEL q r
+
+# If a button is added later, prior cycle-wide setting does not affect it
+OBJECT[BUTTON] t
 ";
 		let expected_appearences = [
 			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
 				has_arrow_tip: false,
 			},
 			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
 				has_arrow_tip: false,
 			},
 			ButtonColorLabelAppearence {
@@ -1059,6 +1126,38 @@ COLORLABEL[::arrow] l
 			ButtonColorLabelAppearence {
 				position: ButtonColorLabelPosition::Inside,
 				has_arrow_tip: true,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(0.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::Inside,
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::Inside,
+				has_arrow_tip: false,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+				has_arrow_tip: true,
+			},
+			ButtonColorLabelAppearence {
+				position: ButtonColorLabelPosition::Inside,
+				has_arrow_tip: false,
 			},
 		];
 
