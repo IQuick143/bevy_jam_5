@@ -525,7 +525,8 @@ fn spawn_box_color_sprites(
 						DIGIT_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
 					}
 				})
-				.sum::<f32>() - DIGIT_SPRITE_SPACING;
+				.sum::<f32>()
+				- DIGIT_SPRITE_SPACING;
 			let (mut width_progress, number_width) = if number_width < 1.0 {
 				// Sprites should never grow in width, so cap the width at one
 				((1.0 - number_width) / 2.0, 1.0)
