@@ -335,9 +335,9 @@ fn parse_statement(
 						Some("leftbtn") => ButtonColorLabelPosition::LeftButton,
 						Some("rightbtn") => ButtonColorLabelPosition::RightButton,
 						Some("above") => ButtonColorLabelPosition::AnglePlaced(0.0),
-						Some("left") => ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+						Some("left") => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
 						Some("below") => ButtonColorLabelPosition::AnglePlaced(PI),
-						Some("right") => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+						Some("right") => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
 						Some(other) => {
 							if let Ok(angle) = other.parse::<f32>() {
 								ButtonColorLabelPosition::AnglePlaced(angle * PI / 180.0)

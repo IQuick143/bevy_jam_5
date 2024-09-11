@@ -1,12 +1,17 @@
 //! Spawn the main level by triggering other observers.
 
+use std::f32::consts::{PI, SQRT_2, TAU};
+
 use crate::{
 	assets::{BoxColorSpriteAtlasLayout, HandleMap, ImageKey, BOX_COLOR_SPRITE_PICTOGRAM_OFFSET},
 	game::{
 		animation::*, components::*, drawing::*, inputs::*, level::*,
 		logic::ComputedCycleTurnability, prelude::*,
 	},
-	graphics::*,
+	graphics::{
+		primitives::{RoundedPentagonArrow, RoundedRectangle},
+		*,
+	},
 	screen::Screen,
 	ui::hover::{self, HintText, Hoverable},
 };
@@ -264,6 +269,7 @@ fn spawn_vertex(
 						image_handles[&ImageKey::BoxSpriteAtlas].clone_weak(),
 						logical_color_atlas_layout.0.clone_weak(),
 						Vec3::new(0.0, COLOR_SPRITE_OFFSET, layers::BOX_COLOR_SPRITES),
+						0.0,
 					);
 				}
 				entity
@@ -308,20 +314,38 @@ fn spawn_vertex(
 						)),
 					},
 				));
-				if let Some((color, _label_style)) = color {
+				if let Some((color, label_style)) = color {
 					entity.insert(color);
-					let mesh = primitives::Rectangle::from_length(COLOR_LABEL_SIZE)
+					let label_mesh = if label_style.has_arrow_tip {
+						RoundedPentagonArrow::from(primitives::Rectangle::from_length(
+							color_labels::SIZE,
+						))
+						.corner_radius(color_labels::CORNER_RADIUS)
+						.tip_length(color_labels::ARROW_TIP_LENGTH)
 						.mesh()
-						.build();
+						.resolution(color_labels::MESH_RESOLUTION)
+						.build()
+					} else {
+						RoundedRectangle::from(primitives::Rectangle::from_length(
+							color_labels::SIZE,
+						))
+						.corner_radius(color_labels::CORNER_RADIUS)
+						.mesh()
+						.resolution(color_labels::MESH_RESOLUTION)
+						.build()
+					};
+					let (label_displacement, label_rotation, sprite_rotation) =
+						get_button_color_label_placement(&label_style);
 					entity.with_children(|children| {
 						children.spawn(ColorMesh2dBundle {
-							mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
+							mesh: bevy::sprite::Mesh2dHandle(meshes.add(label_mesh)),
 							material: colored_button_label_material.clone_weak(),
-							transform: Transform::from_translation(Vec3::new(
-								0.0,
-								COLOR_SPRITE_OFFSET,
-								layers::BUTTON_COLOR_LABELS,
-							)),
+							transform: Transform::from_rotation(Quat::from_rotation_z(
+								label_rotation,
+							))
+							.with_translation(
+								label_displacement.extend(layers::BUTTON_COLOR_LABELS),
+							),
 							..default()
 						});
 					});
@@ -331,7 +355,8 @@ fn spawn_vertex(
 						palette.button_base,
 						image_handles[&ImageKey::BoxSpriteAtlas].clone_weak(),
 						logical_color_atlas_layout.0.clone_weak(),
-						Vec3::new(0.0, COLOR_SPRITE_OFFSET, layers::BUTTON_COLOR_SPRITES),
+						label_displacement.extend(layers::BUTTON_COLOR_SPRITES),
+						sprite_rotation,
 					);
 				}
 				entity
@@ -472,14 +497,18 @@ fn spawn_box_color_sprites(
 	atlas: Handle<Image>,
 	atlas_layout: Handle<TextureAtlasLayout>,
 	displacement: Vec3,
+	rotation: f32,
 ) {
 	box_entity.with_children(|children| {
 		let mut spawn_sprite = |index, x_offset, x_scale| {
+			let mut transform = Transform::from_translation(Vec3::X * x_offset)
+				.with_scale(Vec3::new(x_scale, 1.0, 1.0));
+			transform.rotate_z(rotation);
+			transform.translation += displacement;
 			children.spawn((
 				InheritSpriteColor,
 				SpriteBundle {
-					transform: Transform::from_translation(displacement + Vec3::X * x_offset)
-						.with_scale(Vec3::new(x_scale, 1.0, 1.0)),
+					transform,
 					texture: atlas.clone_weak(),
 					sprite: Sprite {
 						color,
@@ -536,4 +565,99 @@ fn spawn_box_color_sprites(
 			}
 		}
 	});
+}
+
+/// Calculates the actual placement for a button color label
+/// ## Return Value
+/// The position of the center of the label, rotation of the label marker
+/// and rotation of the color sprite
+fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2, f32, f32) {
+	use color_labels::*;
+	use ButtonColorLabelPosition::*;
+	let secondary_offset = if style.has_arrow_tip {
+		OFFSET_SECONDARY_ARROW
+	} else {
+		OFFSET_SECONDARY_SQUARE
+	};
+	match style.position {
+		Inside => (Vec2::Y * CENTER_Y_OFFSET, 0.0, 0.0),
+		LeftButton => (
+			Vec2::new(-secondary_offset, OFFSET_Y_BUTTON_ALIGNED),
+			-PI / 2.0,
+			0.0,
+		),
+		RightButton => (
+			Vec2::new(secondary_offset, OFFSET_Y_BUTTON_ALIGNED),
+			PI / 2.0,
+			0.0,
+		),
+		AnglePlaced(angle) | AngleRotated(angle) => {
+			// Clamp angle to the [0, 2pi] range
+			let angle = angle.rem_euclid(TAU);
+			// If we are above the box, reduce the secondary offset
+			// This is to bring the label closer to the box when there is no button in the way
+			let use_reduced_offset =
+				angle <= OFFSET_REDUCTION_THRESHOLD || angle >= TAU - OFFSET_REDUCTION_THRESHOLD;
+			let secondary_offset = if use_reduced_offset {
+				secondary_offset - SECONDARY_OFFSET_REDUCTION
+			} else {
+				secondary_offset
+			};
+			let (relative_position, quadrant_rotation) = match angle / PI {
+				// Above
+				0.0..0.25 | 1.75..=2.0 => (
+					Vec2::new(angle.tan() * secondary_offset, secondary_offset),
+					PI,
+				),
+				// Right
+				0.25..0.75 => (
+					Vec2::new(
+						secondary_offset,
+						-(angle - PI / 2.0).tan() * secondary_offset,
+					),
+					PI / 2.0,
+				),
+				// Below
+				0.75..1.25 => (
+					Vec2::new(-angle.tan() * secondary_offset, -secondary_offset),
+					0.0,
+				),
+				// Left
+				1.25..1.75 => (
+					Vec2::new(
+						-secondary_offset,
+						(angle - PI / 2.0).tan() * secondary_offset,
+					),
+					-PI / 2.0,
+				),
+				_ => unreachable!("The angle should be clamped to [0, 2pi]"),
+			};
+			let position = relative_position + Vec2::Y * CENTER_Y_OFFSET;
+			// Rotated placements should propagate any rotation angle
+			if matches!(style.position, AngleRotated(_)) {
+				let label_rotation = PI - angle;
+				let sprite_rotation = PI - angle - quadrant_rotation;
+				// If we have a rotated placement near a corner,
+				// we bring it closer to the box to avoid a gap
+				let base_max_displacement = if style.has_arrow_tip {
+					MAX_ROTATED_DISPLACEMENT_ARROW
+				} else {
+					MAX_ROTATED_DISPLACEMENT_SQUARE
+				};
+				let max_distance = if use_reduced_offset {
+					base_max_displacement - SECONDARY_OFFSET_REDUCTION * SQRT_2
+				} else {
+					base_max_displacement
+				};
+				let cut_position = if relative_position.length_squared() >= max_distance.powi(2) {
+					Vec2::from_angle(PI / 2.0 - angle) * max_distance + Vec2::Y * CENTER_Y_OFFSET
+				} else {
+					position
+				};
+				(cut_position, label_rotation, sprite_rotation)
+			} else {
+				(position, quadrant_rotation, 0.0)
+			}
+		}
+	}
 }
