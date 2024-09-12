@@ -251,7 +251,7 @@ fn spawn_vertex(
 						hover_text: hover::BOX,
 						hover_bounding_circle: None,
 						hover_bounding_box: Some(Aabb2d::new(
-							SPRITE_LENGTH * Vec2::new(0.0, 0.125),
+							Vec2::ZERO,
 							SPRITE_LENGTH * Vec2::new(0.25, 0.25),
 						)),
 					},
@@ -304,8 +304,8 @@ fn spawn_vertex(
 						hover_text: hover::BUTTON,
 						hover_bounding_circle: None,
 						hover_bounding_box: Some(Aabb2d::new(
-							SPRITE_LENGTH * Vec2::new(0.0, -0.125),
-							SPRITE_LENGTH * Vec2::new(0.375, 0.125),
+							Vec2::ZERO,
+							SPRITE_LENGTH * Vec2::ONE / 3.0,
 						)),
 					},
 				));
