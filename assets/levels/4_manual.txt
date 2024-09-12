@@ -1,5 +1,7 @@
 Name=Manual
 
+PALETTE[DEFAULT_BOX] up
+
 VERTEX a b c d e f g h
 
 CYCLE main a b c d e f

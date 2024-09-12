@@ -1,5 +1,7 @@
 Name=Send
 
+PALETTE[DEFAULT_BOX] lt
+
 VERTEX a b c d e f g h i j k x
 
 CYCLE main a b c d e f g
