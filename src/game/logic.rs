@@ -158,7 +158,11 @@ pub fn get_flipped_wrapped_iterator<T: Copy>(
 	direction: CycleTurningDirection,
 ) -> impl Iterator<Item = T> + '_ {
 	// Visit the first vertex again at the end to close the loop
-	let vertex_ids_wrapped = array.iter().copied().chain(std::iter::once(array[0]));
+	// Leave it empty if the input is empty
+	let vertex_ids_wrapped = array
+		.iter()
+		.copied()
+		.chain(array.first().into_iter().copied());
 	// Messy but simple way of chosing the iterator direction at run time
 	// https://stackoverflow.com/a/52064434
 	match direction {
