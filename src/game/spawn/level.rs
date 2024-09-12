@@ -238,7 +238,6 @@ fn spawn_vertex(
 						sprite: Sprite {
 							color: palette.box_base,
 							custom_size: Some(SPRITE_SIZE),
-							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
 						},
 						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
@@ -293,7 +292,6 @@ fn spawn_vertex(
 						sprite: Sprite {
 							color: palette.button_base,
 							custom_size: Some(SPRITE_SIZE),
-							anchor: Custom(Vec2::new(0.0, -0.25)),
 							..default()
 						},
 						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),

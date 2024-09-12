@@ -39,7 +39,7 @@ pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
 /// How big logical color sprites should be
 pub const COLOR_SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH * 0.265625);
 /// How logical color sprites on boxes should be offset vertically from the parent sprite
-pub const COLOR_SPRITE_OFFSET: f32 = SPRITE_LENGTH * 0.111328125;
+pub const COLOR_SPRITE_OFFSET: f32 = 0.0;
 /// How much of the width of a sprite is actually taken up by digits other than 1
 pub const DIGIT_SPRITE_WIDTH: f32 = 0.8;
 /// How much of the width of a sprite is taken up by the digit 1
