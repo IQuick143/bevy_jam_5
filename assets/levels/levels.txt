@@ -4,7 +4,7 @@ LEVEL 1_intro 2_transfer 3_boxes 4_manual 5_sync 6_sync2 7_colors
 
 SECTION easy
 Name=Easy
-LEVEL lotus bicycle send 1_swap 2_sort disrupt
+LEVEL lotus bicycle send 1_swap 2_sort num_sort disrupt
 
 SECTION medium
 Name=Medium
