@@ -566,16 +566,6 @@ fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2
 	};
 	match style.position {
 		Inside => (Vec2::Y * CENTER_Y_OFFSET, 0.0, 0.0),
-		LeftButton => (
-			Vec2::new(-secondary_offset, OFFSET_Y_BUTTON_ALIGNED),
-			-PI / 2.0,
-			0.0,
-		),
-		RightButton => (
-			Vec2::new(secondary_offset, OFFSET_Y_BUTTON_ALIGNED),
-			PI / 2.0,
-			0.0,
-		),
 		AnglePlaced(angle) | AngleRotated(angle) => {
 			// Clamp angle to the [0, 2pi] range
 			let angle = angle.rem_euclid(TAU);

@@ -27,16 +27,10 @@ pub struct LevelBuilder {
 pub enum CycleBoundColorLabelPositionSet {
 	/// The label can be placed to the left or right of the button
 	LeftRight,
-	/// The label can be placed to the left or right of the button,
-	/// and will be aligned to the button
-	LeftRightButtonAligned,
 	/// The label can be placed above or below the button
 	AboveBelow,
 	/// The label can be placed in any cardinal direction from the button
 	CardinalDirections,
-	/// The label can be placed in any cardinal direction from the button,
-	/// and if it is to the left or right, it will be aligned to the button
-	CardinalDirectionsButtonAligned,
 	/// The label can be placed in any direction from the button,
 	/// and it will be aligned laterally
 	AllDirections,
@@ -794,13 +788,6 @@ impl LevelBuilder {
 								1.0..=2.0 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
 								_ => unreachable!(),
 							},
-							CycleBoundColorLabelPositionSet::LeftRightButtonAligned => {
-								match target_angle / PI {
-									0.0..1.0 => ButtonColorLabelPosition::RightButton,
-									1.0..=2.0 => ButtonColorLabelPosition::LeftButton,
-									_ => unreachable!(),
-								}
-							}
 							CycleBoundColorLabelPositionSet::AboveBelow => {
 								match target_angle / PI {
 									0.0..0.5 | 1.5..=2.0 => {
@@ -818,17 +805,6 @@ impl LevelBuilder {
 									0.25..0.75 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
 									0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
 									1.25..1.75 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
-									_ => unreachable!(),
-								}
-							}
-							CycleBoundColorLabelPositionSet::CardinalDirectionsButtonAligned => {
-								match target_angle / PI {
-									0.0..0.25 | 1.75..=2.0 => {
-										ButtonColorLabelPosition::AnglePlaced(0.0)
-									}
-									0.25..0.75 => ButtonColorLabelPosition::RightButton,
-									0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
-									1.25..1.75 => ButtonColorLabelPosition::LeftButton,
 									_ => unreachable!(),
 								}
 							}

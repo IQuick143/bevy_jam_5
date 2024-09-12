@@ -332,8 +332,6 @@ fn parse_statement(
 					}
 					let position = match statement.modifier.get(1).copied() {
 						Some("inside" | "") | None => ButtonColorLabelPosition::Inside,
-						Some("leftbtn") => ButtonColorLabelPosition::LeftButton,
-						Some("rightbtn") => ButtonColorLabelPosition::RightButton,
 						Some("above") => ButtonColorLabelPosition::AnglePlaced(0.0),
 						Some("left") => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
 						Some("below") => ButtonColorLabelPosition::AnglePlaced(PI),
@@ -381,12 +379,8 @@ fn parse_statement(
 					}
 					let positions = match statement.modifier.get(1).copied() {
 						Some("lr") => CycleBoundColorLabelPositionSet::LeftRight,
-						Some("lrbtn") => CycleBoundColorLabelPositionSet::LeftRightButtonAligned,
 						Some("tb") => CycleBoundColorLabelPositionSet::AboveBelow,
 						Some("quad") => CycleBoundColorLabelPositionSet::CardinalDirections,
-						Some("quadbtn") => {
-							CycleBoundColorLabelPositionSet::CardinalDirectionsButtonAligned
-						}
 						Some("any") => CycleBoundColorLabelPositionSet::AllDirections,
 						Some("rot") => CycleBoundColorLabelPositionSet::AllDirectionsRotated,
 						Some(other) => {
@@ -1028,8 +1022,8 @@ OBJECT[BOX] n
 	fn color_labels_test() {
 		let data = r"
 PALETTE[DEFAULT] 0
-VERTEX a b c d e f g h i j k l m n o p q r s t
-OBJECT[BUTTON] a b c d e f g h i j k l m n o p q r s
+VERTEX a b c d g h i j k l m n o p q r s t
+OBJECT[BUTTON] a b c d g h i j k l m n o p q r s
 CYCLE x m n o p
 CYCLE y q r s t
 PLACE x 0 0 100
@@ -1043,8 +1037,6 @@ COLORLABEL[:left] a
 COLORLABEL[:right] b
 COLORLABEL[:above] c
 COLORLABEL[:below] d
-COLORLABEL[:leftbtn] e
-COLORLABEL[:rightbtn] f
 
 # The default position is inside the button.
 # This can also be forced manually
@@ -1093,14 +1085,6 @@ OBJECT[BUTTON] t
 			},
 			ButtonColorLabelAppearence {
 				position: ButtonColorLabelPosition::AnglePlaced(PI),
-				has_arrow_tip: false,
-			},
-			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::LeftButton,
-				has_arrow_tip: false,
-			},
-			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::RightButton,
 				has_arrow_tip: false,
 			},
 			ButtonColorLabelAppearence {

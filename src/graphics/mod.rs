@@ -63,9 +63,6 @@ pub mod color_labels {
 	/// Vertical position of the center of the label, relative to the position
 	/// of the entity, when it is inside the button
 	pub const CENTER_Y_OFFSET: f32 = COLOR_SPRITE_OFFSET;
-	/// Vertical position of the center of the label,
-	/// relative to the position of the vertex, when it is aligned to the button
-	pub const OFFSET_Y_BUTTON_ALIGNED: f32 = -SPRITE_LENGTH / 8.0;
 	/// Width of the gap meant to be between the button/box sprite and the label
 	pub const GAP_WIDTH: f32 = SPRITE_LENGTH * 0.04;
 	/// Half-width of the actual button sprite (without the padding)

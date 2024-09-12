@@ -174,12 +174,6 @@ pub enum ButtonColorLabelPosition {
 	/// If a box is present, the label will by obscured by it.
 	#[default]
 	Inside,
-	/// The label will be placed to the left of the button
-	/// and it will be vertically aligned with the button.
-	LeftButton,
-	/// The label will be placed to the right of the button
-	/// and it will be vertically aligned with the button.
-	RightButton,
 	/// The label will be placed somewhere around the box.
 	/// Specify the clock angle (0 = up, positive = clockwise)
 	/// corresponding to the position of the label relative to the box.
