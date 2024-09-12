@@ -1,16 +1,28 @@
 Name=Colors
 
-VERTEX a b c d e f g h i j k
+PALETTE heart club spade diamond
 
-CYCLE player a b c d e
-CYCLE colors f g h i j k
+VERTEX a b c w1 w2 w3 w4 x1 x2 x3 x4 y1 y2 y3 y4 y5 z1 z2 z3 z4 z5
 
-OBJECT[PLAYER] d
-OBJECT[FLAG] b
-OBJECT[BOX:0] f g i
-OBJECT[BOX:1] h j
-OBJECT[BUTTON:0] j k g
-OBJECT[BUTTON:1] f h
+CYCLE w a b w1 w2 w3 w4
+CYCLE[MANUAL] x b a x1 x2 x3 x4
+CYCLE[STILL] y c y1 y2 y3 y4 y5
+CYCLE z c z1 z2 z3 z4 z5
 
-PLACE player 0 0 80
-PLACE colors 200 100 100
+OBJECT[BUTTON:0] w2
+OBJECT[BUTTON:1] w1
+OBJECT[BUTTON:2] y2
+OBJECT[BUTTON:3] z2
+OBJECT[BOX:0] w3
+OBJECT[BOX:1] w4
+OBJECT[BOX:2] y3
+OBJECT[BOX:3] y4
+OBJECT[PLAYER] b
+OBJECT[FLAG] x3
+
+LINK x y
+
+PLACE w -140 50 50
+PLACE x -80 0 50
+PLACE y 100 30 50
+PLACE z 40 -50 50
