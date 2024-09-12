@@ -51,7 +51,6 @@ pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
 /// In a separate module, because there are too many of them
 pub mod color_labels {
 	use super::*;
-	use std::f32::consts::PI;
 
 	/// How big the square labels should be
 	pub const SIZE: f32 = SPRITE_LENGTH * 0.3828125;
@@ -75,10 +74,6 @@ pub mod color_labels {
 	pub const OFFSET_SECONDARY_SQUARE: f32 = BUTTON_SPRITE_HALF_WIDTH + GAP_WIDTH + SIZE / 2.0;
 	/// How far from the center of the box should an arrow label be placed
 	pub const OFFSET_SECONDARY_ARROW: f32 = OFFSET_SECONDARY_SQUARE + ARROW_TIP_LENGTH;
-	/// How much closer can the label be pulled to the box under reduced offset
-	pub const SECONDARY_OFFSET_REDUCTION: f32 = SPRITE_LENGTH * 0.083984375;
-	/// Maximum angle away from the top where reduced offset can apply
-	pub const OFFSET_REDUCTION_THRESHOLD: f32 = PI * 4.0 / 9.0;
 	/// How far from the center of the box can a rotated square label be placed
 	pub const MAX_ROTATED_DISPLACEMENT_SQUARE: f32 =
 		SPRITE_LENGTH * 0.4453125 + GAP_WIDTH + SIZE / 2.0;

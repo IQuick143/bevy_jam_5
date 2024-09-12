@@ -1,6 +1,6 @@
 //! Spawn the main level by triggering other observers.
 
-use std::f32::consts::{PI, SQRT_2, TAU};
+use std::f32::consts::{PI, TAU};
 
 use crate::{
 	assets::{BoxColorSpriteAtlasLayout, HandleMap, ImageKey, BOX_COLOR_SPRITE_PICTOGRAM_OFFSET},
@@ -581,15 +581,6 @@ fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2
 		AnglePlaced(angle) | AngleRotated(angle) => {
 			// Clamp angle to the [0, 2pi] range
 			let angle = angle.rem_euclid(TAU);
-			// If we are above the box, reduce the secondary offset
-			// This is to bring the label closer to the box when there is no button in the way
-			let use_reduced_offset =
-				angle <= OFFSET_REDUCTION_THRESHOLD || angle >= TAU - OFFSET_REDUCTION_THRESHOLD;
-			let secondary_offset = if use_reduced_offset {
-				secondary_offset - SECONDARY_OFFSET_REDUCTION
-			} else {
-				secondary_offset
-			};
 			let (relative_position, quadrant_rotation) = match angle / PI {
 				// Above
 				0.0..0.25 | 1.75..=2.0 => (
@@ -626,15 +617,10 @@ fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2
 				let sprite_rotation = PI - angle - quadrant_rotation;
 				// If we have a rotated placement near a corner,
 				// we bring it closer to the box to avoid a gap
-				let base_max_displacement = if style.has_arrow_tip {
+				let max_distance = if style.has_arrow_tip {
 					MAX_ROTATED_DISPLACEMENT_ARROW
 				} else {
 					MAX_ROTATED_DISPLACEMENT_SQUARE
-				};
-				let max_distance = if use_reduced_offset {
-					base_max_displacement - SECONDARY_OFFSET_REDUCTION * SQRT_2
-				} else {
-					base_max_displacement
 				};
 				let cut_position = if relative_position.length_squared() >= max_distance.powi(2) {
 					Vec2::from_angle(PI / 2.0 - angle) * max_distance + Vec2::Y * CENTER_Y_OFFSET
