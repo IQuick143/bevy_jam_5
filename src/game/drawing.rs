@@ -130,9 +130,9 @@ impl Default for ThingPalette {
 		use palettes::tailwind as p;
 		Self {
 			box_base: p::ORANGE_200.into(),
-			box_trigger: p::GREEN_500.into(),
-			button_base: p::ORANGE_200.into(),
-			button_trigger: p::GREEN_500.into(),
+			box_trigger: p::ORANGE_200.into(),
+			button_base: Srgba::hex("CC5151").unwrap().into(),
+			button_trigger: p::GREEN_300.into(),
 			player: p::SLATE_200.into(),
 			goal_closed: p::SLATE_100.into(),
 			goal_open: p::GREEN_500.into(),
