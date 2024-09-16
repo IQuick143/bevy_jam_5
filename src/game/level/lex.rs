@@ -6,7 +6,7 @@ use regex::Regex;
 #[derive(Clone, Debug)]
 pub struct RawActionStatement<'a> {
 	pub verb: &'a str,
-	pub modifier: Option<&'a str>,
+	pub modifier: Vec<&'a str>,
 	pub values: Vec<&'a str>,
 }
 
@@ -73,7 +73,10 @@ pub fn parse(raw_data: &str) -> impl Iterator<Item = Result<(usize, RawStatement
 							.name("VERB")
 							.expect("VERB clause should always be present")
 							.as_str(),
-						modifier: captures.name("MODIFIER").map(|x| x.as_str()),
+						modifier: captures
+							.name("MODIFIER")
+							.map(|x| x.as_str().split(':').collect())
+							.unwrap_or_else(Vec::new),
 						values: match captures.name("VALUES") {
 							None => Vec::new(),
 							Some(m) => m

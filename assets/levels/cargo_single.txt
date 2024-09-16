@@ -1,5 +1,7 @@
 Name=Tricycle 3
 
+PALETTE[DEFAULT_BOX] desc_neg
+
 VERTEX b1 b2 b3 b4 bgi bgo bri bro r1 r2 r3 r4 rgi rgo g1 g2 g3 g4
 
 CYCLE[MANUAL] blue b1 b2 b3 b4 bgo bri bgi bro

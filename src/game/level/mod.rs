@@ -81,22 +81,28 @@ pub enum GlyphType {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
-pub struct ObjectData {
-	pub object_type: ObjectType,
-	pub color: Option<LogicalColor>,
+pub enum ObjectData {
+	Box(Option<LogicalColor>),
+	Player,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
-pub struct GlyphData {
-	pub glyph_type: GlyphType,
-	pub color: Option<LogicalColor>,
+#[derive(Clone, Copy, Debug, Reflect)]
+pub enum GlyphData {
+	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
+	Flag,
 }
 
-/// Type describing any gameplay object
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum ThingType {
 	Object(ObjectType),
 	Glyph(GlyphType),
+}
+
+/// Type describing any gameplay object
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+pub enum ThingData {
+	Object(ObjectData),
+	Glyph(GlyphData),
 }
 
 /// Defines conditions under which a cycle may be turned
@@ -122,7 +128,85 @@ pub enum LinkedCycleDirection {
 /// Logical color of a box or a button.
 /// Colored buttons require a box of the same color
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
-pub struct LogicalColor(pub usize);
+pub struct LogicalColor {
+	/// Index of the color.
+	/// For pictogram colors, this is the ID of the pictogram.
+	/// For numeric colors, this is the numeric value.
+	pub color_index: usize,
+	/// True to use a pictogram color, false to use a numeric color.
+	///
+	/// The pictogram or number is intended to be displayed inside the box
+	/// and on a label next to the button.
+	///
+	/// Pictogram and numeric color with the same [`color_index`](Self::color_index)
+	/// are entirely different colors.
+	///
+	/// The reason pictogram colors are identified by index (rather than using
+	/// an enum to list all possible pictograms) is to allow for quickly expanding
+	/// the pictogram list with minimal changes to the code.
+	/// Out-of-range pictogram indices will not render properly, but they
+	/// are not a hard error.
+	pub is_pictogram: bool,
+}
+
+/// Describes how a button with logical color should be labeled.
+///
+/// Logical color on button takes the appearence of a label inside
+/// or near the button. This structure describes the shape and
+/// positioning of the label.
+#[derive(Clone, Copy, PartialEq, Debug, Default, Reflect)]
+pub struct ButtonColorLabelAppearence {
+	/// Position of the label
+	pub position: ButtonColorLabelPosition,
+	/// Whether the label should have an arrow/tag-like shape.
+	/// Otherwise the label is square.
+	///
+	/// This has no effect if position is
+	/// [`Inside`](ButtonColorLabelPosition::Inside).
+	pub has_arrow_tip: bool,
+}
+
+/// Positioning of the label of a button with logical color
+#[derive(Clone, Copy, PartialEq, Debug, Default, Reflect)]
+pub enum ButtonColorLabelPosition {
+	/// The label will be placed inside the button,
+	/// and it will align perfectly with the matching label on the box.
+	/// If a box is present, the label will by obscured by it.
+	#[default]
+	Inside,
+	/// The label will be placed somewhere around the box.
+	/// Specify the clock angle (0 = up, positive = clockwise)
+	/// corresponding to the position of the label relative to the box.
+	///
+	/// For some angles, the arrow tip may end up pointing outside the box.
+	AnglePlaced(f32),
+	/// The label will be placed somewhere around the box
+	/// and rotated so that one of its sides (ot its arrow tip, if present)
+	/// is directed towards the center.
+	/// Specify the clock angle (0 = up, positive = clockwise)
+	/// corresponding to the position of the label relative to the box
+	/// and its rotation angle.
+	///
+	/// The whole label is rotated, including the color sprite, so be careful with this
+	/// in combination with rotationally symmetric sprites.
+	AngleRotated(f32),
+}
+
+impl LogicalColor {
+	pub fn new(color_index: usize) -> Self {
+		Self {
+			color_index,
+			is_pictogram: false,
+		}
+	}
+
+	pub fn pictogram(color_index: usize) -> Self {
+		Self {
+			color_index,
+			is_pictogram: true,
+		}
+	}
+}
 
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -141,6 +225,33 @@ impl std::ops::Mul for LinkedCycleDirection {
 			LinkedCycleDirection::Coincident
 		} else {
 			LinkedCycleDirection::Inverse
+		}
+	}
+}
+
+impl From<ObjectData> for ObjectType {
+	fn from(value: ObjectData) -> Self {
+		match value {
+			ObjectData::Box(_) => Self::Box,
+			ObjectData::Player => Self::Player,
+		}
+	}
+}
+
+impl From<GlyphData> for GlyphType {
+	fn from(value: GlyphData) -> Self {
+		match value {
+			GlyphData::Button(_) => Self::Button,
+			GlyphData::Flag => Self::Flag,
+		}
+	}
+}
+
+impl From<ThingData> for ThingType {
+	fn from(value: ThingData) -> Self {
+		match value {
+			ThingData::Glyph(g) => Self::Glyph(g.into()),
+			ThingData::Object(o) => Self::Object(o.into()),
 		}
 	}
 }

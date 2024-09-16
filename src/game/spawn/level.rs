@@ -1,7 +1,9 @@
 //! Spawn the main level by triggering other observers.
 
+use std::f32::consts::{PI, TAU};
+
 use crate::{
-	assets::{HandleMap, ImageKey},
+	assets::{BoxColorSpriteAtlasLayout, HandleMap, ImageKey, BOX_COLOR_SPRITE_PICTOGRAM_OFFSET},
 	game::{
 		animation::*, components::*, drawing::*, inputs::*, level::*,
 		logic::ComputedCycleTurnability, prelude::*,
@@ -11,11 +13,14 @@ use crate::{
 	ui::hover::{self, HintText, Hoverable},
 };
 
-use bevy::math::{
-	bounding::{Aabb2d, BoundingCircle},
-	primitives,
+use bevy::{
+	ecs::system::EntityCommands,
+	math::{
+		bounding::{Aabb2d, BoundingCircle},
+		primitives,
+	},
+	sprite::Anchor::Custom,
 };
-use bevy::sprite::Anchor::Custom;
 use rand::Rng;
 
 pub(super) fn plugin(app: &mut App) {
@@ -34,10 +39,11 @@ fn spawn_level(
 	levels: Res<Assets<LevelData>>,
 	mut is_level_completed: ResMut<IsLevelCompleted>,
 	mut move_history: ResMut<MoveHistory>,
-	cycle_material: ResMut<RingMaterial>,
-	link_material: Res<LinkMaterial>,
+	materials: Res<GameObjectMaterials>,
+	common_meshes: Res<GameObjectMeshes>,
 	palette: ResMut<ThingPalette>,
 	image_handles: Res<HandleMap<ImageKey>>,
+	logical_color_atlas_layout: Res<BoxColorSpriteAtlasLayout>,
 	mut hint_text: ResMut<HintText>,
 ) {
 	println!("Spawning!"); //TODO: debug
@@ -53,10 +59,12 @@ fn spawn_level(
 			spawn_vertex(
 				commands.reborrow(),
 				data,
-				meshes.reborrow(),
-				cycle_material.0.clone(),
+				materials.cycle_rings.clone(),
+				materials.colored_button_labels.clone(),
+				&common_meshes,
 				palette.as_ref(),
 				image_handles.as_ref(),
+				&logical_color_atlas_layout,
 			)
 		})
 		.collect();
@@ -68,7 +76,7 @@ fn spawn_level(
 			spawn_cycle(
 				commands.reborrow(),
 				meshes.reborrow(),
-				cycle_material.0.clone(),
+				materials.cycle_rings.clone(),
 				&palette,
 				&image_handles,
 				data,
@@ -128,7 +136,7 @@ fn spawn_level(
 				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation))
 					.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
-				material: link_material.clone_weak(),
+				material: materials.link_lines.clone_weak(),
 				..default()
 			},
 		));
@@ -139,7 +147,7 @@ fn spawn_level(
 				mesh: bevy::sprite::Mesh2dHandle(mesh),
 				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
 					.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
-				material: link_material.clone_weak(),
+				material: materials.link_lines.clone_weak(),
 				..default()
 			},
 		));
@@ -155,10 +163,12 @@ fn spawn_level(
 fn spawn_vertex(
 	mut commands: Commands,
 	data: &VertexData,
-	mut meshes: Mut<Assets<Mesh>>,
 	base_material: Handle<ColorMaterial>,
+	colored_button_label_material: Handle<ColorMaterial>,
+	common_meshes: &GameObjectMeshes,
 	palette: &ThingPalette,
 	image_handles: &HandleMap<ImageKey>,
+	logical_color_atlas_layout: &BoxColorSpriteAtlasLayout,
 ) -> Entity {
 	let transform =
 		TransformBundle::from_transform(Transform::from_translation(data.position.extend(0.0)));
@@ -172,22 +182,21 @@ fn spawn_vertex(
 			transform,
 		))
 		.id();
-	let mesh = primitives::Circle::new(NODE_RADIUS).mesh();
 	commands.spawn((
 		StateScoped(Screen::Playing),
 		LevelScoped,
 		ColorMesh2dBundle {
 			transform: Transform::from_translation(data.position.extend(layers::CYCLE_NODES)),
-			mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
+			mesh: bevy::sprite::Mesh2dHandle(common_meshes.vertices.clone_weak()),
 			material: base_material,
 			..default()
 		},
 	));
 	if let Some(object_data) = data.object {
-		let object_type = object_data.object_type;
+		let object_type = object_data.into();
 		let thing_type = ThingType::Object(object_type);
-		let mut entity = match object_type {
-			ObjectType::Player => commands.spawn((
+		let entity = match object_data {
+			ObjectData::Player => commands.spawn((
 				StateScoped(Screen::Playing),
 				LevelScoped,
 				Object,
@@ -217,79 +226,124 @@ fn spawn_vertex(
 					)),
 				},
 			)),
-			ObjectType::Box => commands.spawn((
-				StateScoped(Screen::Playing),
-				LevelScoped,
-				Object,
-				Box,
-				VertexPosition(vertex_id),
-				thing_type,
-				SpriteBundle {
-					sprite: Sprite {
-						color: palette.box_base,
-						custom_size: Some(SPRITE_SIZE),
-						anchor: Custom(Vec2::new(0.0, -0.25)),
-						..default()
+			ObjectData::Box(color) => {
+				let mut entity = commands.spawn((
+					StateScoped(Screen::Playing),
+					LevelScoped,
+					Object,
+					Box,
+					VertexPosition(vertex_id),
+					thing_type,
+					SpriteBundle {
+						sprite: Sprite {
+							color: palette.box_base,
+							custom_size: Some(SPRITE_SIZE),
+							..default()
+						},
+						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
+						transform: Transform::from_translation(
+							data.position.extend(layers::OBJECT_SPRITES),
+						),
+						..Default::default()
 					},
-					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(
-						data.position.extend(layers::OBJECT_SPRITES),
-					),
-					..Default::default()
-				},
-				AnimatedObject::default(),
-				Hoverable {
-					hover_text: hover::BOX,
-					hover_bounding_circle: None,
-					hover_bounding_box: Some(Aabb2d::new(
-						SPRITE_LENGTH * Vec2::new(0.0, 0.125),
-						SPRITE_LENGTH * Vec2::new(0.25, 0.25),
-					)),
-				},
-			)),
+					AnimatedObject::default(),
+					Hoverable {
+						hover_text: hover::BOX,
+						hover_bounding_circle: None,
+						hover_bounding_box: Some(Aabb2d::new(
+							Vec2::ZERO,
+							SPRITE_LENGTH * Vec2::new(0.25, 0.25),
+						)),
+					},
+				));
+				if let Some(color) = color {
+					entity.insert(color);
+					spawn_box_color_sprites(
+						entity.reborrow(),
+						color,
+						palette.box_base,
+						image_handles[&ImageKey::BoxSpriteAtlas].clone_weak(),
+						logical_color_atlas_layout.0.clone_weak(),
+						Vec3::new(0.0, COLOR_SPRITE_OFFSET, layers::BOX_COLOR_SPRITES),
+						0.0,
+					);
+				}
+				entity
+			}
 		};
-		if let Some(color) = object_data.color {
-			entity.insert(color);
-		}
 		let object_id = entity.id();
 		commands
 			.entity(vertex_id)
 			.insert(PlacedObject(Some(object_id)));
 	}
 	if let Some(glyph_data) = data.glyph {
-		let glyph_type = glyph_data.glyph_type;
+		let glyph_type = glyph_data.into();
 		let thing_type = ThingType::Glyph(glyph_type);
-		let mut entity = match glyph_type {
-			GlyphType::Button => commands.spawn((
-				StateScoped(Screen::Playing),
-				LevelScoped,
-				Glyph,
-				BoxSlot,
-				VertexPosition(vertex_id),
-				thing_type,
-				SpriteBundle {
-					sprite: Sprite {
-						color: palette.button_base,
-						custom_size: Some(SPRITE_SIZE),
-						anchor: Custom(Vec2::new(0.0, -0.25)),
-						..default()
+		let entity = match glyph_data {
+			GlyphData::Button(color) => {
+				let mut entity = commands.spawn((
+					StateScoped(Screen::Playing),
+					LevelScoped,
+					Glyph,
+					BoxSlot,
+					VertexPosition(vertex_id),
+					thing_type,
+					SpriteBundle {
+						sprite: Sprite {
+							color: palette.button_base,
+							custom_size: Some(SPRITE_SIZE),
+							..default()
+						},
+						texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
+						transform: Transform::from_translation(
+							data.position.extend(layers::GLYPH_SPRITES),
+						),
+						..Default::default()
 					},
-					texture: image_handles[&ImageKey::Object(thing_type)].clone_weak(),
-					transform: Transform::from_translation(
-						data.position.extend(layers::GLYPH_SPRITES),
-					),
-					..Default::default()
-				},
-				Hoverable {
-					hover_text: hover::BUTTON,
-					hover_bounding_circle: None,
-					hover_bounding_box: Some(Aabb2d::new(
-						SPRITE_LENGTH * Vec2::new(0.0, -0.125),
-						SPRITE_LENGTH * Vec2::new(0.375, 0.125),
-					)),
-				},
-			)),
-			GlyphType::Flag => commands.spawn((
+					Hoverable {
+						hover_text: hover::BUTTON,
+						hover_bounding_circle: None,
+						hover_bounding_box: Some(Aabb2d::new(
+							Vec2::ZERO,
+							SPRITE_LENGTH * Vec2::ONE / 3.0,
+						)),
+					},
+				));
+				if let Some((color, label_style)) = color {
+					entity.insert(color);
+					let label_mesh = if label_style.has_arrow_tip {
+						common_meshes.arrow_labels.clone_weak()
+					} else {
+						common_meshes.square_labels.clone_weak()
+					};
+					let (label_displacement, label_rotation, sprite_rotation) =
+						get_button_color_label_placement(&label_style);
+					entity.with_children(|children| {
+						children.spawn(ColorMesh2dBundle {
+							mesh: bevy::sprite::Mesh2dHandle(label_mesh),
+							material: colored_button_label_material.clone_weak(),
+							transform: Transform::from_rotation(Quat::from_rotation_z(
+								label_rotation,
+							))
+							.with_translation(
+								label_displacement.extend(layers::BUTTON_COLOR_LABELS),
+							),
+							..default()
+						});
+					});
+					spawn_box_color_sprites(
+						entity.reborrow(),
+						color,
+						palette.button_base,
+						image_handles[&ImageKey::BoxSpriteAtlas].clone_weak(),
+						logical_color_atlas_layout.0.clone_weak(),
+						label_displacement.extend(layers::BUTTON_COLOR_SPRITES),
+						sprite_rotation,
+					);
+				}
+				entity
+			}
+			GlyphData::Flag => commands.spawn((
 				StateScoped(Screen::Playing),
 				LevelScoped,
 				Glyph,
@@ -319,9 +373,6 @@ fn spawn_vertex(
 				},
 			)),
 		};
-		if let Some(color) = glyph_data.color {
-			entity.insert(color);
-		}
 		let glyph_id = entity.id();
 		commands
 			.entity(vertex_id)
@@ -419,4 +470,155 @@ fn spawn_cycle(
 			});
 		})
 		.id()
+}
+
+fn spawn_box_color_sprites(
+	mut box_entity: EntityCommands,
+	logical_color: LogicalColor,
+	color: Color,
+	atlas: Handle<Image>,
+	atlas_layout: Handle<TextureAtlasLayout>,
+	displacement: Vec3,
+	rotation: f32,
+) {
+	box_entity.with_children(|children| {
+		let mut spawn_sprite = |index, x_offset, x_scale| {
+			let transform = Transform::from_translation(displacement)
+				.mul_transform(Transform::from_rotation(Quat::from_rotation_z(rotation)))
+				.mul_transform(
+					Transform::from_translation(Vec3::X * x_offset)
+						.with_scale(Vec3::new(x_scale, 1.0, 1.0)),
+				);
+			children.spawn((
+				InheritSpriteColor,
+				SpriteBundle {
+					transform,
+					texture: atlas.clone_weak(),
+					sprite: Sprite {
+						color,
+						custom_size: Some(COLOR_SPRITE_SIZE),
+						..default()
+					},
+					..default()
+				},
+				TextureAtlas {
+					layout: atlas_layout.clone_weak(),
+					index,
+				},
+			));
+		};
+
+		if logical_color.is_pictogram {
+			let sprite_index = logical_color.color_index + BOX_COLOR_SPRITE_PICTOGRAM_OFFSET;
+			spawn_sprite(sprite_index, 0.0, 1.0);
+		} else {
+			let index_str = logical_color.color_index.to_string();
+			// Calculate the width of the written number. Digit 1 needs less space than the others.
+			let number_width = index_str
+				.chars()
+				.map(|c| {
+					if c == '1' {
+						DIGIT_ONE_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
+					} else {
+						DIGIT_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
+					}
+				})
+				.sum::<f32>()
+				- DIGIT_SPRITE_SPACING;
+			let (mut width_progress, number_width) = if number_width < 1.0 {
+				// Sprites should never grow in width, so cap the width at one
+				((1.0 - number_width) / 2.0, 1.0)
+			} else {
+				(0.0, number_width)
+			};
+			for digit in index_str.chars() {
+				let digit = digit
+					.to_digit(10)
+					.expect("String representation of a number should only be digits");
+				let current_width = if digit == 1 {
+					DIGIT_ONE_SPRITE_WIDTH
+				} else {
+					DIGIT_SPRITE_WIDTH
+				};
+				let relative_offset = (width_progress + current_width / 2.0) / number_width - 0.5;
+				width_progress += current_width + DIGIT_SPRITE_SPACING;
+				spawn_sprite(
+					digit as usize,
+					relative_offset * COLOR_SPRITE_SIZE.x,
+					1.0 / number_width,
+				);
+			}
+		}
+	});
+}
+
+/// Calculates the actual placement for a button color label
+/// ## Return Value
+/// The position of the center of the label, rotation of the label marker
+/// and rotation of the color sprite
+fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2, f32, f32) {
+	use color_labels::*;
+	use ButtonColorLabelPosition::*;
+	let secondary_offset = if style.has_arrow_tip {
+		OFFSET_SECONDARY_ARROW
+	} else {
+		OFFSET_SECONDARY_SQUARE
+	};
+	match style.position {
+		Inside => (Vec2::Y * CENTER_Y_OFFSET, 0.0, 0.0),
+		AnglePlaced(angle) | AngleRotated(angle) => {
+			// Clamp angle to the [0, 2pi] range
+			let angle = angle.rem_euclid(TAU);
+			let (relative_position, quadrant_rotation) = match angle / PI {
+				// Above
+				0.0..0.25 | 1.75..=2.0 => (
+					Vec2::new(angle.tan() * secondary_offset, secondary_offset),
+					PI,
+				),
+				// Right
+				0.25..0.75 => (
+					Vec2::new(
+						secondary_offset,
+						-(angle - PI / 2.0).tan() * secondary_offset,
+					),
+					PI / 2.0,
+				),
+				// Below
+				0.75..1.25 => (
+					Vec2::new(-angle.tan() * secondary_offset, -secondary_offset),
+					0.0,
+				),
+				// Left
+				1.25..1.75 => (
+					Vec2::new(
+						-secondary_offset,
+						(angle - PI / 2.0).tan() * secondary_offset,
+					),
+					-PI / 2.0,
+				),
+				_ => unreachable!("The angle should be clamped to [0, 2pi]"),
+			};
+			let position = relative_position + Vec2::Y * CENTER_Y_OFFSET;
+			// Rotated placements should propagate any rotation angle
+			if matches!(style.position, AngleRotated(_)) {
+				let label_rotation = PI - angle;
+				let sprite_rotation = PI - angle - quadrant_rotation;
+				// If we have a rotated placement near a corner,
+				// we bring it closer to the box to avoid a gap
+				let max_distance = if style.has_arrow_tip {
+					MAX_ROTATED_DISPLACEMENT_ARROW
+				} else {
+					MAX_ROTATED_DISPLACEMENT_SQUARE
+				};
+				let cut_position = if relative_position.length_squared() >= max_distance.powi(2) {
+					Vec2::from_angle(PI / 2.0 - angle) * max_distance + Vec2::Y * CENTER_Y_OFFSET
+				} else {
+					position
+				};
+				(cut_position, label_rotation, sprite_rotation)
+			} else {
+				(position, quadrant_rotation, 0.0)
+			}
+		}
+	}
 }

@@ -1,5 +1,7 @@
 Name=Swap
 
+PALETTE[DEFAULT_BOX] checker_asc
+
 VERTEX a b c d e f g h i j k
 
 CYCLE main a b c d e f

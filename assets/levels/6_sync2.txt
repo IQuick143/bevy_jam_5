@@ -1,5 +1,7 @@
 Name=Sync2
 
+PALETTE[DEFAULT_BOX] x
+
 VERTEX a b c d e f g h i j k l m n
 
 CYCLE main a b c d e f g
