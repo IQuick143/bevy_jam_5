@@ -1,6 +1,6 @@
 //! The screen state for the main game loop.
 
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::prelude::*;
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
@@ -28,13 +28,12 @@ pub(super) fn plugin(app: &mut App) {
 			(
 				process_enqueued_transitions::<PlayingLevel>,
 				(
-					send_event(GameUiAction::Reset).run_if(input_just_pressed(KeyCode::KeyR)),
+					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
 					send_event(GameUiAction::NextLevel).run_if(
-						input_just_pressed(KeyCode::KeyN)
-							.and_then(resource_equals(IsLevelCompleted(true))),
+						char_input_pressed('n').and_then(resource_equals(IsLevelCompleted(true))),
 					),
 					send_event(GameUiAction::Undo).run_if(
-						input_just_pressed(KeyCode::KeyZ)
+						char_input_pressed('z')
 							.and_then(|history: Res<MoveHistory>| !history.is_empty()),
 					),
 					game_ui_input_recording_system,
