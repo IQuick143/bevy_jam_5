@@ -4,6 +4,7 @@ mod animation;
 pub mod components;
 mod drawing;
 mod game_sfx;
+mod hints;
 pub mod history;
 mod inputs;
 pub mod level;
@@ -36,5 +37,6 @@ pub(super) fn plugin(app: &mut App) {
 		inputs::plugin,
 		game_sfx::plugin,
 		history::plugin,
+		hints::plugin,
 	));
 }

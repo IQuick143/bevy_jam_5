@@ -4,17 +4,8 @@ use super::{
 	components::*, drawing::*, inputs::CycleInteraction, level::*, logic::ComputedCycleTurnability,
 	prelude::*,
 };
-use crate::{
-	assets::*,
-	graphics::*,
-	ui::hover::{self, *},
-	AppSet,
-};
-use bevy::{
-	ecs::schedule::ScheduleLabel,
-	math::bounding::{Aabb2d, BoundingCircle},
-	sprite::Anchor,
-};
+use crate::{assets::*, graphics::*, AppSet};
+use bevy::{ecs::schedule::ScheduleLabel, sprite::Anchor};
 use std::f32::consts::{PI, TAU};
 
 pub(super) fn plugin(app: &mut App) {
@@ -51,8 +42,6 @@ pub(super) fn plugin(app: &mut App) {
 					set_vertex_transforms,
 					set_thing_transforms,
 					set_cycle_transforms,
-					init_cycle_hover_hints,
-					init_thing_hover_hints,
 				)
 					.after(SpawnPrimaryEntities),
 				(
@@ -64,7 +53,6 @@ pub(super) fn plugin(app: &mut App) {
 					create_button_color_markers,
 				)
 					.in_set(SpawnVisuals),
-				apply_level_hint_text,
 			),
 		);
 }
@@ -93,12 +81,12 @@ pub struct EnterLevel(pub Option<Handle<LevelData>>);
 /// An event that is sent to spawn entities for a particular level.
 /// These will replace any older entities
 #[derive(Event, Clone, Debug)]
-struct SpawnLevel(Handle<LevelData>, LevelSessionId);
+pub struct SpawnLevel(pub Handle<LevelData>, pub LevelSessionId);
 
 /// Identifier of a level session.
 /// Every time a level is entered, all its entities are assigned a unique identifier.
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Debug, Reflect)]
-struct LevelSessionId(usize);
+pub struct LevelSessionId(usize);
 
 /// The last [`LevelSessionId`] used by a level spawn
 #[derive(Resource, Clone, Copy, Default, Debug, Reflect)]
@@ -132,20 +120,6 @@ fn despawn_expired_level_entities(
 		if *session <= expiring_session_id.0 {
 			commands.entity(id).despawn_recursive();
 		}
-	}
-}
-
-fn apply_level_hint_text(
-	mut events: EventReader<SpawnLevel>,
-	mut hint: ResMut<HintText>,
-	levels: Res<Assets<LevelData>>,
-) {
-	if let Some(SpawnLevel(level_handle, _)) = events.read().last() {
-		let Some(level) = levels.get(level_handle) else {
-			log::warn!("Got an invalid level handle");
-			return;
-		};
-		hint.hint_text.clone_from(&level.hint);
 	}
 }
 
@@ -739,59 +713,5 @@ fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2
 				(position, quadrant_rotation, 0.0)
 			}
 		}
-	}
-}
-
-fn init_cycle_hover_hints(
-	mut commands: Commands,
-	query: Query<(Entity, &CycleTurnability), Added<CycleTurnability>>,
-) {
-	for (id, turnability) in &query {
-		commands.entity(id).insert(Hoverable {
-			hover_text: match turnability {
-				CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
-				CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
-				CycleTurnability::Never => hover::CYCLE_STILL,
-			},
-			hover_bounding_circle: Some(BoundingCircle::new(Vec2::ZERO, SPRITE_LENGTH / 2.0)),
-			hover_bounding_box: None,
-		});
-	}
-}
-
-fn init_thing_hover_hints(
-	mut commands: Commands,
-	query: Query<(Entity, &ThingData), Added<ThingData>>,
-) {
-	for (id, thing) in &query {
-		let (hover_text, bounding_box) = match thing {
-			ThingData::Object(ObjectData::Player) => (
-				hover::PLAYER,
-				Aabb2d::new(
-					SPRITE_LENGTH * Vec2::new(0.0, 0.25),
-					SPRITE_LENGTH * Vec2::new(0.25, 0.4),
-				),
-			),
-			ThingData::Object(ObjectData::Box(_)) => (
-				hover::BOX,
-				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 4.0)),
-			),
-			ThingData::Glyph(GlyphData::Flag) => (
-				hover::FLAG,
-				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 3.0)),
-			),
-			ThingData::Glyph(GlyphData::Button(_)) => (
-				hover::BUTTON,
-				Aabb2d::new(
-					SPRITE_LENGTH * Vec2::new(0.0, 0.125),
-					SPRITE_LENGTH * Vec2::new(0.25, 0.30),
-				),
-			),
-		};
-		commands.entity(id).insert(Hoverable {
-			hover_text,
-			hover_bounding_box: Some(bounding_box),
-			hover_bounding_circle: None,
-		});
 	}
 }
