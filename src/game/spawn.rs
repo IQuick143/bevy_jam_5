@@ -12,6 +12,7 @@ use crate::{
 	AppSet,
 };
 use bevy::{
+	ecs::schedule::ScheduleLabel,
 	math::bounding::{Aabb2d, BoundingCircle},
 	sprite::Anchor,
 };
@@ -25,23 +26,30 @@ pub(super) fn plugin(app: &mut App) {
 		.add_event::<EnterLevel>()
 		.add_event::<SpawnLevel>()
 		.configure_sets(
-			Update,
+			LevelInitialization,
 			(
-				ReceiveCommand,
-				(SpawnPrimaryEntities, AfterReceiveCommand).after(ReceiveCommand),
-				(SpawnVisualEntities, AfterSpawnPrimaryEntities).after(SpawnPrimaryEntities),
-				AfterSpawnVisualEntities.after(SpawnVisualEntities),
-			)
-				.after(AppSet::ExecuteInput)
-				.before(AppSet::GameLogic),
+				SpawnPrimaryEntities,
+				(SpawnVisuals, AfterSpawnPrimaryEntities).after(SpawnPrimaryEntities),
+				AfterSpawnVisuals.after(SpawnVisuals),
+			),
 		)
 		.add_systems(
 			Update,
 			(
-				handle_enter_level.in_set(ReceiveCommand),
-				despawn_expired_level_entities
-					.run_if(resource_changed::<ExpiringLevelSessionId>)
-					.in_set(AfterReceiveCommand),
+				handle_enter_level.after(AppSet::ExecuteInput),
+				(
+					(|w: &mut World| w.run_schedule(LevelInitialization))
+						.run_if(on_event::<SpawnLevel>()),
+					despawn_expired_level_entities
+						.run_if(resource_changed::<ExpiringLevelSessionId>),
+				)
+					.after(handle_enter_level)
+					.before(AppSet::GameLogic),
+			),
+		)
+		.add_systems(
+			LevelInitialization,
+			(
 				(spawn_primary_level_entities, spawn_thing_entities)
 					.chain()
 					.in_set(SpawnPrimaryEntities),
@@ -62,44 +70,37 @@ pub(super) fn plugin(app: &mut App) {
 					create_box_color_markers,
 					create_button_color_markers,
 				)
-					.in_set(SpawnVisualEntities),
-				init_cycle_animation.in_set(AfterSpawnVisualEntities),
-				(
-					apply_level_hint_text,
-					(
-						|mut history: ResMut<MoveHistory>| history.clear(),
-						|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
-						|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
-						send_event(GameLayoutChanged),
-					)
-						.run_if(on_event::<SpawnLevel>()),
-				)
-					.in_set(AfterReceiveCommand),
+					.in_set(SpawnVisuals),
+				init_cycle_animation.in_set(AfterSpawnVisuals),
+				apply_level_hint_text,
+				|mut history: ResMut<MoveHistory>| history.clear(),
+				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
+				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
+				send_event(GameLayoutChanged),
 			),
 		);
 }
 
+/// Schedule that runs within [`Update`] schedule
+/// every time a non-empty level is entered.
+#[derive(ScheduleLabel, Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
+pub struct LevelInitialization;
+
 /// System sets for initialization of a level.
 /// All of these run after inputs have been processed and dispatched,
 /// but before game logic is run for that frame.
-#[derive(SystemSet, Clone, Copy, PartialEq, Eq, Hash, Default, Debug)]
+#[derive(SystemSet, Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum LevelInitializationSet {
-	/// The initial reception of an [`EnterLevel`] event
-	ReceiveCommand,
 	/// Spawning of all structural entities
 	SpawnPrimaryEntities,
 	/// Spawning of sprites and meshes that visualize level entities
-	SpawnVisualEntities,
+	SpawnVisuals,
 	/// Runs after [`ReceiveCommand`](LevelInitializationSet::ReceiveCommand),
-	/// but still within [`LevelInitializationSet`]
-	#[default]
-	AfterReceiveCommand,
-	/// Runs after [`SpawnPrimaryEntities`](LevelInitializationSet::SpawnPrimaryEntities),
 	/// but still within [`LevelInitializationSet`]
 	AfterSpawnPrimaryEntities,
 	/// Runs after [`SpawnVisualEntities`](LevelInitializationSet::SpawnVisualEntities),
 	/// but still within [`LevelInitializationSet`]
-	AfterSpawnVisualEntities,
+	AfterSpawnVisuals,
 }
 
 /// An event that is sent to switch the game to a level
