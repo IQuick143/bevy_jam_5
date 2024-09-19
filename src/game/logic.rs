@@ -1,5 +1,5 @@
 use super::{components::*, level::*, prelude::*};
-use crate::AppSet;
+use crate::{send_event, AppSet};
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
@@ -8,6 +8,14 @@ pub fn plugin(app: &mut App) {
 		.add_event::<RotateCycleGroup>()
 		.add_event::<RotateSingleCycle>()
 		.add_event::<RecordCycleGroupRotation>()
+		.add_systems(
+			LevelInitialization,
+			(
+				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
+				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
+				send_event(GameLayoutChanged),
+			),
+		)
 		.add_systems(
 			Update,
 			(

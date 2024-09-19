@@ -20,7 +20,7 @@ pub mod prelude {
 			CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, LevelCompletionConditions,
 			RotateCycle,
 		},
-		spawn::EnterLevel,
+		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
 	pub use bevy::prelude::*;
 }

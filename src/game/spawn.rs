@@ -1,13 +1,12 @@
 //! Initialization of level content entities
 
 use super::{
-	animation::*, components::*, drawing::*, inputs::CycleInteraction, level::*,
-	logic::ComputedCycleTurnability, prelude::*,
+	components::*, drawing::*, inputs::CycleInteraction, level::*, logic::ComputedCycleTurnability,
+	prelude::*,
 };
 use crate::{
 	assets::*,
 	graphics::*,
-	send_event,
 	ui::hover::{self, *},
 	AppSet,
 };
@@ -16,7 +15,6 @@ use bevy::{
 	math::bounding::{Aabb2d, BoundingCircle},
 	sprite::Anchor,
 };
-use rand::Rng as _;
 use std::f32::consts::{PI, TAU};
 
 pub(super) fn plugin(app: &mut App) {
@@ -27,11 +25,7 @@ pub(super) fn plugin(app: &mut App) {
 		.add_event::<SpawnLevel>()
 		.configure_sets(
 			LevelInitialization,
-			(
-				SpawnPrimaryEntities,
-				(SpawnVisuals, AfterSpawnPrimaryEntities).after(SpawnPrimaryEntities),
-				AfterSpawnVisuals.after(SpawnVisuals),
-			),
+			(SpawnPrimaryEntities, SpawnVisuals).chain(),
 		)
 		.add_systems(
 			Update,
@@ -57,11 +51,10 @@ pub(super) fn plugin(app: &mut App) {
 					set_vertex_transforms,
 					set_thing_transforms,
 					set_cycle_transforms,
-					init_thing_animation,
 					init_cycle_hover_hints,
 					init_thing_hover_hints,
 				)
-					.in_set(AfterSpawnPrimaryEntities),
+					.after(SpawnPrimaryEntities),
 				(
 					create_vertex_visuals,
 					create_cycle_visuals,
@@ -71,12 +64,7 @@ pub(super) fn plugin(app: &mut App) {
 					create_button_color_markers,
 				)
 					.in_set(SpawnVisuals),
-				init_cycle_animation.in_set(AfterSpawnVisuals),
 				apply_level_hint_text,
-				|mut history: ResMut<MoveHistory>| history.clear(),
-				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
-				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
-				send_event(GameLayoutChanged),
 			),
 		);
 }
@@ -95,12 +83,6 @@ pub enum LevelInitializationSet {
 	SpawnPrimaryEntities,
 	/// Spawning of sprites and meshes that visualize level entities
 	SpawnVisuals,
-	/// Runs after [`ReceiveCommand`](LevelInitializationSet::ReceiveCommand),
-	/// but still within [`LevelInitializationSet`]
-	AfterSpawnPrimaryEntities,
-	/// Runs after [`SpawnVisualEntities`](LevelInitializationSet::SpawnVisualEntities),
-	/// but still within [`LevelInitializationSet`]
-	AfterSpawnVisuals,
 }
 
 /// An event that is sent to switch the game to a level
@@ -757,27 +739,6 @@ fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2
 				(position, quadrant_rotation, 0.0)
 			}
 		}
-	}
-}
-
-fn init_cycle_animation(
-	mut commands: Commands,
-	query: Query<&CycleVisualEntities, Added<CycleVisualEntities>>,
-) {
-	for visuals in &query {
-		commands
-			.entity(visuals.center)
-			.insert(JumpTurnAnimation::default());
-		commands.entity(visuals.arrow).insert(SpinAnimation {
-			current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
-			..default()
-		});
-	}
-}
-
-fn init_thing_animation(mut commands: Commands, query: Query<Entity, Added<ThingData>>) {
-	for id in &query {
-		commands.entity(id).insert(AnimatedObject::default());
 	}
 }
 

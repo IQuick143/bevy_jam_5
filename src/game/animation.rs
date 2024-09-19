@@ -1,11 +1,18 @@
 use std::f32::consts::TAU;
 
-use bevy::utils::hashbrown::HashMap;
-
-use super::{components::*, logic::*, prelude::*};
+use super::{components::*, level::ThingData, logic::*, prelude::*};
 use crate::AppSet;
+use bevy::utils::hashbrown::HashMap;
+use rand::Rng as _;
 
 pub fn plugin(app: &mut App) {
+	app.add_systems(
+		LevelInitialization,
+		(
+			init_thing_animation.after(LevelInitializationSet::SpawnPrimaryEntities),
+			init_cycle_animation.after(LevelInitializationSet::SpawnVisuals),
+		),
+	);
 	app.add_systems(
 		Update,
 		(
@@ -313,5 +320,26 @@ fn cycle_turning_animation_system(
 			direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
 			ANIMATION_TIME,
 		);
+	}
+}
+
+fn init_cycle_animation(
+	mut commands: Commands,
+	query: Query<&CycleVisualEntities, Added<CycleVisualEntities>>,
+) {
+	for visuals in &query {
+		commands
+			.entity(visuals.center)
+			.insert(JumpTurnAnimation::default());
+		commands.entity(visuals.arrow).insert(SpinAnimation {
+			current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),
+			..default()
+		});
+	}
+}
+
+fn init_thing_animation(mut commands: Commands, query: Query<Entity, Added<ThingData>>) {
+	for id in &query {
+		commands.entity(id).insert(AnimatedObject::default());
 	}
 }

@@ -1,12 +1,18 @@
 //! Recording and rewinding of moves
 
-use super::logic::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup};
+use super::{
+	logic::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup},
+	spawn::LevelInitialization,
+};
 use crate::AppSet;
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<MoveHistory>()
 		.add_event::<UndoMove>()
+		.add_systems(LevelInitialization, |mut history: ResMut<MoveHistory>| {
+			history.clear()
+		})
 		.add_systems(
 			Update,
 			(
