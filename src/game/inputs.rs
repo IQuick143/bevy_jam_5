@@ -13,9 +13,6 @@ pub(super) fn plugin(app: &mut App) {
 	);
 }
 
-#[derive(Component, Clone, Copy, Debug, Reflect)]
-pub struct CycleInterationRadius(pub f32);
-
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect, Default)]
 pub enum CycleInteraction {
 	#[default]
