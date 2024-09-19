@@ -19,10 +19,13 @@ pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
 /// Size of a sprite in world-units.
 pub const SPRITE_LENGTH: f32 = 100.0;
 
+/// Half of the width of a cycle perimeter ring in world units
 pub const RING_HALF_WIDTH: f32 = 0.225 / 4.0 * SPRITE_LENGTH;
 
+/// Radius of the visuals for vertices in world units
 pub const NODE_RADIUS: f32 = SPRITE_LENGTH / 8.0;
 
+/// Width of the visuals for cycle links
 pub const CYCLE_LINK_WIDTH: f32 = NODE_RADIUS;
 
 /// Spacing between the two "belts" of a cycle link
@@ -89,17 +92,30 @@ pub const BACKGROUND_TILING: f32 = 400.0;
 
 /// Defines Z depth of various objects to layer them properly
 pub mod layers {
+	/// Z depth of the title screen illustration
 	pub const TITLE_IMAGE: f32 = -10.0;
+	/// Z depth of sprites that indicate logical color of boxes
 	pub const BOX_COLOR_SPRITES: f32 = -8.0;
+	/// Z depth of sprites for players and boxes
 	pub const OBJECT_SPRITES: f32 = -10.0;
+	/// Z depth of sprites that indicate logical color of buttons
 	pub const BUTTON_COLOR_SPRITES: f32 = -48.0;
+	/// Z depth of backdrop for labels that indicate logical color of buttons
 	pub const BUTTON_COLOR_LABELS: f32 = -49.0;
+	/// Z depth of sprites for flags and buttons
 	pub const GLYPH_SPRITES: f32 = -50.0;
+	/// Z depth of the bottom text box
 	pub const HINT_TEXT_PANEL: f32 = -100.0;
+	/// Z depth of meshes for vertices
 	pub const CYCLE_NODES: f32 = -100.0;
+	/// Z depth of meshes for perimeters of cycles
 	pub const CYCLE_RINGS: f32 = -200.0;
+	/// Z depth of arrow sprites at the center of cycles
 	pub const CYCLE_CENTER_ARROWS: f32 = -250.0;
+	/// Z depth of sprites for cycle centers
 	pub const CYCLE_CENTER_SPRITES: f32 = -300.0;
+	/// Z depth of meshes for cycle linkages
 	pub const CYCLE_LINKS: f32 = -400.0;
+	/// Z depth of the animated background
 	pub const BACKGROUND: f32 = -550.0;
 }
