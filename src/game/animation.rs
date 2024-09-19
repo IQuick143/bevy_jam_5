@@ -184,7 +184,7 @@ fn listen_for_moves(
 	let mut permutation_map = HashMap::new();
 	for event in rotation_events.read() {
 		let Ok((vertices, transform)) = cycles.get(event.0.target_cycle) else {
-			// TODO: warn
+			log::warn!("Target of RotateSingleCycle is not a cycle entity");
 			continue;
 		};
 		let location = transform.translation();
@@ -202,7 +202,7 @@ fn listen_for_moves(
 		let end_vertex = vertex_position.0;
 
 		let Ok(end_vertex_transform) = vertices.get(end_vertex) else {
-			// TODO: warn
+			log::warn!("VertexPosition of an object is not a vertex entity");
 			continue;
 		};
 
@@ -217,7 +217,7 @@ fn listen_for_moves(
 			};
 
 			let Ok(start_vertex_transform) = vertices.get(start_vertex) else {
-				// TODO: warn
+				log::warn!("CycleVertices item is not a vertex entity");
 				continue;
 			};
 
@@ -292,17 +292,17 @@ fn jump_turn_animation_system(
 const CYCLE_CENTER_ANIMATION_ANGLE: f32 = std::f32::consts::PI / 2.0;
 
 fn cycle_turning_animation_system(
-	cycles_q: Query<&Children, With<CycleVertices>>,
+	cycles_q: Query<&CycleVisualEntities>,
 	mut jump_q: Query<&mut JumpTurnAnimation>,
 	mut events: EventReader<RotateSingleCycle>,
 ) {
 	for event in events.read() {
-		let Ok(children) = cycles_q.get(event.0.target_cycle) else {
+		let Ok(visuals) = cycles_q.get(event.0.target_cycle) else {
 			log::warn!("RotateSingleCycle event does not target a cycle entity");
 			continue;
 		};
-		let Ok(mut animation) = jump_q.get_mut(children[0]) else {
-			log::warn!("Child of cycle entity does not have JumpTurnAnimation component");
+		let Ok(mut animation) = jump_q.get_mut(visuals.center) else {
+			log::warn!("Cycle center sprite does not have JumpTurnAnimation component");
 			continue;
 		};
 		let direction_multiplier = match event.0.direction.into() {

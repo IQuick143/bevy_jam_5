@@ -54,3 +54,19 @@ pub struct CycleVertices(pub Vec<Entity>);
 /// Describes the linkage of multiple cycles such that they will always turn together
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct LinkedCycles(pub Vec<(Entity, super::level::LinkedCycleDirection)>);
+
+/// Reference to the target cycle of a link entity.
+/// The source cycle is its [`Parent`].
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+pub struct LinkTargetCycle(pub Entity);
+
+/// References to entities that make up the visualization of a cycle
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct CycleVisualEntities {
+	/// The cycle ring
+	pub ring: Entity,
+	/// The sprite at the center of the cycle
+	pub center: Entity,
+	/// The arrow that shows up at the center of the cycle
+	pub arrow: Entity,
+}

@@ -64,7 +64,7 @@ pub struct RecordCycleGroupRotation(pub RotateCycle);
 
 /// Event that is sent when state of the game map changes,
 /// usually by turning a cycle
-#[derive(Event, Debug)]
+#[derive(Event, Clone, Copy, Default, Debug)]
 pub struct GameLayoutChanged;
 
 /// Contains an overview of conditions that are needed to complete the level

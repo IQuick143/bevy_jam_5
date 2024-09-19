@@ -1,6 +1,6 @@
 use crate::{ui::freeze::ui_not_frozen, AppSet};
 
-use super::{logic::*, prelude::*};
+use super::{level::CyclePlacement, logic::*, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -32,7 +32,7 @@ fn cycle_inputs_system(
 	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut cycles_q: Query<(
 		Entity,
-		&CycleInterationRadius,
+		&CyclePlacement,
 		&GlobalTransform,
 		&ComputedCycleTurnability,
 		&mut CycleInteraction,
@@ -54,7 +54,7 @@ fn cycle_inputs_system(
 	if let Some(cursor_pos) = cursor_pos {
 		let (nearest_cycle, _) = cycles_q
 			.iter()
-			.filter_map(|(e, radius, transform, turnability, _)| {
+			.filter_map(|(e, placement, transform, turnability, _)| {
 				// Include turnability this early in the input handling,
 				// because we want to ignore locked cycles in case they overlap
 				// a turnable cycle
@@ -62,7 +62,7 @@ fn cycle_inputs_system(
 					return None;
 				}
 				let d_sq = transform.translation().xy().distance_squared(cursor_pos);
-				let r_sq = radius.0.powi(2);
+				let r_sq = placement.radius.powi(2);
 				if d_sq <= r_sq {
 					Some((e, d_sq))
 				} else {

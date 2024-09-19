@@ -90,7 +90,10 @@ pub const BACKGROUND_TILING: f32 = 400.0;
 /// Defines Z depth of various objects to layer them properly
 pub mod layers {
 	pub const TITLE_IMAGE: f32 = -10.0;
+	pub const BOX_COLOR_SPRITES: f32 = -8.0;
 	pub const OBJECT_SPRITES: f32 = -10.0;
+	pub const BUTTON_COLOR_SPRITES: f32 = -48.0;
+	pub const BUTTON_COLOR_LABELS: f32 = -49.0;
 	pub const GLYPH_SPRITES: f32 = -50.0;
 	pub const HINT_TEXT_PANEL: f32 = -100.0;
 	pub const CYCLE_NODES: f32 = -100.0;
@@ -99,7 +102,4 @@ pub mod layers {
 	pub const CYCLE_CENTER_SPRITES: f32 = -300.0;
 	pub const CYCLE_LINKS: f32 = -400.0;
 	pub const BACKGROUND: f32 = -550.0;
-	pub const BOX_COLOR_SPRITES: f32 = 2.0; // Relative to the box sprite
-	pub const BUTTON_COLOR_LABELS: f32 = 1.0; // Relative to the button sprite
-	pub const BUTTON_COLOR_SPRITES: f32 = 2.0; // Relative to the button sprite
 }
