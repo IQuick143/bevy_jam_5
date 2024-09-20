@@ -348,7 +348,7 @@ fn create_cycle_visuals(
 			placement.radius + RING_HALF_WIDTH,
 		)
 		.mesh()
-		.resolution(64)
+		.resolution(CYCLE_RING_MESH_RESOLUTION)
 		.build();
 		let ring = commands
 			.spawn(ColorMesh2dBundle {
@@ -471,7 +471,7 @@ fn create_thing_sprites(
 		let (color, anchor, z_depth) = match thing {
 			ThingData::Object(ObjectData::Player) => (
 				palette.player,
-				Anchor::Custom(Vec2::Y * -0.25),
+				Anchor::Custom(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::OBJECT_SPRITES,
 			),
 			ThingData::Object(ObjectData::Box(_)) => {
@@ -479,7 +479,7 @@ fn create_thing_sprites(
 			}
 			ThingData::Glyph(GlyphData::Flag) => (
 				palette.goal_closed,
-				Anchor::Custom(Vec2::Y * -0.25),
+				Anchor::Custom(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::GLYPH_SPRITES,
 			),
 			ThingData::Glyph(GlyphData::Button(_)) => {
@@ -581,8 +581,7 @@ fn create_logical_color_sprite(
 	// Shorthand for spawning a color sprite (more than one may be needed for numeric colors)
 	let mut spawn_sprite = |index, x_offset, x_scale| {
 		let transform = transform.mul_transform(
-			Transform::from_translation(Vec3::X * x_offset)
-				.with_scale(Vec3::new(x_scale, 1.0, 1.0)),
+			Transform::from_translation(Vec3::X * x_offset).with_scale(Vec3::ONE.with_x(x_scale)),
 		);
 		children.spawn((
 			SpriteBundle {

@@ -22,6 +22,9 @@ pub const SPRITE_LENGTH: f32 = 100.0;
 /// Half of the width of a cycle perimeter ring in world units
 pub const RING_HALF_WIDTH: f32 = 0.225 / 4.0 * SPRITE_LENGTH;
 
+/// Number of vertices necessary for the meshes for cycle perimeter rings
+pub const CYCLE_RING_MESH_RESOLUTION: usize = 64;
+
 /// Radius of the visuals for vertices in world units
 pub const NODE_RADIUS: f32 = SPRITE_LENGTH / 8.0;
 
@@ -38,6 +41,9 @@ pub const CYCLE_LINK_END_CUT: f32 = SPRITE_LENGTH / 2.0;
 /// How big should a sprite be.
 /// See [`SPRITE_LENGTH`]
 pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
+
+/// Sprite anchor point for player and flag sprites
+pub const PLAYER_FLAG_SPRITE_ANCHOR: Vec2 = Vec2::new(0.0, -0.25);
 
 /// How big logical color sprites should be
 pub const COLOR_SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH * 0.265625);
