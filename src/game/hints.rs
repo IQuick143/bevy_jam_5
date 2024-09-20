@@ -68,14 +68,14 @@ fn init_thing_hover_hints(
 			),
 			ThingData::Glyph(GlyphData::Flag) => (
 				hover::FLAG,
-				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 3.0)),
+				Aabb2d::new(
+					SPRITE_LENGTH * Vec2::new(0.0, 0.08),
+					SPRITE_LENGTH * Vec2::new(0.25, 0.30),
+				),
 			),
 			ThingData::Glyph(GlyphData::Button(_)) => (
 				hover::BUTTON,
-				Aabb2d::new(
-					SPRITE_LENGTH * Vec2::new(0.0, 0.125),
-					SPRITE_LENGTH * Vec2::new(0.25, 0.30),
-				),
+				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 3.0)),
 			),
 		};
 		commands.entity(id).insert(Hoverable {
