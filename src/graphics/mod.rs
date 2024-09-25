@@ -23,7 +23,12 @@ pub const SPRITE_LENGTH: f32 = 100.0;
 pub const RING_HALF_WIDTH: f32 = 0.225 / 4.0 * SPRITE_LENGTH;
 
 /// Number of vertices necessary for the meshes for cycle perimeter rings
-pub const CYCLE_RING_MESH_RESOLUTION: usize = 64;
+/// ## Parameters
+/// - `radius` - Radius of the cycle ring in world units
+pub fn cycle_ring_mesh_resolution(radius: f32) -> usize {
+	let resolution = (5.0 * radius.sqrt()) as usize;
+	resolution.clamp(8, usize::MAX)
+}
 
 /// Radius of the visuals for vertices in world units
 pub const NODE_RADIUS: f32 = SPRITE_LENGTH / 8.0;

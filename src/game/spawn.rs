@@ -348,7 +348,7 @@ fn create_cycle_visuals(
 			placement.radius + RING_HALF_WIDTH,
 		)
 		.mesh()
-		.resolution(CYCLE_RING_MESH_RESOLUTION)
+		.resolution(cycle_ring_mesh_resolution(placement.radius))
 		.build();
 		let ring = commands
 			.spawn(ColorMesh2dBundle {
