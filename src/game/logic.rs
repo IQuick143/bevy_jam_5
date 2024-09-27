@@ -22,7 +22,7 @@ pub fn plugin(app: &mut App) {
 				cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>()),
 				cycle_rotation_system.run_if(on_event::<RotateSingleCycle>()),
 				(
-					level_completion_check_system,
+					(button_trigger_check_system, level_completion_check_system).chain(),
 					cycle_turnability_update_system,
 				)
 					.run_if(on_event::<GameLayoutChanged>()),
@@ -35,6 +35,13 @@ pub fn plugin(app: &mut App) {
 /// Determines whether a cycle may be turned at any given moment
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct ComputedCycleTurnability(pub bool);
+
+/// Denotes whether an [`Object`] or [`Glyph`] entity is currently
+/// on the same vertex as a matching entity of the other kind.
+///
+/// A boolean flag is used instead of a marker to enable change detection.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Default, Debug, Reflect)]
+pub struct IsTriggered(pub bool);
 
 /// Enumerates directions in which a cycle can turn
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -217,10 +224,58 @@ fn cycle_turnability_update_system(
 	}
 }
 
-fn level_completion_check_system(
+fn button_trigger_check_system(
 	vertices_q: Query<(&PlacedObject, &PlacedGlyph)>,
-	objects_q: Query<(Option<&Player>, Option<&Box>, Option<&LogicalColor>), With<Object>>,
-	glyphs_q: Query<(Option<&Goal>, Option<&BoxSlot>, Option<&LogicalColor>), With<Glyph>>,
+	mut objects_q: Query<(&mut IsTriggered, &ObjectData)>,
+	mut glyphs_q: Query<(&mut IsTriggered, &GlyphData), Without<ObjectData>>,
+) {
+	for (object, glyph) in &vertices_q {
+		let mut object = object.0.and_then(|id| {
+			objects_q
+				.get_mut(id)
+				.inspect_err(|e| log::warn!("{e}"))
+				.ok()
+		});
+		let mut glyph = glyph
+			.0
+			.and_then(|id| glyphs_q.get_mut(id).inspect_err(|e| log::warn!("{e}")).ok());
+
+		match (&mut object, &mut glyph) {
+			(
+				Some((ref mut object_triggered, ObjectData::Player)),
+				Some((ref mut glyph_triggered, GlyphData::Flag)),
+			) => {
+				object_triggered.set_if_neq(IsTriggered(true));
+				glyph_triggered.set_if_neq(IsTriggered(true));
+			}
+			(
+				Some((ref mut object_triggered, ObjectData::Box(box_color))),
+				Some((ref mut glyph_triggered, GlyphData::Button(button_color))),
+			) => {
+				let colors_compatible = (*box_color)
+					.and_then(|box_color| {
+						button_color.map(|button_color| box_color == button_color.0)
+					})
+					// If either thing is colorless, they are considered compatible
+					.unwrap_or(true);
+				object_triggered.set_if_neq(IsTriggered(colors_compatible));
+				glyph_triggered.set_if_neq(IsTriggered(colors_compatible));
+			}
+			_ => {
+				if let Some((mut is_triggered, _)) = object {
+					is_triggered.set_if_neq(IsTriggered(false));
+				}
+				if let Some((mut is_triggered, _)) = glyph {
+					is_triggered.set_if_neq(IsTriggered(false));
+				}
+			}
+		};
+	}
+}
+
+fn level_completion_check_system(
+	flags_q: Query<&IsTriggered, With<Goal>>,
+	buttons_q: Query<&IsTriggered, With<BoxSlot>>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
 ) {
@@ -231,34 +286,16 @@ fn level_completion_check_system(
 		flags_occupied: 0,
 	};
 
-	for (object, glyph) in &vertices_q {
-		let (contains_player, contains_box, object_color) = object
-			.0
-			.and_then(|id| objects_q.get(id).inspect_err(|e| log::warn!("{e}")).ok())
-			.map(|(a, b, c)| (a.is_some(), b.is_some(), c))
-			.unwrap_or((false, false, None));
-		let (contains_goal, contains_button, glyph_color) = glyph
-			.0
-			.and_then(|id| glyphs_q.get(id).inspect_err(|e| log::warn!("{e}")).ok())
-			.map(|(a, b, c)| (a.is_some(), b.is_some(), c))
-			.unwrap_or((false, false, None));
-
-		let colors_compatible = object_color
-			.and_then(|object_color| glyph_color.map(|glyph_color| *object_color == *glyph_color))
-			// If either thing is colorless, they are considered compatible
-			.unwrap_or(true);
-
-		if contains_button {
-			new_completion.buttons_present += 1;
-			if contains_box && colors_compatible {
-				new_completion.buttons_triggered += 1;
-			}
+	for is_triggered in &flags_q {
+		new_completion.flags_present += 1;
+		if is_triggered.0 {
+			new_completion.flags_occupied += 1;
 		}
-		if contains_goal {
-			new_completion.flags_present += 1;
-			if contains_player && colors_compatible {
-				new_completion.flags_occupied += 1;
-			}
+	}
+	for is_triggered in &buttons_q {
+		new_completion.buttons_present += 1;
+		if is_triggered.0 {
+			new_completion.buttons_triggered += 1;
 		}
 	}
 

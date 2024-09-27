@@ -1,4 +1,4 @@
-use super::{components::*, inputs::CycleInteraction, level::LogicalColor, logic::*, prelude::*};
+use super::{components::*, inputs::CycleInteraction, logic::*, prelude::*};
 use crate::{
 	graphics::{
 		color_labels,
@@ -108,7 +108,6 @@ impl FromWorld for GameObjectMeshes {
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct ThingPalette {
 	pub box_base: Color,
-	pub box_trigger: Color,
 	pub button_base: Color,
 	pub button_trigger: Color,
 	pub player: Color,
@@ -124,7 +123,6 @@ impl Default for ThingPalette {
 		use palettes::tailwind as p;
 		Self {
 			box_base: p::ORANGE_200.into(),
-			box_trigger: p::ORANGE_200.into(),
 			button_base: Srgba::hex("CC5151").unwrap().into(),
 			button_trigger: p::GREEN_300.into(),
 			player: p::SLATE_200.into(),
@@ -159,47 +157,20 @@ fn goal_unlock_animation_system(
 
 fn button_trigger_animation_system(
 	mut sprites_q: Query<&mut Sprite>,
-	buttons_q: Query<(&Children, Option<&LogicalColor>), With<BoxSlot>>,
-	boxes_q: Query<(&Children, Option<&LogicalColor>), With<Box>>,
-	nodes_q: Query<(&PlacedGlyph, &PlacedObject)>,
+	buttons_q: Query<(&Children, &IsTriggered), (With<BoxSlot>, Changed<IsTriggered>)>,
 	palette: Res<ThingPalette>,
 ) {
-	let mut recolor_sprites = |sprite_ids: &Children, color| {
-		for id in sprite_ids {
+	for (children, is_triggered) in &buttons_q {
+		let color = if is_triggered.0 {
+			palette.button_trigger
+		} else {
+			palette.button_base
+		};
+
+		for id in children {
 			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
 				sprite.color = color;
 			}
-		}
-	};
-
-	for (glyph_id, object_id) in &nodes_q {
-		let button = glyph_id.0.and_then(|id| buttons_q.get(id).ok());
-		let object = object_id.0.and_then(|id| boxes_q.get(id).ok());
-		// Use trigger color if both things are at the same place
-		// and are of the same logical color, otherwise use base color
-		match (button, object) {
-			(Some((button, button_color)), Some((object, object_color))) => {
-				let colors_compatible = object_color
-					.and_then(|object_color| {
-						button_color.map(|glyph_color| *object_color == *glyph_color)
-					})
-					// If either thing is colorless, they are considered compatible
-					.unwrap_or(true);
-				if colors_compatible {
-					recolor_sprites(button, palette.button_trigger);
-					recolor_sprites(object, palette.box_trigger);
-				} else {
-					recolor_sprites(button, palette.button_base);
-					recolor_sprites(object, palette.box_base);
-				}
-			}
-			(Some((button, _)), None) => {
-				recolor_sprites(button, palette.button_base);
-			}
-			(None, Some((object, _))) => {
-				recolor_sprites(object, palette.box_base);
-			}
-			(None, None) => {}
 		}
 	}
 }

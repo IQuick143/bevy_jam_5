@@ -1,7 +1,11 @@
 //! Initialization of level content entities
 
 use super::{
-	components::*, drawing::*, inputs::CycleInteraction, level::*, logic::ComputedCycleTurnability,
+	components::*,
+	drawing::*,
+	inputs::CycleInteraction,
+	level::*,
+	logic::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
 };
 use crate::{assets::*, graphics::*, AppSet};
@@ -214,9 +218,11 @@ fn spawn_thing_entities(
 				.spawn((
 					Object,
 					Player,
+					object,
 					ThingData::Object(object),
 					*session,
 					VertexPosition(id),
+					IsTriggered::default(),
 					TransformBundle::default(),
 					VisibilityBundle::default(),
 				))
@@ -225,9 +231,11 @@ fn spawn_thing_entities(
 				.spawn((
 					Object,
 					Box,
+					object,
 					ThingData::Object(object),
 					*session,
 					VertexPosition(id),
+					IsTriggered::default(),
 					TransformBundle::default(),
 					VisibilityBundle::default(),
 				))
@@ -237,9 +245,11 @@ fn spawn_thing_entities(
 					Object,
 					Box,
 					color,
+					object,
 					ThingData::Object(object),
 					*session,
 					VertexPosition(id),
+					IsTriggered::default(),
 					TransformBundle::default(),
 					VisibilityBundle::default(),
 				))
@@ -250,9 +260,11 @@ fn spawn_thing_entities(
 				.spawn((
 					Glyph,
 					Goal,
+					glyph,
 					ThingData::Glyph(glyph),
 					*session,
 					VertexPosition(id),
+					IsTriggered::default(),
 					TransformBundle::default(),
 					VisibilityBundle::default(),
 				))
@@ -261,9 +273,11 @@ fn spawn_thing_entities(
 				.spawn((
 					Glyph,
 					BoxSlot,
+					glyph,
 					ThingData::Glyph(glyph),
 					*session,
 					VertexPosition(id),
+					IsTriggered::default(),
 					TransformBundle::default(),
 					VisibilityBundle::default(),
 				))
@@ -272,10 +286,12 @@ fn spawn_thing_entities(
 				.spawn((
 					Glyph,
 					BoxSlot,
+					glyph,
 					color_data,
 					ThingData::Glyph(glyph),
 					*session,
 					VertexPosition(id),
+					IsTriggered::default(),
 					TransformBundle::default(),
 					VisibilityBundle::default(),
 				))
