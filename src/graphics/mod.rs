@@ -111,7 +111,14 @@ pub mod fade {
 
 	/// Calculates opacity of the overlay from animation progress \[0, 1]
 	pub fn fade_opacity_function(progress: f32) -> f32 {
-		1.0 - (2.0 * progress - 1.0).abs()
+		const PEAK_OVERFLOW: f32 = 1.5;
+		const SMOOTHING_DISTANCE: f32 = 0.1;
+		// Linear ascent and descent, from 0 to `PEAK_OVERFLOW`
+		let raw_opacity = (1.0 - (2.0 * progress - 1.0).abs()) * PEAK_OVERFLOW;
+		// Quadratic smoothing
+		let smoothing = 4.0 * SMOOTHING_DISTANCE;
+		let h = (smoothing - (raw_opacity - 1.0).abs()).max(0.0) / smoothing;
+		raw_opacity.min(1.0) - h * h * SMOOTHING_DISTANCE
 	}
 }
 
