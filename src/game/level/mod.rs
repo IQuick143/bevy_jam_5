@@ -24,7 +24,7 @@ pub struct LevelData {
 }
 
 /// Description of a single vertex
-#[derive(Debug, Clone, Copy, Reflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct VertexData {
 	/// Position of the vertex on the screen
 	pub position: Vec2,
@@ -60,7 +60,7 @@ pub struct DeclaredLinkData {
 }
 
 /// Computed placement of a cycle
-#[derive(Clone, Copy, PartialEq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub struct CyclePlacement {
 	/// Position of the center point of the cycle
 	pub position: Vec2,
@@ -80,13 +80,13 @@ pub enum GlyphType {
 	Flag,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
 pub enum ObjectData {
 	Box(Option<LogicalColor>),
 	Player,
 }
 
-#[derive(Clone, Copy, Debug, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Reflect)]
 pub enum GlyphData {
 	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
 	Flag,
@@ -117,7 +117,7 @@ pub enum CycleTurnability {
 }
 
 /// Relative direction of two cycles that are to turn together
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum LinkedCycleDirection {
 	/// The cycles will turn in the same direction
 	Coincident,
@@ -154,7 +154,7 @@ pub struct LogicalColor {
 /// Logical color on button takes the appearence of a label inside
 /// or near the button. This structure describes the shape and
 /// positioning of the label.
-#[derive(Clone, Copy, PartialEq, Debug, Default, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Debug, Default, Reflect)]
 pub struct ButtonColorLabelAppearence {
 	/// Position of the label
 	pub position: ButtonColorLabelPosition,

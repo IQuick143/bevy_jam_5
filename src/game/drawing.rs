@@ -1,4 +1,4 @@
-use super::{components::*, inputs::CycleInteraction, level::LogicalColor, logic::*, prelude::*};
+use super::{components::*, inputs::CycleInteraction, logic::*, prelude::*};
 use crate::{
 	graphics::{
 		color_labels,
@@ -19,22 +19,16 @@ pub(super) fn plugin(app: &mut App) {
 				goal_unlock_animation_system
 					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
 				(
-					button_trigger_animation_system.before(sprite_color_propagation_system),
+					button_trigger_animation_system,
 					cycle_center_turnability_visuals_update_system
 						.before(cycle_center_interaction_visuals_update_system),
 				)
 					.run_if(on_event::<GameLayoutChanged>()),
 				cycle_center_interaction_visuals_update_system,
-				sprite_color_propagation_system,
 			)
 				.in_set(AppSet::UpdateVisuals),
 		);
 }
-
-/// Marker component for sprites that should copy the sprite color of their parent sprite.
-/// This only goes one layer deep. Sprite color is not inherited recursively.
-#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
-pub struct InheritSpriteColor;
 
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Reflect)]
@@ -114,7 +108,6 @@ impl FromWorld for GameObjectMeshes {
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct ThingPalette {
 	pub box_base: Color,
-	pub box_trigger: Color,
 	pub button_base: Color,
 	pub button_trigger: Color,
 	pub player: Color,
@@ -130,7 +123,6 @@ impl Default for ThingPalette {
 		use palettes::tailwind as p;
 		Self {
 			box_base: p::ORANGE_200.into(),
-			box_trigger: p::ORANGE_200.into(),
 			button_base: Srgba::hex("CC5151").unwrap().into(),
 			button_trigger: p::GREEN_300.into(),
 			player: p::SLATE_200.into(),
@@ -144,7 +136,8 @@ impl Default for ThingPalette {
 }
 
 fn goal_unlock_animation_system(
-	mut query: Query<&mut Sprite, With<Goal>>,
+	mut sprites_q: Query<&mut Sprite>,
+	flags_q: Query<&Children, With<Goal>>,
 	palette: Res<ThingPalette>,
 	completion: Res<LevelCompletionConditions>,
 ) {
@@ -153,69 +146,48 @@ fn goal_unlock_animation_system(
 	} else {
 		palette.goal_closed
 	};
-	for mut sprite in &mut query {
-		sprite.color = color;
+	for children in &flags_q {
+		for id in children {
+			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
+				sprite.color = color;
+			}
+		}
 	}
 }
 
 fn button_trigger_animation_system(
-	mut buttons_q: Query<(&mut Sprite, Option<&LogicalColor>), With<BoxSlot>>,
-	mut boxes_q: Query<
-		(&mut Sprite, Option<&LogicalColor>),
-		(
-			With<Box>,
-			Without<BoxSlot>, /* To guarantee memory aliasing */
-		),
-	>,
-	nodes_q: Query<(&PlacedGlyph, &PlacedObject)>,
+	mut sprites_q: Query<&mut Sprite>,
+	buttons_q: Query<(&Children, &IsTriggered), (With<BoxSlot>, Changed<IsTriggered>)>,
 	palette: Res<ThingPalette>,
 ) {
-	for (glyph_id, object_id) in &nodes_q {
-		let button = glyph_id.0.and_then(|id| buttons_q.get_mut(id).ok());
-		let object = object_id.0.and_then(|id| boxes_q.get_mut(id).ok());
-		// Use trigger color if both things are at the same place
-		// and are of the same logical color, otherwise use base color
-		match (button, object) {
-			(Some(mut button), Some(mut object)) => {
-				let colors_compatible = object
-					.1
-					.and_then(|object_color| {
-						button.1.map(|glyph_color| *object_color == *glyph_color)
-					})
-					// If either thing is colorless, they are considered compatible
-					.unwrap_or(true);
-				if colors_compatible {
-					button.0.color = palette.button_trigger;
-					object.0.color = palette.box_trigger;
-				} else {
-					button.0.color = palette.button_base;
-					object.0.color = palette.box_base;
-				}
+	for (children, is_triggered) in &buttons_q {
+		let color = if is_triggered.0 {
+			palette.button_trigger
+		} else {
+			palette.button_base
+		};
+
+		for id in children {
+			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
+				sprite.color = color;
 			}
-			(Some((mut button, _)), None) => {
-				button.color = palette.button_base;
-			}
-			(None, Some((mut object, _))) => {
-				object.color = palette.box_base;
-			}
-			(None, None) => {}
 		}
 	}
 }
 
 fn cycle_center_turnability_visuals_update_system(
-	cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
+	cycles_q: Query<(&ComputedCycleTurnability, &CycleVisualEntities)>,
 	mut sprites_q: Query<&mut Sprite>,
 	mut arrows_q: Query<&mut Visibility>,
 	palette: Res<ThingPalette>,
 ) {
-	for (is_turnable, children) in &cycles_q {
-		let Ok(mut sprite) = sprites_q.get_mut(children[0]) else {
-			log::warn!("Child of cycle entity does not have Sprite component");
+	for (is_turnable, visuals) in &cycles_q {
+		let Ok(mut sprite) = sprites_q.get_mut(visuals.center) else {
+			log::warn!("Cycle center sprite does not have Sprite component");
 			continue;
 		};
-		let Ok(mut arrow_visibility) = arrows_q.get_mut(children[1]) else {
-			log::warn!("Child of cycle entity does not have Visibility component");
+		let Ok(mut arrow_visibility) = arrows_q.get_mut(visuals.arrow) else {
+			log::warn!("Cycle arrow sprite does not have Visibility component");
 			continue;
 		};
 		if is_turnable.0 {
@@ -229,37 +201,22 @@ fn cycle_center_turnability_visuals_update_system(
 }
 
 fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<
-		(
-			&CycleInteraction,
-			&ComputedCycleTurnability,
-			Option<&LinkedCycles>,
-			&Children,
-		),
-		Changed<CycleInteraction>,
-	>,
-	all_cycles_q: Query<(&ComputedCycleTurnability, &Children)>,
+	cycles_q: Query<(&CycleInteraction, &LinkedCycles), Changed<CycleInteraction>>,
+	all_cycles_q: Query<(&ComputedCycleTurnability, &CycleVisualEntities)>,
 	mut sprites_q: Query<&mut Sprite>,
 	palette: Res<ThingPalette>,
 ) {
-	for (interaction, is_turnable, links, children) in &cycles_q {
-		let target_sprites = std::iter::once((children[0], is_turnable.0)).chain(
-			links
-				.into_iter()
-				.flat_map(|links| &links.0)
-				.filter_map(|&(id, _)| {
-					all_cycles_q
-						.get(id)
-						.inspect_err(|e| {
-							log::warn!("LinkedCycles refers to a non-cycle entity {e}")
-						})
-						.ok()
-						.map(|(turnable, children)| (children[0], turnable.0))
-				}),
-		);
+	for (interaction, links) in &cycles_q {
+		let target_sprites = links.0.iter().filter_map(|&(id, _)| {
+			all_cycles_q
+				.get(id)
+				.inspect_err(|e| log::warn!("LinkedCycles refers to a non-cycle entity {e}"))
+				.ok()
+				.map(|(turnable, visuals)| (visuals.center, turnable.0))
+		});
 		for (id, is_turnable) in target_sprites {
 			let Ok(mut sprite) = sprites_q.get_mut(id) else {
-				log::warn!("Child of cycle entity does not have Sprite component");
+				log::warn!("Cycle sprite entity does not have Sprite component");
 				continue;
 			};
 			sprite.color = if *interaction != CycleInteraction::None {
@@ -269,19 +226,6 @@ fn cycle_center_interaction_visuals_update_system(
 			} else {
 				palette.cycle_disabled
 			};
-		}
-	}
-}
-
-fn sprite_color_propagation_system(
-	parents_q: Query<(&Sprite, &Children), (Changed<Sprite>, Without<InheritSpriteColor>)>,
-	mut children_q: Query<&mut Sprite, With<InheritSpriteColor>>,
-) {
-	for (parent, children) in &parents_q {
-		for child_id in children {
-			if let Ok(mut child) = children_q.get_mut(*child_id) {
-				child.color = parent.color;
-			}
 		}
 	}
 }

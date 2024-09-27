@@ -16,13 +16,12 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_state::<PlayingLevel>()
 		.init_resource::<PendingTransition<PlayingLevel>>()
 		.add_event::<QueueScreenTransition<PlayingLevel>>()
-		.enable_state_scoped_entities::<PlayingLevel>()
 		.add_event::<GameUiAction>()
 		.add_systems(
 			OnEnter(Screen::Playing),
 			(spawn_game_ui, load_level).chain(),
 		)
-		.add_systems(OnExit(Screen::Playing), clear_playing_level_state)
+		.add_systems(OnExit(Screen::Playing), send_event(EnterLevel(None)))
 		.add_systems(
 			Update,
 			(
@@ -41,9 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
-				(despawn_level_state_scoped, load_level)
-					.chain()
-					.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
+				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
@@ -74,10 +71,6 @@ enum GameUiAction {
 	Reset,
 	NextLevel,
 	Undo,
-}
-
-fn clear_playing_level_state(mut next_state: ResMut<NextState<PlayingLevel>>) {
-	next_state.set(PlayingLevel(None));
 }
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
@@ -245,21 +238,12 @@ fn update_undo_button_display(
 	}
 }
 
-/// Custom handler for despawning level-scoped entities
-/// Unlike the built-in despawner, this despawns everything
-/// in all transitions, including identity transitions
-fn despawn_level_state_scoped(mut commands: Commands, query: Query<Entity, With<LevelScoped>>) {
-	for e in &query {
-		commands.entity(e).despawn_recursive();
-	}
-}
-
 fn load_level(
-	mut commands: Commands,
 	level_list: Res<LoadedLevelList>,
 	level_assets: Res<Assets<LevelData>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
+	mut events: EventWriter<EnterLevel>,
 ) {
 	let level_index = playing_level
 		.get()
@@ -277,5 +261,5 @@ fn load_level(
 	level_name_q.single_mut().sections[0]
 		.value
 		.clone_from(&level_data.name);
-	commands.trigger(SpawnLevel(level_handle.clone_weak()));
+	events.send(EnterLevel(Some(level_handle.clone_weak())));
 }

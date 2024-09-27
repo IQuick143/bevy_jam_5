@@ -4,6 +4,7 @@ mod animation;
 pub mod components;
 mod drawing;
 mod game_sfx;
+mod hints;
 pub mod history;
 mod inputs;
 pub mod level;
@@ -20,7 +21,7 @@ pub mod prelude {
 			CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, LevelCompletionConditions,
 			RotateCycle,
 		},
-		spawn::level::SpawnLevel,
+		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
 	pub use bevy::prelude::*;
 }
@@ -36,5 +37,6 @@ pub(super) fn plugin(app: &mut App) {
 		inputs::plugin,
 		game_sfx::plugin,
 		history::plugin,
+		hints::plugin,
 	));
 }
