@@ -38,7 +38,9 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
-				load_level.run_if(on_event::<LoadLevel>()),
+				(load_level, update_level_name_display)
+					.chain()
+					.run_if(on_event::<LoadLevel>()),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
@@ -243,11 +245,24 @@ fn update_undo_button_display(
 	}
 }
 
+fn update_level_name_display(
+	mut events: EventReader<EnterLevel>,
+	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
+	level_assets: Res<Assets<LevelData>>,
+) {
+	if let Some(level_handle) = events.read().last().and_then(|e| e.0.as_ref()) {
+		let level_data = level_assets
+			.get(level_handle)
+			.expect("Got an invalid level handle");
+		level_name_q.single_mut().sections[0]
+			.value
+			.clone_from(&level_data.name);
+	}
+}
+
 fn load_level(
 	level_list: Res<LoadedLevelList>,
-	level_assets: Res<Assets<LevelData>>,
 	playing_level: Res<State<PlayingLevel>>,
-	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 	mut events: EventWriter<EnterLevel>,
 ) {
 	let level_index = playing_level
@@ -258,13 +273,5 @@ fn load_level(
 		.levels
 		.get(level_index)
 		.expect("PlayingLevel is out of range");
-	let level_data = level_assets
-		.get(level_handle)
-		.expect("All level handles should be valid");
-
-	// Spawn the level
-	level_name_q.single_mut().sections[0]
-		.value
-		.clone_from(&level_data.name);
 	events.send(EnterLevel(Some(level_handle.clone_weak())));
 }
