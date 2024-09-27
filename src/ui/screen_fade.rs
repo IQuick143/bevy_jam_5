@@ -18,8 +18,8 @@ pub(super) fn plugin(app: &mut App) {
 /// Do not spawn this directly, use [`FadeAnimationBundle`] instead.
 ///
 /// Any event components on the entity that had been previously registered
-/// with [`add_fade_event_type`] will be sent via [`EventWriter`]s
-/// when the animation reaches maximum fade-in.
+/// with [`add_fade_event`](AddFadeEvent::add_fade_event) will be sent
+/// via [`EventWriter`]s when the animation reaches maximum fade-in.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct FadeAnimation {
 	/// Time taken by the full fade-in and -out, in seconds
