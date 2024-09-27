@@ -14,9 +14,10 @@ mod widgets;
 pub mod prelude {
 	pub use super::{
 		char_input_pressed,
-		freeze::ui_not_frozen,
+		freeze::{ui_not_frozen, FreezeUi},
 		interaction::{InteractionPalette, InteractionQuery},
 		palette as ui_palette,
+		screen_fade::{AddFadeEvent as _, FadeAnimation, FadeAnimationBundle},
 		widgets::{Containers as _, Widgets as _},
 	};
 }
@@ -45,6 +46,5 @@ pub(super) fn plugin(app: &mut App) {
 		screen_fade::plugin,
 		hover::plugin,
 		background::plugin,
-		freeze::plugin,
 	));
 }

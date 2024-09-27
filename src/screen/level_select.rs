@@ -81,7 +81,7 @@ fn spawn_screen(
 }
 
 fn handle_level_select_screen_action(
-	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+	mut commands: Commands,
 	mut next_level: ResMut<NextState<PlayingLevel>>,
 	query: InteractionQuery<&LevelSelectAction>,
 ) {
@@ -91,11 +91,17 @@ fn handle_level_select_screen_action(
 		}
 		match action {
 			LevelSelectAction::Back => {
-				next_screen.send(QueueScreenTransition::fade(Screen::Title));
+				commands.spawn((
+					FadeAnimationBundle::default(),
+					DoScreenTransition(Screen::Title),
+				));
 			}
 			LevelSelectAction::PlayLevel(id) => {
 				next_level.set(PlayingLevel(Some(*id)));
-				next_screen.send(QueueScreenTransition::fade(Screen::Playing));
+				commands.spawn((
+					FadeAnimationBundle::default(),
+					DoScreenTransition(Screen::Playing),
+				));
 			}
 		}
 	}

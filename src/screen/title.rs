@@ -75,7 +75,7 @@ fn enter_title(
 }
 
 fn handle_title_action(
-	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+	mut commands: Commands,
 	mut button_query: InteractionQuery<&TitleAction>,
 	#[cfg(not(target_family = "wasm"))] mut app_exit: EventWriter<AppExit>,
 ) {
@@ -83,10 +83,16 @@ fn handle_title_action(
 		if matches!(interaction, Interaction::Pressed) {
 			match action {
 				TitleAction::Play => {
-					next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+					commands.spawn((
+						FadeAnimationBundle::default(),
+						DoScreenTransition(Screen::LevelSelect),
+					));
 				}
 				TitleAction::Credits => {
-					next_screen.send(QueueScreenTransition::fade(Screen::Credits));
+					commands.spawn((
+						FadeAnimationBundle::default(),
+						DoScreenTransition(Screen::Credits),
+					));
 				}
 				#[cfg(not(target_family = "wasm"))]
 				TitleAction::Exit => {

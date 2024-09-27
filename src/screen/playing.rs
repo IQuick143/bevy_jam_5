@@ -14,18 +14,16 @@ use super::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<PlayingLevel>()
-		.init_resource::<PendingTransition<PlayingLevel>>()
-		.add_event::<QueueScreenTransition<PlayingLevel>>()
 		.add_event::<GameUiAction>()
+		.add_fade_event::<LoadLevel>()
 		.add_systems(
 			OnEnter(Screen::Playing),
-			(spawn_game_ui, load_level).chain(),
+			(spawn_game_ui, send_event(LoadLevel)),
 		)
 		.add_systems(OnExit(Screen::Playing), send_event(EnterLevel(None)))
 		.add_systems(
 			Update,
 			(
-				process_enqueued_transitions::<PlayingLevel>,
 				(
 					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
 					send_event(GameUiAction::NextLevel).run_if(
@@ -40,7 +38,7 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
-				load_level.run_if(on_event::<StateTransitionEvent<PlayingLevel>>()),
+				load_level.run_if(on_event::<LoadLevel>()),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
@@ -72,6 +70,10 @@ enum GameUiAction {
 	NextLevel,
 	Undo,
 }
+
+/// Event that is sent to signal that the currently selected level should be (re)loaded
+#[derive(Event, Clone, Copy, Debug, Default)]
+struct LoadLevel;
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
@@ -175,26 +177,29 @@ fn game_ui_input_recording_system(
 fn game_ui_input_processing_system(
 	mut events: EventReader<GameUiAction>,
 	playing_level: Res<State<PlayingLevel>>,
-	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
-	mut next_level: EventWriter<QueueScreenTransition<PlayingLevel>>,
+	mut commands: Commands,
+	mut next_level: ResMut<NextState<PlayingLevel>>,
 	mut undo_commands: EventWriter<UndoMove>,
 ) {
 	if let Some(action) = events.read().last() {
 		match action {
 			GameUiAction::Back => {
-				next_screen.send(QueueScreenTransition::fade(Screen::LevelSelect));
+				commands.spawn((
+					FadeAnimationBundle::default(),
+					DoScreenTransition(Screen::LevelSelect),
+				));
 			}
 			GameUiAction::Reset => {
-				next_level.send(QueueScreenTransition::fade(*playing_level.get()));
+				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
 			}
 			GameUiAction::NextLevel => {
 				let playing_level = playing_level
 					.get()
 					.0
 					.expect("When in Screen::Playing state, PlayingLevel must also be set");
-				next_level.send(QueueScreenTransition::fade(PlayingLevel(Some(
-					playing_level + 1,
-				))));
+
+				next_level.set(PlayingLevel(Some(playing_level + 1)));
+				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
 			}
 			GameUiAction::Undo => {
 				undo_commands.send(UndoMove);

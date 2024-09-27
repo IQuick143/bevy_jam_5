@@ -1,16 +1,13 @@
-//! Allows systems to freeze the UI
+//! Allows entities to freeze the UI
 
 use super::*;
 
-pub(super) fn plugin(app: &mut App) {
-	app.init_resource::<FreezeUi>();
-}
-
-/// Indicates whether the UI should discard all inputs
-#[derive(Resource, Debug, Default)]
-pub struct FreezeUi(pub bool);
+/// If an entity with this component exists, all UI inputs are discarded
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct FreezeUi;
 
 /// [`Condition`] that succeeds when the UI is not frozen
-pub fn ui_not_frozen(freeze: Res<FreezeUi>) -> bool {
-	!freeze.0
+/// by any [`FreezeUi`] entities.
+pub fn ui_not_frozen(query: Query<(), With<FreezeUi>>) -> bool {
+	query.is_empty()
 }

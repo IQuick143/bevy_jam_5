@@ -74,14 +74,17 @@ fn exit_credits(mut _commands: Commands) {
 }
 
 fn handle_credits_action(
-	mut next_screen: EventWriter<QueueScreenTransition<Screen>>,
+	mut commands: Commands,
 	mut button_query: InteractionQuery<&CreditsAction>,
 ) {
 	for (interaction, action) in &mut button_query {
 		if matches!(interaction, Interaction::Pressed) {
 			match action {
 				CreditsAction::Back => {
-					next_screen.send(QueueScreenTransition::fade(Screen::Title));
+					commands.spawn((
+						FadeAnimationBundle::default(),
+						DoScreenTransition(Screen::Title),
+					));
 				}
 			}
 		}

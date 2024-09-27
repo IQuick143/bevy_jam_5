@@ -1,94 +1,160 @@
 //! An overlay which changes opacity in order to create a fading in/out effect for the game for screen transitions.
 
-use crate::graphics::FADE_COLOUR;
-
-use super::*;
+use super::freeze::FreezeUi;
+use crate::graphics::fade::*;
+use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-	app.insert_resource(Fader {
-		progress: 1.0,
-		fade_time: 0.5,
-		target: FadeTarget::FadeIn,
-	})
-	.add_systems(Startup, spawn_fader)
-	.add_systems(Update, update_fader);
+	app.add_systems(
+		Update,
+		(update_fade_animations, despawn_expired_fade_animations).chain(),
+	);
 }
 
-/// Marker component for the root node of HUD
-#[derive(Component)]
-pub struct ScreenFader;
-
-/// Resource that controls the visibility of the HUD UI
-#[derive(Resource)]
-pub struct Fader {
-	progress: f32,
-	pub fade_time: f32,
-	pub target: FadeTarget,
+/// Component that designates an entity as a fade-in/out animation.
+///
+/// When the animation is complete, the entity is despawned.
+///
+/// Do not spawn this directly, use [`FadeAnimationBundle`] instead.
+///
+/// Any event components on the entity that had been previously registered
+/// with [`add_fade_event_type`] will be sent via [`EventWriter`]s
+/// when the animation reaches maximum fade-in.
+#[derive(Component, Clone, Copy, Debug, Reflect)]
+pub struct FadeAnimation {
+	/// Time taken by the full fade-in and -out, in seconds
+	pub total_time: f32,
+	/// Current progress of the animation, in seconds
+	time_elapsed: f32,
+	/// Progress of the animation on previous frame, in seconds.
+	/// Used to figure out when we need to send out delayed events.
+	prev_time_elapsed: f32,
 }
 
-impl Fader {
-	pub fn start_fade(&mut self, target: FadeTarget) {
-		self.progress = 0.0;
-		self.target = target;
+impl FadeAnimation {
+	pub fn new(total_time: f32) -> Self {
+		Self {
+			total_time,
+			time_elapsed: 0.0,
+			prev_time_elapsed: 0.0,
+		}
 	}
 
+	/// Advances the elapsed time on the animation
+	/// and updates previous frame timestamp
+	pub fn add_elapsed_time(&mut self, delta_seconds: f32) {
+		self.prev_time_elapsed = self.time_elapsed;
+		self.time_elapsed += delta_seconds;
+	}
+
+	/// Relative progress of the animation \[0, 1]
 	pub fn progress(&self) -> f32 {
-		self.progress
+		(self.time_elapsed / self.total_time).clamp(0.0, 1.0)
 	}
 
-	pub fn is_faded_in(&self) -> bool {
-		self.is_complete() && self.target == FadeTarget::FadeIn
+	/// Relative progress of the animation on previous frame \[0, 1]
+	pub fn prev_progress(&self) -> f32 {
+		(self.prev_time_elapsed / self.total_time).clamp(0.0, 1.0)
 	}
 
-	pub fn is_faded_out(&self) -> bool {
-		self.is_complete() && self.target == FadeTarget::FadeOut
-	}
-
-	pub fn is_complete(&self) -> bool {
-		self.progress >= 1.0
+	pub fn is_completed(&self) -> bool {
+		self.time_elapsed >= self.total_time
 	}
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum FadeTarget {
-	FadeOut,
-	FadeIn,
+impl Default for FadeAnimation {
+	fn default() -> Self {
+		Self {
+			total_time: 1.0,
+			time_elapsed: 0.0,
+			prev_time_elapsed: 0.0,
+		}
+	}
 }
 
-fn spawn_fader(mut commands: Commands) {
-	commands.spawn((
-		ScreenFader,
-		NodeBundle {
-			style: Style {
-				width: Val::Percent(100.0),
-				height: Val::Percent(100.0),
+/// [`FadeAnimation`] bundled with other components that commonly accompany it:
+/// - [`NodeBundle`] that will be the transition overlay node.
+/// - [`FreezeUi`] to disable the UI while the animation is playing.
+#[derive(Bundle, Clone, Debug)]
+pub struct FadeAnimationBundle {
+	pub animation: FadeAnimation,
+	pub node: NodeBundle,
+	pub freeze: FreezeUi,
+}
+
+impl FadeAnimationBundle {
+	pub fn from_time(total_time: f32) -> Self {
+		Self {
+			animation: FadeAnimation::new(total_time),
+			..default()
+		}
+	}
+}
+
+impl Default for FadeAnimationBundle {
+	fn default() -> Self {
+		Self {
+			animation: default(),
+			node: NodeBundle {
+				style: Style {
+					width: Val::Percent(100.0),
+					height: Val::Percent(100.0),
+					..default()
+				},
+				background_color: BackgroundColor(OVERLAY_COLOR.with_alpha(0.0)),
+				z_index: ZIndex::Global(65000),
 				..default()
 			},
-			background_color: BackgroundColor(FADE_COLOUR),
-			z_index: ZIndex::Global(65000),
-			..default()
-		},
-	));
+			freeze: FreezeUi,
+		}
+	}
 }
 
-fn update_fader(
-	mut query: Query<&mut BackgroundColor, With<ScreenFader>>,
-	mut fader: ResMut<Fader>,
+/// Extension trait for [`App`] to allow simple registration
+/// of [`Event`]s that can be used with [`FadeAnimation`].
+pub trait AddFadeEvent {
+	/// Registers an [`Event`] type and enables forwarding
+	/// of components of this type from [`FadeAnimation`] entities.
+	fn add_fade_event<E: Event + Clone>(&mut self) -> &mut Self;
+}
+
+impl AddFadeEvent for App {
+	fn add_fade_event<E: Event + Clone>(&mut self) -> &mut Self {
+		self.add_event::<E>().add_systems(
+			Update,
+			send_delayed_fade_events::<E>
+				.after(update_fade_animations)
+				.before(despawn_expired_fade_animations),
+		)
+	}
+}
+
+fn update_fade_animations(
+	mut query: Query<(&mut FadeAnimation, &mut BackgroundColor)>,
 	time: Res<Time<Real>>,
 ) {
-	if fader.progress <= 1.0 {
-		fader.progress += time.delta_seconds() / fader.fade_time;
-		fader.progress = fader.progress.clamp(0.0, 1.0);
+	for (mut animation, mut overlay) in &mut query {
+		animation.add_elapsed_time(time.delta_seconds());
+		let alpha = fade_opacity_function(animation.progress());
+		overlay.0.set_alpha(alpha);
 	}
+}
 
-	let (start_opacity, end_opacity) = match fader.target {
-		FadeTarget::FadeOut => (0.0, 1.0),
-		FadeTarget::FadeIn => (1.0, 0.0),
-	};
-	// TODO: Better curve
-	let target_alpha = f32::lerp(start_opacity, end_opacity, fader.progress);
+fn despawn_expired_fade_animations(mut commands: Commands, query: Query<(Entity, &FadeAnimation)>) {
+	for (id, animation) in &query {
+		if animation.is_completed() {
+			commands.entity(id).despawn();
+		}
+	}
+}
 
-	for mut cover in query.iter_mut() {
-		cover.0.set_alpha(target_alpha);
+fn send_delayed_fade_events<E: Event + Clone>(
+	mut events: EventWriter<E>,
+	query: Query<(&FadeAnimation, &E)>,
+) {
+	for (animation, event) in &query {
+		if animation.prev_progress() < PEAK_OFFSET && animation.progress() >= PEAK_OFFSET {
+			events.send(event.clone());
+		}
 	}
 }

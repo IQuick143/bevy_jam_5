@@ -96,8 +96,24 @@ pub mod color_labels {
 		MAX_ROTATED_DISPLACEMENT_SQUARE + ARROW_TIP_LENGTH;
 }
 
-/// Colour into which the screen fades during transitions
-pub const FADE_COLOUR: Color = Color::WHITE;
+/// Parameters of fade transition effects
+pub mod fade {
+	use super::*;
+
+	/// Colour into which the screen fades during transitions
+	pub const OVERLAY_COLOR: Color = Color::WHITE;
+
+	/// The progress \[0, 1] of the animation at which the transition
+	/// should be triggered (events are sent out).
+	///
+	/// [`fade_opacity_function`] should be 1 at this progress.
+	pub const PEAK_OFFSET: f32 = 0.5;
+
+	/// Calculates opacity of the overlay from animation progress \[0, 1]
+	pub fn fade_opacity_function(progress: f32) -> f32 {
+		1.0 - (2.0 * progress - 1.0).abs()
+	}
+}
 
 /// Velocity of the background in local background coordinates
 pub const BACKGROUND_VELOCITY: Vec2 = Vec2::new(16.0, -8.0 * f32::consts::SQRT_2);
