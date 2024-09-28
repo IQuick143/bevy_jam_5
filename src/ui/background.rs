@@ -24,7 +24,7 @@ fn spawn_background(
 ) {
 	const MESH_SIZE: f32 = 8000.0;
 	let material = ScrollingTextureMaterial {
-		scale: MESH_SIZE / BACKGROUND_TILING,
+		scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
 		speed: Vec2::from_angle(BACKGROUND_ROTATION)
 			.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
 		texture: images[&ImageKey::Background].clone_weak(),

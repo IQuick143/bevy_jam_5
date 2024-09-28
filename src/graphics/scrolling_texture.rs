@@ -16,7 +16,7 @@ pub(super) fn plugin(app: &mut App) {
 pub struct ScrollingTextureMaterial {
 	/// How many times the texture repeats over the size of the primitive
 	#[uniform(0)]
-	pub scale: f32,
+	pub scale: Vec2,
 	/// Speed of the movement of the texture,
 	/// in sizes of the texture per second
 	#[uniform(1)]
@@ -30,7 +30,7 @@ pub struct ScrollingTextureMaterial {
 impl Default for ScrollingTextureMaterial {
 	fn default() -> Self {
 		Self {
-			scale: 1.0,
+			scale: Vec2::ONE,
 			speed: Vec2::ZERO,
 			texture: default(),
 		}
