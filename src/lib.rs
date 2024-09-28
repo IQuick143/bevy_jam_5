@@ -73,6 +73,7 @@ impl Plugin for AppPlugin {
 			ui::plugin,
 			audio::plugin,
 			assets::plugin,
+			graphics::plugin,
 		));
 
 		// Enable dev tools for dev builds.

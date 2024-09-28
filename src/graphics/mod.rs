@@ -2,6 +2,13 @@ use crate::game::prelude::*;
 use core::f32;
 
 pub mod primitives;
+mod scrolling_texture;
+
+pub use scrolling_texture::ScrollingTextureMaterial;
+
+pub(super) fn plugin(app: &mut App) {
+	app.add_plugins(scrolling_texture::plugin);
+}
 
 /// Rectangle centered on (0,0), into which everything should fit in order to guarantee it being rendered.
 pub const GAME_AREA: Vec2 = Vec2::new(1600.0, 900.0);
@@ -124,8 +131,10 @@ pub mod fade {
 
 /// Velocity of the background in local background coordinates
 pub const BACKGROUND_VELOCITY: Vec2 = Vec2::new(16.0, -8.0 * f32::consts::SQRT_2);
-/// Period of background sprite repetition, in background coordinates
+/// Period of background texture repetition, in background coordinates
 pub const BACKGROUND_TILING: f32 = 400.0;
+/// Angle by which the background texture should be inclined
+pub const BACKGROUND_ROTATION: f32 = f32::consts::PI / 5.0;
 
 /// Defines Z depth of various objects to layer them properly
 pub mod layers {
