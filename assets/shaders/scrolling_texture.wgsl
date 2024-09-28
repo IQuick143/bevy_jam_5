@@ -9,7 +9,6 @@
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
-	var offset: vec2f = (globals.time * material_speed) % 1;
-	var uv: vec2f = (in.uv * material_scale - offset) % 1;
+	var uv: vec2f = fract(in.uv * material_scale - globals.time * material_speed);
 	return textureSample(material_texture, material_sampler, uv);
 }
