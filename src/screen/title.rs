@@ -1,22 +1,26 @@
 //! The title screen that appears when the game starts.
 
-use bevy::prelude::*;
-
 use super::*;
 use crate::{
 	assets::{self, GlobalFont, HandleMap, ImageKey},
 	graphics,
 	ui::prelude::*,
 };
+use bevy::{
+	prelude::*,
+	sprite::{MaterialMesh2dBundle, Mesh2dHandle},
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
-
-	app.register_type::<TitleAction>();
 	app.add_systems(
 		Update,
 		handle_title_action.run_if(in_state(Screen::Title).and_then(ui_not_frozen)),
 	);
+	// Create the material later, when all of its dependencies have been initialized
+	app.add_systems(Startup, |mut commands: Commands| {
+		commands.init_resource::<AnimatedBackgroundMaterial>()
+	});
 }
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
@@ -29,9 +33,39 @@ enum TitleAction {
 	Exit,
 }
 
+/// Width of the background mesh, in multiples of nominal viewport width
+const ANIMATED_BACKGROUND_X_OVERFLOW: f32 = 3.0;
+
+/// Size of the background mesh, in world units
+const ANIMATED_BACKGROUND_MESH_SIZE: Vec2 = Vec2::new(
+	graphics::GAME_AREA.x * ANIMATED_BACKGROUND_X_OVERFLOW,
+	graphics::GAME_AREA.x * 489.0 / 2383.0,
+);
+
+/// Speed of the background animation, in viewport widths per second
+const ANIMATED_BACKGROUND_SPEED: Vec2 = Vec2::new(-0.01, 0.0);
+
+#[derive(Resource, Clone, Deref, DerefMut, Debug, Reflect)]
+struct AnimatedBackgroundMaterial(Handle<graphics::ScrollingTextureMaterial>);
+
+impl FromWorld for AnimatedBackgroundMaterial {
+	fn from_world(world: &mut World) -> Self {
+		let images = world.resource::<HandleMap<ImageKey>>();
+		let material = graphics::ScrollingTextureMaterial {
+			scale: Vec2::new(ANIMATED_BACKGROUND_X_OVERFLOW, 1.0),
+			speed: ANIMATED_BACKGROUND_SPEED,
+			texture: images[&ImageKey::TitleBack].clone_weak(),
+		};
+		let mut materials = world.resource_mut::<Assets<graphics::ScrollingTextureMaterial>>();
+		Self(materials.add(material))
+	}
+}
+
 fn enter_title(
 	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
 	font: Res<GlobalFont>,
+	background_material: Res<AnimatedBackgroundMaterial>,
 	image_handles: Res<HandleMap<ImageKey>>,
 ) {
 	commands
@@ -66,9 +100,16 @@ fn enter_title(
 				..default()
 			},
 			texture: image_handles[&ImageKey::Title].clone_weak(),
-			transform: Transform::from_translation(
-				Vec2::ZERO.extend(graphics::layers::TITLE_IMAGE),
-			),
+			transform: Transform::from_translation(Vec3::Z * graphics::layers::TITLE_IMAGE),
+			..default()
+		},
+	));
+	commands.spawn((
+		StateScoped(Screen::Title),
+		MaterialMesh2dBundle {
+			mesh: Mesh2dHandle(meshes.add(Rectangle::from_size(ANIMATED_BACKGROUND_MESH_SIZE))),
+			material: background_material.clone_weak(),
+			transform: Transform::from_translation(Vec3::Z * graphics::layers::TITLE_BACKDROP),
 			..default()
 		},
 	));

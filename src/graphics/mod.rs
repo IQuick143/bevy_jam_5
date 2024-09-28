@@ -140,6 +140,8 @@ pub const BACKGROUND_ROTATION: f32 = f32::consts::PI / 5.0;
 pub mod layers {
 	/// Z depth of the title screen illustration
 	pub const TITLE_IMAGE: f32 = -10.0;
+	/// Z depth of the secondary/backdrop title screen illistration
+	pub const TITLE_BACKDROP: f32 = -20.0;
 	/// Z depth of sprites that indicate logical color of boxes
 	pub const BOX_COLOR_SPRITES: f32 = -8.0;
 	/// Z depth of sprites for players and boxes

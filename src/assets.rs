@@ -37,6 +37,7 @@ pub enum ImageKey {
 	BoxSpriteAtlas,
 	Background,
 	Title,
+	TitleBack,
 }
 
 impl AssetKey for ImageKey {
@@ -88,6 +89,10 @@ impl FromWorld for HandleMap<ImageKey> {
 				asset_server.load("images/box-sprites.png"),
 			),
 			(ImageKey::Title, asset_server.load("images/title.png")),
+			(
+				ImageKey::TitleBack,
+				asset_server.load("images/title-back.png"),
+			),
 		]
 		.into()
 	}
