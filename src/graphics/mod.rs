@@ -27,7 +27,7 @@ pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
 pub const SPRITE_LENGTH: f32 = 100.0;
 
 /// Half of the width of a cycle perimeter ring in world units
-pub const RING_HALF_WIDTH: f32 = 0.225 / 4.0 * SPRITE_LENGTH;
+pub const RING_HALF_WIDTH: f32 = 0.15 / 4.0 * SPRITE_LENGTH;
 
 /// Number of vertices necessary for the meshes for cycle perimeter rings
 /// ## Parameters
@@ -39,6 +39,9 @@ pub fn cycle_ring_mesh_resolution(radius: f32) -> usize {
 
 /// Radius of the visuals for vertices in world units
 pub const NODE_RADIUS: f32 = SPRITE_LENGTH / 8.0;
+
+/// Thickness of the outlines of visuals for cycle rings and vertices, in world units
+pub const RING_OUTLINE_WIDTH: f32 = SPRITE_LENGTH / 36.0;
 
 /// Width of the visuals for cycle links in world units
 pub const CYCLE_LINK_WIDTH: f32 = NODE_RADIUS;
@@ -158,6 +161,10 @@ pub mod layers {
 	pub const CYCLE_NODES: f32 = -100.0;
 	/// Z depth of meshes for perimeters of cycles
 	pub const CYCLE_RINGS: f32 = -200.0;
+	/// Z depth of meshes for outlines of vertices
+	pub const CYCLE_NODE_OUTLINES: f32 = -210.0;
+	/// Z depth of meshes for outlines of perimeters of cycles
+	pub const CYCLE_RING_OUTLINES: f32 = -220.0;
 	/// Z depth of arrow sprites at the center of cycles
 	pub const CYCLE_CENTER_ARROWS: f32 = -250.0;
 	/// Z depth of sprites for cycle centers

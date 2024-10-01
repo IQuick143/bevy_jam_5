@@ -3,7 +3,7 @@ use crate::{
 	graphics::{
 		color_labels,
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
-		NODE_RADIUS,
+		NODE_RADIUS, RING_OUTLINE_WIDTH,
 	},
 	AppSet,
 };
@@ -41,11 +41,19 @@ pub struct CycleVisualEntities {
 	pub arrow: Entity,
 }
 
+/// Revefence to the entity that makes up the visualization of a vertex
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct VertexVisualEntities(pub Entity);
+
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct GameObjectMaterials {
 	/// Material for cycle rings and vertex dots
 	pub cycle_rings: Handle<ColorMaterial>,
+	/// Material for rings of cycles that are currently selected
+	pub cycle_rings_active: Handle<ColorMaterial>,
+	/// Material for outlines of cycle rings and vertex dots
+	pub cycle_ring_outlines: Handle<ColorMaterial>,
 	/// Material for lines that represent links between cycles
 	pub link_lines: Handle<ColorMaterial>,
 	/// Meterial for labels that show logical color of buttons
@@ -57,7 +65,15 @@ impl FromWorld for GameObjectMaterials {
 		let mut materials = world.resource_mut::<Assets<ColorMaterial>>();
 
 		let cycle_rings = materials.add(ColorMaterial {
+			color: palettes::tailwind::SLATE_200.into(),
+			..default()
+		});
+		let cycle_rings_active = materials.add(ColorMaterial {
 			color: palettes::tailwind::SLATE_400.into(),
+			..default()
+		});
+		let cycle_ring_outlines = materials.add(ColorMaterial {
+			color: palettes::tailwind::SLATE_700.into(),
 			..default()
 		});
 		let link_lines = materials.add(ColorMaterial {
@@ -71,6 +87,8 @@ impl FromWorld for GameObjectMaterials {
 
 		Self {
 			cycle_rings,
+			cycle_rings_active,
+			cycle_ring_outlines,
 			link_lines,
 			colored_button_labels,
 		}
@@ -82,6 +100,8 @@ impl FromWorld for GameObjectMaterials {
 pub struct GameObjectMeshes {
 	/// Mesh for vertex nodes
 	pub vertices: Handle<Mesh>,
+	/// Mesh for outlines of vertex nodes
+	pub vertex_outlines: Handle<Mesh>,
 	/// Mesh for square labels that show logical colors of buttons
 	pub square_labels: Handle<Mesh>,
 	/// Mesh for arrow-like labels that show logical colors of buttons
@@ -93,6 +113,7 @@ impl FromWorld for GameObjectMeshes {
 		let mut meshes = world.resource_mut::<Assets<Mesh>>();
 
 		let vertices = meshes.add(Circle::new(NODE_RADIUS).mesh());
+		let vertex_outlines = meshes.add(Circle::new(NODE_RADIUS + RING_OUTLINE_WIDTH).mesh());
 		let square_labels = meshes.add(
 			RoundedRectangle::from(Rectangle::from_length(color_labels::SIZE))
 				.corner_radius(color_labels::CORNER_RADIUS)
@@ -109,6 +130,7 @@ impl FromWorld for GameObjectMeshes {
 
 		Self {
 			vertices,
+			vertex_outlines,
 			square_labels,
 			arrow_labels,
 		}

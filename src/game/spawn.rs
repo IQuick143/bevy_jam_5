@@ -339,14 +339,26 @@ fn create_vertex_visuals(
 	meshes: Res<GameObjectMeshes>,
 ) {
 	for id in &query {
-		commands.entity(id).with_children(|children| {
-			children.spawn(ColorMesh2dBundle {
+		let node = commands
+			.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.vertices.clone_weak()),
 				material: materials.cycle_rings.clone_weak(),
 				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_NODES),
 				..default()
-			});
-		});
+			})
+			.id();
+		let node_outline = commands
+			.spawn(ColorMesh2dBundle {
+				mesh: bevy::sprite::Mesh2dHandle(meshes.vertex_outlines.clone_weak()),
+				material: materials.cycle_ring_outlines.clone_weak(),
+				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_NODE_OUTLINES),
+				..default()
+			})
+			.id();
+		commands
+			.entity(id)
+			.insert(VertexVisualEntities(node))
+			.push_children(&[node, node_outline]);
 	}
 }
 
@@ -366,11 +378,27 @@ fn create_cycle_visuals(
 		.mesh()
 		.resolution(cycle_ring_mesh_resolution(placement.radius))
 		.build();
+		let outline_mesh = Annulus::new(
+			placement.radius - RING_HALF_WIDTH - RING_OUTLINE_WIDTH,
+			placement.radius + RING_HALF_WIDTH + RING_OUTLINE_WIDTH,
+		)
+		.mesh()
+		.resolution(cycle_ring_mesh_resolution(placement.radius))
+		.build();
+
 		let ring = commands
 			.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
 				material: materials.cycle_rings.clone_weak(),
 				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
+				..default()
+			})
+			.id();
+		let ring_outline = commands
+			.spawn(ColorMesh2dBundle {
+				mesh: bevy::sprite::Mesh2dHandle(meshes.add(outline_mesh)),
+				material: materials.cycle_ring_outlines.clone_weak(),
+				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 				..default()
 			})
 			.id();
@@ -405,7 +433,7 @@ fn create_cycle_visuals(
 				center,
 				arrow,
 			})
-			.push_children(&[ring, center, arrow]);
+			.push_children(&[ring, ring_outline, center, arrow]);
 	}
 }
 
