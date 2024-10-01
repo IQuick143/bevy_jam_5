@@ -59,14 +59,3 @@ pub struct LinkedCycles(pub Vec<(Entity, super::level::LinkedCycleDirection)>);
 /// The source cycle is its [`Parent`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct LinkTargetCycle(pub Entity);
-
-/// References to entities that make up the visualization of a cycle
-#[derive(Component, Clone, Debug, Reflect)]
-pub struct CycleVisualEntities {
-	/// The cycle ring
-	pub ring: Entity,
-	/// The sprite at the center of the cycle
-	pub center: Entity,
-	/// The arrow that shows up at the center of the cycle
-	pub arrow: Entity,
-}

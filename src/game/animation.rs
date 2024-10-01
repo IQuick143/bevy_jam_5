@@ -1,6 +1,6 @@
 use std::f32::consts::TAU;
 
-use super::{components::*, level::ThingData, logic::*, prelude::*};
+use super::{components::*, drawing::CycleVisualEntities, level::ThingData, logic::*, prelude::*};
 use crate::AppSet;
 use bevy::utils::hashbrown::HashMap;
 use rand::Rng as _;

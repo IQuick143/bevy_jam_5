@@ -30,6 +30,17 @@ pub(super) fn plugin(app: &mut App) {
 		);
 }
 
+/// References to entities that make up the visualization of a cycle
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct CycleVisualEntities {
+	/// The cycle ring
+	pub ring: Entity,
+	/// The sprite at the center of the cycle
+	pub center: Entity,
+	/// The arrow that shows up at the center of the cycle
+	pub arrow: Entity,
+}
+
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct GameObjectMaterials {
