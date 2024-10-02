@@ -1,13 +1,13 @@
 use super::{components::*, inputs::CycleInteraction, logic::*, prelude::*};
 use crate::{
 	graphics::{
-		color_labels,
+		color_labels, layers,
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
 		NODE_RADIUS, RING_OUTLINE_WIDTH,
 	},
 	AppSet,
 };
-use bevy::color::palettes;
+use bevy::{color::palettes, utils::hashbrown::HashMap};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<GameObjectMaterials>()
@@ -24,7 +24,8 @@ pub(super) fn plugin(app: &mut App) {
 						.before(cycle_center_interaction_visuals_update_system),
 				)
 					.run_if(on_event::<GameLayoutChanged>()),
-				cycle_center_interaction_visuals_update_system,
+				cycle_center_interaction_visuals_update_system
+					.run_if(cycle_interaction_visuals_changed),
 			)
 				.in_set(AppSet::UpdateVisuals),
 		);
@@ -35,25 +36,36 @@ pub(super) fn plugin(app: &mut App) {
 pub struct CycleVisualEntities {
 	/// The cycle ring
 	pub ring: Entity,
+	/// The cycle ring outline
+	pub outline: Entity,
 	/// The sprite at the center of the cycle
 	pub center: Entity,
 	/// The arrow that shows up at the center of the cycle
 	pub arrow: Entity,
 }
 
-/// Revefence to the entity that makes up the visualization of a vertex
+/// Refernces to entities that make up the visualization of a vertex
 #[derive(Component, Clone, Debug, Reflect)]
-pub struct VertexVisualEntities(pub Entity);
+pub struct VertexVisualEntities {
+	/// The vertex node
+	pub node: Entity,
+	/// The vertex node outline
+	pub outline: Entity,
+}
 
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct GameObjectMaterials {
 	/// Material for cycle rings and vertex dots
-	pub cycle_rings: Handle<ColorMaterial>,
+	pub cycle_rings_ready: Handle<ColorMaterial>,
 	/// Material for rings of cycles that are currently selected
-	pub cycle_rings_active: Handle<ColorMaterial>,
+	pub cycle_rings_select: Handle<ColorMaterial>,
+	/// Material for rings of cycles that are not selectable
+	pub cycle_rings_disabled: Handle<ColorMaterial>,
 	/// Material for outlines of cycle rings and vertex dots
 	pub cycle_ring_outlines: Handle<ColorMaterial>,
+	/// Material for outlines of cycle rings and vertices that are not selectable
+	pub cycle_ring_outlines_disabled: Handle<ColorMaterial>,
 	/// Material for lines that represent links between cycles
 	pub link_lines: Handle<ColorMaterial>,
 	/// Meterial for labels that show logical color of buttons
@@ -64,16 +76,25 @@ impl FromWorld for GameObjectMaterials {
 	fn from_world(world: &mut World) -> Self {
 		let mut materials = world.resource_mut::<Assets<ColorMaterial>>();
 
-		let cycle_rings = materials.add(ColorMaterial {
+		let cycle_rings_ready = materials.add(ColorMaterial {
 			color: palettes::tailwind::SLATE_200.into(),
 			..default()
 		});
-		let cycle_rings_active = materials.add(ColorMaterial {
+		let cycle_rings_select = materials.add(ColorMaterial {
 			color: palettes::tailwind::SLATE_400.into(),
+			..default()
+		});
+		let cycle_rings_disabled = materials.add(ColorMaterial {
+			color: palettes::tailwind::SLATE_100.into(),
 			..default()
 		});
 		let cycle_ring_outlines = materials.add(ColorMaterial {
 			color: palettes::tailwind::SLATE_700.into(),
+			..default()
+		});
+		let cycle_ring_outlines_disabled = materials.add(ColorMaterial {
+			// Roughly Tailwind Slate-350
+			color: Srgba::hex("94A3B8").unwrap().into(),
 			..default()
 		});
 		let link_lines = materials.add(ColorMaterial {
@@ -86,9 +107,11 @@ impl FromWorld for GameObjectMaterials {
 		});
 
 		Self {
-			cycle_rings,
-			cycle_rings_active,
+			cycle_rings_ready,
+			cycle_rings_select,
+			cycle_rings_disabled,
 			cycle_ring_outlines,
+			cycle_ring_outlines_disabled,
 			link_lines,
 			colored_button_labels,
 		}
@@ -168,6 +191,18 @@ impl Default for ThingPalette {
 	}
 }
 
+/// Enumerates the possible presentable states of a cycle
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Debug)]
+enum CycleStatus {
+	/// The cycle is not eligible for an interaction
+	#[default]
+	Disabled,
+	/// The cycle is eligible for an interaction
+	Ready,
+	/// The cycle is being interacted with
+	Selected,
+}
+
 fn goal_unlock_animation_system(
 	mut sprites_q: Query<&mut Sprite>,
 	flags_q: Query<&Children, With<Goal>>,
@@ -210,55 +245,145 @@ fn button_trigger_animation_system(
 
 fn cycle_center_turnability_visuals_update_system(
 	cycles_q: Query<(&ComputedCycleTurnability, &CycleVisualEntities)>,
-	mut sprites_q: Query<&mut Sprite>,
 	mut arrows_q: Query<&mut Visibility>,
-	palette: Res<ThingPalette>,
 ) {
 	for (is_turnable, visuals) in &cycles_q {
-		let Ok(mut sprite) = sprites_q.get_mut(visuals.center) else {
-			log::warn!("Cycle center sprite does not have Sprite component");
-			continue;
-		};
 		let Ok(mut arrow_visibility) = arrows_q.get_mut(visuals.arrow) else {
 			log::warn!("Cycle arrow sprite does not have Visibility component");
 			continue;
 		};
 		if is_turnable.0 {
 			*arrow_visibility = default();
-			sprite.color = palette.cycle_ready;
 		} else {
 			*arrow_visibility = Visibility::Hidden;
-			sprite.color = palette.cycle_disabled;
 		}
 	}
 }
 
+fn cycle_interaction_visuals_changed(
+	query: Query<(), Or<(Changed<CycleInteraction>, Changed<ComputedCycleTurnability>)>>,
+) -> bool {
+	!query.is_empty()
+}
+
 fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<(&CycleInteraction, &LinkedCycles), Changed<CycleInteraction>>,
-	all_cycles_q: Query<(&ComputedCycleTurnability, &CycleVisualEntities)>,
+	cycles_q: Query<(&CycleInteraction, &LinkedCycles)>,
+	all_cycles_q: Query<(
+		&ComputedCycleTurnability,
+		&CycleVertices,
+		&CycleVisualEntities,
+	)>,
+	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
+	mut meshes_q: Query<(&mut Transform, &mut Handle<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
+	materials: Res<GameObjectMaterials>,
 ) {
+	let mut meshes_to_repaint = HashMap::new();
+	let mut outlines_to_repaint = HashMap::new();
+	let mut sprites_to_repaint = HashMap::new();
+
 	for (interaction, links) in &cycles_q {
-		let target_sprites = links.0.iter().filter_map(|&(id, _)| {
-			all_cycles_q
-				.get(id)
-				.inspect_err(|e| log::warn!("LinkedCycles refers to a non-cycle entity {e}"))
-				.ok()
-				.map(|(turnable, visuals)| (visuals.center, turnable.0))
-		});
-		for (id, is_turnable) in target_sprites {
-			let Ok(mut sprite) = sprites_q.get_mut(id) else {
-				log::warn!("Cycle sprite entity does not have Sprite component");
-				continue;
+		let is_selected = *interaction != CycleInteraction::None;
+		for (cycle_id, _) in &links.0 {
+			let (is_turnable, vertices, visuals) = match all_cycles_q.get(*cycle_id) {
+				Ok(x) => x,
+				Err(e) => {
+					log::warn!("LinkedCycles refers to a non-cycle entity: {e}");
+					continue;
+				}
 			};
-			sprite.color = if *interaction != CycleInteraction::None {
-				palette.cycle_trigger
-			} else if is_turnable {
-				palette.cycle_ready
+
+			let cycle_status = if is_selected {
+				CycleStatus::Selected
+			} else if is_turnable.0 {
+				CycleStatus::Ready
 			} else {
-				palette.cycle_disabled
+				CycleStatus::Disabled
 			};
+
+			let sprite_status = sprites_to_repaint.entry(visuals.center).or_default();
+			if *sprite_status < cycle_status {
+				*sprite_status = cycle_status
+			}
+
+			vertices
+				.0
+				.iter()
+				.filter_map(|id| {
+					vertices_q
+						.get(*id)
+						.inspect_err(|e| {
+							log::warn!("CycleVertices refers to a non-vertex entity: {e}")
+						})
+						.ok()
+						.map(|visuals| (visuals.node, visuals.outline))
+				})
+				.chain(std::iter::once((visuals.ring, visuals.outline)))
+				.for_each(|(body, outline)| {
+					let mesh_status = meshes_to_repaint.entry(body).or_default();
+					if *mesh_status < cycle_status {
+						*mesh_status = cycle_status;
+					}
+					let mesh_status = outlines_to_repaint.entry(outline).or_default();
+					if *mesh_status < cycle_status {
+						*mesh_status = cycle_status;
+					}
+				});
+		}
+	}
+
+	for (id, status) in sprites_to_repaint {
+		let Ok(mut sprite) = sprites_q.get_mut(id) else {
+			log::warn!("Cycle sprite entity does not have Sprite component");
+			continue;
+		};
+		sprite.color = match status {
+			CycleStatus::Disabled => palette.cycle_disabled,
+			CycleStatus::Ready => palette.cycle_ready,
+			CycleStatus::Selected => palette.cycle_trigger,
+		};
+	}
+
+	for (id, status) in meshes_to_repaint {
+		let Ok((mut transform, mut material)) = meshes_q.get_mut(id) else {
+			log::warn!(
+				"Vertex or cycle mesh entity does not have a Handle<ColorMaterial> component"
+			);
+			continue;
+		};
+		match status {
+			CycleStatus::Disabled => {
+				transform.translation.z = layers::DISABLED_CYCLE_RINGS;
+				*material = materials.cycle_rings_disabled.clone_weak()
+			}
+			CycleStatus::Ready => {
+				transform.translation.z = layers::CYCLE_RINGS;
+				*material = materials.cycle_rings_ready.clone_weak()
+			}
+			CycleStatus::Selected => {
+				transform.translation.z = layers::ACTIVE_CYCLE_RINGS;
+				*material = materials.cycle_rings_select.clone_weak()
+			}
+		}
+	}
+
+	for (id, status) in outlines_to_repaint {
+		let Ok((mut transform, mut material)) = meshes_q.get_mut(id) else {
+			log::warn!(
+				"Vertex or cycle mesh entity does not have a Handle<ColorMaterial> component"
+			);
+			continue;
+		};
+		match status {
+			CycleStatus::Disabled => {
+				transform.translation.z = layers::DISABLED_CYCLE_RING_OUTLINES;
+				*material = materials.cycle_ring_outlines_disabled.clone_weak()
+			}
+			_ => {
+				transform.translation.z = layers::CYCLE_RING_OUTLINES;
+				*material = materials.cycle_ring_outlines.clone_weak()
+			}
 		}
 	}
 }

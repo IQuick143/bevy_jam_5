@@ -342,23 +342,23 @@ fn create_vertex_visuals(
 		let node = commands
 			.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.vertices.clone_weak()),
-				material: materials.cycle_rings.clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_NODES),
+				material: materials.cycle_rings_ready.clone_weak(),
+				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 				..default()
 			})
 			.id();
-		let node_outline = commands
+		let outline = commands
 			.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.vertex_outlines.clone_weak()),
 				material: materials.cycle_ring_outlines.clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_NODE_OUTLINES),
+				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 				..default()
 			})
 			.id();
 		commands
 			.entity(id)
-			.insert(VertexVisualEntities(node))
-			.push_children(&[node, node_outline]);
+			.insert(VertexVisualEntities { node, outline })
+			.push_children(&[node, outline]);
 	}
 }
 
@@ -389,12 +389,12 @@ fn create_cycle_visuals(
 		let ring = commands
 			.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
-				material: materials.cycle_rings.clone_weak(),
+				material: materials.cycle_rings_ready.clone_weak(),
 				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 				..default()
 			})
 			.id();
-		let ring_outline = commands
+		let outline = commands
 			.spawn(ColorMesh2dBundle {
 				mesh: bevy::sprite::Mesh2dHandle(meshes.add(outline_mesh)),
 				material: materials.cycle_ring_outlines.clone_weak(),
@@ -430,10 +430,11 @@ fn create_cycle_visuals(
 			.entity(id)
 			.insert(CycleVisualEntities {
 				ring,
+				outline,
 				center,
 				arrow,
 			})
-			.push_children(&[ring, ring_outline, center, arrow]);
+			.push_children(&[ring, outline, center, arrow]);
 	}
 }
 

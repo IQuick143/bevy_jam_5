@@ -157,14 +157,16 @@ pub mod layers {
 	pub const GLYPH_SPRITES: f32 = -50.0;
 	/// Z depth of the bottom text box
 	pub const HINT_TEXT_PANEL: f32 = -100.0;
-	/// Z depth of meshes for vertices
-	pub const CYCLE_NODES: f32 = -100.0;
+	/// Z depth of meshes for perimeters of cycles that are currently selected
+	pub const ACTIVE_CYCLE_RINGS: f32 = -150.0;
 	/// Z depth of meshes for perimeters of cycles
 	pub const CYCLE_RINGS: f32 = -200.0;
-	/// Z depth of meshes for outlines of vertices
-	pub const CYCLE_NODE_OUTLINES: f32 = -210.0;
-	/// Z depth of meshes for outlines of perimeters of cycles
+	/// Z depth of meshes for outlines of perimeters of cycles and vertex nodes
 	pub const CYCLE_RING_OUTLINES: f32 = -220.0;
+	/// Z depth of meshes for perimeters of cycles that cannot be selected
+	pub const DISABLED_CYCLE_RINGS: f32 = -225.0;
+	/// Z depth of meshes for outlines of perimeters of cycles that cannot be selected
+	pub const DISABLED_CYCLE_RING_OUTLINES: f32 = -230.0;
 	/// Z depth of arrow sprites at the center of cycles
 	pub const CYCLE_CENTER_ARROWS: f32 = -250.0;
 	/// Z depth of sprites for cycle centers
