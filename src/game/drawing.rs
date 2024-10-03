@@ -184,7 +184,7 @@ impl Default for ThingPalette {
 			player: p::SLATE_200.into(),
 			goal_closed: p::SLATE_100.into(),
 			goal_open: p::GREEN_500.into(),
-			cycle_disabled: p::SLATE_200.into(),
+			cycle_disabled: p::SLATE_300.into(),
 			cycle_ready: p::SLATE_300.into(),
 			cycle_trigger: p::SLATE_400.into(),
 		}
