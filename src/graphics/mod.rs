@@ -159,6 +159,8 @@ pub mod layers {
 	pub const HINT_TEXT_PANEL: f32 = -100.0;
 	/// Z depth of meshes for perimeters of cycles that are currently selected
 	pub const ACTIVE_CYCLE_RINGS: f32 = -150.0;
+	/// Z depth of meshes for outlines of perimeters of cycles that are currently selected
+	pub const ACTIVE_CYCLE_RING_OUTLINES: f32 = -180.0;
 	/// Z depth of meshes for perimeters of cycles
 	pub const CYCLE_RINGS: f32 = -200.0;
 	/// Z depth of meshes for outlines of perimeters of cycles and vertex nodes
