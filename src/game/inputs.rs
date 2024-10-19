@@ -101,6 +101,7 @@ fn cycle_rotation_with_inputs_system(
 		let rotation = RotateCycle {
 			target_cycle: id,
 			direction,
+			amount: 1,
 		};
 		rot_events.send(RotateCycleGroup(rotation));
 		record_events.send(RecordCycleGroupRotation(rotation));

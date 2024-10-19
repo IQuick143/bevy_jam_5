@@ -59,10 +59,14 @@ pub struct RotateCycle {
 	pub target_cycle: Entity,
 	/// Direction in which the cycle should turn
 	pub direction: CycleTurningDirection,
+	/// How many steps the cycle should rotate by
+	pub amount: usize,
 }
 
 /// Internal event sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle, ignores linkages.
+///
+/// Signals a rotation of a cycle occuring.
 #[derive(Event, Clone, Copy, Debug)]
 pub struct RotateSingleCycle(pub RotateCycle);
 
@@ -127,12 +131,14 @@ fn cycle_group_rotation_relay_system(
 				.map(|&(id, relative_direction)| RotateCycle {
 					target_cycle: id,
 					direction: group_rotation.0.direction * relative_direction,
+					amount: group_rotation.0.amount,
 				})
 				.map(RotateSingleCycle),
 		);
 	}
 }
 
+/// System that carries out the rotations on cycles hit by an event queueing a rotation.
 fn cycle_rotation_system(
 	cycles_q: Query<&CycleVertices>,
 	mut events: EventReader<RotateSingleCycle>,
@@ -140,6 +146,13 @@ fn cycle_rotation_system(
 	mut objects_q: Query<&mut VertexPosition>,
 ) {
 	for event in events.read() {
+		if event.0.amount == 0 {
+			log::warn!("0 rotation was emitted.");
+			continue;
+		}
+		if event.0.amount > 1 {
+			unimplemented!("MULTI-TURNS ARE NOT IMPLMENTED YET.");
+		}
 		if let Ok(cycle_vertices) = cycles_q
 			.get(event.0.target_cycle)
 			.inspect_err(|e| log::warn!("{e}"))

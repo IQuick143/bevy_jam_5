@@ -102,6 +102,7 @@ pub fn _debug_inputs(
 			rotate_cycle_events.send(RotateCycleGroup(RotateCycle {
 				target_cycle: target_id,
 				direction,
+				amount: 1,
 			}));
 		}
 	}
