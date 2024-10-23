@@ -143,12 +143,15 @@ fn spawn_primary_level_entities(
 		let vertices = level
 			.vertices
 			.iter()
-			.map(|vertex| {
+			.enumerate()
+			.map(|(i, vertex)| {
 				commands
 					.spawn((
 						*session_id,
 						*vertex,
 						Vertex,
+						#[cfg(feature = "dev")]
+						VertexDebugID(i),
 						TransformBundle::default(),
 						VisibilityBundle::default(),
 					))
@@ -160,12 +163,17 @@ fn spawn_primary_level_entities(
 		let cycles = level
 			.cycles
 			.iter()
-			.map(|cycle| {
+			.enumerate()
+			.map(|(id, cycle)| {
 				commands
 					.spawn((
 						*session_id,
 						cycle.placement,
 						cycle.turnability,
+						Cycle {
+							id,
+							group_id: 0, /* TODO */
+						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
 						CycleVertices(cycle.vertex_indices.iter().map(|i| vertices[*i]).collect()),
@@ -205,6 +213,9 @@ fn spawn_primary_level_entities(
 					));
 				});
 		}
+
+		// Spawn cycle list
+		commands.spawn(CycleEntities(cycles));
 	}
 }
 

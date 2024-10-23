@@ -86,7 +86,7 @@ pub enum ObjectData {
 	Player,
 }
 
-#[derive(Component, Clone, Copy, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub enum GlyphData {
 	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
 	Flag,

@@ -1,11 +1,11 @@
-#[allow(unused_imports)]
-use bevy::{ecs::system::RunSystemOnce, prelude::*};
-
 mod utils {
-	use crate::game::level::{GlyphType, ObjectType, ThingData};
+	use crate::game::{
+		components::{CycleEntities, PlacedGlyph, PlacedObject, VertexDebugID},
+		level::{GlyphData, ObjectData, ThingData},
+		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
+	};
 
 	use super::super::{
-		components::Vertex,
 		level::{parser, LevelData},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
@@ -30,12 +30,27 @@ mod utils {
 	}
 
 	/// Resource for extracting vertex information from the game
-	#[derive(PartialEq)]
+	#[derive(Debug, Clone)]
 	pub struct VertexDebugData {
 		/// How many standard (non-horocycle) vertices there are.
 		pub n_vertices: usize, // TODO: Add fields for Horocycle data.
-		                       //		pub objects: Vec<Option<ObjectType>>,
-		                       //		pub glyphs: Vec<Option<GlyphType>>,
+		pub objects: Vec<Option<ObjectData>>,
+		pub glyphs: Vec<Option<GlyphData>>,
+	}
+
+	impl PartialEq for VertexDebugData {
+		fn eq(&self, other: &Self) -> bool {
+			if self.n_vertices == other.n_vertices {
+				for i in 0..self.n_vertices {
+					// TODO: Rethink checking data which might be irrelevant (like grpahical orientation stored in glyph_data)
+					if !(self.objects[i] == other.objects[i] && self.glyphs[i] == other.glyphs[i]) {
+						return false;
+					}
+				}
+				return true;
+			}
+			false
+		}
 	}
 
 	fn load_level(
@@ -59,17 +74,72 @@ mod utils {
 		app
 	}
 
-	fn read_system(vertices: Query<&Vertex>) -> VertexDebugData {
+	fn read_system(
+		vertices: Query<(&VertexDebugID, &PlacedObject, &PlacedGlyph)>,
+		things: Query<&ThingData>,
+	) -> VertexDebugData {
+		let n_vertices = vertices.iter().count();
+		let mut glyph_data = vec![None; n_vertices];
+		let mut object_data = vec![None; n_vertices];
+		for (vertex, object, glyph) in vertices.iter() {
+			let i = vertex.0;
+
+			// Extract glyph information
+			glyph_data[i] = glyph
+				.0
+				.map(|e| {
+					things
+						.get(e)
+						.expect("Vertex points to a non-existent entity")
+				})
+				.map(|thing| match thing {
+					ThingData::Object(_object_data) => {
+						panic!("Glyph data points to an object, not a glyph")
+					}
+					ThingData::Glyph(glyph_data) => glyph_data.clone(),
+				});
+			// Extract glyph information
+			object_data[i] = object
+				.0
+				.map(|e| {
+					things
+						.get(e)
+						.expect("Vertex points to a non-existent entity")
+				})
+				.map(|thing| match thing {
+					ThingData::Object(object_data) => object_data.clone(),
+					ThingData::Glyph(_glyph_data) => {
+						panic!("Glyph data points to an object, not a glyph")
+					}
+				});
+		}
+
 		VertexDebugData {
-			n_vertices: vertices.iter().count(),
+			n_vertices,
+			objects: object_data,
+			glyphs: glyph_data,
 		}
 	}
 
-	//	fn turn_system(In((id, amount)): In<(usize, i32)>, vertices: Query<&Vertex>) -> () {}
+	fn turn_system(
+		In((id, amount)): In<(usize, i32)>,
+		mut events: EventWriter<RotateCycleGroup>,
+		cycle_list: Query<&CycleEntities>,
+	) -> () {
+		events.send(RotateCycleGroup(RotateCycle {
+			target_cycle: cycle_list.single().0[id],
+			direction: if amount >= 0 {
+				CycleTurningDirection::Nominal
+			} else {
+				CycleTurningDirection::Reverse
+			},
+			amount: amount.abs() as usize,
+		}));
+	}
 
 	pub trait GameLogicAppExt {
 		fn read_vertices(&mut self) -> VertexDebugData;
-		//		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> ();
+		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> ();
 	}
 
 	impl GameLogicAppExt for App {
@@ -77,13 +147,16 @@ mod utils {
 			self.world_mut().run_system_once(read_system)
 		}
 
-		//		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> () {
-		//			self.world_mut()
-		//				.run_system_once_with((cycle_id, amount), turn_system)
-		//		}
+		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> () {
+			self.world_mut()
+				.run_system_once_with((cycle_id, amount), turn_system)
+		}
 	}
 }
 
+#[allow(unused_imports)]
+use bevy::prelude::*;
+#[allow(unused_imports)]
 use utils::*;
 
 /// Metatest for asserting that running the headless game works.
@@ -119,7 +192,6 @@ PLACE cycle 0 0 100
 	app.update();
 }
 
-/*
 /// Test for basic cycle rotation.
 #[test]
 fn test_basic_inputs() {
@@ -140,8 +212,37 @@ PLACE cycle 0 0 100
 
 	let initial_vertex_data = app.read_vertices();
 
-	for i in 0..6 {
+	// Rotate 6 times
+	for _ in 0..6 {
+		app.turn_cycle(0, 1);
 		app.update();
+		let data = app.read_vertices();
+		assert_ne!(
+			initial_vertex_data, data,
+			"Cycle should've turned to a new state!"
+		);
 	}
+
+	// Data after 6 turns
+	let six_steps_data = app.read_vertices();
+
+	// Rotate final time
+	app.turn_cycle(0, 1);
+	app.update();
+	assert_eq!(
+		initial_vertex_data,
+		app.read_vertices(),
+		"Cycle should've turned all the way around!"
+	);
+
+	// Rotate back
+	app.turn_cycle(0, -1);
+	app.update();
+	assert_eq!(
+		six_steps_data,
+		app.read_vertices(),
+		"Cycle should've turned back to 6."
+	);
+
+	// TODO: test -6 rotation once implemented.
 }
-*/

@@ -39,6 +39,11 @@ pub struct VertexPosition(pub Entity);
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
 
+/// A vertex (node) on the circle
+#[cfg(feature = "dev")]
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct VertexDebugID(pub usize);
+
 /// Component of the Vertex representing a link to an object occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct PlacedObject(pub Option<Entity>);
@@ -46,6 +51,19 @@ pub struct PlacedObject(pub Option<Entity>);
 /// Component of the Vertex representing a link to a glyph occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct PlacedGlyph(pub Option<Entity>);
+
+/// Component carrying the data mapping level indices to cycle entities.
+#[derive(Component, Clone, Debug, Default, Reflect)]
+pub struct CycleEntities(pub Vec<Entity>);
+
+/// A component describing a cycle
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct Cycle {
+	/// ID corresponding to the numerical level index of this cycle
+	pub id: usize,
+	/// ID corresponding to the group of linked cycles this cycle is a part of
+	pub group_id: usize,
+}
 
 /// A list of [`Vertex`] entities that are part of a single cycle
 #[derive(Component, Debug, Clone, Reflect)]
