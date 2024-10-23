@@ -281,6 +281,7 @@ fn generate_random_returning_cycle_walk(
 		.collect()
 }
 
+/// Tests rotation with intersecting cycles
 #[test]
 fn stress_test_tricycle() {
 	let mut app = app_with_level(
@@ -336,8 +337,68 @@ PLACE green 87 50 130
 		app.turn_cycle(cycle, turn);
 		app.update();
 		let state = app.read_vertices();
-		let total_cubes = state.objects.iter().filter(|x| x.is_some()).count();
-		assert_eq!(total_cubes, 3, "There should always be exactly 3 cubes")
+		let total_boxes = state.objects.iter().filter(|x| x.is_some()).count();
+		assert_eq!(total_boxes, 3, "There should always be exactly 3 boxes")
+	}
+	assert_eq!(
+		intial_state,
+		app.read_vertices(),
+		"Moves should've been undone."
+	);
+}
+
+/// Tests rotation with cycles intersecting at one point.
+#[test]
+fn stress_test_dicycle() {
+	let mut app = app_with_level(
+		r"
+Name=DebugDicycle
+
+VERTEX X 1 2 3 a b
+
+CYCLE A X 1 2 3
+CYCLE B X a b
+
+OBJECT[BOX:0] X
+OBJECT[BOX:1] 1
+OBJECT[BOX:2] 2
+OBJECT[BOX:3] 3
+OBJECT[BOX:4] a
+OBJECT[BOX:5] b
+
+PLACE A -100 0 100
+PLACE B  100 0 100
+",
+	);
+	let intial_state = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+	app.turn_cycle(1, 1);
+	app.update();
+	assert_ne!(
+		intial_state,
+		app.read_vertices(),
+		"Something should've changed."
+	);
+	app.turn_cycle(1, -1);
+	app.update();
+	app.turn_cycle(0, -1);
+	app.update();
+	assert_eq!(
+		intial_state,
+		app.read_vertices(),
+		"Moves should've been undone."
+	);
+
+	// Perform many moves
+	let mut rng = rand::rngs::SmallRng::seed_from_u64(1234123412341234);
+	for &(cycle, turn) in generate_random_returning_cycle_walk(2, 1024, &mut rng).iter() {
+		app.turn_cycle(cycle, turn);
+		app.update();
+		let state = app.read_vertices();
+		let total_boxes = state.objects.iter().filter(|x| x.is_some()).count();
+		assert_eq!(total_boxes, 6, "There should always be exactly 6 boxes")
 	}
 	assert_eq!(
 		intial_state,
