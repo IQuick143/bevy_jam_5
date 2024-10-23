@@ -157,6 +157,8 @@ mod utils {
 #[allow(unused_imports)]
 use bevy::prelude::*;
 #[allow(unused_imports)]
+use rand::{Rng, SeedableRng};
+#[allow(unused_imports)]
 use utils::*;
 
 /// Metatest for asserting that running the headless game works.
@@ -245,4 +247,101 @@ PLACE cycle 0 0 100
 	);
 
 	// TODO: test -6 rotation once implemented.
+}
+
+/// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
+fn generate_random_cycle_walk<'a>(
+	n_cycles: usize,
+	n_steps: usize,
+	rng: &'a mut impl Rng,
+) -> impl Iterator<Item = (usize, i32)> + 'a {
+	(0..n_steps).map(move |_| {
+		(
+			rng.gen_range(0..n_cycles),
+			if rng.gen_bool(0.5) { 1 } else { -1 },
+		)
+	})
+}
+
+/// Generates a random iterator of `n_steps` moves in the form (cycle, rotation)
+/// with the additional property that it undoes all its moves.
+fn generate_random_returning_cycle_walk(
+	n_cycles: usize,
+	n_steps: usize,
+	rng: &mut impl Rng,
+) -> Vec<(usize, i32)> {
+	let iter: Vec<(usize, i32)> = generate_random_cycle_walk(n_cycles, n_steps, rng).collect();
+	iter.iter()
+		.cloned()
+		.chain(
+			iter.iter()
+				.rev()
+				.map(|(cycle, direction)| (*cycle, -direction)),
+		)
+		.collect()
+}
+
+#[test]
+fn stress_test_tricycle() {
+	let mut app = app_with_level(
+		r"
+Name=DebugTricycle
+
+VERTEX b1 b2 b3 bgi bgo bri bro r1 r2 r3 rgi rgo g1 g2 g3
+
+CYCLE blue b1 b2 b3 bgo bri bgi bro
+CYCLE red r1 r2 r3 bro rgi bri rgo
+CYCLE green g1 g2 g3 rgo bgi rgi bgo
+
+OBJECT[BOX:0] rgi
+OBJECT[BOX:1] bri
+OBJECT[BOX:2] bgi
+OBJECT[BUTTON:0] b2
+OBJECT[BUTTON:1] r2
+OBJECT[BUTTON:2] g2
+
+PLACE blue -87 50 130
+PLACE red 0 -100 130
+PLACE green 87 50 130
+",
+	);
+	let intial_state = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+	app.turn_cycle(1, 1);
+	app.update();
+	app.turn_cycle(2, 1);
+	app.update();
+	assert_ne!(
+		intial_state,
+		app.read_vertices(),
+		"Something should've changed."
+	);
+	app.turn_cycle(2, -1);
+	app.update();
+	app.turn_cycle(1, -1);
+	app.update();
+	app.turn_cycle(0, -1);
+	app.update();
+	assert_eq!(
+		intial_state,
+		app.read_vertices(),
+		"Moves should've been undone."
+	);
+
+	// Perform many moves
+	let mut rng = rand::rngs::SmallRng::seed_from_u64(1234123412341234);
+	for &(cycle, turn) in generate_random_returning_cycle_walk(3, 1024, &mut rng).iter() {
+		app.turn_cycle(cycle, turn);
+		app.update();
+		let state = app.read_vertices();
+		let total_cubes = state.objects.iter().filter(|x| x.is_some()).count();
+		assert_eq!(total_cubes, 3, "There should always be exactly 3 cubes")
+	}
+	assert_eq!(
+		intial_state,
+		app.read_vertices(),
+		"Moves should've been undone."
+	);
 }
