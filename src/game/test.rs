@@ -1,6 +1,6 @@
 mod utils {
 	use crate::game::{
-		components::{CycleEntities, PlacedGlyph, PlacedObject, VertexDebugID},
+		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, VertexDebugID},
 		level::{GlyphData, ObjectData, ThingData},
 		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
 	};
@@ -36,6 +36,12 @@ mod utils {
 		pub n_vertices: usize, // TODO: Add fields for Horocycle data.
 		pub objects: Vec<Option<ObjectData>>,
 		pub glyphs: Vec<Option<GlyphData>>,
+	}
+
+	impl VertexDebugData {
+		pub fn count_objects(&self) -> usize {
+			self.objects.iter().filter(|x| x.is_some()).count()
+		}
 	}
 
 	impl PartialEq for VertexDebugData {
@@ -121,6 +127,21 @@ mod utils {
 		}
 	}
 
+	/// System that counts how many cycles there are.
+	fn count_cycles_system(cycles: Query<&Cycle>, cycle_master: Query<&CycleEntities>) -> usize {
+		let cycle_count = cycles.iter().count();
+		let declared_count = cycle_master
+			.get_single()
+			.expect("There should be exactly one CycleEntities entity")
+			.0
+			.len();
+		assert_eq!(
+			cycle_count, declared_count,
+			"Number of Cycle entities should match the number of entities in CycleEntities"
+		);
+		cycle_count
+	}
+
 	fn turn_system(
 		In((id, amount)): In<(usize, i32)>,
 		mut events: EventWriter<RotateCycleGroup>,
@@ -139,12 +160,17 @@ mod utils {
 
 	pub trait GameLogicAppExt {
 		fn read_vertices(&mut self) -> VertexDebugData;
+		fn conut_cycles(&mut self) -> usize;
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> ();
 	}
 
 	impl GameLogicAppExt for App {
 		fn read_vertices(&mut self) -> VertexDebugData {
 			self.world_mut().run_system_once(read_system)
+		}
+
+		fn conut_cycles(&mut self) -> usize {
+			self.world_mut().run_system_once(count_cycles_system)
 		}
 
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> () {
@@ -281,6 +307,35 @@ fn generate_random_returning_cycle_walk(
 		.collect()
 }
 
+/// Perform a large amount of random moves and then undoes them.
+/// ## ASSERTS:
+/// That the amount of objects is invariant.
+///
+/// That after doing all moves in reverse the state has returned to the starting position.
+fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
+	let n_cycles = app.conut_cycles();
+	let intial_state = app.read_vertices();
+	let n_boxes = intial_state.count_objects();
+	// Perform many moves
+	let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+	for &(cycle, turn) in generate_random_returning_cycle_walk(n_cycles, n_steps, &mut rng).iter() {
+		app.turn_cycle(cycle, turn);
+		app.update();
+		let state = app.read_vertices();
+		// TODO: Redo for Horocycles or other mechanics violating object conservation laws.
+		let total_boxes = state.count_objects();
+		assert_eq!(
+			total_boxes, n_boxes,
+			"The number of boxes should not change."
+		)
+	}
+	assert_eq!(
+		intial_state,
+		app.read_vertices(),
+		"Moves should've been undone."
+	);
+}
+
 /// Tests rotation with intersecting cycles
 #[test]
 fn stress_test_tricycle() {
@@ -308,43 +363,27 @@ PLACE green 87 50 130
 	);
 	let intial_state = app.read_vertices();
 
-	app.turn_cycle(0, 1);
-	app.update();
-	app.turn_cycle(1, 1);
-	app.update();
-	app.turn_cycle(2, 1);
-	app.update();
+	let n_cycles = app.conut_cycles();
+	for i in 0..n_cycles {
+		app.turn_cycle(i, 1);
+		app.update();
+	}
 	assert_ne!(
 		intial_state,
 		app.read_vertices(),
 		"Something should've changed."
 	);
-	app.turn_cycle(2, -1);
-	app.update();
-	app.turn_cycle(1, -1);
-	app.update();
-	app.turn_cycle(0, -1);
-	app.update();
-	assert_eq!(
-		intial_state,
-		app.read_vertices(),
-		"Moves should've been undone."
-	);
-
-	// Perform many moves
-	let mut rng = rand::rngs::SmallRng::seed_from_u64(1234123412341234);
-	for &(cycle, turn) in generate_random_returning_cycle_walk(3, 1024, &mut rng).iter() {
-		app.turn_cycle(cycle, turn);
+	for i in (0..n_cycles).rev() {
+		app.turn_cycle(i, -1);
 		app.update();
-		let state = app.read_vertices();
-		let total_boxes = state.objects.iter().filter(|x| x.is_some()).count();
-		assert_eq!(total_boxes, 3, "There should always be exactly 3 boxes")
 	}
 	assert_eq!(
 		intial_state,
 		app.read_vertices(),
 		"Moves should've been undone."
 	);
+
+	move_fuzz(&mut app, 1024, 1234123412341234);
 }
 
 /// Tests rotation with cycles intersecting at one point.
@@ -392,17 +431,23 @@ PLACE B  100 0 100
 	);
 
 	// Perform many moves
-	let mut rng = rand::rngs::SmallRng::seed_from_u64(1234123412341234);
-	for &(cycle, turn) in generate_random_returning_cycle_walk(2, 1024, &mut rng).iter() {
-		app.turn_cycle(cycle, turn);
-		app.update();
-		let state = app.read_vertices();
-		let total_boxes = state.objects.iter().filter(|x| x.is_some()).count();
-		assert_eq!(total_boxes, 6, "There should always be exactly 6 boxes")
+	move_fuzz(&mut app, 1024, 1234123412341234);
+}
+
+/// Tries fuzzing a random selection of levels
+#[test]
+fn stress_test_random_levels() {
+	let levels = [
+		include_str!("../../assets/levels/1_intro.txt"),
+		include_str!("../../assets/levels/2_sort.txt"),
+		include_str!("../../assets/levels/rubik.txt"),
+		include_str!("../../assets/levels/5_sync.txt"),
+		include_str!("../../assets/levels/6_sync2.txt"),
+		include_str!("../../assets/levels/send.txt"),
+		include_str!("../../assets/levels/linked_sort.txt"),
+	];
+	for level in levels {
+		let mut app = app_with_level(level);
+		move_fuzz(&mut app, 4096, 1337133713371337);
 	}
-	assert_eq!(
-		intial_state,
-		app.read_vertices(),
-		"Moves should've been undone."
-	);
 }

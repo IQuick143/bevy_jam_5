@@ -215,7 +215,7 @@ fn spawn_primary_level_entities(
 		}
 
 		// Spawn cycle list
-		commands.spawn(CycleEntities(cycles));
+		commands.spawn((*session_id, CycleEntities(cycles)));
 	}
 }
 
