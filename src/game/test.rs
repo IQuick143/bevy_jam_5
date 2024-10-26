@@ -290,6 +290,108 @@ PLACE cycle 0 0 100
 	assert_eq!(initial_vertex_data, app.read_vertices(), "2 * -3 = -6.");
 }
 
+/// Test that the cycle rotation direction is truly forwards
+#[test]
+fn test_rotation_direction() {
+	fn test_case(level: &'static str) {
+		println!("Level: {}", level);
+		let mut app = app_with_level(level);
+
+		let state_start = app.read_vertices();
+		// Box should move to intersect, not dummy2
+		app.turn_cycle(0, 1);
+		app.update();
+		// Box should get carried off to off
+		app.turn_cycle(1, 1);
+		app.update();
+		// Box should not return
+		app.turn_cycle(0, -1);
+		app.update();
+		assert_ne!(
+			state_start,
+			app.read_vertices(),
+			"Box should've moved forwards and off."
+		);
+	}
+
+	let test_cases = [
+		r"
+NAME=DebugDirection1
+HINT=A player should not be reading this message!
+
+VERTEX dummy1 start intersect off dummy2 dummy3
+CYCLE test dummy1 start intersect dummy2 dummy3
+CYCLE switch intersect off
+
+OBJECT[BOX:1] start
+
+# Placement does not really matter
+PLACE test 0 0 100
+PLACE switch 200 0 100
+",
+		r"
+NAME=DebugDirection2
+HINT=A player should not be reading this message!
+
+VERTEX a b dummy1 start intersect off dummy2 dummy3
+CYCLE driver a b
+CYCLE switch intersect off
+CYCLE test dummy1 start intersect dummy2 dummy3
+
+OBJECT[BOX:1] start
+
+LINK driver test
+
+# Placement does not really matter
+PLACE driver 400 0 100
+PLACE test 0 0 100
+PLACE switch 200 0 100
+",
+		r"
+NAME=DebugDirection3
+HINT=A player should not be reading this message!
+
+VERTEX a b c d dummy1 start intersect off dummy2 dummy3
+CYCLE driver a b
+CYCLE switch intersect off
+CYCLE gear c d
+CYCLE test dummy1 start intersect dummy2 dummy3
+
+OBJECT[BOX:1] start
+
+LINK[CROSSED] driver gear
+LINK[CROSSED] gear test
+
+# Placement does not really matter
+PLACE driver 400 0 100
+PLACE gear 400 0 50
+PLACE test 0 0 100
+PLACE switch 200 0 100
+",
+		r"
+NAME=DebugDirection4
+HINT=A player should not be reading this message!
+
+VERTEX a b dummy1 start intersect off dummy2 dummy3
+CYCLE test dummy1 start intersect dummy2 dummy3
+CYCLE switch intersect off
+CYCLE dummy_gear a b
+
+OBJECT[BOX:1] start
+
+LINK[CROSSED] dummy_gear test
+
+# Placement does not really matter
+PLACE dummy_gear 400 0 50
+PLACE test 0 0 100
+PLACE switch 200 0 100
+",
+	];
+	for test in test_cases {
+		test_case(test);
+	}
+}
+
 /// Test for normal and crossed links.
 #[test]
 fn test_basic_links() {
