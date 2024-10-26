@@ -118,8 +118,26 @@ fn cycle_group_rotation_relay_system(
 	mut group_events: EventReader<RotateCycleGroup>,
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
-	cycles_q: Query<&LinkedCycles>,
+	cycles_q: Query<&Cycle>,
+	cycle_index: Query<&CycleEntities>,
+	level_asset: Res<Assets<LevelData>>,
+	level: Query<&LevelHandle>,
 ) {
+	let level = {
+		let Ok(LevelHandle(handle)) = level.get_single() else {
+			log::error!("System called without a valid level entity.");
+			return;
+		};
+		let Some(level) = level_asset.get(handle) else {
+			log::error!("Non-existent level asset being referenced.");
+			return;
+		};
+		level
+	};
+	let Ok(cycle_index) = cycle_index.get_single() else {
+		log::error!("System called without a valid CycleEntities entity.");
+		return;
+	};
 	for group_rotation in group_events.read() {
 		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
 		update_event.send(GameLayoutChanged);
@@ -127,11 +145,14 @@ fn cycle_group_rotation_relay_system(
 			cycles_q
 				.get(group_rotation.0.target_cycle)
 				.into_iter()
-				.flat_map(|links| &links.0)
-				.map(|&(id, relative_direction)| RotateCycle {
-					target_cycle: id,
-					direction: group_rotation.0.direction * relative_direction,
-					amount: group_rotation.0.amount,
+				.flat_map(|cycle| &level.groups[cycle.group_id].cycles)
+				.map(|&(id, relative_direction)| {
+					println!("Sending {}", id);
+					RotateCycle {
+						target_cycle: cycle_index.0[id],
+						direction: group_rotation.0.direction * relative_direction,
+						amount: group_rotation.0.amount,
+					}
 				})
 				.map(RotateSingleCycle),
 		);

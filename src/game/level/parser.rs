@@ -923,16 +923,16 @@ LINK 1 2 3
 		let expected_results = [
 			LevelBuilderError::CycleLinkageConflict(0, 0),
 			LevelBuilderError::OverlappedLinkedCycles(OverlappedLinkedCyclesError {
-				source_cycle: 0,
-				dest_cycle: 1,
+				source_cycle: 1,
+				dest_cycle: 0,
 				shared_vertex: 0,
 			}),
-			LevelBuilderError::CycleLinkageConflict(0, 0),
+			LevelBuilderError::CycleLinkageConflict(1, 0),
 			LevelBuilderError::CycleLinkageConflict(0, 2),
 			LevelBuilderError::CycleLinkageConflict(0, 3),
 			LevelBuilderError::OverlappedLinkedCycles(OverlappedLinkedCyclesError {
-				source_cycle: 0,
-				dest_cycle: 2,
+				source_cycle: 2,
+				dest_cycle: 0,
 				shared_vertex: 0,
 			}),
 		];

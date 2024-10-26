@@ -196,7 +196,14 @@ struct IntermediateCycleData {
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
 	/// How other cycles turn together with this one
-	pub link_matrix: Vec<Option<LinkedCycleDirection>>,
+	pub linked_cycle: IntermediateLinkStatus,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum IntermediateLinkStatus {
+	None,
+	Cycle(usize, LinkedCycleDirection),
+	Group(usize, LinkedCycleDirection),
 }
 
 /// Placement of a vertex while the layout is being built
@@ -347,22 +354,8 @@ impl LevelBuilder {
 			placement: None,
 			vertex_indices,
 			turnability,
-			link_matrix: vec![None; self.cycles.len()],
+			linked_cycle: IntermediateLinkStatus::None,
 		});
-		// Extend all existing link matrices, they must cross-reference the new cycle
-		for cycle in self.cycles.iter_mut() {
-			cycle.link_matrix.push(None);
-		}
-		// The link matrix has to be reflective by definition
-		// It is our responsibility to fill in that one new disgonal tile
-		let new_reflective = self
-			.cycles
-			.last_mut()
-			.expect("A cycle has just been inserted")
-			.link_matrix
-			.last_mut()
-			.expect("The link matrix has just been extended");
-		*new_reflective = Some(LinkedCycleDirection::Coincident);
 		Ok(self.cycles.len() - 1)
 	}
 
@@ -414,8 +407,7 @@ impl LevelBuilder {
 			return Err(LevelBuilderError::CycleIndexOutOfRange(dest_cycle));
 		}
 		// Add the link symmetrically, in both directions
-		self.add_asymmetric_cycle_link(source_cycle, dest_cycle, direction)?;
-		self.add_asymmetric_cycle_link(dest_cycle, source_cycle, direction)?;
+		self.add_cycle_link(source_cycle, dest_cycle, direction)?;
 		self.declared_links.push(DeclaredLinkData {
 			source_cycle,
 			dest_cycle,
@@ -681,6 +673,8 @@ impl LevelBuilder {
 
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
+		let groups = self.compute_groups();
+		let forbidden_group_pairs = self.compute_forbidden_groups()?;
 		self.validate_before_build()?;
 		self.materialize_partial_vertex_placements();
 		self.apply_color_label_appearences_to_buttons();
@@ -703,7 +697,86 @@ impl LevelBuilder {
 			vertices,
 			cycles,
 			declared_links: self.declared_links,
+			groups,
+			forbidden_group_pairs,
 		})
+	}
+
+	/// Computes and creates the GroupData objects
+	/// Also assigns all cycles into their groups
+	fn compute_groups(&mut self) -> Vec<GroupData> {
+		let mut groups = Vec::new();
+		for cycle in self.cycles.iter_mut() {
+			if let IntermediateLinkStatus::None = cycle.linked_cycle {
+				groups.push(GroupData { cycles: Vec::new() });
+				cycle.linked_cycle = IntermediateLinkStatus::Group(
+					groups.len() - 1,
+					LinkedCycleDirection::Coincident,
+				);
+			}
+		}
+		// Technically we could've done this in the previous loop,
+		// but I do not trust either of the two doofi working on
+		// this codebase to not break the invariant that
+		// a cycle always points to a lower cycle or a group,
+		// so I will not assume it.
+		for cycle in 0..self.cycles.len() {
+			let (root_cycle, direction_1) = self.find_group_root(cycle);
+			let IntermediateLinkStatus::Group(group, direction_2) =
+				self.cycles[root_cycle].linked_cycle
+			else {
+				panic!("Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)");
+			};
+			let direction = direction_1 * direction_2;
+			groups[group]
+				.cycles
+				.push((cycle, direction_1 * direction_2));
+			self.cycles[cycle].linked_cycle = IntermediateLinkStatus::Group(group, direction);
+		}
+		groups
+	}
+
+	/// Computes which pairs of groups can not be rotated in sync
+	fn compute_forbidden_groups(&self) -> Result<Vec<(usize, usize)>, LevelBuilderError> {
+		let mut forbid = Vec::new();
+		// TODO: Use a better algorithm, like come on O(n^4) ???
+		for cycle_a in 0..self.cycles.len() {
+			for cycle_b in (cycle_a + 1)..self.cycles.len() {
+				'inner: for &vertex_a in self.cycles[cycle_a].vertex_indices.iter() {
+					for &vertex_b in self.cycles[cycle_b].vertex_indices.iter() {
+						if vertex_a == vertex_b {
+							let IntermediateLinkStatus::Group(group_a, _) =
+								self.cycles[cycle_a].linked_cycle
+							else {
+								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
+							};
+							let IntermediateLinkStatus::Group(group_b, _) =
+								self.cycles[cycle_b].linked_cycle
+							else {
+								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
+							};
+							if group_a == group_b {
+								return Err(LevelBuilderError::OverlappedLinkedCycles(
+									OverlappedLinkedCyclesError {
+										dest_cycle: cycle_a,
+										source_cycle: cycle_b,
+										shared_vertex: vertex_a,
+									},
+								));
+							}
+							if group_a < group_b {
+								forbid.push((group_a, group_b));
+							} else {
+								forbid.push((group_b, group_a));
+							}
+							break 'inner;
+						}
+					}
+				}
+			}
+		}
+		forbid.sort();
+		Ok(forbid)
 	}
 
 	/// Asserts that a vertex data object is complete and assembles it
@@ -733,17 +806,14 @@ impl LevelBuilder {
 		let placement = intermediate
 			.placement
 			.expect("Unplaced cycle in build phase, should have been detected earlier");
-		let link_closure = intermediate
-			.link_matrix
-			.into_iter()
-			.enumerate()
-			.filter_map(|(i, dir)| dir.map(|dir| (i, dir)))
-			.collect();
 		CycleData {
 			placement,
 			vertex_indices: intermediate.vertex_indices,
 			turnability: intermediate.turnability,
-			link_closure,
+		    group: match intermediate.linked_cycle {
+					IntermediateLinkStatus::Group(group, _) => group,
+					_ => panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]"),
+				},
 		}
 	}
 
@@ -1006,66 +1076,43 @@ impl LevelBuilder {
 		}
 	}
 
-	/// Links two cycles asymmetrically (the link only goes from source to destination)
-	/// The link is transitive.
-	fn add_asymmetric_cycle_link(
-		&mut self,
-		source_cycle: usize,
-		dest_cycle: usize,
-		direction: LinkedCycleDirection,
-	) -> Result<(), LevelBuilderError> {
-		for i in 0..self.cycles.len() {
-			// If a cycle is linked to the source, it is now by transitivity also linked to destination
-			if let Some(old_link_direction) = self.cycles[i].link_matrix[source_cycle] {
-				self.add_nontransitive_cycle_link(i, dest_cycle, old_link_direction * direction)?;
-			}
-			// If destination is linked to a cycle, source is now by transitivity also linked to that cycle
-			if let Some(old_link_direction) = self.cycles[dest_cycle].link_matrix[i] {
-				self.add_nontransitive_cycle_link(source_cycle, i, old_link_direction * direction)?;
-			}
+	/// Finds the root cycle this cycle's links points to and what is the relative direction.
+	fn find_group_root(&self, mut cycle: usize) -> (usize, LinkedCycleDirection) {
+		let mut relative_direction = LinkedCycleDirection::Coincident;
+		while let IntermediateLinkStatus::Cycle(lower, direction) = self.cycles[cycle].linked_cycle
+		{
+			// Todo: Optimise by shortening the path as we traverse it.
+			cycle = lower;
+			relative_direction *= direction;
 		}
-		Ok(())
+		(cycle, relative_direction)
 	}
 
-	/// Links two cycles atomically. Only these two cycles will be linked,
-	/// it is not symmetric or transitive.
-	fn add_nontransitive_cycle_link(
+	/// Links two cycles asymmetrically (the link only goes from source to destination)
+	/// The link is transitive.
+	fn add_cycle_link(
 		&mut self,
-		source_cycle: usize,
-		dest_cycle: usize,
+		cycle_a: usize,
+		cycle_b: usize,
 		direction: LinkedCycleDirection,
 	) -> Result<(), LevelBuilderError> {
-		if let Some(existing_link_direction) = self.cycles[source_cycle].link_matrix[dest_cycle] {
-			// The cycles are already linked
-			// We must verify that they have the same direction
-			if existing_link_direction != direction {
-				return Err(LevelBuilderError::CycleLinkageConflict(
-					source_cycle,
-					dest_cycle,
-				));
-			}
-		} else {
-			// The cycles are not yet linked
-			// We must verify that they do not have a vertex in common
-			let maybe_shared_vertex = self.cycles[source_cycle]
-				.vertex_indices
-				.iter()
-				.chain(self.cycles[dest_cycle].vertex_indices.iter())
-				.duplicates()
-				.copied()
-				.next();
-			if let Some(shared_vertex) = maybe_shared_vertex {
-				return Err(LevelBuilderError::OverlappedLinkedCycles(
-					OverlappedLinkedCyclesError {
-						source_cycle,
-						dest_cycle,
-						shared_vertex,
-					},
-				));
-			}
-			// Now link them together
-			self.cycles[source_cycle].link_matrix[dest_cycle] = Some(direction);
+		let (cycle_1, rel_dir_a) = self.find_group_root(cycle_a);
+		let (cycle_2, rel_dir_b) = self.find_group_root(cycle_b);
+		let link_direction = direction * rel_dir_a * rel_dir_b;
+
+		if cycle_1 == cycle_2 && link_direction != LinkedCycleDirection::Coincident {
+			return Err(LevelBuilderError::CycleLinkageConflict(cycle_a, cycle_b));
 		}
+
+		// For niceness we always link higher numbers to lower numbers.
+		let (source_cycle, target_cycle) = if cycle_1 > cycle_2 {
+			(cycle_1, cycle_2)
+		} else {
+			(cycle_2, cycle_1)
+		};
+		// We have to take into account all the swaps that occured between
+		self.cycles[source_cycle].linked_cycle =
+			IntermediateLinkStatus::Cycle(target_cycle, link_direction);
 		Ok(())
 	}
 

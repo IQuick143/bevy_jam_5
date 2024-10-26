@@ -3,6 +3,8 @@
 
 use bevy::prelude::*;
 
+use super::level::LevelData;
+
 /// Marker component for entities that belong to a single level
 #[derive(Component, Clone, Copy, Debug, Default, Reflect)]
 pub struct LevelScoped;
@@ -69,9 +71,9 @@ pub struct Cycle {
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct CycleVertices(pub Vec<Entity>);
 
-/// Describes the linkage of multiple cycles such that they will always turn together
+/// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
 #[derive(Component, Debug, Clone, Reflect)]
-pub struct LinkedCycles(pub Vec<(Entity, super::level::LinkedCycleDirection)>);
+pub struct LevelHandle(pub Handle<LevelData>);
 
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`Parent`].

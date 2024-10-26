@@ -130,7 +130,7 @@ fn despawn_expired_level_entities(
 fn spawn_primary_level_entities(
 	mut commands: Commands,
 	mut events: EventReader<SpawnLevel>,
-	levels: Res<Assets<LevelData>>,
+	mut levels: ResMut<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {
 		// Get the level data
@@ -172,7 +172,7 @@ fn spawn_primary_level_entities(
 						cycle.turnability,
 						Cycle {
 							id,
-							group_id: 0, /* TODO */
+							group_id: cycle.group,
 						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
@@ -183,16 +183,6 @@ fn spawn_primary_level_entities(
 					.id()
 			})
 			.collect::<Vec<_>>();
-
-		// Link cycles together
-		for (id, data) in cycles.iter().zip(&level.cycles) {
-			commands.entity(*id).insert(LinkedCycles(
-				data.link_closure
-					.iter()
-					.map(|&(i, dir)| (cycles[i], dir))
-					.collect(),
-			));
-		}
 
 		// Spawn links
 		// Links are children of their source cycle
@@ -216,6 +206,14 @@ fn spawn_primary_level_entities(
 
 		// Spawn cycle list
 		commands.spawn((*session_id, CycleEntities(cycles)));
+		commands.spawn((
+			*session_id,
+			LevelHandle(
+				levels
+					.get_strong_handle(level_handle.id())
+					.expect("I expect you to work."),
+			),
+		));
 	}
 }
 

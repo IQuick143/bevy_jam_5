@@ -20,8 +20,7 @@ mod utils {
 			super::super::logic::plugin,
 			super::super::history::plugin,
 			super::super::spawn::plugin,
-		))
-		// Disable spawning of visual entities
+		)) // Disable spawning of visual entities
 		.configure_sets(
 			LevelInitialization,
 			LevelInitializationSet::SpawnVisuals.run_if(|| false),

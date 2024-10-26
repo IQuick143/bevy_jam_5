@@ -18,6 +18,10 @@ pub struct LevelData {
 	pub vertices: Vec<VertexData>,
 	/// Data for all cycles in the level
 	pub cycles: Vec<CycleData>,
+	/// Data for all groups of cycles in the level
+	pub groups: Vec<GroupData>,
+	/// List of group pairs, which cannot be turned at once
+	pub forbidden_group_pairs: Vec<(usize, usize)>,
 	/// Data for all cycle links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_links: Vec<DeclaredLinkData>,
@@ -44,8 +48,18 @@ pub struct CycleData {
 	pub vertex_indices: Vec<usize>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
-	/// All cycles that have to turn when this cycle is turned, including itself
-	pub link_closure: Vec<(usize, LinkedCycleDirection)>,
+	/// Group this cycle belongs to
+	pub group: usize,
+}
+
+/// Description of a group of cycles
+#[derive(Debug, Clone, Reflect)]
+pub struct GroupData {
+	/// Indices into [`LevelData::cycles`]
+	/// identifies the cycles that belong to the group
+	/// All cycles that have to turn when this cycle is turned and in which direction relative to the nominal direction of the entire group
+	pub cycles: Vec<(usize, LinkedCycleDirection)>,
+	// TODO: Links to other groups
 }
 
 /// Description of a declared (and visualized) cycle link
@@ -226,6 +240,12 @@ impl std::ops::Mul for LinkedCycleDirection {
 		} else {
 			LinkedCycleDirection::Inverse
 		}
+	}
+}
+
+impl std::ops::MulAssign for LinkedCycleDirection {
+	fn mul_assign(&mut self, rhs: Self) {
+		*self = *self * rhs
 	}
 }
 
