@@ -271,7 +271,23 @@ PLACE cycle 0 0 100
 		"Cycle should've turned back to 6."
 	);
 
-	// TODO: test -6 rotation once implemented.
+	app.turn_cycle(0, 1);
+	app.update();
+	assert_eq!(initial_vertex_data, app.read_vertices());
+
+	app.turn_cycle(0, 6);
+	app.update();
+	assert_eq!(
+		six_steps_data,
+		app.read_vertices(),
+		"Rotating sextuply should have the same effect as rotating once six times."
+	);
+
+	app.turn_cycle(0, -3);
+	app.update();
+	app.turn_cycle(0, -3);
+	app.update();
+	assert_eq!(initial_vertex_data, app.read_vertices(), "2 * -3 = -6.");
 }
 
 /// Test for normal and crossed links.
@@ -356,7 +372,34 @@ PLACE c 0 200 100
 	app.turn_cycle(2, 1);
 	app.update();
 	assert_eq!(state_0, app.read_vertices(), "Level is in wrong state.");
-	// TODO: Test multirotation arithmetic once implemented.
+
+	// Testing multiturn arithmetic
+	let states = [state_0, state_1, state_2];
+	// We start in state 0 according to last assert
+	let mut state_index: usize = 0;
+	for i in 1..32 {
+		app.turn_cycle(1, i);
+		app.update();
+		state_index += i as usize;
+		state_index %= 3;
+		assert_eq!(
+			states[state_index],
+			app.read_vertices(),
+			"Level is in wrong state."
+		);
+	}
+	for i in 1..32 {
+		app.turn_cycle(2, i);
+		app.update();
+		// 2 == -1 in mod 3 arithmetic, so we use it as subtraction
+		state_index += 2 * i as usize;
+		state_index %= 3;
+		assert_eq!(
+			states[state_index],
+			app.read_vertices(),
+			"Level is in wrong state."
+		);
+	}
 }
 
 /// Test for rotating two cycles in sync, and counting the combinatorics of when they reset.
