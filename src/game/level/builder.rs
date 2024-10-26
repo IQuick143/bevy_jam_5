@@ -1076,7 +1076,8 @@ impl LevelBuilder {
 		}
 	}
 
-	/// Finds the root cycle this cycle's links points to and what is the relative direction.
+	/// Finds the root cycle (cycle that has no link to another parent) that this cycle's links point to and
+	/// what is the relative direction of rotation, going through the links to there.
 	fn find_group_root(&self, mut cycle: usize) -> (usize, LinkedCycleDirection) {
 		let mut relative_direction = LinkedCycleDirection::Coincident;
 		while let IntermediateLinkStatus::Cycle(lower, direction) = self.cycles[cycle].linked_cycle
@@ -1100,8 +1101,15 @@ impl LevelBuilder {
 		let (cycle_2, rel_dir_b) = self.find_group_root(cycle_b);
 		let link_direction = direction * rel_dir_a * rel_dir_b;
 
-		if cycle_1 == cycle_2 && link_direction != LinkedCycleDirection::Coincident {
-			return Err(LevelBuilderError::CycleLinkageConflict(cycle_a, cycle_b));
+		// There is no link to be created if we converged to the same node twice
+		// However we must check that the relative direction is correct, otherwise we would be requiring that cycles
+		// in the group turn opposite to their own direction.
+		if cycle_1 == cycle_2 {
+			return if link_direction != LinkedCycleDirection::Coincident {
+				Err(LevelBuilderError::CycleLinkageConflict(cycle_a, cycle_b))
+			} else {
+				Ok(())
+			};
 		}
 
 		// For niceness we always link higher numbers to lower numbers.
