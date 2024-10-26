@@ -274,6 +274,91 @@ PLACE cycle 0 0 100
 	// TODO: test -6 rotation once implemented.
 }
 
+/// Test for basic cycle rotation.
+#[test]
+fn test_basic_links() {
+	let mut app = app_with_level(
+		r"
+NAME=DebugLinkBasic
+HINT=A player should not be reading this message!
+
+VERTEX 1 2 3 4 5 6 7 8 9
+CYCLE a 1 2 3
+CYCLE b 4 5 6
+CYCLE c 7 8 9
+
+OBJECT[BOX:1] 1
+OBJECT[BOX:2] 2
+OBJECT[BOX:3] 3
+OBJECT[BOX:4] 4
+OBJECT[BOX:5] 5
+OBJECT[BOX:6] 6
+OBJECT[BOX:7] 7
+OBJECT[BOX:8] 8
+OBJECT[BOX:9] 9
+
+# A valid triangle of links, should not error
+LINK a b
+LINK[CROSSED] b c
+LINK[CROSSED] a c
+
+# Placement does not really matter
+PLACE a 0 0 100
+PLACE b 200 0 100
+PLACE c 0 200 100
+",
+	);
+
+	let state_0 = app.read_vertices();
+	app.turn_cycle(0, 1);
+	app.update();
+	let state_1 = app.read_vertices();
+	app.turn_cycle(0, 1);
+	app.update();
+	let state_2 = app.read_vertices();
+	app.turn_cycle(0, 1);
+	app.update();
+	assert_eq!(
+		state_0,
+		app.read_vertices(),
+		"After 3 turns each cycle should've reset to its original state."
+	);
+	assert_ne!(
+		state_0, state_1,
+		"Each turn should've produced a new state."
+	);
+	assert_ne!(
+		state_0, state_2,
+		"Each turn should've produced a new state."
+	);
+	assert_ne!(
+		state_1, state_2,
+		"Each turn should've produced a new state."
+	);
+
+	// Level is in state_0, turn into 1 then 2 then 0, but use the second cycle this time.
+	app.turn_cycle(1, 1);
+	app.update();
+	assert_eq!(state_1, app.read_vertices(), "Level is in wrong state.");
+	app.turn_cycle(1, 1);
+	app.update();
+	assert_eq!(state_2, app.read_vertices(), "Level is in wrong state.");
+	app.turn_cycle(1, 1);
+	app.update();
+	assert_eq!(state_0, app.read_vertices(), "Level is in wrong state.");
+	// Level is in state_0, turn into 2 then 1 then 0, but use the third cycle this time, which is reversly linked
+	app.turn_cycle(2, 1);
+	app.update();
+	assert_eq!(state_2, app.read_vertices(), "Level is in wrong state.");
+	app.turn_cycle(2, 1);
+	app.update();
+	assert_eq!(state_1, app.read_vertices(), "Level is in wrong state.");
+	app.turn_cycle(2, 1);
+	app.update();
+	assert_eq!(state_0, app.read_vertices(), "Level is in wrong state.");
+	// TODO: Test multirotation arithmetic once implemented.
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk<'a>(
 	n_cycles: usize,
