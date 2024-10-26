@@ -274,7 +274,7 @@ PLACE cycle 0 0 100
 	// TODO: test -6 rotation once implemented.
 }
 
-/// Test for basic cycle rotation.
+/// Test for normal and crossed links.
 #[test]
 fn test_basic_links() {
 	let mut app = app_with_level(
@@ -357,6 +357,65 @@ PLACE c 0 200 100
 	app.update();
 	assert_eq!(state_0, app.read_vertices(), "Level is in wrong state.");
 	// TODO: Test multirotation arithmetic once implemented.
+}
+
+/// Test for rotating two cycles in sync, and counting the combinatorics of when they reset.
+#[test]
+fn test_link_combinatorics() {
+	let mut app = app_with_level(
+		r"
+NAME=DebugLinkCombinatorics
+HINT=A player should not be reading this message!
+
+VERTEX 1 2 3 4 5 6 7 8 9 10 11 12 13 14
+CYCLE a 1 2 3 4 5
+CYCLE b 6 7 8 9 10 11 12 13 14
+
+OBJECT[BOX:1] 1
+OBJECT[BOX:2] 2
+OBJECT[BOX:3] 3
+OBJECT[BOX:4] 4
+OBJECT[BOX:5] 5
+OBJECT[BOX:6] 6
+OBJECT[BOX:7] 7
+OBJECT[BOX:8] 8
+OBJECT[BOX:9] 9
+OBJECT[BOX:10] 10
+OBJECT[BOX:11] 11
+OBJECT[BOX:12] 12
+OBJECT[BOX:13] 13
+OBJECT[BOX:14] 14
+
+LINK a b
+
+# Placement does not really matter
+PLACE a 0 0 100
+PLACE b 200 0 100
+",
+	);
+
+	let state_0 = app.read_vertices();
+
+	// We have a 5-cycle and a 9-cycle
+	let cycle_a = 5;
+	let cycle_b = 9;
+
+	for _ in 0..(cycle_a * cycle_b - 1) {
+		app.turn_cycle(0, 1);
+		app.update();
+		assert_ne!(
+			state_0,
+			app.read_vertices(),
+			"Each turn should've produced a new state."
+		);
+	}
+	app.turn_cycle(0, 1);
+	app.update();
+	assert_eq!(
+		state_0,
+		app.read_vertices(),
+		"After A*B turns each cycle should've reset to its original state."
+	);
 }
 
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
