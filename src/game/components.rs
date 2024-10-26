@@ -3,7 +3,7 @@
 
 use bevy::prelude::*;
 
-use super::level::LevelData;
+use super::level::{LevelData, LinkedCycleDirection};
 
 /// Marker component for entities that belong to a single level
 #[derive(Component, Clone, Copy, Debug, Default, Reflect)]
@@ -65,6 +65,8 @@ pub struct Cycle {
 	pub id: usize,
 	/// ID corresponding to the group of linked cycles this cycle is a part of
 	pub group_id: usize,
+	/// The direction this cycle turns in relation to its parent group
+	pub orientation_within_group: LinkedCycleDirection,
 }
 
 /// A list of [`Vertex`] entities that are part of a single cycle

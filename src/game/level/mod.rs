@@ -50,6 +50,8 @@ pub struct CycleData {
 	pub turnability: CycleTurnability,
 	/// Group this cycle belongs to
 	pub group: usize,
+	/// The relative orientation of the cycle in regards to the group
+	pub orientation_within_group: LinkedCycleDirection,
 }
 
 /// Description of a group of cycles

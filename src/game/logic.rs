@@ -141,16 +141,20 @@ fn cycle_group_rotation_relay_system(
 	for group_rotation in group_events.read() {
 		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
 		update_event.send(GameLayoutChanged);
+		let Ok(source_cycle) = cycles_q.get(group_rotation.0.target_cycle) else {
+			continue;
+		};
 		single_events.send_batch(
-			cycles_q
-				.get(group_rotation.0.target_cycle)
-				.into_iter()
-				.flat_map(|cycle| &level.groups[cycle.group_id].cycles)
+			level.groups[source_cycle.group_id]
+				.cycles
+				.iter()
 				.map(|&(id, relative_direction)| {
-					println!("Sending {}", id);
+					// println!("Sending {}", id);
 					RotateCycle {
 						target_cycle: cycle_index.0[id],
-						direction: group_rotation.0.direction * relative_direction,
+						direction: group_rotation.0.direction
+							* source_cycle.orientation_within_group
+							* relative_direction,
 						amount: group_rotation.0.amount,
 					}
 				})

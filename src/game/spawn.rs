@@ -173,6 +173,7 @@ fn spawn_primary_level_entities(
 						Cycle {
 							id,
 							group_id: cycle.group,
+							orientation_within_group: cycle.orientation_within_group,
 						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),

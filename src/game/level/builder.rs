@@ -806,14 +806,16 @@ impl LevelBuilder {
 		let placement = intermediate
 			.placement
 			.expect("Unplaced cycle in build phase, should have been detected earlier");
+		let IntermediateLinkStatus::Group(group, relative_direction) = intermediate.linked_cycle
+		else {
+			panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
+		};
 		CycleData {
 			placement,
 			vertex_indices: intermediate.vertex_indices,
 			turnability: intermediate.turnability,
-		    group: match intermediate.linked_cycle {
-					IntermediateLinkStatus::Group(group, _) => group,
-					_ => panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]"),
-				},
+			group: group,
+			orientation_within_group: relative_direction,
 		}
 	}
 
