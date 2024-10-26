@@ -175,30 +175,49 @@ fn cycle_rotation_system(
 			log::warn!("0 rotation was emitted.");
 			continue;
 		}
-		if event.0.amount > 1 {
-			unimplemented!("MULTI-TURNS ARE NOT IMPLMENTED YET.");
-		}
 		if let Ok(cycle_vertices) = cycles_q
 			.get(event.0.target_cycle)
 			.inspect_err(|e| log::warn!("{e}"))
 		{
-			let vertex_ids_wrapped =
-				get_flipped_wrapped_iterator(&cycle_vertices.0, event.0.direction);
-			let mut cached_object_id = None;
-			for vertex_id in vertex_ids_wrapped {
-				if let Some(cached_object_id) = cached_object_id {
-					if let Ok(mut object_pos) = objects_q
-						.get_mut(cached_object_id)
+			let n_vertices = cycle_vertices.0.len();
+			let amount = {
+				let step = event.0.amount % n_vertices;
+				if step == 0 {
+					// NOOP, we are done
+					continue;
+				}
+				match event.0.direction {
+					CycleTurningDirection::Nominal => step,
+					CycleTurningDirection::Reverse => n_vertices - step,
+				}
+			};
+			fn gcd(mut a: usize, mut b: usize) -> usize {
+				while a > 0 {
+					(a, b) = (b % a, a);
+				}
+				b
+			}
+			let n_loops = gcd(amount, n_vertices);
+			let loop_len = n_vertices / n_loops;
+			for loop_id in 0..n_loops {
+				let mut cached_object_id = None;
+				for i in 0..loop_len + 1 {
+					let index = (loop_id + amount * i) % n_vertices;
+					let vertex_id = cycle_vertices.0[index];
+					if let Some(cached_object_id) = cached_object_id {
+						if let Ok(mut object_pos) = objects_q
+							.get_mut(cached_object_id)
+							.inspect_err(|e| log::warn!("{e}"))
+						{
+							object_pos.0 = vertex_id;
+						}
+					}
+					if let Ok(mut placed_object_id) = vertices_q
+						.get_mut(vertex_id)
 						.inspect_err(|e| log::warn!("{e}"))
 					{
-						object_pos.0 = vertex_id;
+						std::mem::swap(&mut cached_object_id, &mut placed_object_id.0);
 					}
-				}
-				if let Ok(mut placed_object_id) = vertices_q
-					.get_mut(vertex_id)
-					.inspect_err(|e| log::warn!("{e}"))
-				{
-					std::mem::swap(&mut cached_object_id, &mut placed_object_id.0);
 				}
 			}
 		}

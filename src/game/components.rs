@@ -47,7 +47,7 @@ pub struct Vertex;
 pub struct VertexDebugID(pub usize);
 
 /// Component of the Vertex representing a link to an object occupying this place
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct PlacedObject(pub Option<Entity>);
 
 /// Component of the Vertex representing a link to a glyph occupying this place
