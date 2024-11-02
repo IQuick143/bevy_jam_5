@@ -19,6 +19,8 @@ pub struct LevelBuilder {
 	cycles: Vec<IntermediateCycleData>,
 	/// Cycle links that have been explicitly added (no symmetry or transitivity)
 	declared_links: Vec<DeclaredLinkData>,
+	/// One way links that have been explicitly added (no transitivity)
+	declared_one_way_links: Vec<DeclaredLinkData>,
 }
 
 /// Enumerates the possible sets of positions
@@ -171,6 +173,7 @@ pub enum LevelBuilderError {
 	/// [`set_color_label_appearence`](LevelBuilder::set_color_label_appearence)
 	/// was called on a vertex that does not contain a colored button
 	NoButtonWithColorAtVertex(usize),
+	OneWayLinkLoop,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -197,6 +200,8 @@ struct IntermediateCycleData {
 	pub turnability: CycleTurnability,
 	/// How other cycles turn together with this one
 	pub linked_cycle: IntermediateLinkStatus,
+	/// Outgoing oneways
+	pub outgoing_one_way_links: Vec<OneWayIntermediateData>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -204,6 +209,14 @@ enum IntermediateLinkStatus {
 	None,
 	Cycle(usize, LinkedCycleDirection),
 	Group(usize, LinkedCycleDirection),
+}
+
+#[derive(Clone, Copy, Debug)]
+struct OneWayIntermediateData {
+	target_cycle: usize,
+	direction: LinkedCycleDirection,
+	// /// Information on whether this link interacts with detectors, if that information is known already
+	// has_detectors: Option<bool>
 }
 
 /// Placement of a vertex while the layout is being built
@@ -304,6 +317,7 @@ impl LevelBuilder {
 			vertices: Vec::new(),
 			cycles: Vec::new(),
 			declared_links: Vec::new(),
+			declared_one_way_links: Vec::new(),
 		}
 	}
 
@@ -355,6 +369,7 @@ impl LevelBuilder {
 			vertex_indices,
 			turnability,
 			linked_cycle: IntermediateLinkStatus::None,
+			outgoing_one_way_links: Vec::new(),
 		});
 		Ok(self.cycles.len() - 1)
 	}
@@ -409,6 +424,41 @@ impl LevelBuilder {
 		// Add the link symmetrically, in both directions
 		self.add_cycle_link(source_cycle, dest_cycle, direction)?;
 		self.declared_links.push(DeclaredLinkData {
+			source_cycle,
+			dest_cycle,
+			direction,
+		});
+		Ok(())
+	}
+
+	/// Links two cycles by a one-way.
+	pub fn one_way_link_cycles(
+		&mut self,
+		source_cycle: usize,
+		dest_cycle: usize,
+		direction: LinkedCycleDirection,
+	) -> Result<(), LevelBuilderError> {
+		if source_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(source_cycle));
+		}
+		if dest_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(dest_cycle));
+		}
+		// Add the link symmetrically, in both directions
+		if source_cycle == dest_cycle {
+			// TODO: consider a better error.
+			return Err(LevelBuilderError::CycleLinkageConflict(
+				source_cycle,
+				dest_cycle,
+			));
+		}
+		self.cycles[source_cycle]
+			.outgoing_one_way_links
+			.push(OneWayIntermediateData {
+				target_cycle: dest_cycle,
+				direction,
+			});
+		self.declared_one_way_links.push(DeclaredLinkData {
 			source_cycle,
 			dest_cycle,
 			direction,
@@ -673,7 +723,7 @@ impl LevelBuilder {
 
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
-		let groups = self.compute_groups();
+		let groups = self.compute_groups()?;
 		let forbidden_group_pairs = self.compute_forbidden_groups()?;
 		self.validate_before_build()?;
 		self.materialize_partial_vertex_placements();
@@ -697,6 +747,7 @@ impl LevelBuilder {
 			vertices,
 			cycles,
 			declared_links: self.declared_links,
+			declared_one_way_links: self.declared_one_way_links,
 			groups,
 			forbidden_group_pairs,
 		})
@@ -704,11 +755,14 @@ impl LevelBuilder {
 
 	/// Computes and creates the GroupData objects
 	/// Also assigns all cycles into their groups
-	fn compute_groups(&mut self) -> Vec<GroupData> {
+	fn compute_groups(&mut self) -> Result<Vec<GroupData>, LevelBuilderError> {
 		let mut groups = Vec::new();
 		for cycle in self.cycles.iter_mut() {
 			if let IntermediateLinkStatus::None = cycle.linked_cycle {
-				groups.push(GroupData { cycles: Vec::new() });
+				groups.push(GroupData {
+					cycles: Vec::new(),
+					linked_groups: Vec::new(),
+				});
 				cycle.linked_cycle = IntermediateLinkStatus::Group(
 					groups.len() - 1,
 					LinkedCycleDirection::Coincident,
@@ -733,7 +787,179 @@ impl LevelBuilder {
 				.push((cycle, direction_1 * direction_2));
 			self.cycles[cycle].linked_cycle = IntermediateLinkStatus::Group(group, direction);
 		}
-		groups
+		// A third pass for aggregating group one-ways
+		for source_cycle in 0..self.cycles.len() {
+			let IntermediateLinkStatus::Group(source_group, direction_1) =
+				self.cycles[source_cycle].linked_cycle
+			else {
+				panic!("Some doofus done doofed up the for loop above this one.");
+			};
+			for link in self.cycles[source_cycle].outgoing_one_way_links.iter() {
+				let IntermediateLinkStatus::Group(target_group, direction_2) =
+					self.cycles[link.target_cycle].linked_cycle
+				else {
+					panic!("Some doofus done doofed up the for loop above this one.");
+				};
+				groups[source_group].linked_groups.push(OneWayLinkData {
+					source_cycle_data: Some(source_cycle),
+					target_cycle_data: Some(link.target_cycle),
+					target_group,
+					direction: link.direction * direction_1 * direction_2,
+					multiplicity: 1,
+				});
+			}
+		}
+		// TOPOLOGICAL SORT
+		// THIS BLOCK INVALIDATES OR CHANGES ALL GROUP INDICES BY RESHUFFLING THE `groups` VECTOR.
+		// TODO: use a better structure for the links between cycles, to deduplicate mutliple equivalent dependencies
+		{
+			let group_target_indices = {
+				let mut sorted_order = vec![0usize; groups.len()];
+				let mut next_order_index = 0;
+				let mut sorted_mark = vec![false; groups.len()];
+				let mut currently_visited_mark = vec![false; groups.len()];
+				let mut stack = Vec::new();
+
+				for i in 0..groups.len() {
+					println!("starting {i}");
+					// Node is already in the ordering, skip it
+					if sorted_mark[i] {
+						continue;
+					}
+					stack.push(i);
+					while stack.len() > 0 {
+						let node = *stack.last().unwrap();
+						println!("node {node}");
+						// Node is already in the ordering, skip it
+						// This removes duplicates from the stack
+						if sorted_mark[node] {
+							stack.pop();
+							continue;
+						}
+						currently_visited_mark[node] = true;
+						let mut blocked = false;
+						for dependency in groups[node].linked_groups.iter() {
+							let dependency_node = dependency.target_group;
+							if currently_visited_mark[dependency_node] {
+								// TODO: Better errors, but I really could not be bothered.
+								return Err(LevelBuilderError::OneWayLinkLoop);
+							}
+							// If this node depends on nodes that have not yet been put into the topological ordering
+							// We need to first handle those and block this node
+							if !sorted_mark[dependency_node] {
+								blocked = true;
+								stack.push(dependency_node);
+							}
+						}
+						if !blocked {
+							// Remove our node (it has to be at the top because node is the last element)
+							// And we have not pushed to the stack
+							stack.pop();
+							// Place the node into the ordering giving it the next available index
+							sorted_mark[node] = true;
+							currently_visited_mark[node] = false;
+							sorted_order[node] = next_order_index;
+							println!("Assigned {next_order_index} to {node}");
+							next_order_index += 1;
+						}
+					}
+				}
+				// Reverse the ordering, so sources come before targets
+				for index in sorted_order.iter_mut() {
+					*index = groups.len() - 1 - *index;
+				}
+				sorted_order
+			};
+			#[cfg(debug_assertions)]
+			{
+				// Check that every group index occurs exactly once
+				let mut counter = vec![0; groups.len()];
+				for index in group_target_indices.iter() {
+					counter[*index] += 1;
+				}
+				assert_eq!(
+					counter,
+					vec![1; groups.len()],
+					"Index map is not a bijection"
+				);
+			}
+			// Update ***EVERY*** group index.
+
+			// Update cycle -> group links
+			for source_cycle in 0..self.cycles.len() {
+				let IntermediateLinkStatus::Group(source_group, direction) =
+					self.cycles[source_cycle].linked_cycle
+				else {
+					panic!("Some doofus done doofed up the for loop above this one.");
+				};
+				self.cycles[source_cycle].linked_cycle =
+					IntermediateLinkStatus::Group(group_target_indices[source_group], direction);
+			}
+
+			// Update group -> group links
+			for group in groups.iter_mut() {
+				for link in group.linked_groups.iter_mut() {
+					link.target_group = group_target_indices[link.target_group];
+				}
+			}
+
+			// Shuffle groups
+			let n_groups = groups.len();
+			let old_groups = std::mem::replace(
+				&mut groups,
+				vec![
+					GroupData {
+						cycles: Vec::new(),
+						linked_groups: Vec::new()
+					};
+					n_groups
+				],
+			);
+			for (old_index, group) in old_groups.into_iter().enumerate() {
+				let _ = std::mem::replace(&mut groups[group_target_indices[old_index]], group);
+			}
+			#[cfg(debug_assertions)]
+			{
+				// Check that every group is linked only to groups of higher index
+				for (source_group_id, group) in groups.iter().enumerate() {
+					for link in group.linked_groups.iter() {
+						assert!(
+							link.target_group > source_group_id,
+							"Group {} links to a lower (or equal) index group {}",
+							source_group_id,
+							link.target_group
+						);
+					}
+				}
+			}
+		}
+
+		// Throw away cycle data on links that don't need it
+		for group in groups.iter_mut() {
+			for link in group.linked_groups.iter_mut() {
+				// TODO: take into account detectors
+				link.source_cycle_data = None;
+				link.target_cycle_data = None;
+			}
+		}
+
+		// Deduplicate link data whenever possible
+		for group in groups.iter_mut() {
+			if group.linked_groups.len() == 0 {
+				continue;
+			}
+			group.linked_groups.sort_by(OneWayLinkData::compare);
+			let old_links = std::mem::replace(&mut group.linked_groups, Vec::new());
+			// At least one link must exist because we checked for the vector being empty earlier
+			group.linked_groups.push(old_links[0]);
+			for link in old_links.into_iter().skip(1) {
+				match OneWayLinkData::try_merge(&link, group.linked_groups.last().unwrap()) {
+					Some(new_link) => *group.linked_groups.last_mut().unwrap() = new_link,
+					None => group.linked_groups.push(link),
+				}
+			}
+		}
+		Ok(groups)
 	}
 
 	/// Computes which pairs of groups can not be rotated in sync
@@ -1233,6 +1459,7 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
 			Self::NoButtonWithColorAtVertex(i) => write!(f, "Cannot adjust color label at vertex {i} because there is no colored button there."),
+			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle.")
 		}
 	}
 }

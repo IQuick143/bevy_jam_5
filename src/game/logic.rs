@@ -138,24 +138,62 @@ fn cycle_group_rotation_relay_system(
 		log::error!("System called without a valid CycleEntities entity.");
 		return;
 	};
+	let mut group_rotations = vec![0i64; level.groups.len()];
 	for group_rotation in group_events.read() {
-		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
-		update_event.send(GameLayoutChanged);
 		let Ok(source_cycle) = cycles_q.get(group_rotation.0.target_cycle) else {
 			continue;
 		};
+		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
+		// Queue the rotation
+		match group_rotation.0.direction * source_cycle.orientation_within_group {
+			CycleTurningDirection::Nominal => {
+				group_rotations[source_cycle.group_id] += group_rotation.0.amount as i64
+			}
+			CycleTurningDirection::Reverse => {
+				group_rotations[source_cycle.group_id] -= group_rotation.0.amount as i64
+			}
+		}
+	}
+
+	// Propagate one-way links
+	for group_id in 0..level.groups.len() {
+		if group_rotations[group_id] == 0 {
+			continue;
+		}
+		for link in level.groups[group_id].linked_groups.iter() {
+			match link.direction {
+				LinkedCycleDirection::Coincident => {
+					group_rotations[link.target_group] +=
+						group_rotations[group_id] * link.multiplicity as i64
+				}
+				LinkedCycleDirection::Inverse => {
+					group_rotations[link.target_group] -=
+						group_rotations[group_id] * link.multiplicity as i64
+				}
+			}
+		}
+	}
+
+	for group_id in 0..level.groups.len() {
+		if group_rotations[group_id] == 0 {
+			continue;
+		}
+		let direction = if group_rotations[group_id] > 0 {
+			CycleTurningDirection::Nominal
+		} else {
+			CycleTurningDirection::Reverse
+		};
+		update_event.send(GameLayoutChanged);
 		single_events.send_batch(
-			level.groups[source_cycle.group_id]
+			level.groups[group_id]
 				.cycles
 				.iter()
 				.map(|&(id, relative_direction)| {
 					// println!("Sending {}", id);
 					RotateCycle {
 						target_cycle: cycle_index.0[id],
-						direction: group_rotation.0.direction
-							* source_cycle.orientation_within_group
-							* relative_direction,
-						amount: group_rotation.0.amount,
+						direction: direction * relative_direction,
+						amount: group_rotations[group_id].abs() as usize,
 					}
 				})
 				.map(RotateSingleCycle),

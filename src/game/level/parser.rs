@@ -115,7 +115,7 @@ fn parse_statement(
 				let cycle = builder.add_cycle(turnability, vertices)?;
 				cycle_names.insert(name.to_owned(), cycle);
 			}
-			"LINK" => {
+			"LINK" | "ONEWAY" => {
 				if statement.modifier.len() > 1 {
 					return Err(LevelParsingErrorCode::ExtraneousModifier(
 						1,
@@ -139,7 +139,17 @@ fn parse_statement(
 					})
 					.collect::<Result<Vec<_>, _>>()?;
 				for (source, dest) in cycles.into_iter().tuple_windows() {
-					builder.link_cycles(source, dest, direction)?;
+					match statement.verb {
+						"LINK" => {
+							builder.link_cycles(source, dest, direction)?;
+						}
+						"ONEWAY" => {
+							builder.one_way_link_cycles(source, dest, direction)?;
+						}
+						_ => {
+							unreachable!("LINK and ONEWAY are the only paths to this branch.")
+						}
+					}
 				}
 			}
 			"OBJECT" => {
@@ -1151,6 +1161,228 @@ OBJECT[BUTTON] t
 				panic!("Vertex does not contain a colored button.");
 			};
 			assert_eq!(appearence, expected_appearence);
+		}
+	}
+
+	#[test]
+	fn one_way_parse_test() {
+		let level_header = r"
+VERTEX v1 v2 v3 v4 v5 v6 vx vy
+CYCLE y vy
+CYCLE 1 v1
+CYCLE 2 v2
+CYCLE 3 v3
+CYCLE 4 v4
+CYCLE 5 v5
+CYCLE 6 v6
+CYCLE x vx
+
+LINK 6 x
+LINK[CROSSED] 1 y
+
+PLACE 1 0 0 100
+PLACE 2 0 0 100
+PLACE 3 0 0 100
+PLACE 4 0 0 100
+PLACE 5 0 0 100
+PLACE 6 0 0 100
+PLACE x 0 0 100
+PLACE y 0 0 100
+";
+		let linkages = r"
+# CHAIN
+ONEWAY 1 2
+ONEWAY 2 3
+ONEWAY 3 4
+ONEWAY 4 5
+ONEWAY 5 6
+
+# CHAIN, inversely written
+ONEWAY 5 6
+ONEWAY 4 5
+ONEWAY 3 4
+ONEWAY 2 3
+ONEWAY 1 2
+
+# CHAIN, weird order
+ONEWAY 3 4
+ONEWAY 2 3
+ONEWAY 4 5
+ONEWAY 1 2
+ONEWAY 5 6
+
+# CHAIN, reverse
+ONEWAY 2 1
+ONEWAY 3 2
+ONEWAY 4 3
+ONEWAY 5 4
+ONEWAY 6 5
+
+# TREE
+ONEWAY 1 2
+ONEWAY 1 3
+ONEWAY 2 4
+ONEWAY 2 5
+ONEWAY 3 6
+
+# TREE, different order
+ONEWAY 2 4
+ONEWAY 2 5
+ONEWAY 1 2
+ONEWAY 1 3
+ONEWAY 3 6
+
+# DIAMOND
+ONEWAY 1 2
+ONEWAY 1 3
+ONEWAY 2 4
+ONEWAY 3 4
+
+# DIAMOND, different order
+ONEWAY 2 4
+ONEWAY 3 4
+ONEWAY 1 2
+ONEWAY 1 3
+
+# COMPLETE GRAPH
+ONEWAY 1 2
+ONEWAY 1 3
+ONEWAY 1 4
+ONEWAY 1 5
+ONEWAY 1 6
+ONEWAY 2 3
+ONEWAY 2 4
+ONEWAY 2 5
+ONEWAY 2 6
+ONEWAY 3 4
+ONEWAY 3 5
+ONEWAY 3 6
+ONEWAY 4 5
+ONEWAY 4 6
+ONEWAY 5 6
+
+# COMPLETE GRAPH, different order
+ONEWAY 1 2
+ONEWAY 2 4
+ONEWAY 2 5
+ONEWAY 1 6
+ONEWAY 2 6
+ONEWAY 4 6
+ONEWAY 1 3
+ONEWAY 3 5
+ONEWAY 3 4
+ONEWAY 5 6
+ONEWAY 2 3
+ONEWAY 3 6
+ONEWAY 4 5
+ONEWAY 1 4
+ONEWAY 1 5
+
+# COMPLETE GRAPH, DOUBLED LINKS
+ONEWAY 1 2
+ONEWAY 1 3
+ONEWAY 1 4
+ONEWAY 1 5
+ONEWAY 1 6
+ONEWAY 2 3
+ONEWAY 2 4
+ONEWAY 2 5
+ONEWAY 2 6
+ONEWAY 3 4
+ONEWAY 3 5
+ONEWAY 3 6
+ONEWAY 4 5
+ONEWAY 4 6
+ONEWAY 5 6
+ONEWAY 1 2
+ONEWAY 2 4
+ONEWAY 2 5
+ONEWAY 1 6
+ONEWAY 2 6
+ONEWAY 4 6
+ONEWAY 1 3
+ONEWAY 3 5
+ONEWAY 3 4
+ONEWAY 5 6
+ONEWAY 2 3
+ONEWAY 3 6
+ONEWAY 4 5
+ONEWAY 1 4
+ONEWAY 1 5
+"
+		.split("\n\n");
+
+		for data in linkages {
+			let level = format!("{}\n{}", level_header, data);
+			let output = parse(&level);
+			assert!(output.is_ok(), "{:?}", output);
+		}
+	}
+
+	#[test]
+	fn one_way_validation_test() {
+		let level_header = r"
+VERTEX v1 v2 v3 v4 v5 v6 vx vy
+CYCLE y vy
+CYCLE 1 v1
+CYCLE 2 v2
+CYCLE 3 v3
+CYCLE 4 v4
+CYCLE 5 v5
+CYCLE 6 v6
+CYCLE x vx
+
+LINK 6 x
+LINK[CROSSED] 1 y
+
+PLACE 1 0 0 100
+PLACE 2 0 0 100
+PLACE 3 0 0 100
+PLACE 4 0 0 100
+PLACE 5 0 0 100
+PLACE 6 0 0 100
+PLACE x 0 0 100
+PLACE y 0 0 100
+";
+		let linkages = r"
+# CHAIN with LOOP
+ONEWAY 1 2
+ONEWAY 2 3
+ONEWAY 3 4
+ONEWAY 4 5
+ONEWAY 5 6
+ONEWAY 6 1
+
+# CHAIN with LINK LOOP
+ONEWAY 1 2
+ONEWAY 2 3
+ONEWAY 3 4
+ONEWAY 4 5
+ONEWAY 5 6
+LINK[CROSSED] 2 5
+
+# OVERLAPPING LINK AND ONEWAY
+ONEWAY 1 2
+LINK 1 2
+
+# OVERLAPPING ONEWAYS
+ONEWAY 1 2
+ONEWAY 2 1
+
+# TRIANGLE
+ONEWAY 1 2
+ONEWAY 3 1
+ONEWAY 2 3
+"
+		.split("\n\n");
+
+		for data in linkages {
+			let level = format!("{}\n{}", level_header, data);
+			let output = parse(&level);
+			assert_err_eq!(
+				output,
+				LevelParsingErrorCode::BuilderError(LevelBuilderError::OneWayLinkLoop)
+			);
 		}
 	}
 }
