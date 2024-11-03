@@ -42,7 +42,6 @@ fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTr
 		if let Some(bounding_box) = hover.hover_bounding_box {
 			gizmos.rect_2d(
 				transform.translation().xy() + bounding_box.center(),
-				Rot2::IDENTITY,
 				bounding_box.half_size() * 2.0,
 				palettes::basic::LIME,
 			);
@@ -58,10 +57,9 @@ fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTr
 }
 
 fn draw_layout(mut gizmos: Gizmos) {
-	gizmos.rect(Vec3::ZERO, Quat::IDENTITY, GAME_AREA, palettes::basic::RED);
+	gizmos.rect(Vec3::ZERO, GAME_AREA, palettes::basic::RED);
 	gizmos.rect(
 		LEVEL_AREA_CENTER.extend(0.0),
-		Quat::IDENTITY,
 		LEVEL_AREA_WIDTH,
 		palettes::basic::NAVY,
 	);
@@ -119,19 +117,13 @@ pub fn _gizmo_draw(
 ) {
 	// Draw vertices
 	for transform in vertices.iter() {
-		gizmos.sphere(
-			transform.translation,
-			Quat::IDENTITY,
-			1.0,
-			palettes::tailwind::BLUE_300,
-		);
+		gizmos.sphere(transform.translation, 1.0, palettes::tailwind::BLUE_300);
 	}
 
 	// Draw boxes
 	for transform in boxes.iter() {
 		gizmos.rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(10.0),
 			palettes::css::MAROON,
 		);
@@ -141,7 +133,6 @@ pub fn _gizmo_draw(
 	for transform in players.iter() {
 		gizmos.rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(10.0),
 			palettes::css::TEAL,
 		);
@@ -151,7 +142,6 @@ pub fn _gizmo_draw(
 	for transform in buttons.iter() {
 		gizmos.rounded_rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(20.0),
 			palettes::css::MAROON,
 		);
@@ -161,7 +151,6 @@ pub fn _gizmo_draw(
 	for transform in flags.iter() {
 		gizmos.rounded_rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(20.0),
 			palettes::css::TEAL,
 		);
@@ -172,7 +161,6 @@ pub fn _gizmo_draw(
 		// Draw cycle centers
 		gizmos.sphere(
 			circle_transform.translation,
-			Quat::IDENTITY,
 			10.0,
 			match (turnability, current_turnability.0) {
 				(CycleTurnability::Always, true) => palettes::tailwind::GREEN_600,
