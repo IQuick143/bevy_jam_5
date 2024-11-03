@@ -84,7 +84,7 @@ pub fn _debug_inputs(
 	let (camera, camera_transform) = camera_q.single();
 	if let Some(cursor_pos) = window
 		.cursor_position()
-		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p))
+		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok())
 	{
 		if let (Some(target_id), _) = cycles_q
 			.iter()
