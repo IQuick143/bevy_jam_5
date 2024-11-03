@@ -23,7 +23,7 @@ enum CreditsAction {
 }
 
 fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
-	let mut table_style = Style {
+	let mut table_node = Node {
 		display: Display::Grid,
 		width: Val::Percent(100.0),
 		max_width: Val::Px(800.0),
@@ -37,10 +37,7 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 		.insert(StateScoped(Screen::Credits))
 		.with_children(|children| {
 			children.header("Made by", font.0.clone_weak());
-			children.spawn(NodeBundle {
-				style: table_style.clone(),
-				..default()
-			})
+			children.spawn(table_node.clone())
 				.with_children(|children| {
 					children.text("IQuick 143", JustifyContent::End, font.0.clone_weak());
 					children.text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone_weak());
@@ -53,11 +50,8 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 				});
 
 			children.header("Assets", font.0.clone_weak());
-			table_style.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
-			children.spawn(NodeBundle {
-				style: table_style,
-				..default()
-			})
+			table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
+			children.spawn(table_node)
 				.with_children(|children| {
 					children.text("Bevy logo", JustifyContent::End, font.0.clone_weak());
 					children.text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone_weak());

@@ -34,17 +34,15 @@ impl<T: Spawn> Widgets for T {
 	fn button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
 		let mut entity = self.spawn((
 			Name::new("Button"),
-			ButtonBundle {
-				style: Style {
-					width: Px(200.0),
-					height: Px(65.0),
-					justify_content: JustifyContent::Center,
-					align_items: AlignItems::Center,
-					..default()
-				},
-				background_color: BackgroundColor(NODE_BACKGROUND),
+			Button,
+			Node {
+				width: Px(200.0),
+				height: Px(65.0),
+				justify_content: JustifyContent::Center,
+				align_items: AlignItems::Center,
 				..default()
 			},
+			BackgroundColor(NODE_BACKGROUND),
 			InteractionPalette {
 				none: NODE_BACKGROUND,
 				hovered: BUTTON_HOVERED_BACKGROUND,
@@ -70,17 +68,15 @@ impl<T: Spawn> Widgets for T {
 	fn small_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
 		let mut entity = self.spawn((
 			Name::new("Button"),
-			ButtonBundle {
-				style: Style {
-					width: Px(200.0),
-					height: Px(45.0),
-					justify_content: JustifyContent::Center,
-					align_items: AlignItems::Center,
-					..default()
-				},
-				background_color: BackgroundColor(NODE_BACKGROUND),
+			Button,
+			Node {
+				width: Px(200.0),
+				height: Px(45.0),
+				justify_content: JustifyContent::Center,
+				align_items: AlignItems::Center,
 				..default()
 			},
+			BackgroundColor(NODE_BACKGROUND),
 			InteractionPalette {
 				none: NODE_BACKGROUND,
 				hovered: BUTTON_HOVERED_BACKGROUND,
@@ -106,15 +102,13 @@ impl<T: Spawn> Widgets for T {
 	fn tool_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
 		let mut entity = self.spawn((
 			Name::new("Button"),
-			ButtonBundle {
-				style: Style {
-					padding: UiRect::all(Px(10.0)),
-					align_items: AlignItems::Center,
-					..default()
-				},
-				background_color: BackgroundColor(NODE_BACKGROUND),
+			Button,
+			Node {
+				padding: UiRect::all(Px(10.0)),
+				align_items: AlignItems::Center,
 				..default()
 			},
+			BackgroundColor(NODE_BACKGROUND),
 			InteractionPalette {
 				none: NODE_BACKGROUND,
 				hovered: BUTTON_HOVERED_BACKGROUND,
@@ -140,17 +134,14 @@ impl<T: Spawn> Widgets for T {
 	fn header(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
 		let mut entity = self.spawn((
 			Name::new("Header"),
-			NodeBundle {
-				style: Style {
-					width: Px(500.0),
-					height: Px(65.0),
-					justify_content: JustifyContent::Center,
-					align_items: AlignItems::Center,
-					..default()
-				},
-				background_color: BackgroundColor(NODE_BACKGROUND),
+			Node {
+				width: Px(500.0),
+				height: Px(65.0),
+				justify_content: JustifyContent::Center,
+				align_items: AlignItems::Center,
 				..default()
 			},
+			BackgroundColor(NODE_BACKGROUND),
 		));
 		entity.with_children(|children| {
 			children.spawn((
@@ -171,13 +162,10 @@ impl<T: Spawn> Widgets for T {
 	fn label(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
 		let mut entity = self.spawn((
 			Name::new("Label"),
-			NodeBundle {
-				style: Style {
-					width: Px(500.0),
-					justify_content: JustifyContent::Center,
-					align_items: AlignItems::Center,
-					..default()
-				},
+			Node {
+				width: Px(500.0),
+				justify_content: JustifyContent::Center,
+				align_items: AlignItems::Center,
 				..default()
 			},
 		));
@@ -205,12 +193,9 @@ impl<T: Spawn> Widgets for T {
 	) -> EntityCommands {
 		let mut entity = self.spawn((
 			Name::new("Text"),
-			NodeBundle {
-				style: Style {
-					justify_content: align,
-					align_items: AlignItems::Center,
-					..default()
-				},
+			Node {
+				justify_content: align,
+				align_items: AlignItems::Center,
 				..default()
 			},
 		));
@@ -246,17 +231,14 @@ impl Containers for Commands<'_, '_> {
 	fn ui_root_justified(&mut self, justify_content: JustifyContent) -> EntityCommands {
 		self.spawn((
 			Name::new("UI Root"),
-			NodeBundle {
-				style: Style {
-					width: Percent(100.0),
-					height: Percent(100.0),
-					justify_content,
-					align_items: AlignItems::Center,
-					flex_direction: FlexDirection::Column,
-					row_gap: Px(10.0),
-					position_type: PositionType::Absolute,
-					..default()
-				},
+			Node {
+				width: Percent(100.0),
+				height: Percent(100.0),
+				justify_content,
+				align_items: AlignItems::Center,
+				flex_direction: FlexDirection::Column,
+				row_gap: Px(10.0),
+				position_type: PositionType::Absolute,
 				..default()
 			},
 		))

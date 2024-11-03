@@ -52,16 +52,13 @@ fn spawn_screen(
 					font.0.clone_weak(),
 				);
 				parent
-					.spawn(NodeBundle {
-						style: Style {
-							display: Display::Grid,
-							column_gap: Val::Px(10.0),
-							row_gap: Val::Px(10.0),
-							justify_content: JustifyContent::Center,
-							align_content: AlignContent::Center,
-							grid_template_columns: vec![RepeatedGridTrack::auto(3)],
-							..default()
-						},
+					.spawn(Node {
+						display: Display::Grid,
+						column_gap: Val::Px(10.0),
+						row_gap: Val::Px(10.0),
+						justify_content: JustifyContent::Center,
+						align_content: AlignContent::Center,
+						grid_template_columns: vec![RepeatedGridTrack::auto(3)],
 						..default()
 					})
 					.with_children(|parent| {

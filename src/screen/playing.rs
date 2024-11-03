@@ -83,16 +83,13 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		.insert(StateScoped(Screen::Playing))
 		.with_children(|parent| {
 			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.0),
-						flex_direction: FlexDirection::Row,
-						column_gap: Val::Px(10.0),
-						padding: UiRect::all(Val::Px(10.0)),
-						align_items: AlignItems::Start,
-						justify_content: JustifyContent::Start,
-						..default()
-					},
+				.spawn(Node {
+					width: Val::Percent(100.0),
+					flex_direction: FlexDirection::Row,
+					column_gap: Val::Px(10.0),
+					padding: UiRect::all(Val::Px(10.0)),
+					align_items: AlignItems::Start,
+					justify_content: JustifyContent::Start,
 					..default()
 				})
 				.with_children(|parent| {
@@ -107,17 +104,14 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						.insert((GameUiAction::Undo, UndoButton));
 				});
 			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.0),
-						flex_direction: FlexDirection::Row,
-						column_gap: Val::Px(10.0),
-						padding: UiRect::all(Val::Px(10.0)),
-						align_items: AlignItems::Start,
-						justify_content: JustifyContent::End,
-						position_type: PositionType::Absolute,
-						..default()
-					},
+				.spawn(Node {
+					width: Val::Percent(100.0),
+					flex_direction: FlexDirection::Row,
+					column_gap: Val::Px(10.0),
+					padding: UiRect::all(Val::Px(10.0)),
+					align_items: AlignItems::Start,
+					justify_content: JustifyContent::End,
+					position_type: PositionType::Absolute,
 					..default()
 				})
 				.with_children(|parent| {
@@ -134,16 +128,13 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						));
 				});
 			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.0),
-						height: Val::Px(50.0),
-						margin: UiRect::all(Val::Px(10.0)),
-						position_type: PositionType::Absolute,
-						justify_content: JustifyContent::Center,
-						align_items: AlignItems::Center,
-						..default()
-					},
+				.spawn(Node {
+					width: Val::Percent(100.0),
+					height: Val::Px(50.0),
+					margin: UiRect::all(Val::Px(10.0)),
+					position_type: PositionType::Absolute,
+					justify_content: JustifyContent::Center,
+					align_items: AlignItems::Center,
 					..default()
 				})
 				.with_children(|parent| {
@@ -214,7 +205,7 @@ fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
 	playing_level: Res<State<PlayingLevel>>,
 	level_list: Res<LoadedLevelList>,
-	mut query: Query<&mut Style, With<NextLevelButton>>,
+	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
 	let level_index = playing_level
 		.get()
@@ -226,22 +217,22 @@ fn update_next_level_button_display(
 	} else {
 		Display::None
 	};
-	for mut style in &mut query {
-		style.display = display;
+	for mut node in &mut query {
+		node.display = display;
 	}
 }
 
 fn update_undo_button_display(
 	history: Res<MoveHistory>,
-	mut query: Query<&mut Style, With<UndoButton>>,
+	mut query: Query<&mut Node, With<UndoButton>>,
 ) {
 	let display = if history.is_empty() {
 		Display::None
 	} else {
 		Display::DEFAULT
 	};
-	for mut style in &mut query {
-		style.display = display;
+	for mut node in &mut query {
+		node.display = display;
 	}
 }
 

@@ -53,7 +53,7 @@ fn spawn_splash(mut commands: Commands, asset_server: Res<AssetServer>) {
 			children.spawn((
 				Name::new("Splash image"),
 				ImageBundle {
-					style: Style {
+					node: Node {
 						margin: UiRect::all(Val::Auto),
 						width: Val::Percent(70.0),
 						..default()

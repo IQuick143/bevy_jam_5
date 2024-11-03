@@ -73,13 +73,15 @@ impl Default for FadeAnimation {
 }
 
 /// [`FadeAnimation`] bundled with other components that commonly accompany it:
-/// - [`NodeBundle`] that will be the transition overlay node.
+/// - [`Node`] that will be the transition overlay node.
 /// - [`FreezeUi`] to disable the UI while the animation is playing.
 #[derive(Bundle, Clone, Debug)]
 pub struct FadeAnimationBundle {
 	pub animation: FadeAnimation,
-	pub node: NodeBundle,
+	pub node: Node,
 	pub freeze: FreezeUi,
+	pub background_color: BackgroundColor,
+	pub z_index: ZIndex,
 }
 
 impl FadeAnimationBundle {
@@ -95,16 +97,13 @@ impl Default for FadeAnimationBundle {
 	fn default() -> Self {
 		Self {
 			animation: default(),
-			node: NodeBundle {
-				style: Style {
-					width: Val::Percent(100.0),
-					height: Val::Percent(100.0),
-					..default()
-				},
-				background_color: BackgroundColor(OVERLAY_COLOR.with_alpha(0.0)),
-				z_index: ZIndex::Global(65000),
+			node: Node {
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0),
 				..default()
 			},
+			background_color: BackgroundColor(OVERLAY_COLOR.with_alpha(0.0)),
+			z_index: ZIndex::Global(65000),
 			freeze: FreezeUi,
 		}
 	}

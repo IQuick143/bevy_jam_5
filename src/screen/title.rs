@@ -70,11 +70,8 @@ fn enter_title(
 		.insert(StateScoped(Screen::Title))
 		.with_children(|children| {
 			// Invisible spacer node to bring the menu lower
-			children.spawn(NodeBundle {
-				style: Style {
-					height: Val::Px(200.0),
-					..default()
-				},
+			children.spawn(Node {
+				height: Val::Px(200.0),
 				..default()
 			});
 			children
