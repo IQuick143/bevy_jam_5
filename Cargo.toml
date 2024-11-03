@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.14", features = [] }
+bevy = { version = "0.15.0-rc", features = [] }
 itertools = "0.13.0"
 # Disable low-severity logs at compile time for performance.
 log = { version = "0.4", features = [
