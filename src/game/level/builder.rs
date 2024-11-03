@@ -821,7 +821,6 @@ impl LevelBuilder {
 				let mut stack = Vec::new();
 
 				for i in 0..groups.len() {
-					println!("starting {i}");
 					// Node is already in the ordering, skip it
 					if sorted_mark[i] {
 						continue;
@@ -829,7 +828,6 @@ impl LevelBuilder {
 					stack.push(i);
 					while stack.len() > 0 {
 						let node = *stack.last().unwrap();
-						println!("node {node}");
 						// Node is already in the ordering, skip it
 						// This removes duplicates from the stack
 						if sorted_mark[node] {
@@ -859,7 +857,6 @@ impl LevelBuilder {
 							sorted_mark[node] = true;
 							currently_visited_mark[node] = false;
 							sorted_order[node] = next_order_index;
-							println!("Assigned {next_order_index} to {node}");
 							next_order_index += 1;
 						}
 					}
