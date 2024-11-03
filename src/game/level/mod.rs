@@ -21,6 +21,7 @@ pub struct LevelData {
 	/// Data for all groups of cycles in the level, sorted in topological order (lower indices need to be evaluated before higher ones)
 	pub groups: Vec<GroupData>,
 	/// List of group pairs, which cannot be turned at once
+	/// Sorted in increasing lexicographic order
 	pub forbidden_group_pairs: Vec<(usize, usize)>,
 	/// Data for all cycle links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
@@ -81,9 +82,11 @@ pub struct DeclaredLinkData {
 
 #[derive(Debug, Clone, Copy, Reflect, PartialEq, Eq)]
 pub struct OneWayLinkData {
-	/// TODO: Docs
+	/// The group this link goes to
 	pub target_group: usize,
+	/// Relative turning direction between the linked groups
 	pub direction: LinkedCycleDirection,
+	/// How many copies of this link are present
 	pub multiplicity: u64,
 	/// An Option of (source_cycle, target_cycle) indices, present only if relevant (TODO: Detectors!!)
 	pub source_cycle_data: Option<usize>,

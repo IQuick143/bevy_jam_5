@@ -174,6 +174,34 @@ fn cycle_group_rotation_relay_system(
 		}
 	}
 
+	// Decide if the turns is valid
+	let forbidden = {
+		let mut forbidden = false;
+		let mut pair_index = 0;
+		'outer: for group_a_id in 0..level.groups.len() {
+			if group_rotations[group_a_id] != 0 {
+				while pair_index < level.forbidden_group_pairs.len() {
+					let (a, b) = level.forbidden_group_pairs[pair_index];
+					if a > group_a_id {
+						break;
+					}
+					if a == group_a_id && group_rotations[b] != 0 {
+						forbidden = true;
+						break 'outer;
+					}
+					pair_index += 1;
+				}
+			}
+		}
+		forbidden
+	};
+
+	if forbidden {
+		// TODO: Emit an event informing other systems the rotation hadn't went through.
+		return;
+	}
+
+	// Apply rotations
 	for group_id in 0..level.groups.len() {
 		if group_rotations[group_id] == 0 {
 			continue;

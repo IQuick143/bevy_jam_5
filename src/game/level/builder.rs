@@ -1001,7 +1001,10 @@ impl LevelBuilder {
 				}
 			}
 		}
-		forbid.sort();
+		forbid.sort_by(|a, b| match a.0.cmp(&b.0) {
+			std::cmp::Ordering::Equal => a.1.cmp(&b.1),
+			ord => ord,
+		});
 		Ok(forbid)
 	}
 
