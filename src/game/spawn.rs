@@ -28,7 +28,7 @@ pub(super) fn plugin(app: &mut App) {
 				handle_enter_level.after(AppSet::ExecuteInput),
 				(
 					(|w: &mut World| w.run_schedule(LevelInitialization))
-						.run_if(on_event::<SpawnLevel>()),
+						.run_if(on_event::<SpawnLevel>),
 					despawn_expired_level_entities
 						.run_if(resource_changed::<ExpiringLevelSessionId>),
 				)

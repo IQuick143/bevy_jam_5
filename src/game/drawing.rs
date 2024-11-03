@@ -23,7 +23,7 @@ pub(super) fn plugin(app: &mut App) {
 					cycle_center_turnability_visuals_update_system
 						.before(cycle_center_interaction_visuals_update_system),
 				)
-					.run_if(on_event::<GameLayoutChanged>()),
+					.run_if(on_event::<GameLayoutChanged>),
 				cycle_center_interaction_visuals_update_system
 					.run_if(cycle_interaction_visuals_changed),
 			)

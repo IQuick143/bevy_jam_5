@@ -40,7 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
 				(load_level, update_level_name_display)
 					.chain()
-					.run_if(on_event::<LoadLevel>()),
+					.run_if(on_event::<LoadLevel>),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)

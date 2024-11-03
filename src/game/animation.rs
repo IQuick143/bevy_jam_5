@@ -18,7 +18,7 @@ pub fn plugin(app: &mut App) {
 		(
 			(
 				(listen_for_moves, move_objects).chain(),
-				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>()),
+				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>),
 			)
 				.in_set(AppSet::UpdateVisuals),
 			spin_animation_system,

@@ -19,13 +19,13 @@ pub fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>()),
-				cycle_rotation_system.run_if(on_event::<RotateSingleCycle>()),
+				cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>),
+				cycle_rotation_system.run_if(on_event::<RotateSingleCycle>),
 				(
 					(button_trigger_check_system, level_completion_check_system).chain(),
 					cycle_turnability_update_system,
 				)
-					.run_if(on_event::<GameLayoutChanged>()),
+					.run_if(on_event::<GameLayoutChanged>),
 			)
 				.chain()
 				.in_set(AppSet::GameLogic),
