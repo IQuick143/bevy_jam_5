@@ -6,7 +6,7 @@ use bevy::{
 use crate::assets::{HandleMap, SfxKey};
 
 pub(super) fn plugin(app: &mut App) {
-	app.observe(play_sfx);
+	app.add_observer(play_sfx);
 }
 
 fn play_sfx(

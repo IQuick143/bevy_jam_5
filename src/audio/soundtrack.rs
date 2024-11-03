@@ -7,7 +7,7 @@ use crate::assets::{HandleMap, SoundtrackKey};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<IsSoundtrack>();
-	app.observe(play_soundtrack);
+	app.add_observer(play_soundtrack);
 }
 
 fn play_soundtrack(
