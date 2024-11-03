@@ -184,7 +184,7 @@ pub fn _gizmo_draw(
 			.map(|entity| vertices.get(*entity).unwrap().translation)
 			.collect();
 		positions.push(positions[0]);
-		let spline = CubicCardinalSpline::new(0.5, positions).to_curve();
+		let spline = CubicCardinalSpline::new(0.5, positions).to_curve().unwrap();
 		let samples = spline.iter_positions(32);
 		gizmos.linestrip(samples, palettes::tailwind::AMBER_900);
 
