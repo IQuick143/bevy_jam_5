@@ -138,20 +138,17 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 					..default()
 				})
 				.with_children(|parent| {
-					parent.spawn((
-						LevelNameBox,
-						TextBundle {
-							text: Text::from_section(
-								"", /* Will be set by load_level */
-								TextStyle {
-									font: font.0.clone_weak(),
-									font_size: 35.0,
-									color: ui_palette::LABEL_TEXT,
-								},
-							),
-							..default()
-						},
-					));
+					parent
+						.spawn((
+							LevelNameBox,
+							TextFont {
+								font: font.0.clone_weak(),
+								font_size: 35.0,
+								..default()
+							},
+							TextColor(ui_palette::LABEL_TEXT),
+						))
+						.with_child(TextSpan::default());
 				});
 		});
 }
@@ -238,15 +235,16 @@ fn update_undo_button_display(
 
 fn update_level_name_display(
 	mut events: EventReader<EnterLevel>,
-	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
+	level_name_q: Query<Entity, With<LevelNameBox>>,
+	mut text_writer: TextUiWriter,
 	level_assets: Res<Assets<LevelData>>,
 ) {
 	if let Some(level_handle) = events.read().last().and_then(|e| e.0.as_ref()) {
 		let level_data = level_assets
 			.get(level_handle)
 			.expect("Got an invalid level handle");
-		level_name_q.single_mut().sections[0]
-			.value
+		text_writer
+			.text(level_name_q.single(), 0)
 			.clone_from(&level_data.name);
 	}
 }
