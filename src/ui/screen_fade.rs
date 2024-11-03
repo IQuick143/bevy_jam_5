@@ -134,7 +134,7 @@ fn update_fade_animations(
 	time: Res<Time<Real>>,
 ) {
 	for (mut animation, mut overlay) in &mut query {
-		animation.add_elapsed_time(time.delta_seconds());
+		animation.add_elapsed_time(time.delta_secs());
 		let alpha = fade_opacity_function(animation.progress());
 		overlay.0.set_alpha(alpha);
 	}

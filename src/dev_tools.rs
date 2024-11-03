@@ -304,10 +304,10 @@ pub fn _simulate_vertices(
 
 	for (entity, gradient) in gradients.iter() {
 		if let Ok(mut transform) = vertices.get_mut(*entity) {
-			transform.translation += (*gradient * time.delta_seconds() * 5.0).extend(0.0);
+			transform.translation += (*gradient * time.delta_secs() * 5.0).extend(0.0);
 		}
 		if let Ok((_, _, mut transform)) = circles.get_mut(*entity) {
-			transform.translation += (*gradient * time.delta_seconds()).extend(0.0);
+			transform.translation += (*gradient * time.delta_secs()).extend(0.0);
 		}
 	}
 }

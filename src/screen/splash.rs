@@ -103,7 +103,7 @@ impl UiImageFadeInOut {
 
 fn tick_fade_in_out(time: Res<Time>, mut animation_query: Query<&mut UiImageFadeInOut>) {
 	for mut anim in &mut animation_query {
-		anim.t += time.delta_seconds();
+		anim.t += time.delta_secs();
 	}
 }
 
