@@ -4,11 +4,7 @@ use crate::{
 	assets::{HandleMap, ImageKey},
 	graphics::*,
 };
-use bevy::{
-	color::palettes,
-	prelude::*,
-	sprite::{MaterialMesh2dBundle, Mesh2dHandle},
-};
+use bevy::{color::palettes, prelude::*};
 
 use super::palette;
 
@@ -29,11 +25,10 @@ fn spawn_background(
 			.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
 		texture: images[&ImageKey::Background].clone_weak(),
 	};
-	commands.spawn(MaterialMesh2dBundle {
-		mesh: Mesh2dHandle(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),
-		material: materials.add(material),
-		transform: Transform::from_translation(Vec3::Z * layers::BACKGROUND)
+	commands.spawn((
+		Mesh2d(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),
+		MeshMaterial2d(materials.add(material)),
+		Transform::from_translation(Vec3::Z * layers::BACKGROUND)
 			.with_rotation(Quat::from_rotation_z(BACKGROUND_ROTATION)),
-		..default()
-	});
+	));
 }
