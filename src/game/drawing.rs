@@ -278,7 +278,7 @@ fn cycle_center_interaction_visuals_update_system(
 	level: Query<&LevelHandle>,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
-	mut meshes_q: Query<(&mut Transform, &mut Handle<ColorMaterial>)>,
+	mut meshes_q: Query<(&mut Transform, &mut MeshMaterial2d<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
@@ -377,15 +377,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RINGS;
-				*material = materials.cycle_rings_disabled.clone_weak();
+				material.0 = materials.cycle_rings_disabled.clone_weak();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RINGS;
-				*material = materials.cycle_rings_ready.clone_weak();
+				material.0 = materials.cycle_rings_ready.clone_weak();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RINGS;
-				*material = materials.cycle_rings_select.clone_weak();
+				material.0 = materials.cycle_rings_select.clone_weak();
 			}
 		}
 	}
@@ -400,15 +400,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RING_OUTLINES;
-				*material = materials.cycle_ring_outlines_disabled.clone_weak();
+				material.0 = materials.cycle_ring_outlines_disabled.clone_weak();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RING_OUTLINES;
-				*material = materials.cycle_ring_outlines.clone_weak();
+				material.0 = materials.cycle_ring_outlines.clone_weak();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RING_OUTLINES;
-				*material = materials.cycle_ring_outlines.clone_weak();
+				material.0 = materials.cycle_ring_outlines.clone_weak();
 			}
 		}
 	}
