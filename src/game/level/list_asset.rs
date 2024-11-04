@@ -65,11 +65,11 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 	type Error = LevelListLoadError;
 	type Settings = ();
 
-	fn load<'a>(
-		&'a self,
-		reader: &'a mut bevy::asset::io::Reader,
-		_settings: &'a Self::Settings,
-		_load_context: &'a mut bevy::asset::LoadContext,
+	fn load(
+		&self,
+		reader: &mut dyn bevy::asset::io::Reader,
+		_settings: &Self::Settings,
+		_load_context: &mut bevy::asset::LoadContext,
 	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
 		async {
 			let mut s = String::new();
