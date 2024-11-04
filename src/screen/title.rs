@@ -12,7 +12,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
 	app.add_systems(
 		Update,
-		handle_title_action.run_if(in_state(Screen::Title).and_then(ui_not_frozen)),
+		handle_title_action.run_if(in_state(Screen::Title).and(ui_not_frozen)),
 	);
 	// Create the material later, when all of its dependencies have been initialized
 	app.add_systems(Startup, |mut commands: Commands| {

@@ -12,7 +12,7 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			handle_level_select_screen_action
-				.run_if(in_state(Screen::LevelSelect).and_then(ui_not_frozen)),
+				.run_if(in_state(Screen::LevelSelect).and(ui_not_frozen)),
 		);
 }
 

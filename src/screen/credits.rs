@@ -11,7 +11,7 @@ pub(super) fn plugin(app: &mut App) {
 
 	app.add_systems(
 		Update,
-		handle_credits_action.run_if(in_state(Screen::Credits).and_then(ui_not_frozen)),
+		handle_credits_action.run_if(in_state(Screen::Credits).and(ui_not_frozen)),
 	);
 	app.register_type::<CreditsAction>();
 }

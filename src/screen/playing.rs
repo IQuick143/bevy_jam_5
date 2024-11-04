@@ -27,11 +27,11 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
 					send_event(GameUiAction::NextLevel).run_if(
-						char_input_pressed('n').and_then(resource_equals(IsLevelCompleted(true))),
+						char_input_pressed('n').and(resource_equals(IsLevelCompleted(true))),
 					),
 					send_event(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
-							.and_then(|history: Res<MoveHistory>| !history.is_empty()),
+							.and(|history: Res<MoveHistory>| !history.is_empty()),
 					),
 					game_ui_input_recording_system,
 				)

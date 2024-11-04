@@ -143,7 +143,6 @@ fn update_hover_text(
 	mut text_writer: TextUiWriter,
 	hint_text: Res<HintText>,
 	state: Res<State<Screen>>,
-	font: Res<GlobalFont>,
 ) {
 	let should_be_visible = *state.get() == Screen::Playing;
 
