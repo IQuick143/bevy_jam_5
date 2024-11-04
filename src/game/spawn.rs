@@ -366,7 +366,7 @@ fn create_vertex_visuals(
 		commands
 			.entity(id)
 			.insert(VertexVisualEntities { node, outline })
-			.push_children(&[node, outline]);
+			.add_children(&[node, outline]);
 	}
 }
 
@@ -438,7 +438,7 @@ fn create_cycle_visuals(
 				center,
 				arrow,
 			})
-			.push_children(&[ring, outline, center, arrow]);
+			.add_children(&[ring, outline, center, arrow]);
 	}
 }
 
