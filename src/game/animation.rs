@@ -66,7 +66,7 @@ impl AnimatedObject {
 		Some(if let Some(source) = self.start_direction {
 			let t = animation_easing_function(self.progress).clamp(0.0, 1.0);
 			let dir = {
-				let mut angle = Vec2::angle_between(*source, *target);
+				let mut angle = Vec2::angle_to(*source, *target);
 				match self.rotation_direction {
 					RotationDirection::Clockwise => {
 						if angle > 0.0 {
