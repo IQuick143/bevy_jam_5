@@ -19,6 +19,8 @@ use crate::{
 	screen::Screen,
 };
 
+use super::widgets::Containers;
+
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct HoverText;
 
@@ -45,31 +47,30 @@ pub fn plugin(app: &mut App) {
 fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
 	let margin = 10.0;
 	//	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
-	commands
-		.spawn((
-			bevy::text::TextBounds {
-				width: Some(HINT_TEXT_SIZE.x - margin * 2.0),
-				height: Some(HINT_TEXT_SIZE.y - margin * 2.0),
-			},
-			Transform::from_xyz(
-				0.0,
-				-GAME_AREA.y / 2.0 + HINT_TEXT_SIZE.y / 2.0,
-				layers::HINT_TEXT_PANEL,
-			),
-			bevy::sprite::Anchor::Center,
-			get_text_style(&font),
-			TextLayout {
-				justify: JustifyText::Left,
-				..default()
-			},
-			HoverText,
-			Hoverable {
-				hover_text: HINT_BOX,
-				hover_bounding_circle: None,
-				hover_bounding_box: Some(Aabb2d::new(Vec2::ZERO, HINT_TEXT_SIZE / 2.0)),
-			},
-		))
-		.with_child(TextSpan::default());
+	commands.spawn((
+		bevy::text::TextBounds {
+			width: Some(HINT_TEXT_SIZE.x - margin * 2.0),
+			height: Some(HINT_TEXT_SIZE.y - margin * 2.0),
+		},
+		Transform::from_xyz(
+			0.0,
+			-GAME_AREA.y / 2.0 + HINT_TEXT_SIZE.y / 2.0,
+			layers::HINT_TEXT_PANEL,
+		),
+		bevy::sprite::Anchor::Center,
+		Text2d::default(),
+		get_text_style(&font),
+		TextLayout {
+			justify: JustifyText::Left,
+			..default()
+		},
+		HoverText,
+		Hoverable {
+			hover_text: HINT_BOX,
+			hover_bounding_circle: None,
+			hover_bounding_box: Some(Aabb2d::new(Vec2::ZERO, HINT_TEXT_SIZE / 2.0)),
+		},
+	));
 }
 
 fn get_text_style(font: &GlobalFont) -> (TextFont, TextColor) {
@@ -139,8 +140,7 @@ fn update_hover(
 }
 
 fn update_hover_text(
-	mut text_query: Query<(Entity, &mut Visibility), With<HoverText>>,
-	mut text_writer: TextUiWriter,
+	mut text_query: Query<(&mut Text2d, &mut Visibility), With<HoverText>>,
 	hint_text: Res<HintText>,
 	state: Res<State<Screen>>,
 ) {
@@ -157,11 +157,11 @@ fn update_hover_text(
 		} => hint,
 		_ => "".into(),
 	};
-	for (entity, mut visibility) in text_query.iter_mut() {
+	for (mut text, mut visibility) in text_query.iter_mut() {
 		*visibility = match should_be_visible {
 			true => Visibility::Visible,
 			false => Visibility::Hidden,
 		};
-		text_writer.text(entity, 0).clone_from(&chosen_text);
+		text.0.clone_from(&chosen_text);
 	}
 }

@@ -50,17 +50,16 @@ impl<T: Spawn> Widgets for T {
 			},
 		));
 		entity.with_children(|children| {
-			children
-				.spawn((
-					Name::new("Button Text"),
-					TextFont {
-						font_size: 40.0,
-						font,
-						..default()
-					},
-					TextColor(BUTTON_TEXT),
-				))
-				.with_child(TextSpan::new(text));
+			children.spawn((
+				Name::new("Button Text"),
+				Text::new(text),
+				TextFont {
+					font_size: 40.0,
+					font,
+					..default()
+				},
+				TextColor(BUTTON_TEXT),
+			));
 		});
 		entity
 	}
@@ -84,17 +83,16 @@ impl<T: Spawn> Widgets for T {
 			},
 		));
 		entity.with_children(|children| {
-			children
-				.spawn((
-					Name::new("Button Text"),
-					TextFont {
-						font_size: 30.0,
-						font,
-						..default()
-					},
-					TextColor(BUTTON_TEXT),
-				))
-				.with_child(TextSpan::new(text));
+			children.spawn((
+				Name::new("Button Text"),
+				Text::new(text),
+				TextFont {
+					font_size: 30.0,
+					font,
+					..default()
+				},
+				TextColor(BUTTON_TEXT),
+			));
 		});
 		entity
 	}
@@ -116,17 +114,16 @@ impl<T: Spawn> Widgets for T {
 			},
 		));
 		entity.with_children(|children| {
-			children
-				.spawn((
-					Name::new("Button Text"),
-					TextFont {
-						font_size: 30.0,
-						font,
-						..default()
-					},
-					TextColor(BUTTON_TEXT),
-				))
-				.with_child(TextSpan::new(text));
+			children.spawn((
+				Name::new("Button Text"),
+				Text::new(text),
+				TextFont {
+					font_size: 30.0,
+					font,
+					..default()
+				},
+				TextColor(BUTTON_TEXT),
+			));
 		});
 		entity
 	}
@@ -144,17 +141,16 @@ impl<T: Spawn> Widgets for T {
 			BackgroundColor(NODE_BACKGROUND),
 		));
 		entity.with_children(|children| {
-			children
-				.spawn((
-					Name::new("Header Text"),
-					TextFont {
-						font_size: 40.0,
-						font,
-						..default()
-					},
-					TextColor(HEADER_TEXT),
-				))
-				.with_child(TextSpan::new(text));
+			children.spawn((
+				Name::new("Header Text"),
+				Text::new(text),
+				TextFont {
+					font_size: 40.0,
+					font,
+					..default()
+				},
+				TextColor(HEADER_TEXT),
+			));
 		});
 		entity
 	}
@@ -170,17 +166,16 @@ impl<T: Spawn> Widgets for T {
 			},
 		));
 		entity.with_children(|children| {
-			children
-				.spawn((
-					Name::new("Label Text"),
-					TextFont {
-						font_size: 24.0,
-						font,
-						..default()
-					},
-					TextColor(LABEL_TEXT),
-				))
-				.with_child(TextSpan::new(text));
+			children.spawn((
+				Name::new("Label Text"),
+				Text::new(text),
+				TextFont {
+					font_size: 24.0,
+					font,
+					..default()
+				},
+				TextColor(LABEL_TEXT),
+			));
 		});
 		entity
 	}
@@ -200,17 +195,16 @@ impl<T: Spawn> Widgets for T {
 			},
 		));
 		entity.with_children(|children| {
-			children
-				.spawn((
-					Name::new("Text Content"),
-					TextFont {
-						font_size: 24.0,
-						font,
-						..default()
-					},
-					TextColor(LABEL_TEXT),
-				))
-				.with_child(TextSpan::new(text));
+			children.spawn((
+				Name::new("Text Content"),
+				Text::new(text),
+				TextFont {
+					font_size: 24.0,
+					font,
+					..default()
+				},
+				TextColor(LABEL_TEXT),
+			));
 		});
 		entity
 	}
