@@ -202,6 +202,7 @@ fn cycle_group_rotation_relay_system(
 	}
 
 	// Apply rotations
+	#[expect(clippy::needless_range_loop)]
 	for group_id in 0..level.groups.len() {
 		if group_rotations[group_id] == 0 {
 			continue;
@@ -221,7 +222,7 @@ fn cycle_group_rotation_relay_system(
 					RotateCycle {
 						target_cycle: cycle_index.0[id],
 						direction: direction * relative_direction,
-						amount: group_rotations[group_id].abs() as usize,
+						amount: group_rotations[group_id].unsigned_abs() as usize,
 					}
 				})
 				.map(RotateSingleCycle),

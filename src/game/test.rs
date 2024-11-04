@@ -102,7 +102,7 @@ mod utils {
 					ThingData::Object(_object_data) => {
 						panic!("Glyph data points to an object, not a glyph")
 					}
-					ThingData::Glyph(glyph_data) => glyph_data.clone(),
+					ThingData::Glyph(glyph_data) => *glyph_data,
 				});
 			// Extract glyph information
 			object_data[i] = object
@@ -113,7 +113,7 @@ mod utils {
 						.expect("Vertex points to a non-existent entity")
 				})
 				.map(|thing| match thing {
-					ThingData::Object(object_data) => object_data.clone(),
+					ThingData::Object(object_data) => *object_data,
 					ThingData::Glyph(_glyph_data) => {
 						panic!("Glyph data points to an object, not a glyph")
 					}
@@ -146,7 +146,7 @@ mod utils {
 		In((id, amount)): In<(usize, i32)>,
 		mut events: EventWriter<RotateCycleGroup>,
 		cycle_list: Query<&CycleEntities>,
-	) -> () {
+	) {
 		events.send(RotateCycleGroup(RotateCycle {
 			target_cycle: cycle_list.single().0[id],
 			direction: if amount >= 0 {
@@ -154,14 +154,14 @@ mod utils {
 			} else {
 				CycleTurningDirection::Reverse
 			},
-			amount: amount.abs() as usize,
+			amount: amount.unsigned_abs() as usize,
 		}));
 	}
 
 	pub trait GameLogicAppExt {
 		fn read_vertices(&mut self) -> VertexDebugData;
 		fn conut_cycles(&mut self) -> usize;
-		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> ();
+		fn turn_cycle(&mut self, cycle_id: usize, amount: i32);
 	}
 
 	impl GameLogicAppExt for App {
@@ -177,7 +177,7 @@ mod utils {
 				.expect("System should have all necessary objects.")
 		}
 
-		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) -> () {
+		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) {
 			self.world_mut()
 				.run_system_once_with((cycle_id, amount), turn_system)
 				.expect("System should have all necessary objects.")
@@ -570,11 +570,11 @@ PLACE b 200 0 100
 }
 
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
-fn generate_random_cycle_walk<'a>(
+fn generate_random_cycle_walk(
 	n_cycles: usize,
 	n_steps: usize,
-	rng: &'a mut impl Rng,
-) -> impl Iterator<Item = (usize, i32)> + 'a {
+	rng: &mut impl Rng,
+) -> impl Iterator<Item = (usize, i32)> + '_ {
 	(0..n_steps).map(move |_| {
 		(
 			rng.gen_range(0..n_cycles),
