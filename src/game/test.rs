@@ -73,6 +73,7 @@ mod utils {
 		let mut app = setup_app();
 		app.world_mut()
 			.run_system_once_with(level, load_level)
+			.expect("System should've ran.")
 			.expect("Level should've parsed!");
 		// An update is needed to trigger the spawning logic
 		app.update();
