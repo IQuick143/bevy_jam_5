@@ -103,7 +103,7 @@ impl Default for FadeAnimationBundle {
 				..default()
 			},
 			background_color: BackgroundColor(OVERLAY_COLOR.with_alpha(0.0)),
-			z_index: ZIndex::Global(65000),
+			z_index: ZIndex(65000),
 			freeze: FreezeUi,
 		}
 	}
