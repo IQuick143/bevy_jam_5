@@ -202,18 +202,18 @@ fn cycle_group_rotation_relay_system(
 	}
 
 	// Apply rotations
-	for group_id in 0..level.groups.len() {
-		if group_rotations[group_id] == 0 {
+	for (group_data, &rotation) in level.groups.iter().zip(group_rotations.iter()) {
+		if rotation == 0 {
 			continue;
 		}
-		let direction = if group_rotations[group_id] > 0 {
+		let direction = if rotation > 0 {
 			CycleTurningDirection::Nominal
 		} else {
 			CycleTurningDirection::Reverse
 		};
 		update_event.send(GameLayoutChanged);
 		single_events.send_batch(
-			level.groups[group_id]
+			group_data
 				.cycles
 				.iter()
 				.map(|&(id, relative_direction)| {
@@ -221,7 +221,7 @@ fn cycle_group_rotation_relay_system(
 					RotateCycle {
 						target_cycle: cycle_index.0[id],
 						direction: direction * relative_direction,
-						amount: group_rotations[group_id].abs() as usize,
+						amount: rotation.unsigned_abs() as usize,
 					}
 				})
 				.map(RotateSingleCycle),

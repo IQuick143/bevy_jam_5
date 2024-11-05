@@ -826,7 +826,7 @@ impl LevelBuilder {
 						continue;
 					}
 					stack.push(i);
-					while stack.len() > 0 {
+					while !stack.is_empty() {
 						let node = *stack.last().unwrap();
 						// Node is already in the ordering, skip it
 						// This removes duplicates from the stack
@@ -942,11 +942,11 @@ impl LevelBuilder {
 
 		// Deduplicate link data whenever possible
 		for group in groups.iter_mut() {
-			if group.linked_groups.len() == 0 {
+			if group.linked_groups.is_empty() {
 				continue;
 			}
 			group.linked_groups.sort_by(OneWayLinkData::compare);
-			let old_links = std::mem::replace(&mut group.linked_groups, Vec::new());
+			let old_links = std::mem::take(&mut group.linked_groups);
 			// At least one link must exist because we checked for the vector being empty earlier
 			group.linked_groups.push(old_links[0]);
 			for link in old_links.into_iter().skip(1) {
@@ -1040,7 +1040,7 @@ impl LevelBuilder {
 			placement,
 			vertex_indices: intermediate.vertex_indices,
 			turnability: intermediate.turnability,
-			group: group,
+			group,
 			orientation_within_group: relative_direction,
 		}
 	}
