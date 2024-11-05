@@ -41,11 +41,6 @@ pub struct VertexPosition(pub Entity);
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
 
-/// A vertex (node) on the circle
-#[cfg(feature = "dev")]
-#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct VertexDebugID(pub usize);
-
 /// Component of the Vertex representing a link to an object occupying this place
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct PlacedObject(pub Option<Entity>);

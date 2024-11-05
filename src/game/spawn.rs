@@ -143,15 +143,12 @@ fn spawn_primary_level_entities(
 		let vertices = level
 			.vertices
 			.iter()
-			.enumerate()
-			.map(|(i, vertex)| {
+			.map(|vertex| {
 				commands
 					.spawn((
 						*session_id,
 						*vertex,
 						Vertex,
-						#[cfg(feature = "dev")]
-						VertexDebugID(i),
 						TransformBundle::default(),
 						VisibilityBundle::default(),
 					))

@@ -1,15 +1,10 @@
 mod utils {
 	use crate::game::{
-		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, VertexDebugID},
-		level::{GlyphData, ObjectData, ThingData},
+		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, Vertex},
+		level::{parser, GlyphData, LevelData, ObjectData, ThingData},
 		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
-	};
-
-	use super::super::{
-		level::{parser, LevelData},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
-	#[allow(unused_imports)]
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
 	pub fn setup_app() -> App {
@@ -20,13 +15,22 @@ mod utils {
 			super::super::logic::plugin,
 			super::super::history::plugin,
 			super::super::spawn::plugin,
-		)) // Disable spawning of visual entities
+		))
+		.add_systems(
+			LevelInitialization,
+			assign_debug_ids.after(LevelInitializationSet::SpawnPrimaryEntities),
+		)
+		// Disable spawning of visual entities
 		.configure_sets(
 			LevelInitialization,
 			LevelInitializationSet::SpawnVisuals.run_if(|| false),
 		);
 		app
 	}
+
+	/// A vertex (node) on the circle
+	#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+	pub struct VertexDebugID(pub usize);
 
 	/// Resource for extracting vertex information from the game
 	#[derive(Debug, Clone)]
@@ -55,6 +59,12 @@ mod utils {
 				return true;
 			}
 			false
+		}
+	}
+
+	fn assign_debug_ids(query: Query<Entity, Added<Vertex>>, mut commands: Commands) {
+		for (i, id) in query.iter().enumerate() {
+			commands.entity(id).insert(VertexDebugID(i));
 		}
 	}
 
