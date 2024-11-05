@@ -28,7 +28,7 @@ pub(super) fn plugin(app: &mut App) {
 				handle_enter_level.after(AppSet::ExecuteInput),
 				(
 					(|w: &mut World| w.run_schedule(LevelInitialization))
-						.run_if(on_event::<SpawnLevel>()),
+						.run_if(on_event::<SpawnLevel>),
 					despawn_expired_level_entities
 						.run_if(resource_changed::<ExpiringLevelSessionId>),
 				)
@@ -130,7 +130,7 @@ fn despawn_expired_level_entities(
 fn spawn_primary_level_entities(
 	mut commands: Commands,
 	mut events: EventReader<SpawnLevel>,
-	levels: Res<Assets<LevelData>>,
+	mut levels: ResMut<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {
 		// Get the level data
@@ -143,14 +143,17 @@ fn spawn_primary_level_entities(
 		let vertices = level
 			.vertices
 			.iter()
-			.map(|vertex| {
+			.enumerate()
+			.map(|(i, vertex)| {
 				commands
 					.spawn((
 						*session_id,
 						*vertex,
 						Vertex,
-						TransformBundle::default(),
-						VisibilityBundle::default(),
+						#[cfg(feature = "dev")]
+						VertexDebugID(i),
+						Transform::default(),
+						Visibility::default(),
 					))
 					.id()
 			})
@@ -160,31 +163,27 @@ fn spawn_primary_level_entities(
 		let cycles = level
 			.cycles
 			.iter()
-			.map(|cycle| {
+			.enumerate()
+			.map(|(id, cycle)| {
 				commands
 					.spawn((
 						*session_id,
 						cycle.placement,
 						cycle.turnability,
+						Cycle {
+							id,
+							group_id: cycle.group,
+							orientation_within_group: cycle.orientation_within_group,
+						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
 						CycleVertices(cycle.vertex_indices.iter().map(|i| vertices[*i]).collect()),
-						TransformBundle::default(),
-						VisibilityBundle::default(),
+						Transform::default(),
+						Visibility::default(),
 					))
 					.id()
 			})
 			.collect::<Vec<_>>();
-
-		// Link cycles together
-		for (id, data) in cycles.iter().zip(&level.cycles) {
-			commands.entity(*id).insert(LinkedCycles(
-				data.link_closure
-					.iter()
-					.map(|&(i, dir)| (cycles[i], dir))
-					.collect(),
-			));
-		}
 
 		// Spawn links
 		// Links are children of their source cycle
@@ -200,11 +199,22 @@ fn spawn_primary_level_entities(
 					children.spawn((
 						LinkTargetCycle(target_cycle),
 						link.direction,
-						TransformBundle::default(),
-						VisibilityBundle::default(),
+						Transform::default(),
+						Visibility::default(),
 					));
 				});
 		}
+
+		// Spawn cycle list
+		commands.spawn((*session_id, CycleEntities(cycles)));
+		commands.spawn((
+			*session_id,
+			LevelHandle(
+				levels
+					.get_strong_handle(level_handle.id())
+					.expect("I expect you to work."),
+			),
+		));
 	}
 }
 
@@ -223,8 +233,8 @@ fn spawn_thing_entities(
 					*session,
 					VertexPosition(id),
 					IsTriggered::default(),
-					TransformBundle::default(),
-					VisibilityBundle::default(),
+					Transform::default(),
+					Visibility::default(),
 				))
 				.id(),
 			ObjectData::Box(None) => commands
@@ -236,8 +246,8 @@ fn spawn_thing_entities(
 					*session,
 					VertexPosition(id),
 					IsTriggered::default(),
-					TransformBundle::default(),
-					VisibilityBundle::default(),
+					Transform::default(),
+					Visibility::default(),
 				))
 				.id(),
 			ObjectData::Box(Some(color)) => commands
@@ -250,8 +260,8 @@ fn spawn_thing_entities(
 					*session,
 					VertexPosition(id),
 					IsTriggered::default(),
-					TransformBundle::default(),
-					VisibilityBundle::default(),
+					Transform::default(),
+					Visibility::default(),
 				))
 				.id(),
 		});
@@ -265,8 +275,8 @@ fn spawn_thing_entities(
 					*session,
 					VertexPosition(id),
 					IsTriggered::default(),
-					TransformBundle::default(),
-					VisibilityBundle::default(),
+					Transform::default(),
+					Visibility::default(),
 				))
 				.id(),
 			GlyphData::Button(None) => commands
@@ -278,8 +288,8 @@ fn spawn_thing_entities(
 					*session,
 					VertexPosition(id),
 					IsTriggered::default(),
-					TransformBundle::default(),
-					VisibilityBundle::default(),
+					Transform::default(),
+					Visibility::default(),
 				))
 				.id(),
 			GlyphData::Button(Some(color_data)) => commands
@@ -292,8 +302,8 @@ fn spawn_thing_entities(
 					*session,
 					VertexPosition(id),
 					IsTriggered::default(),
-					TransformBundle::default(),
-					VisibilityBundle::default(),
+					Transform::default(),
+					Visibility::default(),
 				))
 				.id(),
 		});
@@ -340,25 +350,23 @@ fn create_vertex_visuals(
 ) {
 	for id in &query {
 		let node = commands
-			.spawn(ColorMesh2dBundle {
-				mesh: bevy::sprite::Mesh2dHandle(meshes.vertices.clone_weak()),
-				material: materials.cycle_rings_ready.clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
-				..default()
-			})
+			.spawn((
+				Mesh2d(meshes.vertices.clone_weak()),
+				MeshMaterial2d(materials.cycle_rings_ready.clone_weak()),
+				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
+			))
 			.id();
 		let outline = commands
-			.spawn(ColorMesh2dBundle {
-				mesh: bevy::sprite::Mesh2dHandle(meshes.vertex_outlines.clone_weak()),
-				material: materials.cycle_ring_outlines.clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
-				..default()
-			})
+			.spawn((
+				Mesh2d(meshes.vertex_outlines.clone_weak()),
+				MeshMaterial2d(materials.cycle_ring_outlines.clone_weak()),
+				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
+			))
 			.id();
 		commands
 			.entity(id)
 			.insert(VertexVisualEntities { node, outline })
-			.push_children(&[node, outline]);
+			.add_children(&[node, outline]);
 	}
 }
 
@@ -387,44 +395,40 @@ fn create_cycle_visuals(
 		.build();
 
 		let ring = commands
-			.spawn(ColorMesh2dBundle {
-				mesh: bevy::sprite::Mesh2dHandle(meshes.add(mesh)),
-				material: materials.cycle_rings_ready.clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
-				..default()
-			})
+			.spawn((
+				Mesh2d(meshes.add(mesh)),
+				MeshMaterial2d(materials.cycle_rings_ready.clone_weak()),
+				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
+			))
 			.id();
 		let outline = commands
-			.spawn(ColorMesh2dBundle {
-				mesh: bevy::sprite::Mesh2dHandle(meshes.add(outline_mesh)),
-				material: materials.cycle_ring_outlines.clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
-				..default()
-			})
+			.spawn((
+				Mesh2d(meshes.add(outline_mesh)),
+				MeshMaterial2d(materials.cycle_ring_outlines.clone_weak()),
+				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
+			))
 			.id();
 		let center = commands
-			.spawn(SpriteBundle {
-				sprite: Sprite {
+			.spawn((
+				Sprite {
 					custom_size: Some(SPRITE_SIZE),
+					image: images[&ImageKey::CycleCenter(*turnability)].clone_weak(),
 					color: palette.cycle_ready,
 					..default()
 				},
-				texture: images[&ImageKey::CycleCenter(*turnability)].clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_SPRITES),
-				..default()
-			})
+				Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_SPRITES),
+			))
 			.id();
 		let arrow = commands
-			.spawn(SpriteBundle {
-				sprite: Sprite {
+			.spawn((
+				Sprite {
 					custom_size: Some(SPRITE_SIZE * 2.0),
+					image: images[&ImageKey::CycleRotationArrow].clone_weak(),
 					color: palette.cycle_ready,
 					..default()
 				},
-				texture: images[&ImageKey::CycleRotationArrow].clone_weak(),
-				transform: Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_ARROWS),
-				..default()
-			})
+				Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_ARROWS),
+			))
 			.id();
 		commands
 			.entity(id)
@@ -434,7 +438,7 @@ fn create_cycle_visuals(
 				center,
 				arrow,
 			})
-			.push_children(&[ring, outline, center, arrow]);
+			.add_children(&[ring, outline, center, arrow]);
 	}
 }
 
@@ -488,20 +492,18 @@ fn create_link_visuals(
 			),
 		};
 		commands.entity(id).with_children(|children| {
-			children.spawn(ColorMesh2dBundle {
-				mesh: bevy::sprite::Mesh2dHandle(mesh.clone_weak()),
-				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation))
+			children.spawn((
+				Mesh2d(mesh.clone_weak()),
+				Transform::from_rotation(rotation.mul_quat(extra_rotation))
 					.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
-				material: materials.link_lines.clone_weak(),
-				..default()
-			});
-			children.spawn(ColorMesh2dBundle {
-				mesh: bevy::sprite::Mesh2dHandle(mesh),
-				transform: Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
+				MeshMaterial2d(materials.link_lines.clone_weak()),
+			));
+			children.spawn((
+				Mesh2d(mesh),
+				Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
 					.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
-				material: materials.link_lines.clone_weak(),
-				..default()
-			});
+				MeshMaterial2d(materials.link_lines.clone_weak()),
+			));
 		});
 	}
 }
@@ -532,17 +534,16 @@ fn create_thing_sprites(
 			}
 		};
 		commands.entity(id).with_children(|children| {
-			children.spawn(SpriteBundle {
-				texture: sprites[&ImageKey::Object(ThingType::from(*thing))].clone_weak(),
-				sprite: Sprite {
+			children.spawn((
+				Sprite {
+					image: sprites[&ImageKey::Object(ThingType::from(*thing))].clone_weak(),
 					custom_size: Some(SPRITE_SIZE),
 					color,
 					anchor,
 					..default()
 				},
-				transform: Transform::from_translation(Vec3::Z * z_depth),
-				..default()
-			});
+				Transform::from_translation(Vec3::Z * z_depth),
+			));
 		});
 	}
 }
@@ -592,15 +593,12 @@ fn create_button_color_markers(
 			let (translation, label_rotation, sprite_rotation) =
 				get_button_color_label_placement(label_appearence);
 
-			children.spawn(ColorMesh2dBundle {
-				material: materials.colored_button_labels.clone_weak(),
-				mesh: bevy::sprite::Mesh2dHandle(label_mesh),
-				transform: Transform::from_translation(
-					translation.extend(layers::BUTTON_COLOR_LABELS),
-				)
-				.with_rotation(Quat::from_rotation_z(label_rotation)),
-				..default()
-			});
+			children.spawn((
+				MeshMaterial2d(materials.colored_button_labels.clone_weak()),
+				Mesh2d(label_mesh),
+				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_LABELS))
+					.with_rotation(Quat::from_rotation_z(label_rotation)),
+			));
 
 			create_logical_color_sprite(
 				children,
@@ -629,19 +627,16 @@ fn create_logical_color_sprite(
 			Transform::from_translation(Vec3::X * x_offset).with_scale(Vec3::ONE.with_x(x_scale)),
 		);
 		children.spawn((
-			SpriteBundle {
-				transform,
-				texture: atlas.clone_weak(),
-				sprite: Sprite {
-					custom_size: Some(COLOR_SPRITE_SIZE),
-					color: sprite_color,
-					..default()
-				},
+			transform,
+			Sprite {
+				custom_size: Some(COLOR_SPRITE_SIZE),
+				image: atlas.clone_weak(),
+				color: sprite_color,
+				texture_atlas: Some(TextureAtlas {
+					layout: atlas_layout.clone_weak(),
+					index,
+				}),
 				..default()
-			},
-			TextureAtlas {
-				layout: atlas_layout.clone_weak(),
-				index,
 			},
 		));
 	};

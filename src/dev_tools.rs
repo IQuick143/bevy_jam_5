@@ -1,12 +1,7 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::{
-		components::*,
-		level::{CycleTurnability, LinkedCycleDirection},
-		logic::*,
-		prelude::*,
-	},
+	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
 	ui::hover::Hoverable,
@@ -47,7 +42,6 @@ fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTr
 		if let Some(bounding_box) = hover.hover_bounding_box {
 			gizmos.rect_2d(
 				transform.translation().xy() + bounding_box.center(),
-				Rot2::IDENTITY,
 				bounding_box.half_size() * 2.0,
 				palettes::basic::LIME,
 			);
@@ -63,10 +57,9 @@ fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTr
 }
 
 fn draw_layout(mut gizmos: Gizmos) {
-	gizmos.rect(Vec3::ZERO, Quat::IDENTITY, GAME_AREA, palettes::basic::RED);
+	gizmos.rect(Vec3::ZERO, GAME_AREA, palettes::basic::RED);
 	gizmos.rect(
 		LEVEL_AREA_CENTER.extend(0.0),
-		Quat::IDENTITY,
 		LEVEL_AREA_WIDTH,
 		palettes::basic::NAVY,
 	);
@@ -91,7 +84,7 @@ pub fn _debug_inputs(
 	let (camera, camera_transform) = camera_q.single();
 	if let Some(cursor_pos) = window
 		.cursor_position()
-		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p))
+		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok())
 	{
 		if let (Some(target_id), _) = cycles_q
 			.iter()
@@ -102,6 +95,7 @@ pub fn _debug_inputs(
 			rotate_cycle_events.send(RotateCycleGroup(RotateCycle {
 				target_cycle: target_id,
 				direction,
+				amount: 1,
 			}));
 		}
 	}
@@ -114,7 +108,6 @@ pub fn _gizmo_draw(
 		&CycleVertices,
 		&ComputedCycleTurnability,
 		&CycleTurnability,
-		Option<&LinkedCycles>,
 	)>,
 	players: Query<&Transform, With<Player>>,
 	boxes: Query<&Transform, With<Box>>,
@@ -124,19 +117,13 @@ pub fn _gizmo_draw(
 ) {
 	// Draw vertices
 	for transform in vertices.iter() {
-		gizmos.sphere(
-			transform.translation,
-			Quat::IDENTITY,
-			1.0,
-			palettes::tailwind::BLUE_300,
-		);
+		gizmos.sphere(transform.translation, 1.0, palettes::tailwind::BLUE_300);
 	}
 
 	// Draw boxes
 	for transform in boxes.iter() {
 		gizmos.rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(10.0),
 			palettes::css::MAROON,
 		);
@@ -146,7 +133,6 @@ pub fn _gizmo_draw(
 	for transform in players.iter() {
 		gizmos.rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(10.0),
 			palettes::css::TEAL,
 		);
@@ -156,7 +142,6 @@ pub fn _gizmo_draw(
 	for transform in buttons.iter() {
 		gizmos.rounded_rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(20.0),
 			palettes::css::MAROON,
 		);
@@ -166,18 +151,16 @@ pub fn _gizmo_draw(
 	for transform in flags.iter() {
 		gizmos.rounded_rect(
 			transform.translation,
-			Quat::IDENTITY,
 			Vec2::splat(20.0),
 			palettes::css::TEAL,
 		);
 	}
 
 	// Draw cycles & links
-	for (circle_transform, vertex_ids, current_turnability, turnability, links) in circles.iter() {
+	for (circle_transform, vertex_ids, current_turnability, turnability) in circles.iter() {
 		// Draw cycle centers
 		gizmos.sphere(
 			circle_transform.translation,
-			Quat::IDENTITY,
 			10.0,
 			match (turnability, current_turnability.0) {
 				(CycleTurnability::Always, true) => palettes::tailwind::GREEN_600,
@@ -201,25 +184,25 @@ pub fn _gizmo_draw(
 			.map(|entity| vertices.get(*entity).unwrap().translation)
 			.collect();
 		positions.push(positions[0]);
-		let spline = CubicCardinalSpline::new(0.5, positions).to_curve();
+		let spline = CubicCardinalSpline::new(0.5, positions).to_curve().unwrap();
 		let samples = spline.iter_positions(32);
 		gizmos.linestrip(samples, palettes::tailwind::AMBER_900);
 
-		// Draw links
-		if let Some(links) = links {
-			for (linked_entity, direction) in links.0.iter() {
-				if let Ok((other_transform, _, _, _, _)) = circles.get(*linked_entity) {
-					gizmos.line(
-						circle_transform.translation,
-						other_transform.translation,
-						match direction {
-							LinkedCycleDirection::Coincident => palettes::tailwind::GRAY_100,
-							LinkedCycleDirection::Inverse => palettes::tailwind::GRAY_500,
-						},
-					);
-				}
-			}
-		}
+		//	// Draw links
+		//	if let Some(links) = links {
+		//		for (linked_entity, direction) in links.0.iter() {
+		//			if let Ok((other_transform, _, _, _, _)) = circles.get(*linked_entity) {
+		//				gizmos.line(
+		//					circle_transform.translation,
+		//					other_transform.translation,
+		//					match direction {
+		//						LinkedCycleDirection::Coincident => palettes::tailwind::GRAY_100,
+		//						LinkedCycleDirection::Inverse => palettes::tailwind::GRAY_500,
+		//					},
+		//				);
+		//			}
+		//		}
+		//	}
 	}
 }
 
@@ -321,10 +304,10 @@ pub fn _simulate_vertices(
 
 	for (entity, gradient) in gradients.iter() {
 		if let Ok(mut transform) = vertices.get_mut(*entity) {
-			transform.translation += (*gradient * time.delta_seconds() * 5.0).extend(0.0);
+			transform.translation += (*gradient * time.delta_secs() * 5.0).extend(0.0);
 		}
 		if let Ok((_, _, mut transform)) = circles.get_mut(*entity) {
-			transform.translation += (*gradient * time.delta_seconds()).extend(0.0);
+			transform.translation += (*gradient * time.delta_secs()).extend(0.0);
 		}
 	}
 }

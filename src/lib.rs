@@ -111,19 +111,17 @@ fn send_event<E: Event + Clone>(event: E) -> impl Fn(EventWriter<E>) {
 fn spawn_camera(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Camera"),
-		Camera2dBundle {
-			camera: Camera {
-				clear_color: ClearColorConfig::Custom(Color::WHITE),
-				..default()
-			},
-			projection: OrthographicProjection {
-				scaling_mode: ScalingMode::AutoMin {
-					min_width: GAME_AREA.x,
-					min_height: GAME_AREA.y,
-				},
-				..default()
-			},
+		Camera2d,
+		Camera {
+			clear_color: ClearColorConfig::Custom(Color::WHITE),
 			..default()
+		},
+		OrthographicProjection {
+			scaling_mode: ScalingMode::AutoMin {
+				min_width: GAME_AREA.x,
+				min_height: GAME_AREA.y,
+			},
+			..OrthographicProjection::default_2d()
 		},
 		// Render all UI to this camera.
 		// Not strictly necessary since we only use one camera,

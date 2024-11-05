@@ -23,7 +23,7 @@ pub(super) fn plugin(app: &mut App) {
 					cycle_center_turnability_visuals_update_system
 						.before(cycle_center_interaction_visuals_update_system),
 				)
-					.run_if(on_event::<GameLayoutChanged>()),
+					.run_if(on_event::<GameLayoutChanged>),
 				cycle_center_interaction_visuals_update_system
 					.run_if(cycle_interaction_visuals_changed),
 			)
@@ -267,26 +267,48 @@ fn cycle_interaction_visuals_changed(
 }
 
 fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<(&CycleInteraction, &LinkedCycles)>,
+	cycles_q: Query<(&CycleInteraction, &Cycle)>,
 	all_cycles_q: Query<(
 		&ComputedCycleTurnability,
 		&CycleVertices,
 		&CycleVisualEntities,
 	)>,
+	cycle_index: Query<&CycleEntities>,
+	level_asset: Res<Assets<LevelData>>,
+	level: Query<&LevelHandle>,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
-	mut meshes_q: Query<(&mut Transform, &mut Handle<ColorMaterial>)>,
+	mut meshes_q: Query<(&mut Transform, &mut MeshMaterial2d<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
+	let level = {
+		let Ok(LevelHandle(handle)) = level.get_single() else {
+			log::error!("System called without a valid level entity.");
+			return;
+		};
+		let Some(level) = level_asset.get(handle) else {
+			log::error!("Non-existent level asset being referenced.");
+			return;
+		};
+		level
+	};
+	let Ok(cycle_index) = cycle_index.get_single() else {
+		log::error!("System called without a valid CycleEntities entity.");
+		return;
+	};
 	let mut meshes_to_repaint = HashMap::new();
 	let mut outlines_to_repaint = HashMap::new();
 	let mut sprites_to_repaint = HashMap::new();
 
-	for (interaction, links) in &cycles_q {
+	for (interaction, cycle) in &cycles_q {
 		let is_selected = *interaction != CycleInteraction::None;
-		for (cycle_id, _) in &links.0 {
-			let (is_turnable, vertices, visuals) = match all_cycles_q.get(*cycle_id) {
+		for cycle_id in level.groups[cycle.group_id]
+			.cycles
+			.iter()
+			.map(|(cycle_id, _)| cycle_index.0[*cycle_id])
+		{
+			let (is_turnable, vertices, visuals) = match all_cycles_q.get(cycle_id) {
 				Ok(x) => x,
 				Err(e) => {
 					log::warn!("LinkedCycles refers to a non-cycle entity: {e}");
@@ -355,15 +377,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RINGS;
-				*material = materials.cycle_rings_disabled.clone_weak();
+				material.0 = materials.cycle_rings_disabled.clone_weak();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RINGS;
-				*material = materials.cycle_rings_ready.clone_weak();
+				material.0 = materials.cycle_rings_ready.clone_weak();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RINGS;
-				*material = materials.cycle_rings_select.clone_weak();
+				material.0 = materials.cycle_rings_select.clone_weak();
 			}
 		}
 	}
@@ -378,15 +400,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RING_OUTLINES;
-				*material = materials.cycle_ring_outlines_disabled.clone_weak();
+				material.0 = materials.cycle_ring_outlines_disabled.clone_weak();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RING_OUTLINES;
-				*material = materials.cycle_ring_outlines.clone_weak();
+				material.0 = materials.cycle_ring_outlines.clone_weak();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RING_OUTLINES;
-				*material = materials.cycle_ring_outlines.clone_weak();
+				material.0 = materials.cycle_ring_outlines.clone_weak();
 			}
 		}
 	}
