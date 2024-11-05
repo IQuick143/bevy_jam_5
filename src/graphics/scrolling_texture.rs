@@ -3,7 +3,7 @@
 use bevy::{
 	prelude::*,
 	render::render_resource::{AsBindGroup, ShaderRef},
-	sprite::{Material2d, Material2dPlugin},
+	sprite::{AlphaMode2d, Material2d, Material2dPlugin},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -40,5 +40,9 @@ impl Default for ScrollingTextureMaterial {
 impl Material2d for ScrollingTextureMaterial {
 	fn fragment_shader() -> ShaderRef {
 		"shaders/scrolling_texture.wgsl".into()
+	}
+
+	fn alpha_mode(&self) -> AlphaMode2d {
+		AlphaMode2d::Blend
 	}
 }
