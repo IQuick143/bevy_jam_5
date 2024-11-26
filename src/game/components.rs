@@ -49,10 +49,6 @@ pub struct PlacedObject(pub Option<Entity>);
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct PlacedGlyph(pub Option<Entity>);
 
-/// Component carrying the data mapping level indices to cycle entities.
-#[derive(Component, Clone, Debug, Default, Reflect)]
-pub struct CycleEntities(pub Vec<Entity>);
-
 /// A component describing a cycle
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct Cycle {
@@ -69,8 +65,12 @@ pub struct Cycle {
 pub struct CycleVertices(pub Vec<Entity>);
 
 /// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Resource, Debug, Clone, Reflect)]
 pub struct LevelHandle(pub Handle<LevelData>);
+
+/// Component carrying the data mapping level indices to cycle entities.
+#[derive(Resource, Clone, Debug, Default, Reflect)]
+pub struct CycleEntities(pub Vec<Entity>);
 
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`Parent`].

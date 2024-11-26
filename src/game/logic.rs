@@ -119,23 +119,12 @@ fn cycle_group_rotation_relay_system(
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
 	cycles_q: Query<&Cycle>,
-	cycle_index: Query<&CycleEntities>,
+	cycle_index: Res<CycleEntities>,
 	level_asset: Res<Assets<LevelData>>,
-	level: Query<&LevelHandle>,
+	level_handle: Res<LevelHandle>,
 ) {
-	let level = {
-		let Ok(LevelHandle(handle)) = level.get_single() else {
-			log::error!("System called without a valid level entity.");
-			return;
-		};
-		let Some(level) = level_asset.get(handle) else {
-			log::error!("Non-existent level asset being referenced.");
-			return;
-		};
-		level
-	};
-	let Ok(cycle_index) = cycle_index.get_single() else {
-		log::error!("System called without a valid CycleEntities entity.");
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
 	let mut group_rotations = vec![0i64; level.groups.len()];

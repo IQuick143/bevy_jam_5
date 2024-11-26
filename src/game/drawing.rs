@@ -273,30 +273,20 @@ fn cycle_center_interaction_visuals_update_system(
 		&CycleVertices,
 		&CycleVisualEntities,
 	)>,
-	cycle_index: Query<&CycleEntities>,
+	cycle_index: Res<CycleEntities>,
 	level_asset: Res<Assets<LevelData>>,
-	level: Query<&LevelHandle>,
+	level_handle: Res<LevelHandle>,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
 	mut meshes_q: Query<(&mut Transform, &mut Handle<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
-	let level = {
-		let Ok(LevelHandle(handle)) = level.get_single() else {
-			log::error!("System called without a valid level entity.");
-			return;
-		};
-		let Some(level) = level_asset.get(handle) else {
-			log::error!("Non-existent level asset being referenced.");
-			return;
-		};
-		level
-	};
-	let Ok(cycle_index) = cycle_index.get_single() else {
-		log::error!("System called without a valid CycleEntities entity.");
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
+
 	let mut meshes_to_repaint = HashMap::new();
 	let mut outlines_to_repaint = HashMap::new();
 	let mut sprites_to_repaint = HashMap::new();
