@@ -3,6 +3,8 @@
 
 use bevy::prelude::*;
 
+use super::level::{LevelData, LinkedCycleDirection};
+
 /// Marker component for entities that belong to a single level
 #[derive(Component, Clone, Copy, Debug, Default, Reflect)]
 pub struct LevelScoped;
@@ -40,20 +42,35 @@ pub struct VertexPosition(pub Entity);
 pub struct Vertex;
 
 /// Component of the Vertex representing a link to an object occupying this place
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct PlacedObject(pub Option<Entity>);
 
 /// Component of the Vertex representing a link to a glyph occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct PlacedGlyph(pub Option<Entity>);
 
+/// A component describing a cycle
+#[derive(Component, Debug, Clone, Reflect)]
+pub struct Cycle {
+	/// ID corresponding to the numerical level index of this cycle
+	pub id: usize,
+	/// ID corresponding to the group of linked cycles this cycle is a part of
+	pub group_id: usize,
+	/// The direction this cycle turns in relation to its parent group
+	pub orientation_within_group: LinkedCycleDirection,
+}
+
 /// A list of [`Vertex`] entities that are part of a single cycle
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct CycleVertices(pub Vec<Entity>);
 
-/// Describes the linkage of multiple cycles such that they will always turn together
-#[derive(Component, Debug, Clone, Reflect)]
-pub struct LinkedCycles(pub Vec<(Entity, super::level::LinkedCycleDirection)>);
+/// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
+#[derive(Resource, Debug, Clone, Reflect)]
+pub struct LevelHandle(pub Handle<LevelData>);
+
+/// Component carrying the data mapping level indices to cycle entities.
+#[derive(Resource, Clone, Debug, Default, Reflect)]
+pub struct CycleEntities(pub Vec<Entity>);
 
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`Parent`].

@@ -267,26 +267,38 @@ fn cycle_interaction_visuals_changed(
 }
 
 fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<(&CycleInteraction, &LinkedCycles)>,
+	cycles_q: Query<(&CycleInteraction, &Cycle)>,
 	all_cycles_q: Query<(
 		&ComputedCycleTurnability,
 		&CycleVertices,
 		&CycleVisualEntities,
 	)>,
+	cycle_index: Res<CycleEntities>,
+	level_asset: Res<Assets<LevelData>>,
+	level_handle: Res<LevelHandle>,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
 	mut meshes_q: Query<(&mut Transform, &mut Handle<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		log::error!("Non-existent level asset being referenced.");
+		return;
+	};
+
 	let mut meshes_to_repaint = HashMap::new();
 	let mut outlines_to_repaint = HashMap::new();
 	let mut sprites_to_repaint = HashMap::new();
 
-	for (interaction, links) in &cycles_q {
+	for (interaction, cycle) in &cycles_q {
 		let is_selected = *interaction != CycleInteraction::None;
-		for (cycle_id, _) in &links.0 {
-			let (is_turnable, vertices, visuals) = match all_cycles_q.get(*cycle_id) {
+		for cycle_id in level.groups[cycle.group_id]
+			.cycles
+			.iter()
+			.map(|(cycle_id, _)| cycle_index.0[*cycle_id])
+		{
+			let (is_turnable, vertices, visuals) = match all_cycles_q.get(cycle_id) {
 				Ok(x) => x,
 				Err(e) => {
 					log::warn!("LinkedCycles refers to a non-cycle entity: {e}");

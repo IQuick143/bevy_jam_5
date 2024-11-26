@@ -1,12 +1,7 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::{
-		components::*,
-		level::{CycleTurnability, LinkedCycleDirection},
-		logic::*,
-		prelude::*,
-	},
+	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
 	ui::hover::Hoverable,
@@ -102,6 +97,7 @@ pub fn _debug_inputs(
 			rotate_cycle_events.send(RotateCycleGroup(RotateCycle {
 				target_cycle: target_id,
 				direction,
+				amount: 1,
 			}));
 		}
 	}
@@ -114,7 +110,6 @@ pub fn _gizmo_draw(
 		&CycleVertices,
 		&ComputedCycleTurnability,
 		&CycleTurnability,
-		Option<&LinkedCycles>,
 	)>,
 	players: Query<&Transform, With<Player>>,
 	boxes: Query<&Transform, With<Box>>,
@@ -173,7 +168,7 @@ pub fn _gizmo_draw(
 	}
 
 	// Draw cycles & links
-	for (circle_transform, vertex_ids, current_turnability, turnability, links) in circles.iter() {
+	for (circle_transform, vertex_ids, current_turnability, turnability) in circles.iter() {
 		// Draw cycle centers
 		gizmos.sphere(
 			circle_transform.translation,
@@ -205,21 +200,21 @@ pub fn _gizmo_draw(
 		let samples = spline.iter_positions(32);
 		gizmos.linestrip(samples, palettes::tailwind::AMBER_900);
 
-		// Draw links
-		if let Some(links) = links {
-			for (linked_entity, direction) in links.0.iter() {
-				if let Ok((other_transform, _, _, _, _)) = circles.get(*linked_entity) {
-					gizmos.line(
-						circle_transform.translation,
-						other_transform.translation,
-						match direction {
-							LinkedCycleDirection::Coincident => palettes::tailwind::GRAY_100,
-							LinkedCycleDirection::Inverse => palettes::tailwind::GRAY_500,
-						},
-					);
-				}
-			}
-		}
+		//	// Draw links
+		//	if let Some(links) = links {
+		//		for (linked_entity, direction) in links.0.iter() {
+		//			if let Ok((other_transform, _, _, _, _)) = circles.get(*linked_entity) {
+		//				gizmos.line(
+		//					circle_transform.translation,
+		//					other_transform.translation,
+		//					match direction {
+		//						LinkedCycleDirection::Coincident => palettes::tailwind::GRAY_100,
+		//						LinkedCycleDirection::Inverse => palettes::tailwind::GRAY_500,
+		//					},
+		//				);
+		//			}
+		//		}
+		//	}
 	}
 }
 

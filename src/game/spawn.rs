@@ -130,7 +130,7 @@ fn despawn_expired_level_entities(
 fn spawn_primary_level_entities(
 	mut commands: Commands,
 	mut events: EventReader<SpawnLevel>,
-	levels: Res<Assets<LevelData>>,
+	mut levels: ResMut<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {
 		// Get the level data
@@ -160,12 +160,18 @@ fn spawn_primary_level_entities(
 		let cycles = level
 			.cycles
 			.iter()
-			.map(|cycle| {
+			.enumerate()
+			.map(|(id, cycle)| {
 				commands
 					.spawn((
 						*session_id,
 						cycle.placement,
 						cycle.turnability,
+						Cycle {
+							id,
+							group_id: cycle.group,
+							orientation_within_group: cycle.orientation_within_group,
+						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
 						CycleVertices(cycle.vertex_indices.iter().map(|i| vertices[*i]).collect()),
@@ -175,16 +181,6 @@ fn spawn_primary_level_entities(
 					.id()
 			})
 			.collect::<Vec<_>>();
-
-		// Link cycles together
-		for (id, data) in cycles.iter().zip(&level.cycles) {
-			commands.entity(*id).insert(LinkedCycles(
-				data.link_closure
-					.iter()
-					.map(|&(i, dir)| (cycles[i], dir))
-					.collect(),
-			));
-		}
 
 		// Spawn links
 		// Links are children of their source cycle
@@ -205,6 +201,14 @@ fn spawn_primary_level_entities(
 					));
 				});
 		}
+
+		// Spawn cycle list
+		commands.insert_resource(CycleEntities(cycles));
+		commands.insert_resource(LevelHandle(
+			levels
+				.get_strong_handle(level_handle.id())
+				.expect("I expect you to work."),
+		));
 	}
 }
 

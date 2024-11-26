@@ -59,10 +59,14 @@ pub struct RotateCycle {
 	pub target_cycle: Entity,
 	/// Direction in which the cycle should turn
 	pub direction: CycleTurningDirection,
+	/// How many steps the cycle should rotate by
+	pub amount: usize,
 }
 
 /// Internal event sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle, ignores linkages.
+///
+/// Signals a rotation of a cycle occuring.
 #[derive(Event, Clone, Copy, Debug)]
 pub struct RotateSingleCycle(pub RotateCycle);
 
@@ -114,25 +118,107 @@ fn cycle_group_rotation_relay_system(
 	mut group_events: EventReader<RotateCycleGroup>,
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
-	cycles_q: Query<&LinkedCycles>,
+	cycles_q: Query<&Cycle>,
+	cycle_index: Res<CycleEntities>,
+	level_asset: Res<Assets<LevelData>>,
+	level_handle: Res<LevelHandle>,
 ) {
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		log::error!("Non-existent level asset being referenced.");
+		return;
+	};
+	let mut group_rotations = vec![0i64; level.groups.len()];
 	for group_rotation in group_events.read() {
+		let Ok(source_cycle) = cycles_q.get(group_rotation.0.target_cycle) else {
+			continue;
+		};
 		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
+		// Queue the rotation
+		match group_rotation.0.direction * source_cycle.orientation_within_group {
+			CycleTurningDirection::Nominal => {
+				group_rotations[source_cycle.group_id] += group_rotation.0.amount as i64
+			}
+			CycleTurningDirection::Reverse => {
+				group_rotations[source_cycle.group_id] -= group_rotation.0.amount as i64
+			}
+		}
+	}
+
+	// Propagate one-way links
+	for group_id in 0..level.groups.len() {
+		if group_rotations[group_id] == 0 {
+			continue;
+		}
+		for link in level.groups[group_id].linked_groups.iter() {
+			match link.direction {
+				LinkedCycleDirection::Coincident => {
+					group_rotations[link.target_group] +=
+						group_rotations[group_id] * link.multiplicity as i64
+				}
+				LinkedCycleDirection::Inverse => {
+					group_rotations[link.target_group] -=
+						group_rotations[group_id] * link.multiplicity as i64
+				}
+			}
+		}
+	}
+
+	// Decide if the turns is valid
+	let forbidden = {
+		let mut forbidden = false;
+		let mut pair_index = 0;
+		'outer: for group_a_id in 0..level.groups.len() {
+			if group_rotations[group_a_id] != 0 {
+				while pair_index < level.forbidden_group_pairs.len() {
+					let (a, b) = level.forbidden_group_pairs[pair_index];
+					if a > group_a_id {
+						break;
+					}
+					if a == group_a_id && group_rotations[b] != 0 {
+						forbidden = true;
+						break 'outer;
+					}
+					pair_index += 1;
+				}
+			}
+		}
+		forbidden
+	};
+
+	if forbidden {
+		// TODO: Emit an event informing other systems the rotation hadn't went through.
+		return;
+	}
+
+	// Apply rotations
+	for (group_data, &rotation) in level.groups.iter().zip(group_rotations.iter()) {
+		if rotation == 0 {
+			continue;
+		}
+		let direction = if rotation > 0 {
+			CycleTurningDirection::Nominal
+		} else {
+			CycleTurningDirection::Reverse
+		};
 		update_event.send(GameLayoutChanged);
 		single_events.send_batch(
-			cycles_q
-				.get(group_rotation.0.target_cycle)
-				.into_iter()
-				.flat_map(|links| &links.0)
-				.map(|&(id, relative_direction)| RotateCycle {
-					target_cycle: id,
-					direction: group_rotation.0.direction * relative_direction,
+			group_data
+				.cycles
+				.iter()
+				.map(|&(id, relative_direction)| {
+					// println!("Sending {}", id);
+					RotateCycle {
+						target_cycle: cycle_index.0[id],
+						direction: direction * relative_direction,
+						amount: rotation.unsigned_abs() as usize,
+					}
 				})
 				.map(RotateSingleCycle),
 		);
 	}
 }
 
+/// System that carries out the rotations on cycles hit by an event queueing a rotation.
 fn cycle_rotation_system(
 	cycles_q: Query<&CycleVertices>,
 	mut events: EventReader<RotateSingleCycle>,
@@ -140,27 +226,53 @@ fn cycle_rotation_system(
 	mut objects_q: Query<&mut VertexPosition>,
 ) {
 	for event in events.read() {
+		if event.0.amount == 0 {
+			log::warn!("0 rotation was emitted.");
+			continue;
+		}
 		if let Ok(cycle_vertices) = cycles_q
 			.get(event.0.target_cycle)
 			.inspect_err(|e| log::warn!("{e}"))
 		{
-			let vertex_ids_wrapped =
-				get_flipped_wrapped_iterator(&cycle_vertices.0, event.0.direction);
-			let mut cached_object_id = None;
-			for vertex_id in vertex_ids_wrapped {
-				if let Some(cached_object_id) = cached_object_id {
-					if let Ok(mut object_pos) = objects_q
-						.get_mut(cached_object_id)
+			let n_vertices = cycle_vertices.0.len();
+			let amount = {
+				let step = event.0.amount % n_vertices;
+				if step == 0 {
+					// NOOP, we are done
+					continue;
+				}
+				match event.0.direction {
+					CycleTurningDirection::Nominal => step,
+					CycleTurningDirection::Reverse => n_vertices - step,
+				}
+			};
+			fn gcd(mut a: usize, mut b: usize) -> usize {
+				while a > 0 {
+					(a, b) = (b % a, a);
+				}
+				b
+			}
+			let n_loops = gcd(amount, n_vertices);
+			let loop_len = n_vertices / n_loops;
+			for loop_id in 0..n_loops {
+				let mut cached_object_id = None;
+				for i in 0..loop_len + 1 {
+					let index = (loop_id + amount * i) % n_vertices;
+					let vertex_id = cycle_vertices.0[index];
+					if let Some(cached_object_id) = cached_object_id {
+						if let Ok(mut object_pos) = objects_q
+							.get_mut(cached_object_id)
+							.inspect_err(|e| log::warn!("{e}"))
+						{
+							object_pos.0 = vertex_id;
+						}
+					}
+					if let Ok(mut placed_object_id) = vertices_q
+						.get_mut(vertex_id)
 						.inspect_err(|e| log::warn!("{e}"))
 					{
-						object_pos.0 = vertex_id;
+						std::mem::swap(&mut cached_object_id, &mut placed_object_id.0);
 					}
-				}
-				if let Ok(mut placed_object_id) = vertices_q
-					.get_mut(vertex_id)
-					.inspect_err(|e| log::warn!("{e}"))
-				{
-					std::mem::swap(&mut cached_object_id, &mut placed_object_id.0);
 				}
 			}
 		}

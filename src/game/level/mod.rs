@@ -18,9 +18,17 @@ pub struct LevelData {
 	pub vertices: Vec<VertexData>,
 	/// Data for all cycles in the level
 	pub cycles: Vec<CycleData>,
+	/// Data for all groups of cycles in the level, sorted in topological order (lower indices need to be evaluated before higher ones)
+	pub groups: Vec<GroupData>,
+	/// List of group pairs, which cannot be turned at once
+	/// Sorted in increasing lexicographic order
+	pub forbidden_group_pairs: Vec<(usize, usize)>,
 	/// Data for all cycle links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_links: Vec<DeclaredLinkData>,
+	/// Data for all one way links that have been explicitly declared in the level file.
+	/// Will be used for rendering the links
+	pub declared_one_way_links: Vec<DeclaredLinkData>,
 }
 
 /// Description of a single vertex
@@ -44,8 +52,21 @@ pub struct CycleData {
 	pub vertex_indices: Vec<usize>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
-	/// All cycles that have to turn when this cycle is turned, including itself
-	pub link_closure: Vec<(usize, LinkedCycleDirection)>,
+	/// Group this cycle belongs to
+	pub group: usize,
+	/// The relative orientation of the cycle in regards to the group
+	pub orientation_within_group: LinkedCycleDirection,
+}
+
+/// Description of a group of cycles
+#[derive(Debug, Clone, Reflect)]
+pub struct GroupData {
+	/// Indices into [`LevelData::cycles`]
+	/// identifies the cycles that belong to the group
+	/// All cycles that have to turn when this cycle is turned and in which direction relative to the nominal direction of the entire group
+	pub cycles: Vec<(usize, LinkedCycleDirection)>,
+	/// One Way Links to other groups that should get triggered by this one.
+	pub linked_groups: Vec<OneWayLinkData>,
 }
 
 /// Description of a declared (and visualized) cycle link
@@ -57,6 +78,77 @@ pub struct DeclaredLinkData {
 	pub dest_cycle: usize,
 	/// Relative turning direction between the linked cycles
 	pub direction: LinkedCycleDirection,
+}
+
+#[derive(Debug, Clone, Copy, Reflect, PartialEq, Eq)]
+pub struct OneWayLinkData {
+	/// The group this link goes to
+	pub target_group: usize,
+	/// Relative turning direction between the linked groups
+	pub direction: LinkedCycleDirection,
+	/// How many copies of this link are present
+	pub multiplicity: u64,
+	/// An Option of (source_cycle, target_cycle) indices, present only if relevant (TODO: Detectors!!)
+	pub source_cycle_data: Option<usize>,
+	/// An Option of (source_cycle, target_cycle) indices, present only if relevant
+	pub target_cycle_data: Option<usize>,
+}
+
+impl OneWayLinkData {
+	pub fn try_merge(a: &OneWayLinkData, b: &OneWayLinkData) -> Option<OneWayLinkData> {
+		if a.target_group != b.target_group
+			|| a.source_cycle_data != b.source_cycle_data
+			|| a.target_cycle_data != b.target_cycle_data
+		{
+			return None;
+		}
+		let (direction, multiplicity) = if a.direction == b.direction {
+			(a.direction, a.multiplicity + b.multiplicity)
+		} else {
+			match u64::cmp(&a.multiplicity, &b.multiplicity) {
+				std::cmp::Ordering::Less => (b.direction, b.multiplicity - a.multiplicity),
+				std::cmp::Ordering::Equal => (LinkedCycleDirection::Coincident, 0),
+				std::cmp::Ordering::Greater => (a.direction, a.multiplicity - b.multiplicity),
+			}
+		};
+		Some(OneWayLinkData {
+			target_group: a.target_group,
+			direction,
+			multiplicity,
+			source_cycle_data: a.source_cycle_data,
+			target_cycle_data: a.target_cycle_data,
+		})
+	}
+
+	/// A comparison function that sorts objects in a way as to place mergeable ones together
+	pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
+		// First we compare unmergeable attributes
+		match self.target_group.cmp(&other.target_group) {
+			core::cmp::Ordering::Equal => {}
+			ord => return ord,
+		}
+		match self.source_cycle_data.cmp(&other.source_cycle_data) {
+			core::cmp::Ordering::Equal => {}
+			ord => return ord,
+		}
+		match self.target_cycle_data.cmp(&other.target_cycle_data) {
+			core::cmp::Ordering::Equal => {}
+			ord => return ord,
+		}
+		// Then the ordering on the mergeable ones is arbitrary, so we leave it undefined
+		// We do have to uphold that PartialOrd and PartialEq agree though.
+		match (self.direction, other.direction) {
+			(LinkedCycleDirection::Coincident, LinkedCycleDirection::Coincident) => {}
+			(LinkedCycleDirection::Coincident, LinkedCycleDirection::Inverse) => {
+				return std::cmp::Ordering::Greater
+			}
+			(LinkedCycleDirection::Inverse, LinkedCycleDirection::Coincident) => {
+				return std::cmp::Ordering::Less
+			}
+			(LinkedCycleDirection::Inverse, LinkedCycleDirection::Inverse) => {}
+		}
+		self.multiplicity.cmp(&other.multiplicity)
+	}
 }
 
 /// Computed placement of a cycle
@@ -86,7 +178,7 @@ pub enum ObjectData {
 	Player,
 }
 
-#[derive(Component, Clone, Copy, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub enum GlyphData {
 	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
 	Flag,
@@ -226,6 +318,12 @@ impl std::ops::Mul for LinkedCycleDirection {
 		} else {
 			LinkedCycleDirection::Inverse
 		}
+	}
+}
+
+impl std::ops::MulAssign for LinkedCycleDirection {
+	fn mul_assign(&mut self, rhs: Self) {
+		*self = *self * rhs
 	}
 }
 
