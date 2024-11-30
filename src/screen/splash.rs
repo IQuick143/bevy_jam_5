@@ -1,8 +1,8 @@
 //! A splash screen that plays briefly at startup.
 
 use bevy::{
+	image::{ImageLoaderSettings, ImageSampler},
 	prelude::*,
-	render::texture::{ImageLoaderSettings, ImageSampler},
 };
 
 use super::Screen;
@@ -57,7 +57,7 @@ fn spawn_splash(mut commands: Commands, asset_server: Res<AssetServer>) {
 					width: Val::Percent(70.0),
 					..default()
 				},
-				UiImage::new(asset_server.load_with_settings(
+				ImageNode::new(asset_server.load_with_settings(
 					// This should be an embedded asset for instant loading, but that is
 					// currently [broken on Windows Wasm builds](https://github.com/bevyengine/bevy/issues/14246).
 					"images/splash.png",
@@ -104,7 +104,7 @@ fn tick_fade_in_out(time: Res<Time>, mut animation_query: Query<&mut UiImageFade
 	}
 }
 
-fn apply_fade_in_out(mut animation_query: Query<(&UiImageFadeInOut, &mut UiImage)>) {
+fn apply_fade_in_out(mut animation_query: Query<(&UiImageFadeInOut, &mut ImageNode)>) {
 	for (anim, mut image) in &mut animation_query {
 		image.color.set_alpha(anim.alpha())
 	}
