@@ -1,15 +1,10 @@
 mod utils {
 	use crate::game::{
-		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, VertexDebugID},
-		level::{GlyphData, ObjectData, ThingData},
+		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, Vertex},
+		level::{parser, GlyphData, LevelData, ObjectData, ThingData},
 		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
-	};
-
-	use super::super::{
-		level::{parser, LevelData},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
-	#[allow(unused_imports)]
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
 	pub fn setup_app() -> App {
@@ -20,13 +15,22 @@ mod utils {
 			super::super::logic::plugin,
 			super::super::history::plugin,
 			super::super::spawn::plugin,
-		)) // Disable spawning of visual entities
+		))
+		.add_systems(
+			LevelInitialization,
+			assign_debug_ids.after(LevelInitializationSet::SpawnPrimaryEntities),
+		)
+		// Disable spawning of visual entities
 		.configure_sets(
 			LevelInitialization,
 			LevelInitializationSet::SpawnVisuals.run_if(|| false),
 		);
 		app
 	}
+
+	/// A vertex (node) on the circle
+	#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+	pub struct VertexDebugID(pub usize);
 
 	/// Resource for extracting vertex information from the game
 	#[derive(Debug, Clone)]
@@ -55,6 +59,12 @@ mod utils {
 				return true;
 			}
 			false
+		}
+	}
+
+	fn assign_debug_ids(query: Query<Entity, Added<Vertex>>, mut commands: Commands) {
+		for (i, id) in query.iter().enumerate() {
+			commands.entity(id).insert(VertexDebugID(i));
 		}
 	}
 
@@ -128,13 +138,9 @@ mod utils {
 	}
 
 	/// System that counts how many cycles there are.
-	fn count_cycles_system(cycles: Query<&Cycle>, cycle_master: Query<&CycleEntities>) -> usize {
+	fn count_cycles_system(cycles: Query<&Cycle>, cycle_master: Res<CycleEntities>) -> usize {
 		let cycle_count = cycles.iter().count();
-		let declared_count = cycle_master
-			.get_single()
-			.expect("There should be exactly one CycleEntities entity")
-			.0
-			.len();
+		let declared_count = cycle_master.0.len();
 		assert_eq!(
 			cycle_count, declared_count,
 			"Number of Cycle entities should match the number of entities in CycleEntities"
@@ -145,10 +151,10 @@ mod utils {
 	fn turn_system(
 		In((id, amount)): In<(usize, i32)>,
 		mut events: EventWriter<RotateCycleGroup>,
-		cycle_list: Query<&CycleEntities>,
+		cycle_list: Res<CycleEntities>,
 	) {
 		events.send(RotateCycleGroup(RotateCycle {
-			target_cycle: cycle_list.single().0[id],
+			target_cycle: cycle_list.0[id],
 			direction: if amount >= 0 {
 				CycleTurningDirection::Nominal
 			} else {

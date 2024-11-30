@@ -41,11 +41,6 @@ pub struct VertexPosition(pub Entity);
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
 
-/// A vertex (node) on the circle
-#[cfg(feature = "dev")]
-#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct VertexDebugID(pub usize);
-
 /// Component of the Vertex representing a link to an object occupying this place
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct PlacedObject(pub Option<Entity>);
@@ -53,10 +48,6 @@ pub struct PlacedObject(pub Option<Entity>);
 /// Component of the Vertex representing a link to a glyph occupying this place
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct PlacedGlyph(pub Option<Entity>);
-
-/// Component carrying the data mapping level indices to cycle entities.
-#[derive(Component, Clone, Debug, Default, Reflect)]
-pub struct CycleEntities(pub Vec<Entity>);
 
 /// A component describing a cycle
 #[derive(Component, Debug, Clone, Reflect)]
@@ -74,8 +65,12 @@ pub struct Cycle {
 pub struct CycleVertices(pub Vec<Entity>);
 
 /// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Resource, Debug, Clone, Reflect)]
 pub struct LevelHandle(pub Handle<LevelData>);
+
+/// Component carrying the data mapping level indices to cycle entities.
+#[derive(Resource, Clone, Debug, Default, Reflect)]
+pub struct CycleEntities(pub Vec<Entity>);
 
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`Parent`].

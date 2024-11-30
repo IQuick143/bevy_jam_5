@@ -10,8 +10,7 @@ mod inputs;
 pub mod level;
 pub mod logic;
 pub mod spawn;
-#[cfg(debug_assertions)]
-#[allow(dead_code)]
+#[cfg(test)]
 pub mod test;
 
 pub mod prelude {
