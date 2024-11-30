@@ -83,6 +83,7 @@ mod utils {
 		let mut app = setup_app();
 		app.world_mut()
 			.run_system_once_with(level, load_level)
+			.expect("System should've ran.")
 			.expect("Level should've parsed!");
 		// An update is needed to trigger the spawning logic
 		app.update();
@@ -171,16 +172,21 @@ mod utils {
 
 	impl GameLogicAppExt for App {
 		fn read_vertices(&mut self) -> VertexDebugData {
-			self.world_mut().run_system_once(read_system)
+			self.world_mut()
+				.run_system_once(read_system)
+				.expect("System should have all necessary objects.")
 		}
 
 		fn conut_cycles(&mut self) -> usize {
-			self.world_mut().run_system_once(count_cycles_system)
+			self.world_mut()
+				.run_system_once(count_cycles_system)
+				.expect("System should have all necessary objects.")
 		}
 
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) {
 			self.world_mut()
 				.run_system_once_with((cycle_id, amount), turn_system)
+				.expect("System should have all necessary objects.")
 		}
 	}
 }

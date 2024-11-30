@@ -1072,7 +1072,7 @@ impl LevelBuilder {
 							.expect("Color label appearences cannot be applied before all cycles are placed")
 							.position;
 						let angle_from_owner =
-							-Vec2::Y.angle_between(vertex_position - owner_cycle_position);
+							-Vec2::Y.angle_to(vertex_position - owner_cycle_position);
 						// Flip target angle if we want the labels inside the cycle
 						let target_angle = if p.place_outside_cycle {
 							angle_from_owner
@@ -1160,7 +1160,7 @@ impl LevelBuilder {
 					// Materialize all vertices between the marked ones
 					let next_relative_pos = next_fixed_pos - cycle_placement.position;
 					let vertex_count = next_fixed_vertex - current_fixed_vertex;
-					let mut segment_angle = next_relative_pos.angle_between(current_relative_pos);
+					let mut segment_angle = next_relative_pos.angle_to(current_relative_pos);
 					if segment_angle <= 0.0 {
 						segment_angle += 2.0 * PI;
 					}
@@ -1187,7 +1187,7 @@ impl LevelBuilder {
 				// and this segment covers the whole cycle
 				let vertex_count =
 					first_fixed_vertex + cycle_data.vertex_indices.len() - current_fixed_vertex;
-				let mut segment_angle = first_relative_pos.angle_between(current_relative_pos);
+				let mut segment_angle = first_relative_pos.angle_to(current_relative_pos);
 				if first_fixed_vertex == current_fixed_vertex {
 					// I do not trust floats, so set this value explicitly
 					segment_angle = 2.0 * PI;
@@ -1289,7 +1289,7 @@ impl LevelBuilder {
 		let mut total_angle = 0.0;
 		if let Some(mut current) = points.next() {
 			for next in points {
-				let mut angle = next.angle_between(current);
+				let mut angle = next.angle_to(current);
 				if angle < 0.0 {
 					// Recalculate angles to [0, 2 * pi]
 					// so that we stay in clockwise movement

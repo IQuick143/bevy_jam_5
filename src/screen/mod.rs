@@ -29,7 +29,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and_then(ui_not_frozen)),
+			go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and(ui_not_frozen)),
 			do_screen_transitions,
 		),
 	);

@@ -19,6 +19,8 @@ use crate::{
 	screen::Screen,
 };
 
+use super::widgets::Containers;
+
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct HoverText;
 
@@ -46,20 +48,20 @@ fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
 	let margin = 10.0;
 	//	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
 	commands.spawn((
-		Text2dBundle {
-			text_2d_bounds: bevy::text::Text2dBounds {
-				size: Vec2::new(
-					HINT_TEXT_SIZE.x - margin * 2.0,
-					HINT_TEXT_SIZE.y - margin * 2.0,
-				),
-			},
-			transform: Transform::from_xyz(
-				0.0,
-				-GAME_AREA.y / 2.0 + HINT_TEXT_SIZE.y / 2.0,
-				layers::HINT_TEXT_PANEL,
-			),
-			text_anchor: bevy::sprite::Anchor::Center,
-			text: Text::from_section("", get_text_style(&font)).with_justify(JustifyText::Left),
+		bevy::text::TextBounds {
+			width: Some(HINT_TEXT_SIZE.x - margin * 2.0),
+			height: Some(HINT_TEXT_SIZE.y - margin * 2.0),
+		},
+		Transform::from_xyz(
+			0.0,
+			-GAME_AREA.y / 2.0 + HINT_TEXT_SIZE.y / 2.0,
+			layers::HINT_TEXT_PANEL,
+		),
+		bevy::sprite::Anchor::Center,
+		Text2d::default(),
+		get_text_style(&font),
+		TextLayout {
+			justify: JustifyText::Left,
 			..default()
 		},
 		HoverText,
@@ -71,12 +73,15 @@ fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
 	));
 }
 
-fn get_text_style(font: &GlobalFont) -> TextStyle {
-	TextStyle {
-		font: font.0.clone_weak(),
-		font_size: 32.0,
-		color: super::palette::LABEL_TEXT,
-	}
+fn get_text_style(font: &GlobalFont) -> (TextFont, TextColor) {
+	(
+		TextFont {
+			font: font.0.clone_weak(),
+			font_size: 32.0,
+			..default()
+		},
+		TextColor(super::palette::LABEL_TEXT),
+	)
 }
 
 fn update_hover(
@@ -89,7 +94,7 @@ fn update_hover(
 	let (camera, camera_transform) = camera_q.single();
 	let cursor_pos = window
 		.cursor_position()
-		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p));
+		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok());
 	if let Some(cursor_pos) = cursor_pos {
 		let mut closest_hoverable: Option<Entity> = None;
 		let mut closest_distance = f32::MAX;
@@ -135,10 +140,9 @@ fn update_hover(
 }
 
 fn update_hover_text(
-	mut text_query: Query<(&mut Text, &mut Visibility), With<HoverText>>,
+	mut text_query: Query<(&mut Text2d, &mut Visibility), With<HoverText>>,
 	hint_text: Res<HintText>,
 	state: Res<State<Screen>>,
-	font: Res<GlobalFont>,
 ) {
 	let should_be_visible = *state.get() == Screen::Playing;
 
@@ -158,6 +162,6 @@ fn update_hover_text(
 			true => Visibility::Visible,
 			false => Visibility::Hidden,
 		};
-		text.sections = vec![TextSection::new(chosen_text.clone(), get_text_style(&font))];
+		text.0.clone_from(&chosen_text);
 	}
 }

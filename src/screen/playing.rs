@@ -27,11 +27,11 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
 					send_event(GameUiAction::NextLevel).run_if(
-						char_input_pressed('n').and_then(resource_equals(IsLevelCompleted(true))),
+						char_input_pressed('n').and(resource_equals(IsLevelCompleted(true))),
 					),
 					send_event(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
-							.and_then(|history: Res<MoveHistory>| !history.is_empty()),
+							.and(|history: Res<MoveHistory>| !history.is_empty()),
 					),
 					game_ui_input_recording_system,
 				)
@@ -40,7 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
 				(load_level, update_level_name_display)
 					.chain()
-					.run_if(on_event::<LoadLevel>()),
+					.run_if(on_event::<LoadLevel>),
 				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
@@ -83,16 +83,13 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		.insert(StateScoped(Screen::Playing))
 		.with_children(|parent| {
 			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.0),
-						flex_direction: FlexDirection::Row,
-						column_gap: Val::Px(10.0),
-						padding: UiRect::all(Val::Px(10.0)),
-						align_items: AlignItems::Start,
-						justify_content: JustifyContent::Start,
-						..default()
-					},
+				.spawn(Node {
+					width: Val::Percent(100.0),
+					flex_direction: FlexDirection::Row,
+					column_gap: Val::Px(10.0),
+					padding: UiRect::all(Val::Px(10.0)),
+					align_items: AlignItems::Start,
+					justify_content: JustifyContent::Start,
 					..default()
 				})
 				.with_children(|parent| {
@@ -107,17 +104,14 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						.insert((GameUiAction::Undo, UndoButton));
 				});
 			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.0),
-						flex_direction: FlexDirection::Row,
-						column_gap: Val::Px(10.0),
-						padding: UiRect::all(Val::Px(10.0)),
-						align_items: AlignItems::Start,
-						justify_content: JustifyContent::End,
-						position_type: PositionType::Absolute,
-						..default()
-					},
+				.spawn(Node {
+					width: Val::Percent(100.0),
+					flex_direction: FlexDirection::Row,
+					column_gap: Val::Px(10.0),
+					padding: UiRect::all(Val::Px(10.0)),
+					align_items: AlignItems::Start,
+					justify_content: JustifyContent::End,
+					position_type: PositionType::Absolute,
 					..default()
 				})
 				.with_children(|parent| {
@@ -134,32 +128,25 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						));
 				});
 			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.0),
-						height: Val::Px(50.0),
-						margin: UiRect::all(Val::Px(10.0)),
-						position_type: PositionType::Absolute,
-						justify_content: JustifyContent::Center,
-						align_items: AlignItems::Center,
-						..default()
-					},
+				.spawn(Node {
+					width: Val::Percent(100.0),
+					height: Val::Px(50.0),
+					margin: UiRect::all(Val::Px(10.0)),
+					position_type: PositionType::Absolute,
+					justify_content: JustifyContent::Center,
+					align_items: AlignItems::Center,
 					..default()
 				})
 				.with_children(|parent| {
 					parent.spawn((
 						LevelNameBox,
-						TextBundle {
-							text: Text::from_section(
-								"", /* Will be set by load_level */
-								TextStyle {
-									font: font.0.clone_weak(),
-									font_size: 35.0,
-									color: ui_palette::LABEL_TEXT,
-								},
-							),
+						Text::default(),
+						TextFont {
+							font: font.0.clone_weak(),
+							font_size: 35.0,
 							..default()
 						},
+						TextColor(ui_palette::LABEL_TEXT),
 					));
 				});
 		});
@@ -214,7 +201,7 @@ fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
 	playing_level: Res<State<PlayingLevel>>,
 	level_list: Res<LoadedLevelList>,
-	mut query: Query<&mut Style, With<NextLevelButton>>,
+	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
 	let level_index = playing_level
 		.get()
@@ -226,22 +213,22 @@ fn update_next_level_button_display(
 	} else {
 		Display::None
 	};
-	for mut style in &mut query {
-		style.display = display;
+	for mut node in &mut query {
+		node.display = display;
 	}
 }
 
 fn update_undo_button_display(
 	history: Res<MoveHistory>,
-	mut query: Query<&mut Style, With<UndoButton>>,
+	mut query: Query<&mut Node, With<UndoButton>>,
 ) {
 	let display = if history.is_empty() {
 		Display::None
 	} else {
 		Display::DEFAULT
 	};
-	for mut style in &mut query {
-		style.display = display;
+	for mut node in &mut query {
+		node.display = display;
 	}
 }
 
@@ -254,9 +241,7 @@ fn update_level_name_display(
 		let level_data = level_assets
 			.get(level_handle)
 			.expect("Got an invalid level handle");
-		level_name_q.single_mut().sections[0]
-			.value
-			.clone_from(&level_data.name);
+		level_name_q.single_mut().0.clone_from(&level_data.name);
 	}
 }
 

@@ -7,7 +7,7 @@ use crate::assets::{HandleMap, SoundtrackKey};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<IsSoundtrack>();
-	app.observe(play_soundtrack);
+	app.add_observer(play_soundtrack);
 }
 
 fn play_soundtrack(
@@ -25,13 +25,11 @@ fn play_soundtrack(
 		PlaySoundtrack::Disable => return,
 	};
 	commands.spawn((
-		AudioSourceBundle {
-			source: soundtrack_handles[&soundtrack_key].clone_weak(),
-			settings: PlaybackSettings {
-				mode: PlaybackMode::Loop,
-				volume: Volume::new(3.5),
-				..default()
-			},
+		AudioPlayer(soundtrack_handles[&soundtrack_key].clone_weak()),
+		PlaybackSettings {
+			mode: PlaybackMode::Loop,
+			volume: Volume::new(3.5),
+			..default()
 		},
 		IsSoundtrack,
 	));
