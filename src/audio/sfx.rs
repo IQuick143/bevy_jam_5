@@ -6,7 +6,7 @@ use bevy::{
 use crate::assets::{HandleMap, SfxKey};
 
 pub(super) fn plugin(app: &mut App) {
-	app.observe(play_sfx);
+	app.add_observer(play_sfx);
 }
 
 fn play_sfx(
@@ -17,14 +17,14 @@ fn play_sfx(
 	let sfx_key = match trigger.event() {
 		PlaySfx::Effect(key) => *key,
 	};
-	commands.spawn(AudioSourceBundle {
-		source: sfx_handles[&sfx_key].clone_weak(),
-		settings: PlaybackSettings {
+	commands.spawn((
+		AudioPlayer(sfx_handles[&sfx_key].clone_weak()),
+		PlaybackSettings {
 			mode: PlaybackMode::Despawn,
 			volume: Volume::new(sfx_key.volume_multiplier()),
 			..default()
 		},
-	});
+	));
 }
 
 /// Trigger this event to play a single sound effect.

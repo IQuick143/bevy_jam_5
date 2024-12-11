@@ -18,7 +18,7 @@ pub fn plugin(app: &mut App) {
 		(
 			(
 				(listen_for_moves, move_objects).chain(),
-				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>()),
+				cycle_turning_animation_system.run_if(on_event::<RotateSingleCycle>),
 			)
 				.in_set(AppSet::UpdateVisuals),
 			spin_animation_system,
@@ -66,7 +66,7 @@ impl AnimatedObject {
 		Some(if let Some(source) = self.start_direction {
 			let t = animation_easing_function(self.progress).clamp(0.0, 1.0);
 			let dir = {
-				let mut angle = Vec2::angle_between(*source, *target);
+				let mut angle = Vec2::angle_to(*source, *target);
 				match self.rotation_direction {
 					RotationDirection::Clockwise => {
 						if angle > 0.0 {
@@ -266,7 +266,7 @@ fn move_objects(mut objects: Query<(&mut Transform, &mut AnimatedObject)>, time:
 		if animation.progress >= 1.0 {
 			continue;
 		}
-		animation.progress += (time.delta_seconds() / ANIMATION_TIME).min(1.0);
+		animation.progress += (time.delta_secs() / ANIMATION_TIME).min(1.0);
 		if let Some(goal) = animation.sample() {
 			transform.translation.x = goal.x;
 			transform.translation.y = goal.y;
@@ -278,7 +278,7 @@ fn spin_animation_system(
 	mut query: Query<(&mut SpinAnimation, &mut Transform)>,
 	time: Res<Time<Real>>,
 ) {
-	let delta_seconds = time.delta_seconds();
+	let delta_seconds = time.delta_secs();
 	for (mut animation, mut transform) in &mut query {
 		animation.progress(delta_seconds);
 		transform.rotation = Quat::from_axis_angle(Vec3::Z, animation.sample());
@@ -289,7 +289,7 @@ fn jump_turn_animation_system(
 	mut query: Query<(&mut JumpTurnAnimation, &mut Transform)>,
 	time: Res<Time<Real>>,
 ) {
-	let delta_seconds = time.delta_seconds();
+	let delta_seconds = time.delta_secs();
 	for (mut animation, mut transform) in &mut query {
 		animation.progress(delta_seconds);
 		transform.rotation = Quat::from_axis_angle(Vec3::Z, animation.sample());

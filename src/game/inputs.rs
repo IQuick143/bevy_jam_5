@@ -47,7 +47,7 @@ fn cycle_inputs_system(
 	let (camera, camera_transform) = camera_q.single();
 	let cursor_pos = window
 		.cursor_position()
-		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p));
+		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok());
 	if let Some(cursor_pos) = cursor_pos {
 		let (nearest_cycle, _) = cycles_q
 			.iter()

@@ -14,7 +14,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Loading), enter_loading);
 	app.add_systems(
 		Update,
-		continue_to_title.run_if(in_state(Screen::Loading).and_then(all_assets_loaded)),
+		continue_to_title.run_if(in_state(Screen::Loading).and(all_assets_loaded)),
 	);
 }
 

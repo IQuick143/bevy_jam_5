@@ -6,16 +6,13 @@ use crate::{
 	graphics,
 	ui::prelude::*,
 };
-use bevy::{
-	prelude::*,
-	sprite::{MaterialMesh2dBundle, Mesh2dHandle},
-};
+use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Title), enter_title);
 	app.add_systems(
 		Update,
-		handle_title_action.run_if(in_state(Screen::Title).and_then(ui_not_frozen)),
+		handle_title_action.run_if(in_state(Screen::Title).and(ui_not_frozen)),
 	);
 	// Create the material later, when all of its dependencies have been initialized
 	app.add_systems(Startup, |mut commands: Commands| {
@@ -73,11 +70,8 @@ fn enter_title(
 		.insert(StateScoped(Screen::Title))
 		.with_children(|children| {
 			// Invisible spacer node to bring the menu lower
-			children.spawn(NodeBundle {
-				style: Style {
-					height: Val::Px(200.0),
-					..default()
-				},
+			children.spawn(Node {
+				height: Val::Px(200.0),
 				..default()
 			});
 			children
@@ -94,24 +88,18 @@ fn enter_title(
 		});
 	commands.spawn((
 		StateScoped(Screen::Title),
-		SpriteBundle {
-			sprite: Sprite {
-				custom_size: Some(graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
-				..default()
-			},
-			texture: image_handles[&ImageKey::Title].clone_weak(),
-			transform: Transform::from_translation(Vec3::Z * graphics::layers::TITLE_IMAGE),
+		Sprite {
+			custom_size: Some(graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
+			image: image_handles[&ImageKey::Title].clone_weak(),
 			..default()
 		},
+		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_IMAGE),
 	));
 	commands.spawn((
 		StateScoped(Screen::Title),
-		MaterialMesh2dBundle {
-			mesh: Mesh2dHandle(meshes.add(Rectangle::from_size(ANIMATED_BACKGROUND_MESH_SIZE))),
-			material: background_material.clone_weak(),
-			transform: Transform::from_translation(Vec3::Z * graphics::layers::TITLE_BACKDROP),
-			..default()
-		},
+		Mesh2d(meshes.add(Rectangle::from_size(ANIMATED_BACKGROUND_MESH_SIZE))),
+		MeshMaterial2d(background_material.clone_weak()),
+		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_BACKDROP),
 	));
 }
 
