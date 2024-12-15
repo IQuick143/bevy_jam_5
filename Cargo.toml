@@ -43,6 +43,8 @@ log = { version = "0.4", features = [
 ] }
 rand =  { version = "0.8", features = ["small_rng"] }
 regex = "1.10.5"
+logos = "0.15.0"
+pomelo = "0.1.5"
 
 [features]
 default = [
