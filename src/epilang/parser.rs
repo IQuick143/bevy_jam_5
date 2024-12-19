@@ -72,7 +72,6 @@ pomelo! {
 	%type namedarg NamedArgument;
 	%type capturelist (Range<SourceLocation>, Vec<String>);
 	%type namelist Vec<String>;
-	%type pident (Range<SourceLocation>, String);
 
 	// Underlying types of terminals
 	%type IntLiteral u32;
