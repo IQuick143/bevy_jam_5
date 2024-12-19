@@ -1,6 +1,7 @@
 #![allow(unused)] // TODO: Use it somewhere and then drop this
 
 mod ast;
+mod interpreter;
 mod lex;
 mod parser;
 
