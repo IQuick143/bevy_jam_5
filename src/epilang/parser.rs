@@ -179,58 +179,58 @@ pomelo! {
 	namelist ::= Identifier((_, first)) Comma Identifier((_, second)) { vec![first, second] }
 	namelist ::= namelist(mut params) Comma Identifier((_, next)) { params.push(next); params }
 	expr ::= Plus(start_loc) expr(operand) [Not] {
-		Expression::new(start_loc.start..operand.loc.end, ExpressionContent::UnaryPlus(operand))
+		Expression::new(start_loc.start..operand.loc.end, ExpressionContent::Operation(OperationExpression::UnaryPlus(operand)))
 	}
 	expr ::= Minus(start_loc) expr(operand) [Not] {
-		Expression::new(start_loc.start..operand.loc.end, ExpressionContent::UnaryMinus(operand))
+		Expression::new(start_loc.start..operand.loc.end, ExpressionContent::Operation(OperationExpression::UnaryMinus(operand)))
 	}
 	expr ::= Not(start_loc) expr(operand) {
-		Expression::new(start_loc.start..operand.loc.end, ExpressionContent::Not(operand))
+		Expression::new(start_loc.start..operand.loc.end, ExpressionContent::Operation(OperationExpression::Not(operand)))
 	}
 	expr ::= expr(left) Plus expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::BinaryPlus(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::BinaryPlus(left, right)))
 	}
 	expr ::= expr(left) Minus expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::BinaryMinus(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::BinaryMinus(left, right)))
 	}
 	expr ::= expr(left) Asterisk expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Multiply(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::Multiply(left, right)))
 	}
 	expr ::= expr(left) Slash expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Divide(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::Divide(left, right)))
 	}
 	expr ::= expr(left) DoubleSlash expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::IntegerDivide(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::IntegerDivide(left, right)))
 	}
 	expr ::= expr(left) Percent expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Modulo(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::Modulo(left, right)))
 	}
 	expr ::= expr(left) Pow expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Power(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::Power(left, right)))
 	}
 	expr ::= expr(left) And expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::And(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::And(left, right)))
 	}
 	expr ::= expr(left) Or expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Or(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::Or(left, right)))
 	}
 	expr ::= expr(left) Equals expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::CompareEqual(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::CompareEqual(left, right)))
 	}
 	expr ::= expr(left) NotEquals expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::CompareNotEqual(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::CompareNotEqual(left, right)))
 	}
 	expr ::= expr(left) Less expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::CompareLess(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::CompareLess(left, right)))
 	}
 	expr ::= expr(left) Greater expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::CompareGreater(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::CompareGreater(left, right)))
 	}
 	expr ::= expr(left) LessEquals expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::CompareLessEqual(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::CompareLessEqual(left, right)))
 	}
 	expr ::= expr(left) GreaterEquals expr(right) {
-		Expression::new(left.loc.start..right.loc.end, ExpressionContent::CompareGreaterEqual(left, right))
+		Expression::new(left.loc.start..right.loc.end, ExpressionContent::Operation(OperationExpression::CompareGreaterEqual(left, right)))
 	}
 }
 

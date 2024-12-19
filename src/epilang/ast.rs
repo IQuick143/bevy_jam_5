@@ -166,6 +166,11 @@ pub enum ExpressionContent {
 	/// }
 	/// ```
 	Lambda(Vec<String>, Expression),
+	Operation(OperationExpression),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum OperationExpression {
 	UnaryPlus(Expression),
 	UnaryMinus(Expression),
 	Not(Expression),

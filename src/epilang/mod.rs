@@ -198,15 +198,17 @@ mod test {
 						},
 						Expression {
 							loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 10),
-							value: Box::new(ExpressionContent::BinaryPlus(
-								Expression {
-									loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 5),
-									value: Box::new(ExpressionContent::IntLiteral(4)),
-								},
-								Expression {
-									loc: SourceLocation::new(0, 8)..SourceLocation::new(0, 10),
-									value: Box::new(ExpressionContent::MacroParameter(0)),
-								}
+							value: Box::new(ExpressionContent::Operation(
+								OperationExpression::BinaryPlus(
+									Expression {
+										loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 5),
+										value: Box::new(ExpressionContent::IntLiteral(4)),
+									},
+									Expression {
+										loc: SourceLocation::new(0, 8)..SourceLocation::new(0, 10),
+										value: Box::new(ExpressionContent::MacroParameter(0)),
+									}
+								)
 							))
 						}
 					))
@@ -239,44 +241,44 @@ mod test {
 									},
 									Expression {
 										loc: SourceLocation::new(0, 13)..SourceLocation::new(0, 48),
-										value: Box::new(ExpressionContent::BinaryMinus(
+										value: Box::new(ExpressionContent::Operation(OperationExpression::BinaryMinus(
 											Expression {
 												loc: SourceLocation::new(0, 13)..SourceLocation::new(0, 44),
-												value: Box::new(ExpressionContent::BinaryPlus(
+												value: Box::new(ExpressionContent::Operation(OperationExpression::BinaryPlus(
 													Expression {
 														loc: SourceLocation::new(0, 13)..SourceLocation::new(0, 15),
 														value: Box::new(ExpressionContent::IntLiteral(42)),
 													},
 													Expression {
 														loc: SourceLocation::new(0, 18)..SourceLocation::new(0, 44),
-														value: Box::new(ExpressionContent::Divide(
+														value: Box::new(ExpressionContent::Operation(OperationExpression::Divide(
 															Expression {
 																loc: SourceLocation::new(0, 18)..SourceLocation::new(0, 40),
-																value: Box::new(ExpressionContent::Multiply(
+																value: Box::new(ExpressionContent::Operation(OperationExpression::Multiply(
 																	Expression {
 																		loc: SourceLocation::new(0, 18)..SourceLocation::new(0, 20),
-																		value: Box::new(ExpressionContent::UnaryMinus(Expression {
+																		value: Box::new(ExpressionContent::Operation(OperationExpression::UnaryMinus(Expression {
 																			loc: SourceLocation::new(0, 19)..SourceLocation::new(0, 20),
 																			value: Box::new(ExpressionContent::Identifier("n".to_owned())),
-																		})),
+																		}))),
 																	},
 																	Expression {
 																		loc: SourceLocation::new(0, 23)..SourceLocation::new(0, 40),
-																		value: Box::new(ExpressionContent::Power(
+																		value: Box::new(ExpressionContent::Operation(OperationExpression::Power(
 																			Expression {
 																				loc: SourceLocation::new(0, 23)..SourceLocation::new(0, 24),
 																				value: Box::new(ExpressionContent::Identifier("x".to_owned())),
 																			},
 																			Expression {
 																				loc: SourceLocation::new(0, 28)..SourceLocation::new(0, 40),
-																				value: Box::new(ExpressionContent::Power(
+																				value: Box::new(ExpressionContent::Operation(OperationExpression::Power(
 																					Expression {
 																						loc: SourceLocation::new(0, 28)..SourceLocation::new(0, 29),
 																						value: Box::new(ExpressionContent::IntLiteral(2)),
 																					},
 																					Expression {
 																						loc: SourceLocation::new(0, 33)..SourceLocation::new(0, 40),
-																						value: Box::new(ExpressionContent::BinaryMinus(
+																						value: Box::new(ExpressionContent::Operation(OperationExpression::BinaryMinus(
 																							Expression {
 																								loc: SourceLocation::new(0, 34)..SourceLocation::new(0, 35),
 																								value: Box::new(ExpressionContent::Identifier("n".to_owned())),
@@ -285,27 +287,27 @@ mod test {
 																								loc: SourceLocation::new(0, 38)..SourceLocation::new(0, 39),
 																								value: Box::new(ExpressionContent::IntLiteral(1)),
 																							},
-																						))
+																						)))
 																					},
-																				))
+																				)))
 																			},
-																		))
+																		)))
 																	},
-																))
+																)))
 															},
 															Expression {
 																loc: SourceLocation::new(0, 43)..SourceLocation::new(0, 44),
 																value: Box::new(ExpressionContent::IntLiteral(3)),
 															},
-														))
+														)))
 													},
-												))
+												)))
 											},
 											Expression {
 												loc: SourceLocation::new(0, 47)..SourceLocation::new(0, 48),
 												value: Box::new(ExpressionContent::Identifier("x".to_owned())),
 											},
-										))
+										)))
 									}
 								))
 							}
