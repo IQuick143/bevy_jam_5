@@ -171,24 +171,34 @@ pub enum ExpressionContent {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OperationExpression {
-	UnaryPlus(Expression),
-	UnaryMinus(Expression),
-	Not(Expression),
-	BinaryPlus(Expression, Expression),
-	BinaryMinus(Expression, Expression),
-	Multiply(Expression, Expression),
-	Divide(Expression, Expression),
-	IntegerDivide(Expression, Expression),
-	Modulo(Expression, Expression),
-	Power(Expression, Expression),
-	CompareLess(Expression, Expression),
-	CompareGreater(Expression, Expression),
-	CompareLessEqual(Expression, Expression),
-	CompareGreaterEqual(Expression, Expression),
-	CompareEqual(Expression, Expression),
-	CompareNotEqual(Expression, Expression),
-	And(Expression, Expression),
-	Or(Expression, Expression),
+	Unary(UnaryOperator, Expression),
+	Binary(BinaryOperator, Expression, Expression),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnaryOperator {
+	UnaryPlus,
+	UnaryMinus,
+	Not,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BinaryOperator {
+	BinaryPlus,
+	BinaryMinus,
+	Multiply,
+	Divide,
+	IntegerDivide,
+	Modulo,
+	Power,
+	CompareLess,
+	CompareGreater,
+	CompareLessEqual,
+	CompareGreaterEqual,
+	CompareEqual,
+	CompareNotEqual,
+	And,
+	Or,
 }
 
 #[derive(Clone, PartialEq, Default, Debug)]

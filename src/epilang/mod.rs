@@ -2,6 +2,7 @@
 
 mod ast;
 mod interpreter;
+mod ir;
 mod lex;
 mod parser;
 
@@ -199,7 +200,8 @@ mod test {
 						Expression {
 							loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 10),
 							value: Box::new(ExpressionContent::Operation(
-								OperationExpression::BinaryPlus(
+								OperationExpression::Binary(
+									BinaryOperator::BinaryPlus,
 									Expression {
 										loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 5),
 										value: Box::new(ExpressionContent::IntLiteral(4)),
@@ -241,44 +243,44 @@ mod test {
 									},
 									Expression {
 										loc: SourceLocation::new(0, 13)..SourceLocation::new(0, 48),
-										value: Box::new(ExpressionContent::Operation(OperationExpression::BinaryMinus(
+										value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::BinaryMinus,
 											Expression {
 												loc: SourceLocation::new(0, 13)..SourceLocation::new(0, 44),
-												value: Box::new(ExpressionContent::Operation(OperationExpression::BinaryPlus(
+												value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::BinaryPlus,
 													Expression {
 														loc: SourceLocation::new(0, 13)..SourceLocation::new(0, 15),
 														value: Box::new(ExpressionContent::IntLiteral(42)),
 													},
 													Expression {
 														loc: SourceLocation::new(0, 18)..SourceLocation::new(0, 44),
-														value: Box::new(ExpressionContent::Operation(OperationExpression::Divide(
+														value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::Divide,
 															Expression {
 																loc: SourceLocation::new(0, 18)..SourceLocation::new(0, 40),
-																value: Box::new(ExpressionContent::Operation(OperationExpression::Multiply(
+																value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::Multiply,
 																	Expression {
 																		loc: SourceLocation::new(0, 18)..SourceLocation::new(0, 20),
-																		value: Box::new(ExpressionContent::Operation(OperationExpression::UnaryMinus(Expression {
+																		value: Box::new(ExpressionContent::Operation(OperationExpression::Unary(UnaryOperator::UnaryMinus, Expression {
 																			loc: SourceLocation::new(0, 19)..SourceLocation::new(0, 20),
 																			value: Box::new(ExpressionContent::Identifier("n".to_owned())),
 																		}))),
 																	},
 																	Expression {
 																		loc: SourceLocation::new(0, 23)..SourceLocation::new(0, 40),
-																		value: Box::new(ExpressionContent::Operation(OperationExpression::Power(
+																		value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::Power,
 																			Expression {
 																				loc: SourceLocation::new(0, 23)..SourceLocation::new(0, 24),
 																				value: Box::new(ExpressionContent::Identifier("x".to_owned())),
 																			},
 																			Expression {
 																				loc: SourceLocation::new(0, 28)..SourceLocation::new(0, 40),
-																				value: Box::new(ExpressionContent::Operation(OperationExpression::Power(
+																				value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::Power,
 																					Expression {
 																						loc: SourceLocation::new(0, 28)..SourceLocation::new(0, 29),
 																						value: Box::new(ExpressionContent::IntLiteral(2)),
 																					},
 																					Expression {
 																						loc: SourceLocation::new(0, 33)..SourceLocation::new(0, 40),
-																						value: Box::new(ExpressionContent::Operation(OperationExpression::BinaryMinus(
+																						value: Box::new(ExpressionContent::Operation(OperationExpression::Binary(BinaryOperator::BinaryMinus,
 																							Expression {
 																								loc: SourceLocation::new(0, 34)..SourceLocation::new(0, 35),
 																								value: Box::new(ExpressionContent::Identifier("n".to_owned())),
