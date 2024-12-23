@@ -14,38 +14,51 @@ enum Instruction {
 	PushFloat(f32),
 	PushString(String),
 	// Value discarding
+	/// Discard top value from stack
 	DiscardValue,
 	// Scope management
+	/// Create a new scope
 	EnterScope,
+	/// Exit a scope
 	ExitScope,
+	/// Create a new scope for containing macro arguments
 	EnterMacroScope,
-	ExitMacroScope,
-	PushDollar,
-	PopDollar,
 	// Value access
+	/// Create a new variable, return nothing
 	CreateVariable(String),
+	/// Accesses variable and pushes its reference to stack
 	AccessVariable(String),
+	/// Accesses $n register and pushes the value to stack
 	AccessMacroRegister(usize),
+	/// Grab [L, R] (L from the top then R) from stack and perform assignment L = R, returning the new L value
+	Assign,
 	// Operations
 	BinaryOperation(ast::BinaryOperator),
 	UnaryOperation(ast::UnaryOperator),
 	// Arrays
-	Collect(usize),
+	/// Push a special literal to stack
+	CollectEnd,
+	/// Collects all values from stack into an array until it hits either the end of the stack or a [`CollectEnd`] literal
+	Collect,
+	/// Grab [A, I] (I from the top then A) from stack and calculate the indexed value A[I]
+	Index,
 	// Loops
-	EnterLoop,
-	LoopStartLabel {
+	/// Calls a given macro
+	StartMacro(String),
+	/// Denotes the start of the block segment a macro shall execute
+	MacroInnerLabel {
 		/// Jump delta to the end of the loop
 		end_offset: isize,
 		/// A unique id for this loop
-		loop_label: u32,
+		label_id: u32,
 	},
-	LoopEndLabel {
+	/// Denotes the end of the block segment a macro shall execute
+	MacroInnerEndLabel {
 		/// Jump delta to the start of the loop
 		start_offset: isize,
 		/// A unique id for this loop
-		loop_label: u32,
+		label_id: u32,
 	},
-	ExitLoop,
 }
 
 enum Token<'expr> {
@@ -63,6 +76,12 @@ impl Program {
 
 		// Counter with the value of the next free loop label.
 		let mut loop_id_counter: u32 = 0;
+		// Produces a fresh label ID
+		let mut next_label = || {
+			let label = loop_id_counter;
+			loop_id_counter += 1;
+			label
+		};
 
 		while let Some(token) = working_stack.pop() {
 			match token {
@@ -88,7 +107,11 @@ impl Program {
 								working_stack.push(expression.into());
 							}
 						}
-						ast::ExpressionContent::Assignment(expression, expression1) => todo!(),
+						ast::ExpressionContent::Assignment(lvalue, rvalue) => {
+							working_stack.push(Instruction::Assign.into());
+							working_stack.push(lvalue.into());
+							working_stack.push(rvalue.into());
+						}
 						ast::ExpressionContent::IntLiteral(value) => {
 							instructions.push(Instruction::PushInt(
 								(*value).try_into().unwrap_or(i32::MAX), // TODO: better handling
@@ -104,31 +127,102 @@ impl Program {
 							instructions.push(Instruction::PushBlank);
 						}
 						ast::ExpressionContent::Identifier(identifier) => {
-							instructions.push(Instruction::AccessVariable(identifier.clone()))
+							instructions.push(Instruction::AccessVariable(identifier.clone()));
 						}
 						ast::ExpressionContent::LetIdentifier(identifier) => {
-							instructions.push(Instruction::CreateVariable(identifier.clone()))
+							instructions.push(Instruction::CreateVariable(identifier.clone()));
+							instructions.push(Instruction::AccessVariable(identifier.clone()));
 						}
 						ast::ExpressionContent::MacroParameter(value) => {
 							instructions.push(Instruction::AccessMacroRegister(*value as usize))
 						}
-						ast::ExpressionContent::MacroCall(_, argument_list) => todo!(),
+						ast::ExpressionContent::MacroCall(macro_name, argument_list) => {
+							let label = next_label();
+							working_stack.push(
+								Instruction::MacroInnerEndLabel {
+									start_offset: 0,
+									label_id: label,
+								}
+								.into(),
+							);
+							working_stack.push(
+								Instruction::MacroInnerLabel {
+									end_offset: 0,
+									label_id: label,
+								}
+								.into(),
+							);
+							// Call the macro
+							working_stack
+								.push(Instruction::StartMacro(macro_name.to_string()).into());
+							for argument in argument_list.named_arguments.iter() {
+								working_stack.push(Instruction::Assign.into());
+								working_stack.push((&argument.value).into());
+								working_stack.push(
+									Instruction::CreateVariable(argument.name.clone()).into(),
+								);
+							}
+							working_stack.push(Instruction::EnterMacroScope.into()); // Macro variables go into a macro scope
+						}
 						ast::ExpressionContent::MethodCall(expression, _, argument_list) => todo!(),
-						ast::ExpressionContent::IndexAccess(expression, expression1) => todo!(),
+						ast::ExpressionContent::IndexAccess(array_value, index_expr) => {
+							working_stack.push(Instruction::Index.into());
+							working_stack.push(index_expr.into());
+							working_stack.push(array_value.into());
+						}
 						ast::ExpressionContent::ArrayLiteral(values) => {
-							working_stack.push(Instruction::Collect(values.len()).into());
+							working_stack.push(Instruction::Collect.into());
 							for expression in values.iter().rev() {
 								working_stack.push(expression.into());
 							}
+							working_stack.push(Instruction::CollectEnd.into());
 						}
 						ast::ExpressionContent::FillArrayLiteral(
 							inner_expression,
 							count_expression,
 						) => {
-							working_stack.push(Instruction::EnterLoop.into());
-							working_stack.push(count_expression.into());
+							let label = next_label();
+							// Finally collect the array
+							working_stack.push(Instruction::Collect.into());
+							working_stack.push(
+								Instruction::MacroInnerEndLabel {
+									start_offset: 0,
+									label_id: label,
+								}
+								.into(),
+							);
+							working_stack.push(inner_expression.into());
+							working_stack.push(
+								Instruction::MacroInnerLabel {
+									end_offset: 0,
+									label_id: label,
+								}
+								.into(),
+							);
+							// Call the macro
+							working_stack.push(
+								Instruction::StartMacro("builtin_FillArray".to_string()).into(),
+							);
+							working_stack.push(count_expression.into()); // Init the input variable for the macro
+							working_stack.push(Instruction::EnterMacroScope.into()); // Macro variables go into a macro scope
+																// Array value collection ends here
+							working_stack.push(Instruction::CollectEnd.into());
 						}
-						ast::ExpressionContent::Lambda(vec, expression) => todo!(),
+						ast::ExpressionContent::Lambda(bindings, expression) => {
+							for (i, variable) in bindings.iter().enumerate() {
+								// Make a new variable (let)
+								instructions.push(Instruction::CreateVariable(variable.clone()));
+								// Access it to get an lvalue
+								instructions.push(Instruction::AccessVariable(variable.clone()));
+								// Access a macro register to get the appropriate rvalue
+								instructions.push(Instruction::AccessMacroRegister(i));
+								// Assign
+								instructions.push(Instruction::Assign);
+								// Discard the implicit-return value of the assignment
+								instructions.push(Instruction::DiscardValue);
+							}
+							working_stack.push(expression.into());
+						}
 						ast::ExpressionContent::Operation(operation_expression) => {
 							match operation_expression {
 								ast::OperationExpression::Unary(unary_operator, expression) => {

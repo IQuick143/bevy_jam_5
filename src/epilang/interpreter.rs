@@ -9,8 +9,10 @@ trait DynamicVariableValue {}
 
 enum VariableValue {
 	Blank,
+	CollectEnd,
 	Int(i32),
 	Float(f32),
+	Reference(Box<VariableValue>),
 	Dynamic(Box<dyn DynamicVariableValue>),
 }
 
@@ -227,7 +229,7 @@ impl<'ast> Interpreter<'ast> {
 						// TODO: Desugar
 						// TODO: Account for vector iteration in step count
 						for capture in captures.iter() {
-							self.operation_stack.0.push(Operation::LetAssign());
+							//self.operation_stack.0.push(Operation::LetAssign());
 						}
 						todo!()
 					}
@@ -273,12 +275,16 @@ impl<'ast> Interpreter<'ast> {
 									VariableValue::Int(_) => input,
 									VariableValue::Float(_) => input,
 									VariableValue::Dynamic(_) => todo!(),
+									VariableValue::CollectEnd => todo!(),
+									VariableValue::Reference(variable_value) => todo!(),
 								},
 								super::ast::UnaryOperator::UnaryMinus => match &input {
 									VariableValue::Blank => todo!(),
 									VariableValue::Int(value) => VariableValue::Int(-value),
 									VariableValue::Float(value) => VariableValue::Float(-value),
 									VariableValue::Dynamic(_) => todo!(),
+									VariableValue::CollectEnd => todo!(),
+									VariableValue::Reference(variable_value) => todo!(),
 								},
 								super::ast::UnaryOperator::Not => todo!(),
 							};
@@ -288,6 +294,7 @@ impl<'ast> Interpreter<'ast> {
 						}
 					}
 				}
+				Operation::LetAssign(_) => todo!(),
 			}
 		}
 	}

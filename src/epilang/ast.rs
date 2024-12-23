@@ -177,8 +177,11 @@ pub enum OperationExpression {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOperator {
+	/// Identity on ints and floats
 	UnaryPlus,
+	/// Negates ints and floats
 	UnaryMinus,
+	/// Negates bools
 	Not,
 }
 
