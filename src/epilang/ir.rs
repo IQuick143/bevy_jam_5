@@ -42,23 +42,6 @@ enum Instruction {
 	Collect,
 	/// Grab [A, I] (I from the top then A) from stack and calculate the indexed value A[I]
 	Index,
-	// Loops
-	/// Calls a given macro
-	StartMacro(String),
-	/// Denotes the start of the block segment a macro shall execute
-	MacroInnerLabel {
-		/// Jump delta to the end of the loop
-		end_offset: isize,
-		/// A unique id for this loop
-		label_id: u32,
-	},
-	/// Denotes the end of the block segment a macro shall execute
-	MacroInnerEndLabel {
-		/// Jump delta to the start of the loop
-		start_offset: isize,
-		/// A unique id for this loop
-		label_id: u32,
-	},
 }
 
 enum Token<'expr> {
@@ -91,8 +74,6 @@ impl Program {
 				Token::Expr(expr) => {
 					match expr.value.as_ref() {
 						ast::ExpressionContent::Sequence(sequence) => {
-							// Push a scope
-							instructions.push(Instruction::EnterScope);
 							// Remaining instructions go into the working stack in reverse order to be processed later
 							working_stack.push(Instruction::ExitScope.into());
 							// The return value is either the tail expression or a Blank.
@@ -106,6 +87,8 @@ impl Program {
 								working_stack.push(Instruction::DiscardValue.into());
 								working_stack.push(expression.into());
 							}
+							// Push a scope
+							working_stack.push(Instruction::EnterScope.into());
 						}
 						ast::ExpressionContent::Assignment(lvalue, rvalue) => {
 							working_stack.push(Instruction::Assign.into());

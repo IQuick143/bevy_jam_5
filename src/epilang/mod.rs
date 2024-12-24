@@ -2,7 +2,6 @@
 
 mod ast;
 mod interpreter;
-mod ir;
 mod lex;
 mod parser;
 

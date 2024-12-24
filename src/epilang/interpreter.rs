@@ -1,42 +1,272 @@
+/// Module for the interpreter and language extensions (types and macros) and their related traits.
+///
+/// To the poor souls that lay their eyes upon this cursed piece of virtual estate,
+/// I am sorry for the many many sins that have been commited and whose blood stains this soil.
+/// I did what I had to, mistakes have been made, and those mistakes pushed the world into
+/// an unrecoverable state of more and more poor decisions.
+/// But I persevered, perhaps out of determination, perhaps out of folly, perhaps I shouldn't've.
+/// Honestly, at least a part of it was just a morbid fascination with the fractal mess that
+/// unfolded its many wings like a swarm of moths, and like a moth I too felt attracted to the
+/// bright light shining from the burning remmants of good code practice whose ashes have
+/// been burried here long ago.
+///
+/// ...and that is how we ended up trapped here, in this file, together,
+/// yet separated by time.
+///
+/// Hence to bridge that gap I leave you this message: TODO: Refactor.
 use super::{
-	ast::{Expression, ExpressionContent, OperationExpression, Sequence},
+	ast::{
+		ArgumentList, BinaryOperator, Expression, ExpressionContent, OperationExpression, Sequence,
+		UnaryOperator,
+	},
 	SourceLocation,
 };
-use bevy::utils::HashMap;
-use std::{borrow::Borrow, cell::RefCell, ops::Range, rc::Rc};
+use epilang_macros::{ArrayFillLiteralMacro, ArrayLiteralMacro};
+use std::collections::HashMap;
+use std::{
+	borrow::Borrow,
+	cell::{Cell, Ref, RefCell},
+	ops::{Deref, Range},
+	rc::Rc,
+};
 
-trait DynamicVariableValue {}
+pub trait DynamicVariableValue {
+	/// Returns whether this variable is mutable (meaning that it does not currently have any borrows)
+	fn is_mutable(&self) -> bool;
 
-enum VariableValue {
+	/// Returns a reference to an internal value.
+	fn index(&mut self, index: VariableValue) -> Option<ReferenceValue>; // TODO: Error handling
+
+	/// Workaround for the object-insafety of [`Clone`]
+	fn clone(&self) -> Box<dyn DynamicVariableValue>;
+
+	//
+	//fn call_method(&self, name: String, ) ->  {
+	//		todo!()
+	//}
+}
+
+enum MethodCallValue {
+	// TODO
+}
+
+pub enum MacroReturn<'ast> {
+	Operations(Vec<Operation<'ast>>),
+	Return(StackValue),
+}
+
+type MacroConstructor<'ast> =
+	dyn FnMut(Option<&'ast ArgumentList>) -> Option<Box<dyn Macro<'ast> + 'ast>> + 'ast; // TODO: Result type
+
+pub trait Macro<'ast> {
+	/// Perform one step of macro evaluation
+	/// Input:
+	///     On first call, the input value should be a [`Blank`](PlainValue::Blank), on subsequent calls, it is the value of the operations that have been previously emitted.
+	/// Returns either:
+	///     A list [`Operation`]s that should be evaluated before the next call and *must* result in *one* value being pushed onto the stack, this value is then fed back into the macro next iteration.
+	///     A return [`VariableValue`] signaling the macro has finished and should no longer be bothered.
+	fn poll(&mut self, input: StackValue) -> MacroReturn<'ast>;
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PlainValue {
 	Blank,
-	CollectEnd,
+	Bool(bool),
 	Int(i32),
 	Float(f32),
-	Reference(Box<VariableValue>),
+}
+
+#[derive(Clone)]
+pub struct ReferenceValue {
+	counter: Rc<()>,
+	value: Rc<Cell<VariableValue>>,
+}
+
+pub enum VariableValue {
+	/// A plain value with copy semantics everywhere
+	Plain(PlainValue),
+	/// A reference to the inner part of some other value
 	Dynamic(Box<dyn DynamicVariableValue>),
 }
 
-enum VariablePathSegment<'ast> {
-	Method(&'ast str),
-	Index(i32),
+impl Clone for VariableValue {
+	fn clone(&self) -> Self {
+		match self {
+			VariableValue::Plain(plain_value) => VariableValue::Plain(*plain_value),
+			VariableValue::Dynamic(dynamic_variable_value) => {
+				VariableValue::Dynamic(dynamic_variable_value.as_ref().clone())
+			}
+		}
+	}
 }
 
-struct VariablePath<'ast> {
-	variable: &'ast str,
-	indirections: Vec<VariablePathSegment<'ast>>,
+impl Default for VariableValue {
+	fn default() -> Self {
+		VariableValue::Plain(PlainValue::Blank)
+	}
 }
 
-enum InterpreterValue<'ast> {
-	Unit,
-	Monad(Option<VariableValue>),
-	Variable(VariableValue),
-	MethodName(&'ast str),
-	Path(VariablePath<'ast>),
+#[derive(Clone)]
+pub enum StackValue {
+	Value(VariableValue),
+	Reference(ReferenceValue),
+}
+
+trait CellValueExt {
+	type Inner;
+	/// Calls a function on the inner value, allowing the caller to extract data from the [`Cell`]
+	fn introspect<U>(&self, func: impl Fn(&Self::Inner) -> U) -> U;
+	/// Calls a function on the inner value, allowing the caller to extract data from the [`Cell`] and/or mutate the contents.
+	fn introspect_mut<U>(&self, func: impl FnMut(&mut Self::Inner) -> U) -> U;
+}
+
+impl<T: Default> CellValueExt for Cell<T> {
+	type Inner = T;
+
+	fn introspect<U>(&self, func: impl FnOnce(&Self::Inner) -> U) -> U {
+		let temp = self.take();
+		let return_value = func(&temp);
+		self.set(temp);
+		return_value
+	}
+
+	fn introspect_mut<U>(&self, mut func: impl FnOnce(&mut Self::Inner) -> U) -> U {
+		let mut temp = self.take();
+		let return_value = func(&mut temp);
+		self.set(temp);
+		return_value
+	}
+}
+
+impl StackValue {
+	/// Returns whether this value can be used as an lvalue
+	fn assignable(&self) -> bool {
+		match self {
+			StackValue::Value(_) => false,
+			StackValue::Reference(ReferenceValue { value, .. }) => {
+				value.as_ref().introspect(|value| match value {
+					VariableValue::Plain(plain_value) => true,
+					VariableValue::Dynamic(dynamic_variable_value) => {
+						dynamic_variable_value.is_mutable()
+					}
+				})
+			}
+		}
+	}
+
+	fn assign(&self, new_value: VariableValue) {
+		match self {
+			StackValue::Value(_) => todo!("Error!"),
+			StackValue::Reference(ReferenceValue { value, .. }) => {
+				value.as_ref().replace(new_value);
+			}
+		}
+	}
+
+	/// Returns the internal value, cloning it if it's behind a reference
+	fn to_value(self) -> VariableValue {
+		match self {
+			StackValue::Value(variable_value) => variable_value,
+			StackValue::Reference(ReferenceValue { value, .. }) => {
+				value.as_ref().introspect(|value| value.clone())
+			}
+		}
+	}
+
+	/// Returns whether the underlying value is a plain datatype that doesn't require clones
+	fn is_plain(&self) -> bool {
+		match self {
+			StackValue::Value(variable_value) => match variable_value {
+				VariableValue::Plain(plain_value) => true,
+				VariableValue::Dynamic(dynamic_variable_value) => false,
+			},
+			StackValue::Reference(ReferenceValue { value, .. }) => {
+				value.as_ref().introspect(|value| match value {
+					VariableValue::Plain(plain_value) => true,
+					VariableValue::Dynamic(dynamic_variable_value) => false,
+				})
+			}
+		}
+	}
+
+	fn index(&mut self, index_value: VariableValue) -> Option<ReferenceValue> {
+		match self {
+			StackValue::Value(variable_value) => match variable_value {
+				VariableValue::Plain(plain_value) => None, // TODO: Error
+				VariableValue::Dynamic(dynamic_variable_value) => {
+					dynamic_variable_value.index(index_value)
+				}
+			},
+			StackValue::Reference(reference_value) => {
+				// This block should've been implemented using `instrospect_mut`,
+				// but I couldn't get the ownership shenanigans for `index_value` to work out.
+				let mut inner = reference_value.value.as_ref().take();
+				let return_value = match &mut inner {
+					VariableValue::Plain(plain_value) => None, // TODO: Error
+					VariableValue::Dynamic(dynamic_variable_value) => {
+						dynamic_variable_value.index(index_value)
+					}
+				};
+				reference_value.value.as_ref().set(inner);
+				return_value
+			}
+		}
+	}
+}
+
+impl<T> From<T> for StackValue
+where
+	T: Into<VariableValue>,
+{
+	fn from(value: T) -> Self {
+		StackValue::Value(value.into())
+	}
+}
+
+impl From<ReferenceValue> for StackValue {
+	fn from(reference: ReferenceValue) -> Self {
+		StackValue::Reference(reference)
+	}
+}
+
+impl From<i32> for VariableValue {
+	fn from(value: i32) -> Self {
+		VariableValue::Plain(PlainValue::Int(value))
+	}
+}
+
+impl From<f32> for VariableValue {
+	fn from(value: f32) -> Self {
+		VariableValue::Plain(PlainValue::Float(value))
+	}
+}
+
+impl From<bool> for VariableValue {
+	fn from(value: bool) -> Self {
+		VariableValue::Plain(PlainValue::Bool(value))
+	}
 }
 
 struct VariableSlot {
-	value: Option<VariableValue>,
-	declaration_loc: Range<SourceLocation>,
+	value: Rc<Cell<VariableValue>>,
+	// Option is None for Dollar variables, TODO: Reconsider
+	declaration_loc: Option<Range<SourceLocation>>,
+}
+
+impl VariableSlot {
+	pub fn new() -> Self {
+		VariableSlot {
+			value: Rc::new(Cell::new(VariableValue::default())),
+			declaration_loc: None, // TODO
+		}
+	}
+
+	pub fn borrow(&self) -> ReferenceValue {
+		ReferenceValue {
+			counter: Rc::new(()),
+			value: self.value.clone(),
+		}
+	}
 }
 
 enum ContextFrameType {
@@ -46,7 +276,6 @@ enum ContextFrameType {
 }
 
 struct ContextFrame {
-	macro_parameters: Option<Vec<VariableValue>>,
 	variables: HashMap<String, VariableSlot>,
 	context_loc: Option<Range<SourceLocation>>,
 	context_type: ContextFrameType,
@@ -56,7 +285,6 @@ impl ContextFrame {
 	/// Creates a ContextFrame for the top level.
 	pub fn new_top_level(lines: Option<Range<SourceLocation>>) -> Self {
 		ContextFrame {
-			macro_parameters: None,
 			variables: HashMap::new(),
 			context_loc: lines,
 			context_type: ContextFrameType::TopLevel,
@@ -66,7 +294,6 @@ impl ContextFrame {
 	/// Creates a ContextFrame for a sequence.
 	pub fn new_sequence() -> Self {
 		ContextFrame {
-			macro_parameters: None,
 			variables: HashMap::new(),
 			context_loc: None,
 			context_type: ContextFrameType::Sequence,
@@ -76,7 +303,6 @@ impl ContextFrame {
 	/// Creates a ContextFrame for a macro.
 	pub fn new_macro() -> Self {
 		ContextFrame {
-			macro_parameters: None,
 			variables: HashMap::new(),
 			context_loc: None,
 			context_type: ContextFrameType::MacroArgument,
@@ -84,64 +310,84 @@ impl ContextFrame {
 	}
 }
 
-enum Operation<'expr> {
-	/// Either expands an [`Expression`] into multiple [`Operation`]s on the stack or executes it completely and converts it to a value.
-	Eval(&'expr Expression),
-	/// Evaluates the given operation using top stack values
-	EvalOperation(&'expr OperationExpression),
-	/// Repeats a given [`Expression`] multiple times, changing the macro parameters.
-	Iterate {
-		remaining_steps: usize,
-		macro_value: usize,
-		inner_expression: &'expr Expression,
-	},
-	//ToRvalue,
-	/// Pops and discards a value from the value stack
+pub enum Instruction {
+	// Literal values
+	PushBlank,
+	PushBool(bool),
+	PushInt(i32),
+	PushFloat(f32),
+	PushString(String),
+	// Value discarding
+	/// Discard top value from stack
 	DiscardValue,
-	/// Pushes a new [`ContextFrame`]
-	PushContext(ContextFrame),
-	/// Pops a [`ContextFrame`]
-	PopContext,
-	/// Collects n values from the value stack into a single array value on the stack
-	Collect(usize),
-	/// Assigns top value from the value stack to a variable with a given name in the
-	LetAssign(String),
+	// Scope management
+	/// Create a new scope
+	EnterScope,
+	/// Exit a scope
+	ExitScope,
+	/// Create a new dollar register
+	PushDollar,
+	/// Discard topmost dollar register
+	PopDollar,
+	// Value access
+	/// Create a new variable, return nothing
+	CreateVariable(String),
+	/// Accesses variable and pushes its reference to stack
+	AccessVariable(String),
+	/// Accesses $n register and pushes the value to stack
+	AccessMacroRegister(usize),
+	/// Grab (L, R) (L from the top then R) from stack and perform assignment L = R, returning the new L value
+	Assign,
+	// Operations
+	BinaryOperation(BinaryOperator),
+	UnaryOperation(UnaryOperator),
+	// Arrays
+	/// Grab (A, I) (I from the top then A) from stack and calculate the indexed value A\[I\]
+	Index,
+}
+
+pub enum Operation<'expr> {
+	/// Either expands an [`Expression`] into sub-[`Operation`]s.
+	Expand(&'expr Expression),
+	/// An instruction to be executed
+	Instruction(Instruction),
+	/// A macro to poll for further operations
+	MacroCallBack(Box<dyn Macro<'expr> + 'expr>),
+}
+
+impl<'a> From<Instruction> for Operation<'a> {
+	fn from(value: Instruction) -> Self {
+		Operation::Instruction(value)
+	}
+}
+
+impl<'a> From<&'a Expression> for Operation<'a> {
+	fn from(value: &'a Expression) -> Self {
+		Operation::Expand(value)
+	}
 }
 
 struct ContextStack(Vec<ContextFrame>);
 
-struct OperationStack<'op>(Vec<Operation<'op>>);
-
-impl<'op> OperationStack<'op> {
-	fn push_expression(&mut self, expression: &'op Expression) {
-		self.0.push(Operation::Eval(expression));
-	}
-
-	fn queue_expression(&mut self, expression: &'op Expression) {}
-
-	fn queue_sequence(&mut self, sequence: &'op Sequence) {
-		self.0.push(Operation::PopContext);
-		if let Some(expression) = sequence.tail.borrow() {
-			self.push_expression(expression);
-		}
-		for expression in sequence.statements.iter().rev() {
-			//self.0.push(Operation::PopValue);
-			self.push_expression(expression);
-		}
-		self.0
-			.push(Operation::PushContext(ContextFrame::new_sequence()));
+impl ContextStack {
+	pub fn pop(&mut self) {
+		self.0.pop(); // TODO: Error handling
 	}
 }
 
-struct ValueStack(Vec<VariableValue>);
+struct OperationStack<'op>(Vec<Operation<'op>>);
+
+impl<'op> OperationStack<'op> {
+	fn push(&mut self, operation: impl Into<Operation<'op>>) {
+		self.0.push(operation.into());
+	}
+}
+
+struct ValueStack(Vec<StackValue>);
 
 impl ValueStack {
-	pub fn push_int(&mut self, value: i32) {
-		self.0.push(VariableValue::Int(value));
-	}
-
-	pub fn push_float(&mut self, value: f32) {
-		self.0.push(VariableValue::Float(value));
+	pub fn push(&mut self, value: impl Into<StackValue>) {
+		self.0.push(value.into());
 	}
 
 	pub fn push_string(&mut self, value: &str) {
@@ -149,7 +395,27 @@ impl ValueStack {
 	}
 
 	pub fn push_blank(&mut self) {
-		self.0.push(VariableValue::Blank);
+		self.0
+			.push(StackValue::Value(VariableValue::Plain(PlainValue::Blank)));
+	}
+
+	pub fn pop(&mut self) -> Option<StackValue> {
+		self.0.pop()
+	}
+}
+
+struct DollarStack(Vec<VariableSlot>);
+
+impl DollarStack {
+	pub fn push_new(&mut self) {
+		self.0.push(VariableSlot {
+			value: Rc::new(Cell::new(VariableValue::default())),
+			declaration_loc: None,
+		}); // TODO: Error handling
+	}
+
+	pub fn pop(&mut self) {
+		self.0.pop(); // TODO: Error handling
 	}
 }
 
@@ -162,140 +428,847 @@ pub struct Interpreter<'ast> {
 	/// Stack of values evaluated from expressions
 	value_stack: ValueStack,
 	/// Stack of values corresponding to $n registers
-	dollar_stack: ValueStack,
+	dollar_stack: DollarStack,
+	macro_library: HashMap<String, Box<MacroConstructor<'ast>>>,
 }
 
 impl<'ast> Interpreter<'ast> {
-	pub fn new(script: &'ast Expression) -> Self {
+	pub fn new(
+		script: &'ast Expression,
+		macro_library: HashMap<String, Box<MacroConstructor<'ast>>>,
+	) -> Self {
 		let mut interpreter = Interpreter {
 			script,
 			context_stack: ContextStack(Vec::new()),
 			operation_stack: OperationStack(Vec::new()),
 			value_stack: ValueStack(Vec::new()),
-			dollar_stack: ValueStack(Vec::new()),
+			dollar_stack: DollarStack(Vec::new()),
+			macro_library,
 		};
 		interpreter
 			.context_stack
 			.0
 			.push(ContextFrame::new_top_level(Some(script.loc.clone())));
-		interpreter.operation_stack.push_expression(script);
+		interpreter.operation_stack.push(script);
 		interpreter
 	}
 
 	pub fn execute(&mut self, max_steps: usize) {
 		let mut steps = 0;
-		while self.operation_stack.0.len() > 0 && steps < max_steps {
+		while !self.operation_stack.0.is_empty() && steps < max_steps {
 			steps += 1;
 			let Some(operation) = self.operation_stack.0.pop() else {
 				break;
 			};
 			match operation {
-				Operation::Eval(expresssion) => match expresssion.value.as_ref() {
+				Operation::Expand(expresssion) => match expresssion.value.as_ref() {
 					ExpressionContent::Sequence(sequence) => {
-						self.operation_stack.queue_sequence(sequence)
-					}
-					ExpressionContent::Assignment(expression, expression1) => todo!(),
-					ExpressionContent::IntLiteral(value) => self
-						.value_stack
-						.push_int((*value).try_into().unwrap_or(0) /* TODO */),
-					ExpressionContent::FloatLiteral(value) => self.value_stack.push_float(*value),
-					ExpressionContent::StringLiteral(value) => self.value_stack.push_string(value),
-					ExpressionContent::Identifier(_) => {
-						// TODO: Check if Identifier is a global macro and evaluate
-						// TODO: Check if Identifier is a variable and evaluate it
-						// TODO: Error handling otherwise
-						todo!()
-					}
-					ExpressionContent::LetIdentifier(_) => {
-						// TODO: Expand into a LetAssign operation and an expression
-						todo!()
-					}
-					ExpressionContent::MacroParameter(_) => {
-						// TODO: Evaluate to the given macro parameter value
-						todo!()
-					}
-					ExpressionContent::Blank => self.value_stack.push_blank(),
-					ExpressionContent::MacroCall(_, argument_list) => todo!(),
-					ExpressionContent::MethodCall(expression, _, argument_list) => {
-						todo!()
-					}
-					ExpressionContent::IndexAccess(expression, expression1) => todo!(),
-					ExpressionContent::ArrayLiteral(vec) => todo!(),
-					ExpressionContent::FillArrayLiteral(expression, expression1) => {
-						// TODO: Expand into a macro call
-						todo!()
-					}
-					ExpressionContent::Lambda(captures, expression) => {
-						// TODO: Desugar
-						// TODO: Account for vector iteration in step count
-						for capture in captures.iter() {
-							//self.operation_stack.0.push(Operation::LetAssign());
+						// Remaining instructions go into the working stack in reverse order to be processed later
+						self.operation_stack.push(Instruction::ExitScope);
+						// The return value is either the tail expression or a Blank.
+						if let Some(expression) = sequence.tail.borrow() {
+							self.operation_stack.push(expression);
+						} else {
+							self.operation_stack.push(Instruction::PushBlank);
 						}
+						// Other expressions have their values discarded
+						for expression in sequence.statements.iter().rev() {
+							self.operation_stack.push(Instruction::DiscardValue);
+							self.operation_stack.push(expression);
+						}
+						// Push a scope
+						self.operation_stack.push(Instruction::EnterScope);
+					}
+					ExpressionContent::Assignment(lvalue, rvalue) => {
+						self.operation_stack.push(Instruction::Assign);
+						self.operation_stack.push(lvalue);
+						self.operation_stack.push(rvalue);
+					}
+					ExpressionContent::IntLiteral(value) => {
+						self.operation_stack.push(Instruction::PushInt(
+							(*value).try_into().unwrap_or(i32::MAX), // TODO: better handling
+						));
+					}
+					ExpressionContent::FloatLiteral(value) => {
+						self.operation_stack.push(Instruction::PushFloat(*value));
+					}
+					ExpressionContent::StringLiteral(value) => {
+						self.operation_stack
+							.push(Instruction::PushString(value.clone()));
+					}
+					ExpressionContent::Blank => {
+						self.operation_stack.push(Instruction::PushBlank);
+					}
+					ExpressionContent::Identifier(identifier) => {
+						if let Some(constructor) = self.macro_library.get_mut(identifier) {
+							if let Some(macro_data) = constructor(None) {
+								self.operation_stack
+									.push(Operation::MacroCallBack(macro_data));
+								self.operation_stack.push(Instruction::PushBlank);
+							} else {
+								todo!()
+							}
+						} else {
+							self.operation_stack
+								.push(Instruction::AccessVariable(identifier.clone()));
+						}
+					}
+					ExpressionContent::LetIdentifier(identifier) => {
+						// TODO: Check for macro name collisions
+						self.operation_stack
+							.push(Instruction::AccessVariable(identifier.clone()));
+						self.operation_stack
+							.push(Instruction::CreateVariable(identifier.clone()));
+					}
+					ExpressionContent::MacroParameter(value) => self
+						.operation_stack
+						.push(Instruction::AccessMacroRegister(*value as usize)),
+					ExpressionContent::MacroCall(macro_name, argument_list) => {
+						if let Some(constructor) = self.macro_library.get_mut(macro_name) {
+							if let Some(macro_data) = constructor(Some(argument_list)) {
+								self.operation_stack
+									.push(Operation::MacroCallBack(macro_data));
+								self.operation_stack.push(Instruction::PushBlank);
+							} else {
+								todo!()
+							}
+						} else {
+							todo!()
+						}
+					}
+					ExpressionContent::MethodCall(expression, method_name, argument_list) => {
 						todo!()
+					}
+					ExpressionContent::IndexAccess(array_value, index_expr) => {
+						self.operation_stack.push(Instruction::Index);
+						self.operation_stack.push(index_expr);
+						self.operation_stack.push(array_value);
+					}
+					ExpressionContent::ArrayLiteral(values) => {
+						self.operation_stack.push(Operation::MacroCallBack(Box::new(
+							ArrayLiteralMacro::<'ast>::new(values),
+						)));
+						self.operation_stack.push(Instruction::PushBlank);
+					}
+					ExpressionContent::FillArrayLiteral(inner_expression, count_expression) => {
+						self.operation_stack.push(Operation::MacroCallBack(Box::new(
+							ArrayFillLiteralMacro::<'ast>::new(inner_expression, count_expression),
+						)));
+						self.operation_stack.push(Instruction::PushBlank);
+					}
+					ExpressionContent::Lambda(bindings, expression) => {
+						self.operation_stack.push(expression);
+						for (i, variable) in bindings.iter().enumerate() {
+							// Discard the implicit-return value of the assignment
+							self.operation_stack.push(Instruction::DiscardValue);
+							// Assign
+							self.operation_stack.push(Instruction::Assign);
+							// Access a macro register to get the appropriate rvalue
+							self.operation_stack
+								.push(Instruction::AccessMacroRegister(i));
+							// Access it to get an lvalue
+							self.operation_stack
+								.push(Instruction::AccessVariable(variable.clone()));
+							// Make a new variable (let)
+							self.operation_stack
+								.push(Instruction::CreateVariable(variable.clone()));
+						}
 					}
 					ExpressionContent::Operation(operation_expression) => {
-						self.operation_stack
-							.0
-							.push(Operation::EvalOperation(operation_expression));
 						match operation_expression {
-							OperationExpression::Unary(_, expression) => {
-								self.operation_stack.push_expression(expression)
+							OperationExpression::Unary(unary_operator, expression) => {
+								self.operation_stack
+									.push(Instruction::UnaryOperation(*unary_operator));
+								self.operation_stack.push(expression);
 							}
-							OperationExpression::Binary(_, expression1, expression2) => {
-								// NOTE: This is to evaluate left to right
-								self.operation_stack.push_expression(expression2);
-								self.operation_stack.push_expression(expression1);
+							OperationExpression::Binary(binary_operator, left, right) => {
+								self.operation_stack
+									.push(Instruction::BinaryOperation(*binary_operator));
+								self.operation_stack.push(right);
+								self.operation_stack.push(left);
 							}
 						}
 					}
 				},
-				Operation::DiscardValue => {
-					self.value_stack.0.pop(); // TODO: Check for [`None`]
-				}
-				Operation::PushContext(context_frame) => {
-					self.context_stack.0.push(context_frame);
-				}
-				Operation::PopContext => {
-					self.context_stack.0.pop(); // TODO: Check for [`None`]
-				}
-				Operation::Collect(_) => todo!(),
-				Operation::Iterate {
-					remaining_steps,
-					macro_value,
-					inner_expression,
-				} => todo!(),
-				Operation::EvalOperation(operation) => {
-					match operation {
-						OperationExpression::Unary(operator, expression) => {
-							// TODO: Error handling for none.
-							let input = self.value_stack.0.pop().unwrap();
-							let result = match operator {
-								super::ast::UnaryOperator::UnaryPlus => match &input {
-									VariableValue::Blank => todo!(),
-									VariableValue::Int(_) => input,
-									VariableValue::Float(_) => input,
-									VariableValue::Dynamic(_) => todo!(),
-									VariableValue::CollectEnd => todo!(),
-									VariableValue::Reference(variable_value) => todo!(),
-								},
-								super::ast::UnaryOperator::UnaryMinus => match &input {
-									VariableValue::Blank => todo!(),
-									VariableValue::Int(value) => VariableValue::Int(-value),
-									VariableValue::Float(value) => VariableValue::Float(-value),
-									VariableValue::Dynamic(_) => todo!(),
-									VariableValue::CollectEnd => todo!(),
-									VariableValue::Reference(variable_value) => todo!(),
-								},
-								super::ast::UnaryOperator::Not => todo!(),
-							};
+				Operation::Instruction(instruction) => {
+					match instruction {
+						Instruction::PushBlank => self.value_stack.push_blank(),
+						Instruction::PushBool(value) => self.value_stack.push(value),
+						Instruction::PushInt(value) => self.value_stack.push(value),
+						Instruction::PushFloat(value) => self.value_stack.push(value),
+						Instruction::PushString(value) => todo!(),
+						Instruction::DiscardValue => {
+							self.value_stack.pop();
+						} // TODO: Error handling
+						Instruction::EnterScope => {
+							self.context_stack.0.push(ContextFrame::new_sequence())
 						}
-						OperationExpression::Binary(binary_operator, expression, expression1) => {
+						Instruction::ExitScope => self.context_stack.pop(), // TODO: Error handling
+						Instruction::PushDollar => self.dollar_stack.push_new(),
+						Instruction::PopDollar => self.dollar_stack.pop(),
+						Instruction::CreateVariable(name) => {
+							let frame = self
+								.context_stack
+								.0
+								.last_mut()
+								.expect("Context Stack should never be empty"); // TODO: Error handling
+							if frame.variables.contains_key(&name) {
+								todo!()
+							}
+							frame.variables.insert(name, VariableSlot::new());
+						}
+						Instruction::AccessVariable(name) => {
+							let mut found = false;
+							for context in self.context_stack.0.iter().rev() {
+								if let Some(value) = context.variables.get(&name) {
+									found = true;
+									self.value_stack.push(StackValue::Reference(value.borrow())); // TODO: Error handling
+									break;
+								}
+							}
+							if !found {
+								todo!(
+									"error handling not implemented: variable {} not found",
+									name
+								)
+							}
+						}
+						Instruction::AccessMacroRegister(index) => {
+							self.value_stack.push(StackValue::Reference(
+								self.dollar_stack.0.get(index).unwrap().borrow(),
+							)) // TODO: Error handling
+						}
+						Instruction::Assign => {
+							let lvalue = self.value_stack.pop().unwrap();
+							let rvalue = self.value_stack.pop().unwrap();
+							if !lvalue.assignable() {
+								todo!("Assignment Error!");
+							}
+							lvalue.assign(rvalue.to_value());
+							self.value_stack.push(lvalue);
+						}
+						Instruction::BinaryOperation(binary_operator) => {
 							todo!()
+						}
+						Instruction::UnaryOperation(unary_operator) => {
+							// TODO: Error handling for none.
+							let input = self.value_stack.pop().unwrap();
+							let result = match unary_operator {
+								super::ast::UnaryOperator::UnaryPlus => {
+									// To avoid unncecesary copies
+									if !input.is_plain() {
+										todo!("Wrong type")
+									}
+									let value = input.to_value();
+									match value {
+										VariableValue::Plain(PlainValue::Blank) => todo!("Error"),
+										VariableValue::Plain(PlainValue::Int(_)) => value,
+										VariableValue::Plain(PlainValue::Float(_)) => value,
+										VariableValue::Plain(PlainValue::Bool(_)) => todo!("Error"),
+										VariableValue::Dynamic(dynamic_variable_value) => {
+											todo!("Error")
+										}
+									}
+								}
+								super::ast::UnaryOperator::UnaryMinus => {
+									// To avoid unncecesary copies
+									if !input.is_plain() {
+										todo!("Wrong type")
+									}
+									match input.to_value() {
+										VariableValue::Plain(PlainValue::Blank) => todo!("Error"),
+										VariableValue::Plain(PlainValue::Int(value)) => {
+											(-value).into()
+										}
+										VariableValue::Plain(PlainValue::Float(value)) => {
+											(-value).into()
+										}
+										VariableValue::Plain(PlainValue::Bool(_)) => todo!("Error"),
+										VariableValue::Dynamic(dynamic_variable_value) => {
+											todo!("Error")
+										}
+									}
+								}
+								super::ast::UnaryOperator::Not => {
+									// To avoid unncecesary copies
+									if !input.is_plain() {
+										todo!("Wrong type")
+									}
+									match input.to_value() {
+										VariableValue::Plain(PlainValue::Blank) => todo!("Error"),
+										VariableValue::Plain(PlainValue::Int(_)) => todo!("Error"),
+										VariableValue::Plain(PlainValue::Float(_)) => {
+											todo!("Error")
+										}
+										VariableValue::Plain(PlainValue::Bool(value)) => {
+											(!value).into()
+										}
+										VariableValue::Dynamic(dynamic_variable_value) => {
+											todo!("Error")
+										}
+									}
+								}
+							};
+							self.value_stack.push(result);
+						}
+						Instruction::Index => {
+							let index = self.value_stack.pop().unwrap().to_value();
+							let mut indexed_value = self.value_stack.pop().unwrap();
+							match indexed_value.index(index) {
+								Some(value) => self.value_stack.push(value),
+								None => todo!(),
+							}
 						}
 					}
 				}
-				Operation::LetAssign(_) => todo!(),
+				Operation::MacroCallBack(mut macro_data) => {
+					let input = self.value_stack.pop().unwrap(); // TODO
+					match macro_data.poll(input) {
+						MacroReturn::Operations(queue) => {
+							self.operation_stack
+								.push(Operation::MacroCallBack(macro_data));
+							for operation in queue.into_iter().rev() {
+								self.operation_stack.0.push(operation);
+							}
+						}
+						MacroReturn::Return(value) => self.value_stack.push(value),
+					}
+				}
 			}
 		}
+	}
+}
+
+mod epilang_types {
+	use std::{cell::Cell, rc::Rc};
+
+	use super::{DynamicVariableValue, PlainValue, ReferenceValue, VariableValue};
+
+	pub struct ArrayType {
+		// This could be done better with some sort of subrc construct, but that would require unsafe and I won't bother.
+		values: Vec<Rc<Cell<VariableValue>>>,
+		/// [`Rc`] to keep track of whether there are external pointers to the insides of this object.
+		borrow_counter: Rc<()>,
+	}
+
+	impl ArrayType {
+		pub fn new(values: Vec<VariableValue>) -> Self {
+			ArrayType {
+				values: values
+					.into_iter()
+					.map(|val| Rc::new(Cell::new(val)))
+					.collect(),
+				borrow_counter: Rc::new(()),
+			}
+		}
+	}
+
+	impl DynamicVariableValue for ArrayType {
+		fn index(&mut self, index: VariableValue) -> Option<ReferenceValue> {
+			if self.values.is_empty() {
+				return None; // TODO: Error handling
+			}
+			let index = match index {
+				VariableValue::Plain(PlainValue::Int(value)) => {
+					((value as isize).rem_euclid(self.values.len() as isize) as usize)
+				}
+				_ => todo!("Error handling for wrong type array indexing not yet implemented"),
+			};
+			let value = &self.values[index];
+			Some(ReferenceValue {
+				counter: self.borrow_counter.clone(),
+				value: self.values[index].clone(),
+			})
+		}
+
+		fn is_mutable(&self) -> bool {
+			// Check we're the only person holding a reference to the counter
+			Rc::strong_count(&self.borrow_counter) == 1
+		}
+
+		fn clone(&self) -> Box<dyn DynamicVariableValue> {
+			Box::new(ArrayType {
+				values: self
+					.values
+					.iter()
+					.map(|val| {
+						let inner = (*val.as_ref()).take();
+						let clone = inner.clone();
+						val.as_ref().set(inner);
+						Rc::new(Cell::new(clone))
+					})
+					.collect(),
+				borrow_counter: Rc::new(()),
+			})
+		}
+	}
+}
+
+mod epilang_macros {
+	use crate::epilang::{ast::Expression, interpreter::CellValueExt};
+
+	use super::{
+		epilang_types::ArrayType, Instruction, Macro, MacroReturn, Operation, PlainValue,
+		StackValue, VariableValue,
+	};
+
+	/// An unary macro that works as an identity, but does debug printing on the passed in value.
+	pub struct PrintMacro<'ast> {
+		expr: &'ast Expression,
+		evaluating: bool,
+	}
+
+	impl<'ast> PrintMacro<'ast> {
+		pub fn new(expr: &'ast Expression) -> Self {
+			PrintMacro {
+				expr,
+				evaluating: true,
+			}
+		}
+	}
+
+	impl<'ast> Macro<'ast> for PrintMacro<'ast> {
+		fn poll(&mut self, input: StackValue) -> MacroReturn<'ast> {
+			if self.evaluating {
+				self.evaluating = false;
+				MacroReturn::Operations(vec![self.expr.into()])
+			} else {
+				fn log_value(value: &VariableValue) {
+					match value {
+						VariableValue::Plain(plain_value) => match plain_value {
+							PlainValue::Blank => println!("_Blank"),
+							PlainValue::Bool(value) => println!("b{:?}", value),
+							PlainValue::Int(value) => println!("i{:?}", value),
+							PlainValue::Float(value) => println!("f{:?}", value),
+						},
+						VariableValue::Dynamic(dynamic_variable_value) => println!("Dynamic value"),
+					}
+				}
+				match &input {
+					StackValue::Value(variable_value) => log_value(variable_value),
+					StackValue::Reference(reference_value) => {
+						print!("Reference to: ");
+						reference_value.value.as_ref().introspect(log_value);
+					}
+				}
+				MacroReturn::Return(input)
+			}
+		}
+	}
+
+	/// A nullary macro that simply yields the VariableValue it was constructed with.
+	pub struct ConstantMacro {
+		value: VariableValue,
+	}
+
+	impl ConstantMacro {
+		pub fn new(value: VariableValue) -> Self {
+			ConstantMacro { value }
+		}
+	}
+
+	impl<'ast> Macro<'ast> for ConstantMacro {
+		fn poll(&mut self, input: StackValue) -> MacroReturn<'ast> {
+			let mut return_value = VariableValue::default();
+			std::mem::swap(&mut self.value, &mut return_value);
+			MacroReturn::Return(return_value.into())
+		}
+	}
+
+	enum ArrayLiteralMacroState {
+		Init,
+		EvaluateCounter,
+		GenerateValues { counter: usize, maximum: usize },
+	}
+
+	/// Internal macro used to implement arrayfill literals.
+	pub struct ArrayFillLiteralMacro<'ast> {
+		values: Vec<VariableValue>,
+		state: ArrayLiteralMacroState,
+		inner_expression: &'ast Expression,
+		counter_expression: &'ast Expression,
+	}
+
+	impl<'ast> ArrayFillLiteralMacro<'ast> {
+		pub fn new(
+			inner_expression: &'ast Expression,
+			counter_expression: &'ast Expression,
+		) -> Self {
+			ArrayFillLiteralMacro {
+				values: Vec::new(),
+				state: ArrayLiteralMacroState::Init,
+				inner_expression,
+				counter_expression,
+			}
+		}
+	}
+
+	impl<'ast> Macro<'ast> for ArrayFillLiteralMacro<'ast> {
+		fn poll(&mut self, input: StackValue) -> super::MacroReturn<'ast> {
+			match self.state {
+				ArrayLiteralMacroState::Init => {
+					self.state = ArrayLiteralMacroState::EvaluateCounter;
+					return MacroReturn::Operations(vec![self.counter_expression.into()]);
+				}
+				ArrayLiteralMacroState::EvaluateCounter => match input.to_value() {
+					VariableValue::Plain(PlainValue::Int(value)) => {
+						if value == 0 {
+							todo!("Return empty array");
+						}
+						if value < 0 {
+							todo!("Error handling");
+						}
+						self.state = ArrayLiteralMacroState::GenerateValues {
+							counter: 0,
+							maximum: value as usize,
+						};
+					}
+					VariableValue::Dynamic(dynamic_variable_value) => todo!("Array handling"),
+					_ => todo!("Error handling"),
+				},
+				ArrayLiteralMacroState::GenerateValues { .. } => {
+					self.values.push(input.to_value());
+				}
+			};
+			let ArrayLiteralMacroState::GenerateValues { counter, maximum } = &mut self.state
+			else {
+				todo!("This should be unreachable, probably.");
+			};
+			if counter >= maximum {
+				let mut temp = Vec::new();
+				std::mem::swap(&mut self.values, &mut temp);
+				return MacroReturn::Return(
+					VariableValue::Dynamic(Box::new(ArrayType::new(temp))).into(),
+				);
+			}
+			let return_val = MacroReturn::Operations(vec![
+				Instruction::EnterScope.into(),
+				Instruction::PushDollar.into(),
+				Instruction::PushInt(*counter as i32).into(),
+				Instruction::AccessMacroRegister(0).into(),
+				Instruction::Assign.into(),
+				Instruction::DiscardValue.into(),
+				self.inner_expression.into(),
+				Instruction::PopDollar.into(),
+				Instruction::ExitScope.into(),
+			]);
+			*counter += 1;
+			return_val
+		}
+	}
+
+	/// Internal macro used to implement array literals
+	pub struct ArrayLiteralMacro<'ast> {
+		values: Vec<VariableValue>,
+		counter: usize,
+		inner_expressions: &'ast Vec<Expression>,
+	}
+
+	impl<'ast> ArrayLiteralMacro<'ast> {
+		pub fn new(inner_expressions: &'ast Vec<Expression>) -> Self {
+			ArrayLiteralMacro {
+				values: Vec::with_capacity(inner_expressions.len()),
+				counter: 0,
+				inner_expressions,
+			}
+		}
+	}
+
+	impl<'ast> Macro<'ast> for ArrayLiteralMacro<'ast> {
+		fn poll(&mut self, input: StackValue) -> super::MacroReturn<'ast> {
+			if self.counter > 0 {
+				self.values.push(input.to_value());
+			}
+			if self.counter >= self.inner_expressions.len() {
+				let mut temp = Vec::new();
+				std::mem::swap(&mut self.values, &mut temp);
+				return MacroReturn::Return(
+					VariableValue::Dynamic(Box::new(ArrayType::new(temp))).into(),
+				);
+			}
+			let return_val = MacroReturn::Operations(vec![
+				Instruction::EnterScope.into(),
+				(&self.inner_expressions[self.counter]).into(),
+				Instruction::ExitScope.into(),
+			]);
+			self.counter += 1;
+			return_val
+		}
+	}
+}
+
+mod test {
+	use std::collections::HashMap;
+
+	use crate::epilang::{
+		ast::{ArgumentList, Expression, ExpressionContent, Sequence},
+		lex::{tokenize, Token},
+		parser::parse,
+		SourceLocation,
+	};
+
+	use super::{
+		epilang_macros::{ConstantMacro, PrintMacro},
+		Interpreter, Macro, MacroConstructor, PlainValue,
+	};
+
+	fn macro_dictionary<'ast>() -> HashMap<String, Box<MacroConstructor<'ast>>> {
+		let mut map: HashMap<
+			String,
+			Box<
+				dyn FnMut(Option<&'ast ArgumentList>) -> Option<Box<dyn Macro<'ast> + 'ast>> + 'ast,
+			>,
+		> = HashMap::new();
+		map.insert(
+			"print".to_string(),
+			Box::new(|args: Option<&'ast ArgumentList>| match args {
+				Some(args) => {
+					if let Some(expr) = args.positional_arguments.first() {
+						Some(Box::new(PrintMacro::new(expr)))
+					} else {
+						None
+					}
+				}
+				None => None,
+			}),
+		);
+		map.insert(
+			"true".to_string(),
+			Box::new(|args: Option<&'ast ArgumentList>| {
+				Some(Box::new(ConstantMacro::new(true.into())))
+			}),
+		);
+		map.insert(
+			"false".to_string(),
+			Box::new(|args: Option<&'ast ArgumentList>| {
+				Some(Box::new(ConstantMacro::new(false.into())))
+			}),
+		);
+		map
+	}
+
+	fn get_tokens(text: &str) -> Vec<(Token, std::ops::Range<SourceLocation>)> {
+		tokenize(text).collect::<Result<Vec<_>, _>>().unwrap()
+	}
+
+	fn get_ast(text: &str) -> Expression {
+		Expression {
+			loc: SourceLocation::new(0, 0)..SourceLocation::new(0, 1),
+			value: Box::new(ExpressionContent::Sequence(
+				parse(get_tokens(text)).unwrap(),
+			)),
+		}
+	}
+
+	#[test]
+	fn test_print() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast("print(0)");
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(100);
+	}
+
+	#[test]
+	fn test_unary() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+print(1);
+print(+1);
+print(-1);
+print(1.5);
+print(+1.5);
+print(-1.5);
+print(true);
+print(false);
+print(!false);
+print(_);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(100);
+	}
+
+	#[test]
+	fn test_let() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = 3;
+print(a);
+a = -a;
+print(a);
+a = 5.5;
+print(a);
+print(a);
+let b = _;
+print(a);
+print(b);
+a = b;
+print(a);
+print(b);
+b = 420;
+print(a);
+print(b);
+a = b;
+a = false;
+print(a);
+print(b);
+let d = let c = b = a = 123;
+print(a);
+print(b);
+print(c);
+print(d);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(1000);
+	}
+
+	#[test]
+	fn test_scope() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = 3;
+print(a);
+let b = {
+			print(a);
+			let a = 5;
+			print(a);
+			a
+};
+print(a);
+print(b);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(100);
+	}
+
+	#[test]
+	fn test_array_fill() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [_;3];
+let b = [a;4];
+let c = [$0;5];
+print(a);
+print(b);
+print(c);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(200);
+	}
+
+	#[test]
+	fn test_array_literal() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [0,1,2,3];
+let b = [a,a,a];
+print(a);
+print(b);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(200);
+	}
+
+	#[test]
+	fn test_array_index() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [_;3];
+let b = [a;4];
+let c = [$0;5];
+
+print(a[0]);
+print(b[0][0]);
+print(c[0]);
+print(c[1]);
+print(c[2]);
+print(c[3]);
+print(c[4]);
+print(c[5]);
+print(c[6]);
+print(c[-1]);
+
+let d = [true, false];
+print(d[0]);
+print(d[1]);
+print(d[2]);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(1000);
+	}
+
+	#[test]
+	fn test_array_mutability() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [_;3];
+
+a[0] = 1;
+a[a[0]] = 2;
+a[a[a[0]]] = 3;
+
+let b = 0;
+b = a[b];
+print(b);
+b = a[b];
+print(b);
+b = a[b];
+print(b);
+b = a[0];
+b = 7;
+print(a[0]);
+print(a[1]);
+print(a[2]);
+
+let nested = [a; 4];
+
+print(nested[0][0]);
+print(nested[1][0]);
+nested[1][0] = 76;
+print(nested[0][0]);
+print(nested[1][0]);
+nested[0] = _;
+print(nested[0]);
+print(nested[1][0]);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(1000);
 	}
 }
