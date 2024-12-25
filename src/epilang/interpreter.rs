@@ -22,13 +22,13 @@ use super::{
 	SourceLocation,
 };
 use epilang_macros::{ArrayFillLiteralMacro, ArrayLiteralMacro, ForMacro};
-use std::collections::HashMap;
 use std::{
 	borrow::Borrow,
-	cell::{Cell, Ref, RefCell},
+	cell::Cell,
 	ops::{Deref, Range},
 	rc::Rc,
 };
+use std::{collections::HashMap, ops::Mul};
 
 pub trait DynamicVariableValue {
 	/// Returns whether this variable is mutable (meaning that it does not currently have any borrows)
@@ -46,10 +46,6 @@ pub trait DynamicVariableValue {
 		name: &str,
 		arguments: &'ast Option<ArgumentList>,
 	) -> Option<Box<dyn Macro<'ast> + 'ast>>;
-}
-
-enum MethodCallValue {
-	// TODO
 }
 
 pub enum MacroReturn<'ast> {
@@ -653,7 +649,117 @@ impl<'ast> Interpreter<'ast> {
 							self.value_stack.push(lvalue);
 						}
 						Instruction::BinaryOperation(binary_operator) => {
-							todo!()
+							// TODO: errors
+							let right = self.value_stack.pop().unwrap();
+							let left = self.value_stack.pop().unwrap();
+							if !left.is_plain() || !right.is_plain() {
+								todo!()
+							}
+							let left = match left.to_value() {
+								VariableValue::Plain(plain_value) => plain_value,
+								VariableValue::Dynamic(dynamic_variable_value) => unreachable!(),
+							};
+							let right = match right.to_value() {
+								VariableValue::Plain(plain_value) => plain_value,
+								VariableValue::Dynamic(dynamic_variable_value) => unreachable!(),
+							};
+							use BinaryOperator::*;
+							use PlainValue::*;
+							#[rustfmt::skip]
+							let result = match (binary_operator, left, right) {
+								(BinaryPlus, Int(a), Int(b)) => Some(Int(a + b)),
+								(BinaryPlus, Int(a), Float(b)) => Some(Float((a as f32) + b)),
+								(BinaryPlus, Float(a), Int(b)) => Some(Float(a + (b as f32))),
+								(BinaryPlus, Float(a), Float(b)) => Some(Float(a + b)),
+								(BinaryPlus, _, _) => None,
+								(BinaryMinus, Int(a), Int(b)) => Some(Int(a - b)),
+								(BinaryMinus, Int(a), Float(b)) => Some(Float((a as f32) - b)),
+								(BinaryMinus, Float(a), Int(b)) => Some(Float(a - (b as f32))),
+								(BinaryMinus, Float(a), Float(b)) => Some(Float(a - b)),
+								(BinaryMinus, _, _) => None,
+								(Multiply, Int(a), Int(b)) => Some(Int(a * b)),
+								(Multiply, Int(a), Float(b)) => Some(Float((a as f32) * b)),
+								(Multiply, Float(a), Int(b)) => Some(Float(a * (b as f32))),
+								(Multiply, Float(a), Float(b)) => Some(Float(a * b)),
+								(Multiply, _, _) => None,
+								// TODO: Handle division by 0
+								(Divide, Int(a), Int(b)) => Some(Float((a as f32) / (b as f32))),
+								(Divide, Int(a), Float(b)) => Some(Float((a as f32) / b)),
+								(Divide, Float(a), Int(b)) => Some(Float(a / (b as f32))),
+								(Divide, Float(a), Float(b)) => Some(Float(a / b)),
+								(Divide, _, _) => None,
+								(IntegerDivide, Int(a), Int(b)) => todo!(),
+								(IntegerDivide, Int(a), Float(b)) => todo!(),
+								(IntegerDivide, Float(a), Int(b)) => todo!(),
+								(IntegerDivide, Float(a), Float(b)) => todo!(),
+								(IntegerDivide, _, _) => None,
+								(Modulo, Int(a), Int(b)) => todo!(),
+								(Modulo, Int(a), Float(b)) => todo!(),
+								(Modulo, Float(a), Int(b)) => todo!(),
+								(Modulo, Float(a), Float(b)) => todo!(),
+								(Modulo, _, _) => None,
+								(Power, Int(a), Int(b)) => todo!(),
+								(Power, Int(a), Float(b)) => todo!(),
+								(Power, Float(a), Int(b)) => todo!(),
+								(Power, Float(a), Float(b)) => todo!(),
+								(Power, _, _) => None,
+								(CompareLess, Int(a), Int(b)) => Some(Bool(a < b)),
+								(CompareLess, Int(a), Float(b)) => Some(Bool((a as f32) < b)),
+								(CompareLess, Float(a), Int(b)) => Some(Bool(a < (b as f32))),
+								(CompareLess, Float(a), Float(b)) => Some(Bool(a < b)),
+								(CompareLess, _, _) => None,
+								(CompareGreater, Int(a), Int(b)) => Some(Bool(a > b)),
+								(CompareGreater, Int(a), Float(b)) => Some(Bool((a as f32) > b)),
+								(CompareGreater, Float(a), Int(b)) => Some(Bool(a > (b as f32))),
+								(CompareGreater, Float(a), Float(b)) => Some(Bool(a > b)),
+								(CompareGreater, _, _) => None,
+								(CompareLessEqual, Int(a), Int(b)) => Some(Bool(a <= b)),
+								(CompareLessEqual, Int(a), Float(b)) => Some(Bool((a as f32) <= b)),
+								(CompareLessEqual, Float(a), Int(b)) => Some(Bool(a <= (b as f32))),
+								(CompareLessEqual, Float(a), Float(b)) => Some(Bool(a <= b)),
+								(CompareLessEqual, _, _) => None,
+								(CompareGreaterEqual, Int(a), Int(b)) => Some(Bool(a >= b)),
+								(CompareGreaterEqual, Int(a), Float(b)) => Some(Bool((a as f32) >= b)),
+								(CompareGreaterEqual, Float(a), Int(b)) => Some(Bool(a >= (b as f32))),
+								(CompareGreaterEqual, Float(a), Float(b)) => Some(Bool(a >= b)),
+								(CompareGreaterEqual, _, _) => None,
+								(CompareEqual, Int(a), Int(b)) => Some(Bool(a == b)),
+								(CompareEqual, Int(a), Float(b)) => Some(Bool((a as f32) == b)),
+								(CompareEqual, Float(a), Int(b)) => Some(Bool(a == (b as f32))),
+								(CompareEqual, Float(a), Float(b)) => Some(Bool(a == b)),
+								(CompareEqual, Float(_), _) => Some(Bool(false)),
+								(CompareEqual, _, Float(_)) => Some(Bool(false)),
+								(CompareEqual, Int(_), _) => Some(Bool(false)),
+								(CompareEqual, _, Int(_)) => Some(Bool(false)),
+								(CompareEqual, Bool(a), Bool(b)) => Some(Bool(a == b)),
+								(CompareEqual, Bool(_), _) => Some(Bool(false)),
+								(CompareEqual, _, Bool(_)) => Some(Bool(false)),
+								(CompareEqual, Blank, Blank) => Some(Bool(true)),
+								(CompareEqual, Blank, _) => Some(Bool(false)),
+								(CompareEqual, _, Blank) => Some(Bool(false)),
+								(CompareNotEqual, Int(a), Int(b)) => Some(Bool(a != b)),
+								(CompareNotEqual, Int(a), Float(b)) => Some(Bool((a as f32) != b)),
+								(CompareNotEqual, Float(a), Int(b)) => Some(Bool(a != (b as f32))),
+								(CompareNotEqual, Float(a), Float(b)) => Some(Bool(a != b)),
+								(CompareNotEqual, Float(_), _) => Some(Bool(true)),
+								(CompareNotEqual, _, Float(_)) => Some(Bool(true)),
+								(CompareNotEqual, Int(_), _) => Some(Bool(true)),
+								(CompareNotEqual, _, Int(_)) => Some(Bool(true)),
+								(CompareNotEqual, Bool(a), Bool(b)) => Some(Bool(a != b)),
+								(CompareNotEqual, Bool(_), _) => Some(Bool(true)),
+								(CompareNotEqual, _, Bool(_)) => Some(Bool(true)),
+								(CompareNotEqual, Blank, Blank) => Some(Bool(false)),
+								(CompareNotEqual, Blank, _) => Some(Bool(true)),
+								(CompareNotEqual, _, Blank) => Some(Bool(true)),
+								(And, Bool(a), Bool(b)) => Some(Bool(a && b)),
+								(And, _, _) => None,
+								(Or, Bool(a), Bool(b)) => Some(Bool(a || b)),
+								(Or, _, _) => None,
+							};
+							match result {
+								Some(value) => self.value_stack.push(VariableValue::Plain(value)),
+								None => todo!("Error handling yay"),
+							}
 						}
 						Instruction::UnaryOperation(unary_operator) => {
 							// TODO: Error handling for none.
@@ -1541,6 +1647,87 @@ a.len.for(a[$0].len.for({
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(2000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_math() {
+		let dictionary = macro_dictionary();
+
+		// TODO: Better tests and better coverage
+		let ast = get_ast(
+			r"
+let N = 20;
+let A = [1,2,3];
+print(2 * N);
+print(N + N);
+print(A[2] * A[2]);
+print(9);
+print(A[2] == A[2]);
+print(A[2] == 3);
+print(20 - 50);
+print(-30);
+print(20 - 50.0);
+print(20.0 - 50);
+print(20 == 20.0);
+print(20.0 != 50);
+print(20 >= 20.0);
+print(20.0 <= 50);
+print(20 > 20.0);
+print(20.0 < 10);
+
+print(_);
+print(true && true);
+print(true && false);
+print(false && true);
+print(false && false);
+
+print(_);
+print(true || true);
+print(true || false);
+print(false || true);
+print(false || false);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(500);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_erasthotenes() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let sqrt_N = 7;
+
+let N = sqrt_N * sqrt_N;
+
+let primes = [true; N];
+primes[0] = false;
+primes[1] = false;
+
+(sqrt_N - 2).for({
+	let divisor1 = $0 + 2;
+	(N - 2).for({
+		let product = divisor1 * ($0 + 2);
+		primes[product] = primes[product] && product >= N;
+	});
+});
+
+N.for(i => {
+	print(i);
+	print(primes[i]);
+});
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(20000);
 		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 }
