@@ -21,7 +21,7 @@ use super::{
 	},
 	SourceLocation,
 };
-use epilang_macros::{ArrayFillLiteralMacro, ArrayLiteralMacro};
+use epilang_macros::{ArrayFillLiteralMacro, ArrayLiteralMacro, ForMacro};
 use std::collections::HashMap;
 use std::{
 	borrow::Borrow,
@@ -40,10 +40,12 @@ pub trait DynamicVariableValue {
 	/// Workaround for the object-insafety of [`Clone`]
 	fn clone(&self) -> Box<dyn DynamicVariableValue>;
 
-	//
-	//fn call_method(&self, name: String, ) ->  {
-	//		todo!()
-	//}
+	/// Method that implements all the method calls on this object.
+	fn call_method<'ast>(
+		&mut self,
+		name: &str,
+		arguments: &'ast Option<ArgumentList>,
+	) -> Option<Box<dyn Macro<'ast> + 'ast>>;
 }
 
 enum MethodCallValue {
@@ -63,8 +65,8 @@ pub trait Macro<'ast> {
 	/// Input:
 	///     On first call, the input value should be a [`Blank`](PlainValue::Blank), on subsequent calls, it is the value of the operations that have been previously emitted.
 	/// Returns either:
-	///     A list [`Operation`]s that should be evaluated before the next call and *must* result in *one* value being pushed onto the stack, this value is then fed back into the macro next iteration.
-	///     A return [`VariableValue`] signaling the macro has finished and should no longer be bothered.
+	///     A list of [`Operation`]s that should be evaluated before the next call and *must* result in *one* value being pushed onto the stack, this value is then fed back into the macro next iteration.
+	///     A return [`StackValue`] signaling the macro has finished and should no longer be bothered.
 	fn poll(&mut self, input: StackValue) -> MacroReturn<'ast>;
 }
 
@@ -115,9 +117,9 @@ pub enum StackValue {
 trait CellValueExt {
 	type Inner;
 	/// Calls a function on the inner value, allowing the caller to extract data from the [`Cell`]
-	fn introspect<U>(&self, func: impl Fn(&Self::Inner) -> U) -> U;
+	fn introspect<U>(&self, func: impl FnOnce(&Self::Inner) -> U) -> U;
 	/// Calls a function on the inner value, allowing the caller to extract data from the [`Cell`] and/or mutate the contents.
-	fn introspect_mut<U>(&self, func: impl FnMut(&mut Self::Inner) -> U) -> U;
+	fn introspect_mut<U>(&self, func: impl FnOnce(&mut Self::Inner) -> U) -> U;
 }
 
 impl<T: Default> CellValueExt for Cell<T> {
@@ -154,6 +156,7 @@ impl StackValue {
 		}
 	}
 
+	/// Assigns to this reference, assumes that [`Self::assignable`] returns true.
 	fn assign(&self, new_value: VariableValue) {
 		match self {
 			StackValue::Value(_) => todo!("Error!"),
@@ -181,7 +184,7 @@ impl StackValue {
 				VariableValue::Dynamic(dynamic_variable_value) => false,
 			},
 			StackValue::Reference(ReferenceValue { value, .. }) => {
-				value.as_ref().introspect(|value| match value {
+				value.introspect(|value| match value {
 					VariableValue::Plain(plain_value) => true,
 					VariableValue::Dynamic(dynamic_variable_value) => false,
 				})
@@ -190,26 +193,27 @@ impl StackValue {
 	}
 
 	fn index(&mut self, index_value: VariableValue) -> Option<ReferenceValue> {
-		match self {
-			StackValue::Value(variable_value) => match variable_value {
-				VariableValue::Plain(plain_value) => None, // TODO: Error
-				VariableValue::Dynamic(dynamic_variable_value) => {
-					dynamic_variable_value.index(index_value)
-				}
-			},
-			StackValue::Reference(reference_value) => {
-				// This block should've been implemented using `instrospect_mut`,
-				// but I couldn't get the ownership shenanigans for `index_value` to work out.
-				let mut inner = reference_value.value.as_ref().take();
-				let return_value = match &mut inner {
-					VariableValue::Plain(plain_value) => None, // TODO: Error
-					VariableValue::Dynamic(dynamic_variable_value) => {
-						dynamic_variable_value.index(index_value)
-					}
-				};
-				reference_value.value.as_ref().set(inner);
-				return_value
+		self.introspect_mut(|inner| match inner {
+			VariableValue::Plain(plain_value) => None, // TODO: Error
+			VariableValue::Dynamic(dynamic_variable_value) => {
+				dynamic_variable_value.index(index_value)
 			}
+		})
+	}
+}
+
+impl StackValue {
+	fn introspect<U>(&self, func: impl FnOnce(&VariableValue) -> U) -> U {
+		match self {
+			StackValue::Value(variable_value) => func(variable_value),
+			StackValue::Reference(reference_value) => reference_value.value.introspect(func),
+		}
+	}
+
+	fn introspect_mut<U>(&mut self, mut func: impl FnOnce(&mut VariableValue) -> U) -> U {
+		match self {
+			StackValue::Value(variable_value) => func(variable_value),
+			StackValue::Reference(reference_value) => reference_value.value.introspect_mut(func),
 		}
 	}
 }
@@ -312,11 +316,8 @@ impl ContextFrame {
 
 pub enum Instruction {
 	// Literal values
+	Push(VariableValue),
 	PushBlank,
-	PushBool(bool),
-	PushInt(i32),
-	PushFloat(f32),
-	PushString(String),
 	// Value discarding
 	/// Discard top value from stack
 	DiscardValue,
@@ -351,6 +352,8 @@ pub enum Operation<'expr> {
 	Expand(&'expr Expression),
 	/// An instruction to be executed
 	Instruction(Instruction),
+	/// A method to be called
+	MethodCall(&'expr str, &'expr Option<ArgumentList>),
 	/// A macro to poll for further operations
 	MacroCallBack(Box<dyn Macro<'expr> + 'expr>),
 }
@@ -388,10 +391,6 @@ struct ValueStack(Vec<StackValue>);
 impl ValueStack {
 	pub fn push(&mut self, value: impl Into<StackValue>) {
 		self.0.push(value.into());
-	}
-
-	pub fn push_string(&mut self, value: &str) {
-		self.0.push(todo!());
 	}
 
 	pub fn push_blank(&mut self) {
@@ -453,6 +452,10 @@ impl<'ast> Interpreter<'ast> {
 		interpreter
 	}
 
+	pub fn halted(&self) -> bool {
+		self.operation_stack.0.is_empty()
+	}
+
 	pub fn execute(&mut self, max_steps: usize) {
 		let mut steps = 0;
 		while !self.operation_stack.0.is_empty() && steps < max_steps {
@@ -485,16 +488,16 @@ impl<'ast> Interpreter<'ast> {
 						self.operation_stack.push(rvalue);
 					}
 					ExpressionContent::IntLiteral(value) => {
-						self.operation_stack.push(Instruction::PushInt(
-							(*value).try_into().unwrap_or(i32::MAX), // TODO: better handling
+						self.operation_stack.push(Instruction::Push(
+							(*value).try_into().unwrap_or(i32::MAX).into(), // TODO: better handling
 						));
 					}
 					ExpressionContent::FloatLiteral(value) => {
-						self.operation_stack.push(Instruction::PushFloat(*value));
+						self.operation_stack
+							.push(Instruction::Push((*value).into()));
 					}
 					ExpressionContent::StringLiteral(value) => {
-						self.operation_stack
-							.push(Instruction::PushString(value.clone()));
+						self.operation_stack.push(Instruction::Push(todo!()));
 					}
 					ExpressionContent::Blank => {
 						self.operation_stack.push(Instruction::PushBlank);
@@ -537,7 +540,9 @@ impl<'ast> Interpreter<'ast> {
 						}
 					}
 					ExpressionContent::MethodCall(expression, method_name, argument_list) => {
-						todo!()
+						self.operation_stack
+							.push(Operation::MethodCall(method_name, argument_list));
+						self.operation_stack.push(expression);
 					}
 					ExpressionContent::IndexAccess(array_value, index_expr) => {
 						self.operation_stack.push(Instruction::Index);
@@ -563,12 +568,12 @@ impl<'ast> Interpreter<'ast> {
 							self.operation_stack.push(Instruction::DiscardValue);
 							// Assign
 							self.operation_stack.push(Instruction::Assign);
-							// Access a macro register to get the appropriate rvalue
-							self.operation_stack
-								.push(Instruction::AccessMacroRegister(i));
 							// Access it to get an lvalue
 							self.operation_stack
 								.push(Instruction::AccessVariable(variable.clone()));
+							// Access a macro register to get the appropriate rvalue
+							self.operation_stack
+								.push(Instruction::AccessMacroRegister(i));
 							// Make a new variable (let)
 							self.operation_stack
 								.push(Instruction::CreateVariable(variable.clone()));
@@ -593,10 +598,7 @@ impl<'ast> Interpreter<'ast> {
 				Operation::Instruction(instruction) => {
 					match instruction {
 						Instruction::PushBlank => self.value_stack.push_blank(),
-						Instruction::PushBool(value) => self.value_stack.push(value),
-						Instruction::PushInt(value) => self.value_stack.push(value),
-						Instruction::PushFloat(value) => self.value_stack.push(value),
-						Instruction::PushString(value) => todo!(),
+						Instruction::Push(value) => self.value_stack.push(value),
 						Instruction::DiscardValue => {
 							self.value_stack.pop();
 						} // TODO: Error handling
@@ -634,9 +636,12 @@ impl<'ast> Interpreter<'ast> {
 							}
 						}
 						Instruction::AccessMacroRegister(index) => {
-							self.value_stack.push(StackValue::Reference(
-								self.dollar_stack.0.get(index).unwrap().borrow(),
-							)) // TODO: Error handling
+							self.value_stack.push(StackValue::Reference({
+								if index >= self.dollar_stack.0.len() {
+									todo!("Errors!");
+								}
+								self.dollar_stack.0[self.dollar_stack.0.len() - 1 - index].borrow()
+							}))
 						}
 						Instruction::Assign => {
 							let lvalue = self.value_stack.pop().unwrap();
@@ -719,6 +724,41 @@ impl<'ast> Interpreter<'ast> {
 								None => todo!(),
 							}
 						}
+						Instruction::Push(variable_value) => self.value_stack.push(variable_value),
+					}
+				}
+				Operation::MethodCall(name, arguments) => {
+					// TODO errors
+					match self
+						.value_stack
+						.pop()
+						.unwrap()
+						.introspect_mut(|value| match value {
+							VariableValue::Plain(plain_value) => match plain_value {
+								PlainValue::Int(iterations) => match name {
+									"for" => arguments
+										.as_ref()
+										.and_then(|a| a.positional_arguments.first())
+										.map(|inner_expr| {
+											Box::new(ForMacro::<'ast>::new(*iterations, inner_expr))
+												as Box<dyn Macro>
+										}),
+									_ => None,
+								},
+								_ => None,
+							},
+							VariableValue::Dynamic(dynamic_variable_value) => {
+								dynamic_variable_value.call_method(name, arguments)
+							}
+						}) {
+						Some(macro_data) => {
+							self.operation_stack
+								.push(Operation::MacroCallBack(macro_data));
+							self.operation_stack.push(Instruction::PushBlank);
+						}
+						None => {
+							todo!()
+						}
 					}
 				}
 				Operation::MacroCallBack(mut macro_data) => {
@@ -742,7 +782,12 @@ impl<'ast> Interpreter<'ast> {
 mod epilang_types {
 	use std::{cell::Cell, rc::Rc};
 
-	use super::{DynamicVariableValue, PlainValue, ReferenceValue, VariableValue};
+	use crate::epilang::ast::ArgumentList;
+
+	use super::{
+		epilang_macros::{ConstantMacro, ForMacro},
+		DynamicVariableValue, Macro, PlainValue, ReferenceValue, VariableValue,
+	};
 
 	pub struct ArrayType {
 		// This could be done better with some sort of subrc construct, but that would require unsafe and I won't bother.
@@ -800,6 +845,20 @@ mod epilang_types {
 					.collect(),
 				borrow_counter: Rc::new(()),
 			})
+		}
+
+		fn call_method<'ast>(
+			&mut self,
+			name: &str,
+			arguments: &'ast Option<ArgumentList>,
+		) -> Option<Box<dyn Macro<'ast> + 'ast>> {
+			match name {
+				"for" => todo!(),
+				"len" => Some(Box::new(ConstantMacro::new(
+					(self.values.len() as i32).into(),
+				))),
+				_ => None,
+			}
 		}
 	}
 }
@@ -910,22 +969,31 @@ mod epilang_macros {
 					self.state = ArrayLiteralMacroState::EvaluateCounter;
 					return MacroReturn::Operations(vec![self.counter_expression.into()]);
 				}
-				ArrayLiteralMacroState::EvaluateCounter => match input.to_value() {
-					VariableValue::Plain(PlainValue::Int(value)) => {
-						if value == 0 {
-							todo!("Return empty array");
+				ArrayLiteralMacroState::EvaluateCounter => {
+					match input.introspect(|inner| match inner {
+						VariableValue::Plain(PlainValue::Int(value)) => {
+							if *value == 0 {
+								return Some(MacroReturn::Return(
+									VariableValue::Dynamic(Box::new(ArrayType::new(Vec::new())))
+										.into(),
+								));
+							}
+							if *value < 0 {
+								todo!("Error handling");
+							}
+							self.state = ArrayLiteralMacroState::GenerateValues {
+								counter: 0,
+								maximum: *value as usize,
+							};
+							None
 						}
-						if value < 0 {
-							todo!("Error handling");
-						}
-						self.state = ArrayLiteralMacroState::GenerateValues {
-							counter: 0,
-							maximum: value as usize,
-						};
+						VariableValue::Dynamic(dynamic_variable_value) => todo!("Array handling"),
+						_ => todo!("Error handling"),
+					}) {
+						Some(return_value) => return return_value,
+						None => {}
 					}
-					VariableValue::Dynamic(dynamic_variable_value) => todo!("Array handling"),
-					_ => todo!("Error handling"),
-				},
+				}
 				ArrayLiteralMacroState::GenerateValues { .. } => {
 					self.values.push(input.to_value());
 				}
@@ -944,7 +1012,7 @@ mod epilang_macros {
 			let return_val = MacroReturn::Operations(vec![
 				Instruction::EnterScope.into(),
 				Instruction::PushDollar.into(),
-				Instruction::PushInt(*counter as i32).into(),
+				Instruction::Push((*counter as i32).into()).into(),
 				Instruction::AccessMacroRegister(0).into(),
 				Instruction::Assign.into(),
 				Instruction::DiscardValue.into(),
@@ -995,6 +1063,41 @@ mod epilang_macros {
 			return_val
 		}
 	}
+
+	pub struct ForMacro<'ast> {
+		iterator: Box<dyn Iterator<Item = VariableValue>>,
+		inner_expression: &'ast Expression,
+	}
+
+	impl<'ast> ForMacro<'ast> {
+		pub fn new(iteration: i32, inner_expression: &'ast Expression) -> Self {
+			let iteration = iteration.max(0);
+			ForMacro {
+				iterator: Box::new((0..iteration).map(VariableValue::from)),
+				inner_expression,
+			}
+		}
+	}
+
+	impl<'ast> Macro<'ast> for ForMacro<'ast> {
+		fn poll(&mut self, input: StackValue) -> super::MacroReturn<'ast> {
+			if let Some(value) = self.iterator.next() {
+				MacroReturn::Operations(vec![
+					Instruction::EnterScope.into(),
+					Instruction::PushDollar.into(),
+					Instruction::Push(value).into(),
+					Instruction::AccessMacroRegister(0).into(),
+					Instruction::Assign.into(),
+					Instruction::DiscardValue.into(),
+					self.inner_expression.into(),
+					Instruction::PopDollar.into(),
+					Instruction::ExitScope.into(),
+				])
+			} else {
+				MacroReturn::Return(VariableValue::Plain(PlainValue::Blank).into())
+			}
+		}
+	}
 }
 
 mod test {
@@ -1011,6 +1114,8 @@ mod test {
 		epilang_macros::{ConstantMacro, PrintMacro},
 		Interpreter, Macro, MacroConstructor, PlainValue,
 	};
+
+	const NOT_HALTED_ERROR: &'static str = "Interpreter has not finished running during the testcase! Consider increasing the step count or improving performance";
 
 	fn macro_dictionary<'ast>() -> HashMap<String, Box<MacroConstructor<'ast>>> {
 		let mut map: HashMap<
@@ -1069,6 +1174,7 @@ mod test {
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(100);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1093,6 +1199,7 @@ print(_);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(100);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1132,6 +1239,7 @@ print(d);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(1000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1156,6 +1264,7 @@ print(b);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(100);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1176,6 +1285,7 @@ print(c);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(200);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1194,6 +1304,7 @@ print(b);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(200);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1227,6 +1338,7 @@ print(d[2]);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(1000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 
 	#[test]
@@ -1270,5 +1382,165 @@ print(nested[1][0]);
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(1000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_nested_array_literal() {
+		let dictionary = macro_dictionary();
+
+		/// Note: This is designed to have the same output as [`test_lambda`]
+		let ast = get_ast(
+			r"
+let a = [$0; 3];
+print(a[0]);
+print(a[1]);
+print(a[2]);
+print(_);
+a = [[[$0,$1]; 3]; 4];
+print(a[0][0][0]);
+print(a[0][0][1]);
+print(_);
+print(a[0][1][0]);
+print(a[0][1][1]);
+print(_);
+print(a[3][0][0]);
+print(a[3][0][1]);
+print(_);
+print(a[3][2][0]);
+print(a[3][2][1]);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(1000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_lambda() {
+		let dictionary = macro_dictionary();
+
+		/// Note: This is designed to have the same output as [`test_nested_array_literal`]
+		let ast = get_ast(
+			r"
+let a = [i => i; 3];
+print(a[0]);
+print(a[1]);
+print(a[2]);
+print(_);
+a = [[(x,y) => [x,y]; 3]; 4];
+print(a[0][0][0]);
+print(a[0][0][1]);
+print(_);
+print(a[0][1][0]);
+print(a[0][1][1]);
+print(_);
+print(a[3][0][0]);
+print(a[3][0][1]);
+print(_);
+print(a[3][2][0]);
+print(a[3][2][1]);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(1000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_array_len() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [_;3];
+
+print(a.len());
+print(a.len);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(100);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_array_len_advanced() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [[_;$0];3];
+
+print(a.len);
+print(a[0].len);
+print(a[1].len);
+print(a[2].len);
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(500);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_for() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [2,3,5,7,11];
+
+print(_);
+a.len.for(print($0));
+
+print(_);
+a.len.for(print(a[$0]));
+print(_);
+a.len.for(i => print(a[i]));
+
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(500);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_for_advanced() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let a = [[(x,y) => [x,y]; 3]; 4];
+
+print(_);
+4.for(3.for({
+	print($0);
+	print($1);
+}));
+
+print(_);
+a.len.for(a[$0].len.for({
+	print(a[$1][$0][0]);
+	print(a[$1][$0][1]);
+}));
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(2000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 }
