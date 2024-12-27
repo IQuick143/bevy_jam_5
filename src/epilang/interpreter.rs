@@ -21,14 +21,188 @@ use super::{
 	},
 	SourceLocation,
 };
+use bevy::tasks::futures_lite::FutureExt;
 use epilang_macros::{ArrayFillLiteralMacro, ArrayLiteralMacro, ForMacro};
+use evil_yield_hack::{InterpreterChannel, InterpreterPendingCommand};
 use std::{
-	borrow::Borrow,
+	borrow::{Borrow, BorrowMut},
 	cell::Cell,
+	future::Future,
+	marker::PhantomData,
 	ops::{Deref, Range},
+	pin::Pin,
 	rc::Rc,
+	task::Context,
 };
 use std::{collections::HashMap, ops::Mul};
+
+mod evil_yield_hack {
+	use std::{
+		cell::Cell,
+		future::Future,
+		marker::PhantomData,
+		num::NonZero,
+		rc::Rc,
+		task::{RawWaker, RawWakerVTable, Waker},
+	};
+
+	use bevy::tasks::futures_lite::FutureExt;
+
+	use crate::epilang::ast::Expression;
+
+	use super::{Instruction, Operation, PlainValue, StackValue, VariableValue};
+
+	/// A command that a Future is expecting to be finished in order to continue.
+	pub enum InterpreterPendingCommand<'ast> {
+		/// Run these [`Operation`]'s on the machine and send the result.
+		Eval(Vec<Operation<'ast>>),
+		/// Account for elapsed time and send a blank.
+		ReportRuntime(usize),
+		// Allocate()
+	}
+
+	/// A communications channel used to pass messages and values
+	#[derive(Clone)]
+	pub struct InterpreterChannel<'ast> {
+		/// Operation that was queue'd before a future started `Pending`
+		pending_operation: Rc<Cell<Option<InterpreterPendingCommand<'ast>>>>,
+		/// Variable for passing the result of the operation.
+		/// `None` indicates the operation has not been performed,
+		/// `Some` indicates the future can continue its operations.
+		result: Rc<Cell<Option<StackValue>>>,
+	}
+
+	impl<'ast> InterpreterChannel<'ast> {
+		pub fn new() -> Self {
+			Self {
+				pending_operation: Rc::new(Cell::new(None)),
+				result: Rc::new(Cell::new(None)),
+			}
+		}
+
+		pub fn take_requests(&self) -> Option<InterpreterPendingCommand<'ast>> {
+			self.pending_operation.take()
+		}
+
+		pub fn send_value(&self, value: StackValue) {
+			self.result.set(Some(value));
+		}
+	}
+
+	pub struct InterpreterResultFuture {
+		result: Rc<Cell<Option<StackValue>>>,
+	}
+
+	impl InterpreterResultFuture {
+		pub fn new(ctx: &InterpreterChannel) -> Self {
+			Self {
+				result: Rc::clone(&ctx.result),
+			}
+		}
+	}
+
+	impl Future for InterpreterResultFuture {
+		type Output = StackValue;
+
+		fn poll(
+			self: std::pin::Pin<&mut Self>,
+			cx: &mut std::task::Context<'_>,
+		) -> std::task::Poll<Self::Output> {
+			match self.result.replace(None) {
+				Some(value) => std::task::Poll::Ready(value),
+				None => std::task::Poll::Pending,
+			}
+		}
+	}
+
+	pub struct NearInstantFuture(bool);
+
+	impl Future for NearInstantFuture {
+		type Output = ();
+
+		fn poll(
+			mut self: std::pin::Pin<&mut Self>,
+			cx: &mut std::task::Context<'_>,
+		) -> std::task::Poll<Self::Output> {
+			match self.0 {
+				true => std::task::Poll::Ready(()),
+				false => {
+					self.0 = true;
+					std::task::Poll::Pending
+				}
+			}
+		}
+	}
+
+	impl<'ast> InterpreterChannel<'ast> {
+		pub fn eval_operations(
+			&self,
+			operations: Vec<Operation<'ast>>,
+		) -> impl Future<Output = StackValue> {
+			// TODO: Consider checking that we're not overriding anything here as a debug assertion.
+			self.pending_operation
+				.set(Some(InterpreterPendingCommand::Eval(operations)));
+			InterpreterResultFuture::new(self)
+		}
+
+		pub fn yield_cpu(&self) -> impl Future<Output = ()> {
+			// TODO: Consider checking that we're not overriding anything here as a debug assertion.
+			self.pending_operation
+				.set(Some(InterpreterPendingCommand::ReportRuntime(1)));
+			NearInstantFuture(false)
+		}
+	}
+
+	const NOOP_RAW_WAKER: RawWaker = {
+		const VTABLE: RawWakerVTable = RawWakerVTable::new(
+			// Cloning just returns a new no-op raw waker
+			|_| NOOP_RAW_WAKER,
+			// `wake` does nothing
+			|_| {},
+			// `wake_by_ref` does nothing
+			|_| {},
+			// Dropping does nothing as we don't allocate anything
+			|_| {},
+		);
+		RawWaker::new(std::ptr::null(), &VTABLE)
+	};
+
+	pub const fn noop_waker() -> &'static Waker {
+		// SAFETY: I copy pasted this code from the standard library.
+		const WAKER: &Waker = &unsafe { Waker::from_raw(NOOP_RAW_WAKER) };
+		WAKER
+	}
+}
+
+/// To obtain instances of this trait, implement [`Macro`] + [`Sized`]
+pub trait MacroInternal<'ast> {
+	fn run(
+		self: Box<Self>,
+		interpreter: InterpreterChannel<'ast>,
+	) -> Pin<Box<dyn Future<Output = StackValue> + 'ast>>;
+}
+
+impl<'ast, T: Macro<'ast> + 'ast + Sized> MacroInternal<'ast> for T {
+	fn run(
+		self: Box<Self>,
+		interpreter: InterpreterChannel<'ast>,
+	) -> Pin<Box<dyn Future<Output = StackValue> + 'ast>> {
+		Box::pin(Macro::run(*self, interpreter))
+	}
+}
+
+trait Macro<'ast>: Sized {
+	/// Runs a macro,
+	/// Calls to this function should avoid performing possibly arbitrarily large numbers of operations,
+	/// or using more than O(1) memory.
+	///
+	/// If more is needed, one should `await` an interpreter routine such
+	/// as [`InterpreterChannel::yield_cpu`] in such a way, as to perform roughly O(1) time and space operations
+	/// between such calls.
+	///
+	/// To evaluate [`Expression`]'s or perform operations, one should `await` [`InterpreterChannel::eval_operations`].
+	async fn run(self, interpreter: InterpreterChannel<'ast>) -> StackValue;
+}
 
 pub trait DynamicVariableValue {
 	/// Returns whether this variable is mutable (meaning that it does not currently have any borrows)
@@ -45,7 +219,7 @@ pub trait DynamicVariableValue {
 		&mut self,
 		name: &str,
 		arguments: &'ast Option<ArgumentList>,
-	) -> Option<Box<dyn Macro<'ast> + 'ast>>;
+	) -> Option<Box<dyn MacroInternal<'ast> + 'ast>>;
 }
 
 pub enum MacroReturn<'ast> {
@@ -54,17 +228,7 @@ pub enum MacroReturn<'ast> {
 }
 
 type MacroConstructor<'ast> =
-	dyn FnMut(Option<&'ast ArgumentList>) -> Option<Box<dyn Macro<'ast> + 'ast>> + 'ast; // TODO: Result type
-
-pub trait Macro<'ast> {
-	/// Perform one step of macro evaluation
-	/// Input:
-	///     On first call, the input value should be a [`Blank`](PlainValue::Blank), on subsequent calls, it is the value of the operations that have been previously emitted.
-	/// Returns either:
-	///     A list of [`Operation`]s that should be evaluated before the next call and *must* result in *one* value being pushed onto the stack, this value is then fed back into the macro next iteration.
-	///     A return [`StackValue`] signaling the macro has finished and should no longer be bothered.
-	fn poll(&mut self, input: StackValue) -> MacroReturn<'ast>;
-}
+	dyn FnMut(Option<&'ast ArgumentList>) -> Option<Box<dyn MacroInternal<'ast> + 'ast>> + 'ast; // TODO: Result type
 
 #[derive(Clone, Copy, Debug)]
 pub enum PlainValue {
@@ -101,6 +265,15 @@ impl Clone for VariableValue {
 impl Default for VariableValue {
 	fn default() -> Self {
 		VariableValue::Plain(PlainValue::Blank)
+	}
+}
+
+impl<T> From<T> for VariableValue
+where
+	T: DynamicVariableValue + Sized + 'static,
+{
+	fn from(value: T) -> Self {
+		VariableValue::Dynamic(Box::new(value))
 	}
 }
 
@@ -350,8 +523,10 @@ pub enum Operation<'expr> {
 	Instruction(Instruction),
 	/// A method to be called
 	MethodCall(&'expr str, &'expr Option<ArgumentList>),
-	/// A macro to poll for further operations
-	MacroCallBack(Box<dyn Macro<'expr> + 'expr>),
+	/// A macro to be executed
+	RunMacro(Box<dyn MacroInternal<'expr> + 'expr>),
+	/// Future to be polled and whether it requested a value from the stack last poll.
+	MacroCallBack(Box<Pin<Box<dyn Future<Output = StackValue> + 'expr>>>, bool),
 }
 
 impl<'a> From<Instruction> for Operation<'a> {
@@ -425,6 +600,8 @@ pub struct Interpreter<'ast> {
 	/// Stack of values corresponding to $n registers
 	dollar_stack: DollarStack,
 	macro_library: HashMap<String, Box<MacroConstructor<'ast>>>,
+	async_channel: InterpreterChannel<'ast>,
+	async_context: Context<'ast>,
 }
 
 impl<'ast> Interpreter<'ast> {
@@ -439,6 +616,8 @@ impl<'ast> Interpreter<'ast> {
 			value_stack: ValueStack(Vec::new()),
 			dollar_stack: DollarStack(Vec::new()),
 			macro_library,
+			async_channel: InterpreterChannel::new(),
+			async_context: Context::from_waker(evil_yield_hack::noop_waker()),
 		};
 		interpreter
 			.context_stack
@@ -501,9 +680,7 @@ impl<'ast> Interpreter<'ast> {
 					ExpressionContent::Identifier(identifier) => {
 						if let Some(constructor) = self.macro_library.get_mut(identifier) {
 							if let Some(macro_data) = constructor(None) {
-								self.operation_stack
-									.push(Operation::MacroCallBack(macro_data));
-								self.operation_stack.push(Instruction::PushBlank);
+								self.operation_stack.push(Operation::RunMacro(macro_data));
 							} else {
 								todo!()
 							}
@@ -525,9 +702,7 @@ impl<'ast> Interpreter<'ast> {
 					ExpressionContent::MacroCall(macro_name, argument_list) => {
 						if let Some(constructor) = self.macro_library.get_mut(macro_name) {
 							if let Some(macro_data) = constructor(Some(argument_list)) {
-								self.operation_stack
-									.push(Operation::MacroCallBack(macro_data));
-								self.operation_stack.push(Instruction::PushBlank);
+								self.operation_stack.push(Operation::RunMacro(macro_data));
 							} else {
 								todo!()
 							}
@@ -546,16 +721,14 @@ impl<'ast> Interpreter<'ast> {
 						self.operation_stack.push(array_value);
 					}
 					ExpressionContent::ArrayLiteral(values) => {
-						self.operation_stack.push(Operation::MacroCallBack(Box::new(
+						self.operation_stack.push(Operation::RunMacro(Box::new(
 							ArrayLiteralMacro::<'ast>::new(values),
 						)));
-						self.operation_stack.push(Instruction::PushBlank);
 					}
 					ExpressionContent::FillArrayLiteral(inner_expression, count_expression) => {
-						self.operation_stack.push(Operation::MacroCallBack(Box::new(
+						self.operation_stack.push(Operation::RunMacro(Box::new(
 							ArrayFillLiteralMacro::<'ast>::new(inner_expression, count_expression),
 						)));
-						self.operation_stack.push(Instruction::PushBlank);
 					}
 					ExpressionContent::Lambda(bindings, expression) => {
 						self.operation_stack.push(expression);
@@ -847,7 +1020,7 @@ impl<'ast> Interpreter<'ast> {
 										.and_then(|a| a.positional_arguments.first())
 										.map(|inner_expr| {
 											Box::new(ForMacro::<'ast>::new(*iterations, inner_expr))
-												as Box<dyn Macro>
+												as Box<dyn MacroInternal>
 										}),
 									_ => None,
 								},
@@ -858,26 +1031,43 @@ impl<'ast> Interpreter<'ast> {
 							}
 						}) {
 						Some(macro_data) => {
-							self.operation_stack
-								.push(Operation::MacroCallBack(macro_data));
-							self.operation_stack.push(Instruction::PushBlank);
+							self.operation_stack.push(Operation::RunMacro(macro_data));
 						}
 						None => {
 							todo!()
 						}
 					}
 				}
-				Operation::MacroCallBack(mut macro_data) => {
-					let input = self.value_stack.pop().unwrap(); // TODO
-					match macro_data.poll(input) {
-						MacroReturn::Operations(queue) => {
-							self.operation_stack
-								.push(Operation::MacroCallBack(macro_data));
-							for operation in queue.into_iter().rev() {
-								self.operation_stack.0.push(operation);
-							}
+				Operation::RunMacro(mut macro_data) => {
+					self.operation_stack.push(Operation::MacroCallBack(
+						Box::new(macro_data.run(self.async_channel.clone())),
+						false,
+					))
+				}
+				Operation::MacroCallBack(mut macro_data, value_requested) => {
+					if value_requested {
+						self.async_channel
+							.send_value(self.value_stack.pop().unwrap()); // TODO
+					}
+					match Future::poll((*macro_data).as_mut(), &mut self.async_context) {
+						std::task::Poll::Ready(value) => self.value_stack.push(value),
+						std::task::Poll::Pending => {
+							match self.async_channel.take_requests() {
+								Some(InterpreterPendingCommand::Eval(queue)) => {
+									self.operation_stack
+										.push(Operation::MacroCallBack(macro_data, true));
+									for operation in queue.into_iter().rev() {
+										self.operation_stack.0.push(operation);
+									}
+								}
+								Some(InterpreterPendingCommand::ReportRuntime(operations)) => {
+									self.operation_stack
+										.push(Operation::MacroCallBack(macro_data, false));
+									steps += operations;
+								}
+								None => todo!("I don't think this should happen..."),
+							};
 						}
-						MacroReturn::Return(value) => self.value_stack.push(value),
 					}
 				}
 			}
@@ -892,7 +1082,7 @@ mod epilang_types {
 
 	use super::{
 		epilang_macros::{ConstantMacro, ForMacro},
-		DynamicVariableValue, Macro, PlainValue, ReferenceValue, VariableValue,
+		DynamicVariableValue, Macro, MacroInternal, PlainValue, ReferenceValue, VariableValue,
 	};
 
 	pub struct ArrayType {
@@ -957,7 +1147,7 @@ mod epilang_types {
 			&mut self,
 			name: &str,
 			arguments: &'ast Option<ArgumentList>,
-		) -> Option<Box<dyn Macro<'ast> + 'ast>> {
+		) -> Option<Box<dyn MacroInternal<'ast> + 'ast>> {
 			match name {
 				"for" => todo!(),
 				"len" => Some(Box::new(ConstantMacro::new(
@@ -973,8 +1163,8 @@ mod epilang_macros {
 	use crate::epilang::{ast::Expression, interpreter::CellValueExt};
 
 	use super::{
-		epilang_types::ArrayType, Instruction, Macro, MacroReturn, Operation, PlainValue,
-		StackValue, VariableValue,
+		epilang_types::ArrayType, evil_yield_hack::InterpreterChannel, Instruction, Macro,
+		MacroReturn, Operation, PlainValue, StackValue, VariableValue,
 	};
 
 	/// An unary macro that works as an identity, but does debug printing on the passed in value.
@@ -993,31 +1183,27 @@ mod epilang_macros {
 	}
 
 	impl<'ast> Macro<'ast> for PrintMacro<'ast> {
-		fn poll(&mut self, input: StackValue) -> MacroReturn<'ast> {
-			if self.evaluating {
-				self.evaluating = false;
-				MacroReturn::Operations(vec![self.expr.into()])
-			} else {
-				fn log_value(value: &VariableValue) {
-					match value {
-						VariableValue::Plain(plain_value) => match plain_value {
-							PlainValue::Blank => println!("_Blank"),
-							PlainValue::Bool(value) => println!("b{:?}", value),
-							PlainValue::Int(value) => println!("i{:?}", value),
-							PlainValue::Float(value) => println!("f{:?}", value),
-						},
-						VariableValue::Dynamic(dynamic_variable_value) => println!("Dynamic value"),
-					}
+		async fn run(self, interpreter: InterpreterChannel<'ast>) -> StackValue {
+			let input = interpreter.eval_operations(vec![self.expr.into()]).await;
+			fn log_value(value: &VariableValue) {
+				match value {
+					VariableValue::Plain(plain_value) => match plain_value {
+						PlainValue::Blank => println!("_Blank"),
+						PlainValue::Bool(value) => println!("b{:?}", value),
+						PlainValue::Int(value) => println!("i{:?}", value),
+						PlainValue::Float(value) => println!("f{:?}", value),
+					},
+					VariableValue::Dynamic(dynamic_variable_value) => println!("Dynamic value"),
 				}
-				match &input {
-					StackValue::Value(variable_value) => log_value(variable_value),
-					StackValue::Reference(reference_value) => {
-						print!("Reference to: ");
-						reference_value.value.as_ref().introspect(log_value);
-					}
-				}
-				MacroReturn::Return(input)
 			}
+			match &input {
+				StackValue::Value(variable_value) => log_value(variable_value),
+				StackValue::Reference(reference_value) => {
+					print!("Reference to: ");
+					reference_value.value.as_ref().introspect(log_value);
+				}
+			}
+			input
 		}
 	}
 
@@ -1033,10 +1219,8 @@ mod epilang_macros {
 	}
 
 	impl<'ast> Macro<'ast> for ConstantMacro {
-		fn poll(&mut self, input: StackValue) -> MacroReturn<'ast> {
-			let mut return_value = VariableValue::default();
-			std::mem::swap(&mut self.value, &mut return_value);
-			MacroReturn::Return(return_value.into())
+		async fn run(self, interpreter: InterpreterChannel<'ast>) -> StackValue {
+			self.value.into()
 		}
 	}
 
@@ -1048,8 +1232,6 @@ mod epilang_macros {
 
 	/// Internal macro used to implement arrayfill literals.
 	pub struct ArrayFillLiteralMacro<'ast> {
-		values: Vec<VariableValue>,
-		state: ArrayLiteralMacroState,
 		inner_expression: &'ast Expression,
 		counter_expression: &'ast Expression,
 	}
@@ -1060,8 +1242,6 @@ mod epilang_macros {
 			counter_expression: &'ast Expression,
 		) -> Self {
 			ArrayFillLiteralMacro {
-				values: Vec::new(),
-				state: ArrayLiteralMacroState::Init,
 				inner_expression,
 				counter_expression,
 			}
@@ -1069,104 +1249,83 @@ mod epilang_macros {
 	}
 
 	impl<'ast> Macro<'ast> for ArrayFillLiteralMacro<'ast> {
-		fn poll(&mut self, input: StackValue) -> super::MacroReturn<'ast> {
-			match self.state {
-				ArrayLiteralMacroState::Init => {
-					self.state = ArrayLiteralMacroState::EvaluateCounter;
-					return MacroReturn::Operations(vec![self.counter_expression.into()]);
-				}
-				ArrayLiteralMacroState::EvaluateCounter => {
-					match input.introspect(|inner| match inner {
-						VariableValue::Plain(PlainValue::Int(value)) => {
-							if *value == 0 {
-								return Some(MacroReturn::Return(
-									VariableValue::Dynamic(Box::new(ArrayType::new(Vec::new())))
-										.into(),
-								));
-							}
-							if *value < 0 {
-								todo!("Error handling");
-							}
-							self.state = ArrayLiteralMacroState::GenerateValues {
-								counter: 0,
-								maximum: *value as usize,
-							};
-							None
+		async fn run(self, interpreter: InterpreterChannel<'ast>) -> StackValue {
+			let mut count = 0;
+			let mut values = Vec::new();
+			if let Some(return_value) = interpreter
+				.eval_operations(vec![
+					Instruction::EnterScope.into(),
+					self.counter_expression.into(),
+					Instruction::ExitScope.into(),
+				])
+				.await
+				.introspect(|inner| match inner {
+					VariableValue::Plain(PlainValue::Int(value)) => {
+						if *value == 0 {
+							return Some(
+								VariableValue::Dynamic(Box::new(ArrayType::new(Vec::new()))).into(),
+							);
 						}
-						VariableValue::Dynamic(dynamic_variable_value) => todo!("Array handling"),
-						_ => todo!("Error handling"),
-					}) {
-						Some(return_value) => return return_value,
-						None => {}
+						if *value < 0 {
+							todo!("Error handling");
+						}
+						count = *value as usize;
+						None
 					}
-				}
-				ArrayLiteralMacroState::GenerateValues { .. } => {
-					self.values.push(input.to_value());
-				}
+					VariableValue::Dynamic(dynamic_variable_value) => todo!("Array handling"),
+					_ => todo!("Error handling"),
+				}) {
+				return return_value;
 			};
-			let ArrayLiteralMacroState::GenerateValues { counter, maximum } = &mut self.state
-			else {
-				todo!("This should be unreachable, probably.");
-			};
-			if counter >= maximum {
-				let mut temp = Vec::new();
-				std::mem::swap(&mut self.values, &mut temp);
-				return MacroReturn::Return(
-					VariableValue::Dynamic(Box::new(ArrayType::new(temp))).into(),
+			for i in 0..count {
+				values.push(
+					interpreter
+						.eval_operations(vec![
+							Instruction::EnterScope.into(),
+							Instruction::PushDollar.into(),
+							Instruction::Push((i as i32).into()).into(),
+							Instruction::AccessMacroRegister(0).into(),
+							Instruction::Assign.into(),
+							Instruction::DiscardValue.into(),
+							self.inner_expression.into(),
+							Instruction::PopDollar.into(),
+							Instruction::ExitScope.into(),
+						])
+						.await
+						.to_value(),
 				);
 			}
-			let return_val = MacroReturn::Operations(vec![
-				Instruction::EnterScope.into(),
-				Instruction::PushDollar.into(),
-				Instruction::Push((*counter as i32).into()).into(),
-				Instruction::AccessMacroRegister(0).into(),
-				Instruction::Assign.into(),
-				Instruction::DiscardValue.into(),
-				self.inner_expression.into(),
-				Instruction::PopDollar.into(),
-				Instruction::ExitScope.into(),
-			]);
-			*counter += 1;
-			return_val
+			ArrayType::new(values).into()
 		}
 	}
 
 	/// Internal macro used to implement array literals
 	pub struct ArrayLiteralMacro<'ast> {
-		values: Vec<VariableValue>,
-		counter: usize,
 		inner_expressions: &'ast Vec<Expression>,
 	}
 
 	impl<'ast> ArrayLiteralMacro<'ast> {
 		pub fn new(inner_expressions: &'ast Vec<Expression>) -> Self {
-			ArrayLiteralMacro {
-				values: Vec::with_capacity(inner_expressions.len()),
-				counter: 0,
-				inner_expressions,
-			}
+			ArrayLiteralMacro { inner_expressions }
 		}
 	}
 
 	impl<'ast> Macro<'ast> for ArrayLiteralMacro<'ast> {
-		fn poll(&mut self, input: StackValue) -> super::MacroReturn<'ast> {
-			if self.counter > 0 {
-				self.values.push(input.to_value());
-			}
-			if self.counter >= self.inner_expressions.len() {
-				let mut temp = Vec::new();
-				std::mem::swap(&mut self.values, &mut temp);
-				return MacroReturn::Return(
-					VariableValue::Dynamic(Box::new(ArrayType::new(temp))).into(),
+		async fn run(self, interpreter: InterpreterChannel<'ast>) -> StackValue {
+			let mut values = Vec::with_capacity(self.inner_expressions.len());
+			for inner_expression in self.inner_expressions.iter() {
+				values.push(
+					interpreter
+						.eval_operations(vec![
+							Instruction::EnterScope.into(),
+							inner_expression.into(),
+							Instruction::ExitScope.into(),
+						])
+						.await
+						.to_value(),
 				);
 			}
-			let return_val = MacroReturn::Operations(vec![
-				Instruction::EnterScope.into(),
-				(&self.inner_expressions[self.counter]).into(),
-				Instruction::ExitScope.into(),
-			]);
-			self.counter += 1;
-			return_val
+			ArrayType::new(values).into()
 		}
 	}
 
@@ -1186,22 +1345,23 @@ mod epilang_macros {
 	}
 
 	impl<'ast> Macro<'ast> for ForMacro<'ast> {
-		fn poll(&mut self, input: StackValue) -> super::MacroReturn<'ast> {
-			if let Some(value) = self.iterator.next() {
-				MacroReturn::Operations(vec![
-					Instruction::EnterScope.into(),
-					Instruction::PushDollar.into(),
-					Instruction::Push(value).into(),
-					Instruction::AccessMacroRegister(0).into(),
-					Instruction::Assign.into(),
-					Instruction::DiscardValue.into(),
-					self.inner_expression.into(),
-					Instruction::PopDollar.into(),
-					Instruction::ExitScope.into(),
-				])
-			} else {
-				MacroReturn::Return(VariableValue::Plain(PlainValue::Blank).into())
+		async fn run(self, interpreter: InterpreterChannel<'ast>) -> StackValue {
+			for value in self.iterator {
+				interpreter
+					.eval_operations(vec![
+						Instruction::EnterScope.into(),
+						Instruction::PushDollar.into(),
+						Instruction::Push(value).into(),
+						Instruction::AccessMacroRegister(0).into(),
+						Instruction::Assign.into(),
+						Instruction::DiscardValue.into(),
+						self.inner_expression.into(),
+						Instruction::PopDollar.into(),
+						Instruction::ExitScope.into(),
+					])
+					.await;
 			}
+			StackValue::Value(VariableValue::Plain(PlainValue::Blank))
 		}
 	}
 }
@@ -1218,16 +1378,17 @@ mod test {
 
 	use super::{
 		epilang_macros::{ConstantMacro, PrintMacro},
-		Interpreter, Macro, MacroConstructor, PlainValue,
+		Interpreter, Macro, MacroConstructor, MacroInternal, PlainValue,
 	};
 
-	const NOT_HALTED_ERROR: &'static str = "Interpreter has not finished running during the testcase! Consider increasing the step count or improving performance";
+	const NOT_HALTED_ERROR: &str = "Interpreter has not finished running during the testcase! Consider increasing the step count or improving performance";
 
 	fn macro_dictionary<'ast>() -> HashMap<String, Box<MacroConstructor<'ast>>> {
 		let mut map: HashMap<
 			String,
 			Box<
-				dyn FnMut(Option<&'ast ArgumentList>) -> Option<Box<dyn Macro<'ast> + 'ast>> + 'ast,
+				dyn FnMut(Option<&'ast ArgumentList>) -> Option<Box<dyn MacroInternal<'ast> + 'ast>>
+					+ 'ast,
 			>,
 		> = HashMap::new();
 		map.insert(
@@ -1728,6 +1889,26 @@ N.for(i => {
 		let mut interpreter = Interpreter::new(&ast, dictionary);
 
 		interpreter.execute(20000);
+		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
+	}
+
+	#[test]
+	fn test_forkbomb() {
+		let dictionary = macro_dictionary();
+
+		let ast = get_ast(
+			r"
+let payload = [_];
+
+20.for({
+	payload = [payload;3];
+});
+",
+		);
+
+		let mut interpreter = Interpreter::new(&ast, dictionary);
+
+		interpreter.execute(1000);
 		assert!(interpreter.halted(), "{}", NOT_HALTED_ERROR);
 	}
 }
