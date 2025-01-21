@@ -1,6 +1,6 @@
 #![allow(unused)]
 mod ast;
-mod builtins;
+pub mod builtins;
 mod compile;
 mod interpreter;
 mod lex;
@@ -10,7 +10,6 @@ mod test;
 mod values;
 
 pub use ast::{BinaryOperator, Module, UnaryOperator};
-pub use builtins::*;
 pub use compile::{compile, CompileError};
 pub use interpreter::*;
 pub use values::{DynVariableValue, VariableType, VariableValue};

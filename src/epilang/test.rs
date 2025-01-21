@@ -611,6 +611,27 @@ fn negative_int_pow() {
 }
 
 #[test]
+fn abs_integer_overflow() {
+	let module = compile("abs(-1 - 0x7fffffff);").unwrap();
+	let mut interpreter = Interpreter::new(&module, DefaultInterpreterBackend);
+	let err = interpreter.run(1000).unwrap_err();
+	let expected_loc = SourceLocation { line: 0, column: 0 }..SourceLocation {
+		line: 0,
+		column: 20,
+	};
+	assert_eq!(
+		err,
+		InterpreterError::LogicError(
+			LogicError::FunctionCall(
+				FunctionCallError::Domain(ArithmeticOverflowError),
+				"abs".to_owned()
+			),
+			expected_loc
+		)
+	);
+}
+
+#[test]
 fn must_use_warning() {
 	let module = compile(
 		r"

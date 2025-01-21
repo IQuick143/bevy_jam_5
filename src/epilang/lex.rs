@@ -48,7 +48,7 @@ pub enum Token {
 	Identifier(String),
 
 	#[regex(r"\d+", |lex| lex.slice().parse())]
-	#[regex(r"0[Xx][0-9a-fA-F]+", |lex| i32::from_str_radix(lex.slice(), 16))]
+	#[regex(r"0[Xx][0-9a-fA-F]+", |lex| i32::from_str_radix(&lex.slice()[2..], 16))]
 	IntLiteral(i32),
 
 	#[regex(r"(\d*\.\d+|\d+\.)([eE][+\-]?\d+)?|\d+[eE][+\-]\d+", |lex| lex.slice().parse())]

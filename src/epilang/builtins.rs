@@ -22,11 +22,22 @@ pub fn default_builtin_variables<'a>() -> HashMap<&'a str, VariableSlot<'a>> {
 	)])
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct ArithmeticOverflowError;
+
+impl std::error::Error for ArithmeticOverflowError {}
+
+impl std::fmt::Display for ArithmeticOverflowError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_str("integer arithmetic overflow")
+	}
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultInterpreterBackend;
 
 impl InterpreterBackend for DefaultInterpreterBackend {
-	type Error = std::convert::Infallible;
+	type Error = ArithmeticOverflowError;
 
 	type Warning = std::convert::Infallible;
 
@@ -35,7 +46,7 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 		function_name: &str,
 		args: &[ArgumentValue<'a>],
 		_: WarningSink<Self::Warning>,
-	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Warning>> {
+	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
 		Self::call_function(function_name, args)
 	}
 }
@@ -66,7 +77,7 @@ impl DefaultInterpreterBackend {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => i
 				.checked_abs()
 				.map(VariableValue::Int)
-				.ok_or(FunctionCallError::ArithmeticOverflow),
+				.ok_or(ArithmeticOverflowError.into()),
 			[ArgumentValue::Argument(VariableValue::Float(f))] => Ok(VariableValue::Float(f.abs())),
 			[ArgumentValue::Argument(other)] => Err(FunctionCallError::TypeError(other.get_type())),
 			_ => Err(FunctionCallError::BadArgumentCount),

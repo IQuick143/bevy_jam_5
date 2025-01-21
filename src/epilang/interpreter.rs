@@ -72,8 +72,6 @@ pub enum FunctionCallError<E: std::error::Error> {
 	BadArgumentCount,
 	/// Incorrect types of arguments
 	TypeError(VariableType),
-	/// Integer arithmetic has resulted in a value that cannot be represented
-	ArithmeticOverflow,
 	/// Domain-specific error defined by [`InterpreterBackend`]
 	Domain(E),
 }
@@ -86,7 +84,6 @@ impl<E: std::error::Error> std::fmt::Display for FunctionCallError<E> {
 			Self::FunctionDoesNotExist => f.write_str("function does not exist"),
 			Self::BadArgumentCount => f.write_str("incorrect number of arguments"),
 			Self::TypeError(ty) => f.write_fmt(format_args!("argument has incorrect type {ty}")),
-			Self::ArithmeticOverflow => f.write_str("integer arithmetic overflow"),
 			Self::Domain(e) => std::fmt::Display::fmt(e, f),
 		}
 	}
@@ -163,7 +160,7 @@ impl<'a, E: std::error::Error> WarningSink<'a, E> {
 }
 
 /// Describes the reason why the [`Interpreter::run`] has returned
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum InterpreterEndState<E: std::error::Error> {
 	/// Either the program ran successfully or it terminated with an error
 	Halted(Result<(), InterpreterError<E>>),
