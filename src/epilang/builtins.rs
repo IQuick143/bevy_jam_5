@@ -34,7 +34,8 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 		&mut self,
 		function_name: &str,
 		args: &[ArgumentValue<'a>],
-	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
+		_: WarningSink<Self::Warning>,
+	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Warning>> {
 		Self::call_function(function_name, args)
 	}
 }

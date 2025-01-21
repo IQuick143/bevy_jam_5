@@ -92,10 +92,16 @@ impl<E: std::error::Error> std::fmt::Display for FunctionCallError<E> {
 	}
 }
 
+impl<E: std::error::Error> From<E> for FunctionCallError<E> {
+	fn from(value: E) -> Self {
+		Self::Domain(value)
+	}
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InterpreterWarning<E: std::error::Error> {
-	warning_code: WarningCode<E>,
-	loc: Range<SourceLocation>,
+	pub warning_code: WarningCode<E>,
+	pub loc: Range<SourceLocation>,
 }
 
 impl<E: std::error::Error> std::fmt::Display for InterpreterWarning<E> {
@@ -125,6 +131,33 @@ impl<E: std::error::Error> std::fmt::Display for WarningCode<E> {
 				f.write_fmt(format_args!("Assignment to builtin variable {name}"))
 			}
 			Self::Domain(w) => std::fmt::Display::fmt(w, f),
+		}
+	}
+}
+
+impl<E: std::error::Error> From<E> for WarningCode<E> {
+	fn from(value: E) -> Self {
+		Self::Domain(value)
+	}
+}
+
+pub struct WarningSink<'a, E: std::error::Error> {
+	warning_stash: &'a mut Vec<InterpreterWarning<E>>,
+	loc: Range<SourceLocation>,
+}
+
+impl<'a, E: std::error::Error> WarningSink<'a, E> {
+	pub fn emit(&mut self, warning_code: WarningCode<E>) {
+		self.warning_stash.push(InterpreterWarning {
+			warning_code,
+			loc: self.loc.clone(),
+		});
+	}
+
+	pub fn reborrow(&'a mut self) -> Self {
+		Self {
+			warning_stash: self.warning_stash,
+			loc: self.loc.clone(),
 		}
 	}
 }
@@ -198,6 +231,7 @@ pub trait InterpreterBackend {
 		&mut self,
 		function_name: &str,
 		args: &[ArgumentValue<'a>],
+		warnings: WarningSink<Self::Warning>,
 	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
 		Err(FunctionCallError::FunctionDoesNotExist)
 	}
@@ -209,7 +243,7 @@ pub struct Interpreter<'ast, T: InterpreterBackend + 'ast> {
 	is_halted: bool,
 	pub variable_pool: HashMap<&'ast str, VariableSlot<'ast>>,
 	pub backend: T,
-	pub warnings: Vec<InterpreterWarning<T::Warning>>,
+	warnings: Vec<InterpreterWarning<T::Warning>>,
 }
 
 impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
@@ -239,6 +273,12 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 
 	pub fn set_instruction_stack_limit(&mut self, new_limit: usize) {
 		self.instruction_stack.max_height = new_limit;
+	}
+
+	/// Clears all warnings that have been emitted by the interpreter
+	/// and iterates through them
+	pub fn get_warnings(&mut self) -> impl Iterator<Item = InterpreterWarning<T::Warning>> + '_ {
+		self.warnings.drain(..)
 	}
 
 	pub fn run(&mut self, mut max_iterations: u32) -> InterpreterEndState<T::Error> {
@@ -463,10 +503,15 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						}
 					}
 				} else {
-					match self
-						.backend
-						.call_function(instruction.function_name, &instruction.argument_values)
-					{
+					let warning_sink = WarningSink {
+						warning_stash: &mut self.warnings,
+						loc: instruction.loc.clone(),
+					};
+					match self.backend.call_function(
+						instruction.function_name,
+						&instruction.argument_values,
+						warning_sink,
+					) {
 						Ok(returned_value) => {
 							self.value_stack.push(VariableValueFrame {
 								value: returned_value.value,

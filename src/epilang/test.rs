@@ -1,4 +1,5 @@
 use super::{builtins::*, compile, interpreter::*, SourceLocation, VariableType, VariableValue};
+use bevy::utils::HashMap;
 
 /// Testing interpreter backend that provides no functions
 #[derive(Clone, Copy, Debug, Default)]
@@ -73,7 +74,7 @@ f = 'hello';
 		variable!(interpreter.f),
 		VariableValue::String("hello")
 	));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -102,12 +103,12 @@ a = fn {
 	.unwrap();
 	let mut interpreter = Interpreter::new(&module, NoBackend);
 	assert!(interpreter.run(1000).is_ok());
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 	let inner_module = (&variable!(interpreter.a)).try_into().unwrap();
 	interpreter = Interpreter::new(inner_module, NoBackend);
 	assert!(interpreter.run(1000).is_ok());
 	assert!(matches!(variable!(interpreter.k), VariableValue::Int(42)));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -124,6 +125,7 @@ fn functions() {
 			&mut self,
 			function_name: &str,
 			args: &[ArgumentValue<'a>],
+			_: WarningSink<Self::Warning>,
 		) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
 			match self.invocation_count {
 				0 => assert!(matches!(
@@ -168,7 +170,7 @@ fn functions() {
 		variable!(interpreter.b),
 		VariableValue::Bool(true)
 	));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 	assert_eq!(interpreter.backend.invocation_count, 2);
 }
 
@@ -253,7 +255,7 @@ intbf = int(1 == 0);
 		variable!(interpreter.intbf),
 		VariableValue::Int(0)
 	));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -307,7 +309,7 @@ pow = 5 ** 3;
 		variable!(interpreter.pow),
 		VariableValue::Int(125)
 	));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -333,7 +335,7 @@ pow = 2.25 ** 1.5;
 	assert_float_almost_eq!(variable!(interpreter.mul), 0.2);
 	assert_float_almost_eq!(variable!(interpreter.div), 4.1);
 	assert_float_almost_eq!(variable!(interpreter.pow), 3.375);
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -365,7 +367,7 @@ pow_r = 1.5 ** 3;
 	assert_float_almost_eq!(variable!(interpreter.div_r), 2.84);
 	assert_float_almost_eq!(variable!(interpreter.pow_l), 27.0);
 	assert_float_almost_eq!(variable!(interpreter.pow_r), 3.375);
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -467,7 +469,7 @@ nee = 1 != 1.0;
 		variable!(interpreter.nee),
 		VariableValue::Bool(false)
 	));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -480,7 +482,7 @@ fn precedence() {
 		variable!(interpreter.a),
 		VariableValue::Float(20.166666)
 	));
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -517,7 +519,7 @@ x =
 		VariableValue::Bool(false)
 	));
 	assert!(get_variable!(interpreter.f).is_none());
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -580,7 +582,7 @@ if 0 == 1 {
 	assert!(get_variable!(interpreter.false_two).is_none());
 	assert!(get_variable!(interpreter.false_three).is_none());
 	assert!(get_variable!(interpreter.false_four).is_none());
-	assert!(interpreter.warnings.is_empty());
+	assert!(interpreter.get_warnings().next().is_none());
 }
 
 #[test]
@@ -606,4 +608,47 @@ fn negative_int_pow() {
 		interpreter.run(1000).unwrap_err(),
 		InterpreterError::LogicError(LogicError::NegativeIntPow, expected_loc)
 	);
+}
+
+#[test]
+fn must_use_warning() {
+	let module = compile(
+		r"
+1;
+12.5;
+'hello';
+1 + 2.3;
+pi;
+abs(-3);
+fn {};
+1 <= 42;
+0 == 1 && 0 == 0;
+1 == 1 && 1 == 0;
+0 == 1 || 0 == 0;
+1 == 1 || 1 == 0;
+	",
+	)
+	.unwrap();
+	let mut interpreter = Interpreter::new(&module, DefaultInterpreterBackend);
+	interpreter.variable_pool = default_builtin_variables();
+	assert!(interpreter.run(1000).is_ok());
+	let warnings = interpreter
+		.get_warnings()
+		.map(|w| w.warning_code)
+		.collect::<Vec<_>>();
+	assert_eq!(warnings, [const { WarningCode::DiscardedMustUse }; 12]);
+}
+
+#[test]
+fn overwritte_builtin_warning() {
+	let module = compile("a = 1;").unwrap();
+	let mut interpreter = Interpreter::new(&module, NoBackend);
+	interpreter.variable_pool =
+		HashMap::from_iter([("a", VariableSlot::builtin(VariableValue::Int(42)))]);
+	assert!(interpreter.run(1000).is_ok());
+	let warnings = interpreter
+		.get_warnings()
+		.map(|w| w.warning_code)
+		.collect::<Vec<_>>();
+	assert_eq!(warnings, [WarningCode::OverwrittenBuiltin("a".to_owned())]);
 }
