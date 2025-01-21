@@ -119,14 +119,8 @@ impl LexerWrapper<'_> {
 	fn get_source_location(&self) -> Range<SourceLocation> {
 		let extras = self.0.extras;
 		let span = self.0.span();
-		let start = SourceLocation {
-			line: extras.line_index,
-			column: span.start - extras.line_start_offset,
-		};
-		let end = SourceLocation {
-			line: extras.line_index,
-			column: span.end - extras.line_start_offset,
-		};
+		let start = SourceLocation::new(extras.line_index, span.start - extras.line_start_offset);
+		let end = SourceLocation::new(extras.line_index, span.end - extras.line_start_offset);
 		start..end
 	}
 }

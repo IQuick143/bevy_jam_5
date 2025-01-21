@@ -81,7 +81,7 @@ f = 'hello';
 fn undeclared_variable() {
 	let module = compile("a;").unwrap();
 	let err = Interpreter::new(&module, NoBackend).run(1000).unwrap_err();
-	let expected_loc = SourceLocation { line: 0, column: 0 }..SourceLocation { line: 0, column: 1 };
+	let expected_loc = SourceLocation::new(0, 0)..SourceLocation::new(0, 1);
 	assert_eq!(
 		err,
 		InterpreterError::LogicError(
@@ -178,7 +178,7 @@ fn functions() {
 fn undeclared_function() {
 	let module = compile("f();").unwrap();
 	let err = Interpreter::new(&module, NoBackend).run(1000).unwrap_err();
-	let expected_loc = SourceLocation { line: 0, column: 0 }..SourceLocation { line: 0, column: 3 };
+	let expected_loc = SourceLocation::new(0, 0)..SourceLocation::new(0, 3);
 	assert_eq!(
 		err,
 		InterpreterError::LogicError(
@@ -589,7 +589,7 @@ if 0 == 1 {
 fn conditional_type_errors() {
 	let module = compile("if 'hi' {}").unwrap();
 	let mut interpreter = Interpreter::new(&module, NoBackend);
-	let expected_loc = SourceLocation { line: 0, column: 3 }..SourceLocation { line: 0, column: 7 };
+	let expected_loc = SourceLocation::new(0, 3)..SourceLocation::new(0, 7);
 	assert_eq!(
 		interpreter.run(1000).unwrap_err(),
 		InterpreterError::LogicError(
@@ -603,7 +603,7 @@ fn conditional_type_errors() {
 fn negative_int_pow() {
 	let module = compile("42 ** -2;").unwrap();
 	let mut interpreter = Interpreter::new(&module, NoBackend);
-	let expected_loc = SourceLocation { line: 0, column: 0 }..SourceLocation { line: 0, column: 8 };
+	let expected_loc = SourceLocation::new(0, 0)..SourceLocation::new(0, 8);
 	assert_eq!(
 		interpreter.run(1000).unwrap_err(),
 		InterpreterError::LogicError(LogicError::NegativeIntPow, expected_loc)
@@ -615,10 +615,7 @@ fn abs_integer_overflow() {
 	let module = compile("abs(-1 - 0x7fffffff);").unwrap();
 	let mut interpreter = Interpreter::new(&module, DefaultInterpreterBackend);
 	let err = interpreter.run(1000).unwrap_err();
-	let expected_loc = SourceLocation { line: 0, column: 0 }..SourceLocation {
-		line: 0,
-		column: 20,
-	};
+	let expected_loc = SourceLocation::new(0, 0)..SourceLocation::new(0, 20);
 	assert_eq!(
 		err,
 		InterpreterError::LogicError(
