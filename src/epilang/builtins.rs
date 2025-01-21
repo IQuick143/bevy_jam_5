@@ -26,11 +26,15 @@ pub fn default_builtin_variables<'a>() -> HashMap<&'a str, VariableSlot<'a>> {
 pub struct DefaultInterpreterBackend;
 
 impl InterpreterBackend for DefaultInterpreterBackend {
+	type Error = std::convert::Infallible;
+
+	type Warning = std::convert::Infallible;
+
 	fn call_function<'a>(
 		&mut self,
 		function_name: &str,
 		args: &[ArgumentValue<'a>],
-	) -> Result<ReturnValue<'a>, FunctionCallError> {
+	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
 		Self::call_function(function_name, args)
 	}
 }
@@ -39,7 +43,7 @@ impl DefaultInterpreterBackend {
 	pub fn call_function<'a>(
 		function_name: &str,
 		args: &[ArgumentValue<'a>],
-	) -> Result<ReturnValue<'a>, FunctionCallError> {
+	) -> Result<ReturnValue<'a>, FunctionCallError<<Self as InterpreterBackend>::Error>> {
 		match function_name {
 			"sqrt" => float_method!(sqrt(args)),
 			"sin" => float_method!(sin(args)),
@@ -54,7 +58,9 @@ impl DefaultInterpreterBackend {
 		}
 	}
 
-	fn abs(args: &[ArgumentValue]) -> Result<VariableValue<'static>, FunctionCallError> {
+	fn abs(
+		args: &[ArgumentValue],
+	) -> Result<VariableValue<'static>, FunctionCallError<<Self as InterpreterBackend>::Error>> {
 		match args {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => i
 				.checked_abs()
@@ -66,7 +72,9 @@ impl DefaultInterpreterBackend {
 		}
 	}
 
-	fn int(args: &[ArgumentValue]) -> Result<VariableValue<'static>, FunctionCallError> {
+	fn int(
+		args: &[ArgumentValue],
+	) -> Result<VariableValue<'static>, FunctionCallError<<Self as InterpreterBackend>::Error>> {
 		match args {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => Ok(VariableValue::Int(*i)),
 			[ArgumentValue::Argument(VariableValue::Float(f))] => Ok(VariableValue::Int(*f as i32)),

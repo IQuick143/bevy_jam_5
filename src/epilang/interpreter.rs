@@ -3,16 +3,16 @@ use bevy::utils::HashMap;
 use std::ops::Range;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum InterpreterError {
+pub enum InterpreterError<E: std::error::Error> {
 	/// One of the interpreter stacks has overflown.
 	StackOverflow,
 	/// An error bound to a specific place in the source code.
-	LogicError(LogicError, Range<SourceLocation>),
+	LogicError(LogicError<E>, Range<SourceLocation>),
 }
 
-impl std::error::Error for InterpreterError {}
+impl<E: std::error::Error> std::error::Error for InterpreterError<E> {}
 
-impl std::fmt::Display for InterpreterError {
+impl<E: std::error::Error> std::fmt::Display for InterpreterError<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::StackOverflow => f.write_str("Interpreter stack overflow"),
@@ -24,7 +24,7 @@ impl std::fmt::Display for InterpreterError {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum LogicError {
+pub enum LogicError<E: std::error::Error> {
 	/// An expression used in conditional context (condition of if statement
 	/// or short-circuiting boolean operator) evaluated to type other than boolean.
 	IllegalConditionType(VariableType),
@@ -39,10 +39,10 @@ pub enum LogicError {
 	/// Integer was raised to a negative integer power.
 	NegativeIntPow,
 	/// Error caused by a function call.
-	FunctionCall(FunctionCallError, String),
+	FunctionCall(FunctionCallError<E>, String),
 }
 
-impl std::fmt::Display for LogicError {
+impl<E: std::error::Error> std::fmt::Display for LogicError<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::IllegalConditionType(ty) => f.write_fmt(format_args!(
@@ -65,7 +65,7 @@ impl std::fmt::Display for LogicError {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum FunctionCallError {
+pub enum FunctionCallError<E: std::error::Error> {
 	/// No function of the given name exists
 	FunctionDoesNotExist,
 	/// Incorrect number of arguments passed to the function
@@ -74,32 +74,31 @@ pub enum FunctionCallError {
 	TypeError(VariableType),
 	/// Integer arithmetic has resulted in a value that cannot be represented
 	ArithmeticOverflow,
-	/// Domain-specific error defined by the function implementations.
-	/// Implementations should provide error details themselves.
-	Domain,
+	/// Domain-specific error defined by [`InterpreterBackend`]
+	Domain(E),
 }
 
-impl std::error::Error for FunctionCallError {}
+impl<E: std::error::Error> std::error::Error for FunctionCallError<E> {}
 
-impl std::fmt::Display for FunctionCallError {
+impl<E: std::error::Error> std::fmt::Display for FunctionCallError<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::FunctionDoesNotExist => f.write_str("function does not exist"),
 			Self::BadArgumentCount => f.write_str("incorrect number of arguments"),
 			Self::TypeError(ty) => f.write_fmt(format_args!("argument has incorrect type {ty}")),
 			Self::ArithmeticOverflow => f.write_str("integer arithmetic overflow"),
-			Self::Domain => f.write_str("domain-specific error"),
+			Self::Domain(e) => std::fmt::Display::fmt(e, f),
 		}
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct InterpreterWarning {
-	warning_code: WarningCode,
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct InterpreterWarning<E: std::error::Error> {
+	warning_code: WarningCode<E>,
 	loc: Range<SourceLocation>,
 }
 
-impl std::fmt::Display for InterpreterWarning {
+impl<E: std::error::Error> std::fmt::Display for InterpreterWarning<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_fmt(format_args!(
 			"{}..{}: {}",
@@ -108,36 +107,39 @@ impl std::fmt::Display for InterpreterWarning {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub enum WarningCode {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum WarningCode<E: std::error::Error> {
 	/// The value of an expression without side effects was not used
 	DiscardedMustUse,
 	/// A built-in variable was overwritten
 	OverwrittenBuiltin(String),
+	/// Domain-specific warning defined by [`InterpreterBackend`]
+	Domain(E),
 }
 
-impl std::fmt::Display for WarningCode {
+impl<E: std::error::Error> std::fmt::Display for WarningCode<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::DiscardedMustUse => f.write_str("Discarded value that must be used"),
 			Self::OverwrittenBuiltin(name) => {
 				f.write_fmt(format_args!("Assignment to builtin variable {name}"))
 			}
+			Self::Domain(w) => std::fmt::Display::fmt(w, f),
 		}
 	}
 }
 
 /// Describes the reason why the [`Interpreter::run`] has returned
 #[derive(Clone, Debug)]
-pub enum InterpreterEndState {
+pub enum InterpreterEndState<E: std::error::Error> {
 	/// Either the program ran successfully or it terminated with an error
-	Halted(Result<(), InterpreterError>),
+	Halted(Result<(), InterpreterError<E>>),
 	/// The program did not end within the allowed number of instructions.
 	/// [`Interpreter::run`] may be called again to resume execution
 	Timeout,
 }
 
-impl InterpreterEndState {
+impl<E: std::error::Error> InterpreterEndState<E> {
 	pub fn is_ok(&self) -> bool {
 		matches!(self, Self::Halted(Ok(())))
 	}
@@ -150,7 +152,7 @@ impl InterpreterEndState {
 		matches!(self, Self::Timeout)
 	}
 
-	pub fn unwrap_err(self) -> InterpreterError {
+	pub fn unwrap_err(self) -> InterpreterError<E> {
 		match self {
 			Self::Halted(Err(err)) => err,
 			other => panic!("unwrap_err called on a value of {other:?}"),
@@ -184,13 +186,19 @@ impl<'a> ReturnValue<'a> {
 }
 
 pub trait InterpreterBackend {
+	/// Type of the domain-specific error this backend can emit
+	type Error: std::error::Error;
+
+	/// Type of the domain-specific warning this backend can emit
+	type Warning: std::error::Error;
+
 	/// Calls a function by name.
 	/// Performs side effects of the function (if any) and returns the value returned by it.
 	fn call_function<'a>(
 		&mut self,
 		function_name: &str,
 		args: &[ArgumentValue<'a>],
-	) -> Result<ReturnValue<'a>, FunctionCallError> {
+	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
 		Err(FunctionCallError::FunctionDoesNotExist)
 	}
 }
@@ -201,7 +209,7 @@ pub struct Interpreter<'ast, T: InterpreterBackend + 'ast> {
 	is_halted: bool,
 	pub variable_pool: HashMap<&'ast str, VariableSlot<'ast>>,
 	pub backend: T,
-	pub warnings: Vec<InterpreterWarning>,
+	pub warnings: Vec<InterpreterWarning<T::Warning>>,
 }
 
 impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
@@ -233,7 +241,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 		self.instruction_stack.max_height = new_limit;
 	}
 
-	pub fn run(&mut self, mut max_iterations: u32) -> InterpreterEndState {
+	pub fn run(&mut self, mut max_iterations: u32) -> InterpreterEndState<T::Error> {
 		if self.is_halted {
 			return InterpreterEndState::Halted(Ok(()));
 		}
@@ -258,7 +266,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 	fn execute_instruction(
 		&mut self,
 		instruction: Instruction<'ast>,
-	) -> Result<(), InterpreterError> {
+	) -> Result<(), InterpreterError<T::Error>> {
 		match instruction {
 			Instruction::Execute(statements) => {
 				if let Some(first_statement) = statements.first() {
@@ -860,7 +868,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 		})
 	}
 
-	fn emit_warning(&mut self, warning_code: WarningCode, loc: Range<SourceLocation>) {
+	fn emit_warning(&mut self, warning_code: WarningCode<T::Warning>, loc: Range<SourceLocation>) {
 		self.warnings.push(InterpreterWarning { warning_code, loc });
 	}
 }
@@ -1007,7 +1015,7 @@ struct CallInstruction<'ast> {
 	argument_values: Vec<ArgumentValue<'ast>>,
 }
 
-impl From<InterpreterStackOverflow> for InterpreterError {
+impl<E: std::error::Error> From<InterpreterStackOverflow> for InterpreterError<E> {
 	fn from(_: InterpreterStackOverflow) -> Self {
 		Self::StackOverflow
 	}

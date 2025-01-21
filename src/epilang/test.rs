@@ -4,7 +4,10 @@ use super::{builtins::*, compile, interpreter::*, SourceLocation, VariableType, 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NoBackend;
 
-impl InterpreterBackend for NoBackend {}
+impl InterpreterBackend for NoBackend {
+	type Error = std::convert::Infallible;
+	type Warning = std::convert::Infallible;
+}
 
 macro_rules! get_variable {
 	( $interpreter:ident . $var:ident ) => {
@@ -114,11 +117,14 @@ fn functions() {
 	};
 
 	impl InterpreterBackend for MockBackend {
+		type Error = std::convert::Infallible;
+		type Warning = std::convert::Infallible;
+
 		fn call_function<'a>(
 			&mut self,
 			function_name: &str,
 			args: &[ArgumentValue<'a>],
-		) -> Result<ReturnValue<'a>, FunctionCallError> {
+		) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
 			match self.invocation_count {
 				0 => assert!(matches!(
 					(function_name, args),
