@@ -2,6 +2,7 @@ mod assets;
 mod audio;
 #[cfg(feature = "dev")]
 mod dev_tools;
+mod epilang;
 mod game;
 mod graphics;
 mod screen;
