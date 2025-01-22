@@ -1,4 +1,4 @@
-use super::{interpreter::*, values::VariableValue};
+use super::{interpreter::*, values::*};
 use bevy::utils::HashMap;
 
 macro_rules! float_method {
@@ -15,7 +15,8 @@ macro_rules! float_method {
 	};
 }
 
-pub fn default_builtin_variables<'a>() -> HashMap<&'a str, VariableSlot<'a>> {
+pub fn default_builtin_variables<'a, T: DomainVariableValue + 'a>(
+) -> HashMap<&'a str, VariableSlot<'a, T>> {
 	HashMap::from_iter([(
 		"pi",
 		VariableSlot::builtin(VariableValue::Float(std::f32::consts::PI)),
@@ -33,6 +34,23 @@ impl std::fmt::Display for ArithmeticOverflowError {
 	}
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NoDomainValue {}
+
+impl std::fmt::Display for NoDomainValue {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		unreachable!("This type cannot be constructed")
+	}
+}
+
+impl DomainVariableValue for NoDomainValue {
+	type Type = Self;
+
+	fn get_type(&self) -> Self::Type {
+		unreachable!("This type cannot be constructed")
+	}
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DefaultInterpreterBackend;
 
@@ -41,12 +59,17 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 
 	type Warning = std::convert::Infallible;
 
+	type Value = NoDomainValue;
+
 	fn call_function<'a>(
 		&mut self,
 		function_name: &str,
-		args: &[ArgumentValue<'a>],
+		args: &[ArgumentValue<'a, Self::Value>],
 		_: WarningSink<Self::Warning>,
-	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
+	) -> Result<
+		ReturnValue<'a, Self::Value>,
+		FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
+	> {
 		Self::call_function(function_name, args)
 	}
 }
@@ -54,8 +77,14 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 impl DefaultInterpreterBackend {
 	pub fn call_function<'a>(
 		function_name: &str,
-		args: &[ArgumentValue<'a>],
-	) -> Result<ReturnValue<'a>, FunctionCallError<<Self as InterpreterBackend>::Error>> {
+		args: &[ArgumentValue<'a, <Self as InterpreterBackend>::Value>],
+	) -> Result<
+		ReturnValue<'a, <Self as InterpreterBackend>::Value>,
+		FunctionCallError<
+			<Self as InterpreterBackend>::Error,
+			<<Self as InterpreterBackend>::Value as DomainVariableValue>::Type,
+		>,
+	> {
 		match function_name {
 			"sqrt" => float_method!(sqrt(args)),
 			"sin" => float_method!(sin(args)),
@@ -71,8 +100,14 @@ impl DefaultInterpreterBackend {
 	}
 
 	fn abs(
-		args: &[ArgumentValue],
-	) -> Result<VariableValue<'static>, FunctionCallError<<Self as InterpreterBackend>::Error>> {
+		args: &[ArgumentValue<<Self as InterpreterBackend>::Value>],
+	) -> Result<
+		VariableValue<'static, <Self as InterpreterBackend>::Value>,
+		FunctionCallError<
+			<Self as InterpreterBackend>::Error,
+			<<Self as InterpreterBackend>::Value as DomainVariableValue>::Type,
+		>,
+	> {
 		match args {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => i
 				.checked_abs()
@@ -85,8 +120,14 @@ impl DefaultInterpreterBackend {
 	}
 
 	fn int(
-		args: &[ArgumentValue],
-	) -> Result<VariableValue<'static>, FunctionCallError<<Self as InterpreterBackend>::Error>> {
+		args: &[ArgumentValue<<Self as InterpreterBackend>::Value>],
+	) -> Result<
+		VariableValue<'static, <Self as InterpreterBackend>::Value>,
+		FunctionCallError<
+			<Self as InterpreterBackend>::Error,
+			<<Self as InterpreterBackend>::Value as DomainVariableValue>::Type,
+		>,
+	> {
 		match args {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => Ok(VariableValue::Int(*i)),
 			[ArgumentValue::Argument(VariableValue::Float(f))] => Ok(VariableValue::Int(*f as i32)),

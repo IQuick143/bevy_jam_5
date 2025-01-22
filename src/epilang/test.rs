@@ -1,13 +1,14 @@
-use super::{builtins::*, compile, interpreter::*, SourceLocation, VariableType, VariableValue};
+use super::{builtins::*, compile, interpreter::*, values::*, SourceLocation};
 use bevy::utils::HashMap;
 
 /// Testing interpreter backend that provides no functions
 #[derive(Clone, Copy, Debug, Default)]
-pub struct NoBackend;
+struct NoBackend;
 
 impl InterpreterBackend for NoBackend {
 	type Error = std::convert::Infallible;
 	type Warning = std::convert::Infallible;
+	type Value = NoDomainValue;
 }
 
 macro_rules! get_variable {
@@ -120,13 +121,17 @@ fn functions() {
 	impl InterpreterBackend for MockBackend {
 		type Error = std::convert::Infallible;
 		type Warning = std::convert::Infallible;
+		type Value = NoDomainValue;
 
 		fn call_function<'a>(
 			&mut self,
 			function_name: &str,
-			args: &[ArgumentValue<'a>],
-			_: WarningSink<Self::Warning>,
-		) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
+			args: &[ArgumentValue<'a, Self::Value>],
+			warnings: WarningSink<Self::Warning>,
+		) -> Result<
+			ReturnValue<'a, Self::Value>,
+			FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
+		> {
 			match self.invocation_count {
 				0 => assert!(matches!(
 					(function_name, args),

@@ -3,16 +3,16 @@ use bevy::utils::HashMap;
 use std::ops::Range;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum InterpreterError<E: std::error::Error> {
+pub enum InterpreterError<E: std::error::Error, T: DomainVariableType> {
 	/// One of the interpreter stacks has overflown.
 	StackOverflow,
 	/// An error bound to a specific place in the source code.
-	LogicError(LogicError<E>, Range<SourceLocation>),
+	LogicError(LogicError<E, T>, Range<SourceLocation>),
 }
 
-impl<E: std::error::Error> std::error::Error for InterpreterError<E> {}
+impl<E: std::error::Error, T: DomainVariableType> std::error::Error for InterpreterError<E, T> {}
 
-impl<E: std::error::Error> std::fmt::Display for InterpreterError<E> {
+impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for InterpreterError<E, T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::StackOverflow => f.write_str("Interpreter stack overflow"),
@@ -24,25 +24,25 @@ impl<E: std::error::Error> std::fmt::Display for InterpreterError<E> {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum LogicError<E: std::error::Error> {
+pub enum LogicError<E: std::error::Error, T: DomainVariableType> {
 	/// An expression used in conditional context (condition of if statement
 	/// or short-circuiting boolean operator) evaluated to type other than boolean.
-	IllegalConditionType(VariableType),
+	IllegalConditionType(VariableType<T>),
 	/// A variable was read but no variable of that name exists.
 	VariableDoesNotExist(String),
 	/// A unary operator was called on an unsupported type.
-	IllegalTypeInUnaryOperator(UnaryOperator, VariableType),
+	IllegalTypeInUnaryOperator(UnaryOperator, VariableType<T>),
 	/// A binary operator was called on unsupported types.
-	IllegalTypeInBinaryOperator(BinaryOperator, VariableType, VariableType),
+	IllegalTypeInBinaryOperator(BinaryOperator, VariableType<T>, VariableType<T>),
 	/// Integer arithmetic has resulted in a value that cannot be represented.
 	ArithmeticOverflow,
 	/// Integer was raised to a negative integer power.
 	NegativeIntPow,
 	/// Error caused by a function call.
-	FunctionCall(FunctionCallError<E>, String),
+	FunctionCall(FunctionCallError<E, T>, String),
 }
 
-impl<E: std::error::Error> std::fmt::Display for LogicError<E> {
+impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for LogicError<E, T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::IllegalConditionType(ty) => f.write_fmt(format_args!(
@@ -65,20 +65,20 @@ impl<E: std::error::Error> std::fmt::Display for LogicError<E> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum FunctionCallError<E: std::error::Error> {
+pub enum FunctionCallError<E: std::error::Error, T: DomainVariableType> {
 	/// No function of the given name exists
 	FunctionDoesNotExist,
 	/// Incorrect number of arguments passed to the function
 	BadArgumentCount,
 	/// Incorrect types of arguments
-	TypeError(VariableType),
+	TypeError(VariableType<T>),
 	/// Domain-specific error defined by [`InterpreterBackend`]
 	Domain(E),
 }
 
-impl<E: std::error::Error> std::error::Error for FunctionCallError<E> {}
+impl<E: std::error::Error, T: DomainVariableType> std::error::Error for FunctionCallError<E, T> {}
 
-impl<E: std::error::Error> std::fmt::Display for FunctionCallError<E> {
+impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for FunctionCallError<E, T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::FunctionDoesNotExist => f.write_str("function does not exist"),
@@ -89,7 +89,7 @@ impl<E: std::error::Error> std::fmt::Display for FunctionCallError<E> {
 	}
 }
 
-impl<E: std::error::Error> From<E> for FunctionCallError<E> {
+impl<E: std::error::Error, T: DomainVariableType> From<E> for FunctionCallError<E, T> {
 	fn from(value: E) -> Self {
 		Self::Domain(value)
 	}
@@ -161,15 +161,15 @@ impl<'a, E: std::error::Error> WarningSink<'a, E> {
 
 /// Describes the reason why the [`Interpreter::run`] has returned
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum InterpreterEndState<E: std::error::Error> {
+pub enum InterpreterEndState<E: std::error::Error, T: DomainVariableType> {
 	/// Either the program ran successfully or it terminated with an error
-	Halted(Result<(), InterpreterError<E>>),
+	Halted(Result<(), InterpreterError<E, T>>),
 	/// The program did not end within the allowed number of instructions.
 	/// [`Interpreter::run`] may be called again to resume execution
 	Timeout,
 }
 
-impl<E: std::error::Error> InterpreterEndState<E> {
+impl<E: std::error::Error, T: DomainVariableType> InterpreterEndState<E, T> {
 	pub fn is_ok(&self) -> bool {
 		matches!(self, Self::Halted(Ok(())))
 	}
@@ -182,7 +182,7 @@ impl<E: std::error::Error> InterpreterEndState<E> {
 		matches!(self, Self::Timeout)
 	}
 
-	pub fn unwrap_err(self) -> InterpreterError<E> {
+	pub fn unwrap_err(self) -> InterpreterError<E, T> {
 		match self {
 			Self::Halted(Err(err)) => err,
 			other => panic!("unwrap_err called on a value of {other:?}"),
@@ -191,26 +191,26 @@ impl<E: std::error::Error> InterpreterEndState<E> {
 }
 
 #[derive(Clone, Debug)]
-pub enum ArgumentValue<'a> {
-	Argument(VariableValue<'a>),
+pub enum ArgumentValue<'a, T: DomainVariableValue + 'a> {
+	Argument(VariableValue<'a, T>),
 	Separator,
 }
 
-pub struct ReturnValue<'a> {
-	pub value: VariableValue<'a>,
+pub struct ReturnValue<'a, T: DomainVariableValue + 'a> {
+	pub value: VariableValue<'a, T>,
 	pub must_use: bool,
 }
 
-impl<'a> ReturnValue<'a> {
-	pub fn new(value: VariableValue<'a>, must_use: bool) -> Self {
+impl<'a, T: DomainVariableValue + 'a> ReturnValue<'a, T> {
+	pub fn new(value: VariableValue<'a, T>, must_use: bool) -> Self {
 		Self { value, must_use }
 	}
 
-	pub fn pure(value: VariableValue<'a>) -> Self {
+	pub fn pure(value: VariableValue<'a, T>) -> Self {
 		Self::new(value, true)
 	}
 
-	pub fn with_side_effect(value: VariableValue<'a>) -> Self {
+	pub fn with_side_effect(value: VariableValue<'a, T>) -> Self {
 		Self::new(value, false)
 	}
 }
@@ -222,23 +222,29 @@ pub trait InterpreterBackend {
 	/// Type of the domain-specific warning this backend can emit
 	type Warning: std::error::Error;
 
+	/// Type of domain-specific variable values used by this backend
+	type Value: DomainVariableValue;
+
 	/// Calls a function by name.
 	/// Performs side effects of the function (if any) and returns the value returned by it.
 	fn call_function<'a>(
 		&mut self,
 		function_name: &str,
-		args: &[ArgumentValue<'a>],
+		args: &[ArgumentValue<'a, Self::Value>],
 		warnings: WarningSink<Self::Warning>,
-	) -> Result<ReturnValue<'a>, FunctionCallError<Self::Error>> {
+	) -> Result<
+		ReturnValue<'a, Self::Value>,
+		FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
+	> {
 		Err(FunctionCallError::FunctionDoesNotExist)
 	}
 }
 
 pub struct Interpreter<'ast, T: InterpreterBackend + 'ast> {
-	value_stack: InterpreterStack<VariableValueFrame<'ast>>,
-	instruction_stack: InterpreterStack<Instruction<'ast>>,
+	value_stack: InterpreterStack<VariableValueFrame<'ast, T::Value>>,
+	instruction_stack: InterpreterStack<Instruction<'ast, T::Value>>,
 	is_halted: bool,
-	pub variable_pool: HashMap<&'ast str, VariableSlot<'ast>>,
+	pub variable_pool: HashMap<&'ast str, VariableSlot<'ast, T::Value>>,
 	pub backend: T,
 	warnings: Vec<InterpreterWarning<T::Warning>>,
 }
@@ -278,7 +284,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 		self.warnings.drain(..)
 	}
 
-	pub fn run(&mut self, mut max_iterations: u32) -> InterpreterEndState<T::Error> {
+	pub fn run(
+		&mut self,
+		mut max_iterations: u32,
+	) -> InterpreterEndState<T::Error, <T::Value as DomainVariableValue>::Type> {
 		if self.is_halted {
 			return InterpreterEndState::Halted(Ok(()));
 		}
@@ -302,8 +311,8 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 
 	fn execute_instruction(
 		&mut self,
-		instruction: Instruction<'ast>,
-	) -> Result<(), InterpreterError<T::Error>> {
+		instruction: Instruction<'ast, T::Value>,
+	) -> Result<(), InterpreterError<T::Error, <T::Value as DomainVariableValue>::Type>> {
 		match instruction {
 			Instruction::Execute(statements) => {
 				if let Some(first_statement) = statements.first() {
@@ -900,7 +909,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 
 	fn construct_value(
 		&mut self,
-		value: VariableValue<'ast>,
+		value: VariableValue<'ast, T::Value>,
 		loc: Range<SourceLocation>,
 	) -> Result<(), InterpreterStackOverflow> {
 		self.value_stack.push(VariableValueFrame {
@@ -963,8 +972,8 @@ impl<T> InterpreterStack<T> {
 }
 
 #[derive(Clone, Debug)]
-struct VariableValueFrame<'ast> {
-	value: VariableValue<'ast>,
+struct VariableValueFrame<'ast, T: DomainVariableValue + 'ast> {
+	value: VariableValue<'ast, T>,
 	loc: Range<SourceLocation>,
 	must_use: bool,
 }
@@ -977,13 +986,13 @@ pub enum VariableOrigin {
 }
 
 #[derive(Clone, Debug)]
-pub struct VariableSlot<'ast> {
-	pub value: VariableValue<'ast>,
+pub struct VariableSlot<'ast, T: DomainVariableValue + 'ast> {
+	pub value: VariableValue<'ast, T>,
 	pub origin: VariableOrigin,
 }
 
-impl<'ast> VariableSlot<'ast> {
-	pub fn builtin(value: VariableValue<'ast>) -> Self {
+impl<'ast, T: DomainVariableValue + 'ast> VariableSlot<'ast, T> {
+	pub fn builtin(value: VariableValue<'ast, T>) -> Self {
 		Self {
 			value,
 			origin: VariableOrigin::Builtin,
@@ -992,7 +1001,7 @@ impl<'ast> VariableSlot<'ast> {
 }
 
 #[derive(Clone, Debug)]
-enum Instruction<'ast> {
+enum Instruction<'ast, T: DomainVariableValue + 'ast> {
 	/// Executes a block of statements.
 	Execute(&'ast [Statement]),
 	/// Executes a conditional statement.
@@ -1000,7 +1009,7 @@ enum Instruction<'ast> {
 	/// Evaluates an expression and pushes the result onto the stack.
 	Evaluate(&'ast ExpressionNode),
 	/// Pushes a value onto the stack
-	Push(VariableValueFrame<'ast>),
+	Push(VariableValueFrame<'ast, T>),
 	/// Pops the top value from the stack and discards it.
 	/// A warning is emitted if [`VariableValueFrame::must_use`] is true.
 	///
@@ -1042,22 +1051,24 @@ enum Instruction<'ast> {
 	/// Panics if the stack does not contain at least two values.
 	BinaryOperator(BinaryOperator, Range<SourceLocation>),
 	/// Calls a function with provided arguments.
-	Call(CallInstruction<'ast>),
+	Call(CallInstruction<'ast, T>),
 	/// Pops a value from the stack and adds it to the argument list of this
 	/// [`CallInstruction`], then pushes a [`Call`](Instruction::Call) instruction
 	/// so that the function may be called.
-	PassArgument(CallInstruction<'ast>),
+	PassArgument(CallInstruction<'ast, T>),
 }
 
 #[derive(Clone, Debug)]
-struct CallInstruction<'ast> {
+struct CallInstruction<'ast, T: DomainVariableValue + 'ast> {
 	loc: Range<SourceLocation>,
 	function_name: &'ast str,
 	argument_expressions: &'ast [ArgumentItem],
-	argument_values: Vec<ArgumentValue<'ast>>,
+	argument_values: Vec<ArgumentValue<'ast, T>>,
 }
 
-impl<E: std::error::Error> From<InterpreterStackOverflow> for InterpreterError<E> {
+impl<E: std::error::Error, T: DomainVariableType> From<InterpreterStackOverflow>
+	for InterpreterError<E, T>
+{
 	fn from(_: InterpreterStackOverflow) -> Self {
 		Self::StackOverflow
 	}

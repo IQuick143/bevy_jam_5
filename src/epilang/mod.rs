@@ -2,17 +2,16 @@
 mod ast;
 pub mod builtins;
 mod compile;
-mod interpreter;
+pub mod interpreter;
 mod lex;
 mod parser;
 #[cfg(test)]
 mod test;
-mod values;
+pub mod values;
 
 pub use ast::{BinaryOperator, Module, UnaryOperator};
 pub use compile::{compile, CompileError};
-pub use interpreter::*;
-pub use values::{DynVariableValue, VariableType, VariableValue};
+pub use interpreter::Interpreter;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
 pub struct SourceLocation {

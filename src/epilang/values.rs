@@ -1,18 +1,16 @@
 use super::Module;
 
-pub trait DynVariableValue: std::fmt::Debug {
-	fn get_type_name(&self) -> &'static str;
-	fn dyn_clone(&self) -> Box<dyn DynVariableValue>;
+pub trait DomainVariableValue: Clone + std::fmt::Debug {
+	type Type: DomainVariableType;
+	fn get_type(&self) -> Self::Type;
 }
 
-impl Clone for Box<dyn DynVariableValue> {
-	fn clone(&self) -> Self {
-		self.dyn_clone()
-	}
-}
+pub trait DomainVariableType: Clone + Copy + std::fmt::Debug + std::fmt::Display + 'static {}
+
+impl<T: Clone + Copy + std::fmt::Debug + std::fmt::Display + 'static> DomainVariableType for T {}
 
 #[derive(Clone, Debug, Default)]
-pub enum VariableValue<'m> {
+pub enum VariableValue<'m, T: DomainVariableValue + 'm> {
 	#[default]
 	Blank,
 	Bool(bool),
@@ -20,15 +18,15 @@ pub enum VariableValue<'m> {
 	Float(f32),
 	String(&'m str),
 	Callback(&'m Module),
-	Dyn(Box<dyn DynVariableValue>),
+	Domain(T),
 }
 
 macro_rules! impl_try_from_for_variable_value {
 	( $($variant:ident ( $type:ty )),* $(,)? ) => {
 		$(
-			impl<'m> TryFrom<&VariableValue<'m>> for $type {
-				type Error = VariableType;
-				fn try_from(value: &VariableValue<'m>) -> Result<Self, Self::Error> {
+			impl<'m, T: DomainVariableValue> TryFrom<&VariableValue<'m, T>> for $type {
+				type Error = VariableType<T::Type>;
+				fn try_from(value: &VariableValue<'m, T>) -> Result<Self, Self::Error> {
 					match value {
 						VariableValue::$variant(x) => Ok(*x),
 						_ => Err(value.get_type())
@@ -36,14 +34,14 @@ macro_rules! impl_try_from_for_variable_value {
 				}
 			}
 
-			impl<'m> TryFrom<VariableValue<'m>> for $type {
-				type Error = VariableType;
-				fn try_from(value: VariableValue<'m>) -> Result<Self, Self::Error> {
+			impl<'m, T: DomainVariableValue> TryFrom<VariableValue<'m, T>> for $type {
+				type Error = VariableType<T::Type>;
+				fn try_from(value: VariableValue<'m, T>) -> Result<Self, Self::Error> {
 					Self::try_from(&value)
 				}
 			}
 
-			impl<'m> From<$type> for VariableValue<'m> {
+			impl<'m, T: DomainVariableValue> From<$type> for VariableValue<'m, T> {
 				fn from(value: $type) -> Self {
 					Self::$variant(value)
 				}
@@ -61,7 +59,7 @@ impl_try_from_for_variable_value! {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub enum VariableType {
+pub enum VariableType<T: DomainVariableType> {
 	#[default]
 	Blank,
 	Bool,
@@ -69,10 +67,10 @@ pub enum VariableType {
 	Float,
 	String,
 	Callback,
-	Custom(&'static str),
+	Domain(T),
 }
 
-impl std::fmt::Display for VariableType {
+impl<T: DomainVariableType> std::fmt::Display for VariableType<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Blank => f.write_str("_"),
@@ -81,18 +79,21 @@ impl std::fmt::Display for VariableType {
 			Self::Float => f.write_str("float"),
 			Self::String => f.write_str("string"),
 			Self::Callback => f.write_str("fn"),
-			Self::Custom(name) => f.write_fmt(format_args!("'{name}'")),
+			Self::Domain(t) => f.write_fmt(format_args!("domain:{t}")),
 		}
 	}
 }
 
-pub enum NumericPair {
+pub(super) enum NumericPair {
 	Int(i32, i32),
 	Float(f32, f32),
 }
 
 impl NumericPair {
-	pub fn convert_from(left: &VariableValue, right: &VariableValue) -> Option<Self> {
+	pub fn convert_from<T: DomainVariableValue>(
+		left: &VariableValue<T>,
+		right: &VariableValue<T>,
+	) -> Option<Self> {
 		use VariableValue::{Float, Int};
 		match (left, right) {
 			(&Int(left), &Int(right)) => Some(Self::Int(left, right)),
@@ -104,16 +105,18 @@ impl NumericPair {
 	}
 }
 
-impl VariableValue<'_> {
-	pub fn get_type(&self) -> VariableType {
+impl<T: DomainVariableValue> DomainVariableValue for VariableValue<'_, T> {
+	type Type = VariableType<T::Type>;
+
+	fn get_type(&self) -> Self::Type {
 		match self {
-			Self::Blank => VariableType::Blank,
-			Self::Bool(_) => VariableType::Bool,
-			Self::Int(_) => VariableType::Int,
-			Self::Float(_) => VariableType::Float,
-			Self::String(_) => VariableType::String,
-			Self::Callback(_) => VariableType::Callback,
-			Self::Dyn(value) => VariableType::Custom(value.get_type_name()),
+			Self::Blank => Self::Type::Blank,
+			Self::Bool(_) => Self::Type::Bool,
+			Self::Int(_) => Self::Type::Int,
+			Self::Float(_) => Self::Type::Float,
+			Self::String(_) => Self::Type::String,
+			Self::Callback(_) => Self::Type::Callback,
+			Self::Domain(value) => Self::Type::Domain(value.get_type()),
 		}
 	}
 }
