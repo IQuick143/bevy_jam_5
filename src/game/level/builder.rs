@@ -170,9 +170,7 @@ pub enum LevelBuilderError {
 	OverlappedLinkedCycles(OverlappedLinkedCyclesError),
 	/// There is a loop in cycle links, and their directions are contradicting
 	CycleLinkageConflict(usize, usize),
-	/// [`set_color_label_appearence`](LevelBuilder::set_color_label_appearence)
-	/// was called on a vertex that does not contain a colored button
-	NoButtonWithColorAtVertex(usize),
+	/// There is a loop in one-way cycle links
 	OneWayLinkLoop,
 }
 
@@ -185,8 +183,8 @@ struct IntermediateVertexData {
 	/// Glyph that lies on the vertex, if any
 	pub glyph: Option<GlyphData>,
 	/// Appearence of the button color label,
-	/// if any appears on this vertex
-	pub color_label_appearence: IntermediateButtonColorLabelAppearence,
+	/// if it is bound to a parent cycle and set to be resolved at build time
+	pub color_label_appearence: Option<CycleBoundButtonColorLabelAppearence>,
 }
 
 #[derive(Clone, Debug)]
@@ -239,15 +237,6 @@ struct PartiallyBoundVertexPosition {
 	owner_cycle: usize,
 	/// Index of the vertex within the owner cycle's vertex list
 	index_in_owner: usize,
-}
-
-/// Appearence of a button color label relating to a vertex
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum IntermediateButtonColorLabelAppearence {
-	/// Color label appearence is specified explicitly
-	Static(ButtonColorLabelAppearence),
-	/// Color label should be placed with respect to an owning cycle
-	CycleBound(CycleBoundButtonColorLabelAppearence),
 }
 
 /// Placeholder appearence for a button color label that will be
@@ -342,7 +331,7 @@ impl LevelBuilder {
 			position: IntermediateVertexPosition::Free,
 			object: None,
 			glyph: None,
-			color_label_appearence: IntermediateButtonColorLabelAppearence::Static(default()),
+			color_label_appearence: None,
 		});
 		Ok(self.vertices.len() - 1)
 	}
@@ -674,27 +663,6 @@ impl LevelBuilder {
 		}
 	}
 
-	/// Sets the appearence of a button color label at a particular vertex.
-	/// The vertex must have a colored button on it.
-	pub fn set_color_label_appearence(
-		&mut self,
-		target_vertex: usize,
-		appearence: ButtonColorLabelAppearence,
-	) -> Result<(), LevelBuilderError> {
-		if target_vertex >= self.vertices.len() {
-			return Err(LevelBuilderError::VertexIndexOutOfRange(target_vertex));
-		}
-		if !matches!(
-			self.vertices[target_vertex].glyph,
-			Some(GlyphData::Button(Some(_)))
-		) {
-			return Err(LevelBuilderError::NoButtonWithColorAtVertex(target_vertex));
-		}
-		self.vertices[target_vertex].color_label_appearence =
-			IntermediateButtonColorLabelAppearence::Static(appearence);
-		Ok(())
-	}
-
 	pub fn set_color_label_appearences_for_cycle(
 		&mut self,
 		target_cycle: usize,
@@ -708,14 +676,12 @@ impl LevelBuilder {
 		for target_vertex in &self.cycles[target_cycle].vertex_indices {
 			let vertex = &mut self.vertices[*target_vertex];
 			if matches!(vertex.glyph, Some(GlyphData::Button(Some(_)))) {
-				vertex.color_label_appearence = IntermediateButtonColorLabelAppearence::CycleBound(
-					CycleBoundButtonColorLabelAppearence {
-						owner_cycle: target_cycle,
-						place_outside_cycle,
-						has_arrow_tip,
-						positions: position_set,
-					},
-				)
+				vertex.color_label_appearence = Some(CycleBoundButtonColorLabelAppearence {
+					owner_cycle: target_cycle,
+					place_outside_cycle,
+					has_arrow_tip,
+					positions: position_set,
+				})
 			}
 		}
 		Ok(())
@@ -1063,61 +1029,54 @@ impl LevelBuilder {
 	fn apply_color_label_appearences_to_buttons(&mut self) {
 		for vertex in &mut self.vertices {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
-				match vertex.color_label_appearence {
-					IntermediateButtonColorLabelAppearence::Static(a) => *appearence = a,
-					IntermediateButtonColorLabelAppearence::CycleBound(p) => {
-						let vertex_position = vertex.position.get_fixed()
-							.expect("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
-						let owner_cycle_position = self.cycles[p.owner_cycle].placement
-							.expect("Color label appearences cannot be applied before all cycles are placed")
-							.position;
-						let angle_from_owner =
-							-Vec2::Y.angle_to(vertex_position - owner_cycle_position);
-						// Flip target angle if we want the labels inside the cycle
-						let target_angle = if p.place_outside_cycle {
-							angle_from_owner
-						} else {
-							angle_from_owner + PI
-						}
-						.rem_euclid(2.0 * PI);
-						let position = match p.positions {
-							CycleBoundColorLabelPositionSet::LeftRight => match target_angle / PI {
-								0.0..1.0 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
-								1.0..=2.0 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
-								_ => unreachable!(),
-							},
-							CycleBoundColorLabelPositionSet::AboveBelow => {
-								match target_angle / PI {
-									0.0..0.5 | 1.5..=2.0 => {
-										ButtonColorLabelPosition::AnglePlaced(0.0)
-									}
-									0.5..1.5 => ButtonColorLabelPosition::AnglePlaced(PI),
-									_ => unreachable!(),
-								}
-							}
-							CycleBoundColorLabelPositionSet::CardinalDirections => {
-								match target_angle / PI {
-									0.0..0.25 | 1.75..=2.0 => {
-										ButtonColorLabelPosition::AnglePlaced(0.0)
-									}
-									0.25..0.75 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
-									0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
-									1.25..1.75 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
-									_ => unreachable!(),
-								}
-							}
-							CycleBoundColorLabelPositionSet::AllDirections => {
-								ButtonColorLabelPosition::AnglePlaced(target_angle)
-							}
-							CycleBoundColorLabelPositionSet::AllDirectionsRotated => {
-								ButtonColorLabelPosition::AngleRotated(target_angle)
-							}
-						};
-						*appearence = ButtonColorLabelAppearence {
-							position,
-							has_arrow_tip: p.has_arrow_tip,
-						};
+				if let Some(p) = vertex.color_label_appearence {
+					let vertex_position = vertex.position.get_fixed()
+						.expect("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
+					let owner_cycle_position = self.cycles[p.owner_cycle].placement
+						.expect("Color label appearences cannot be applied before all cycles are placed")
+						.position;
+					let angle_from_owner =
+						-Vec2::Y.angle_to(vertex_position - owner_cycle_position);
+					// Flip target angle if we want the labels inside the cycle
+					let target_angle = if p.place_outside_cycle {
+						angle_from_owner
+					} else {
+						angle_from_owner + PI
 					}
+					.rem_euclid(2.0 * PI);
+					let position = match p.positions {
+						CycleBoundColorLabelPositionSet::LeftRight => match target_angle / PI {
+							0.0..1.0 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
+							1.0..=2.0 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+							_ => unreachable!(),
+						},
+						CycleBoundColorLabelPositionSet::AboveBelow => match target_angle / PI {
+							0.0..0.5 | 1.5..=2.0 => ButtonColorLabelPosition::AnglePlaced(0.0),
+							0.5..1.5 => ButtonColorLabelPosition::AnglePlaced(PI),
+							_ => unreachable!(),
+						},
+						CycleBoundColorLabelPositionSet::CardinalDirections => {
+							match target_angle / PI {
+								0.0..0.25 | 1.75..=2.0 => {
+									ButtonColorLabelPosition::AnglePlaced(0.0)
+								}
+								0.25..0.75 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
+								0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
+								1.25..1.75 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+								_ => unreachable!(),
+							}
+						}
+						CycleBoundColorLabelPositionSet::AllDirections => {
+							ButtonColorLabelPosition::AnglePlaced(target_angle)
+						}
+						CycleBoundColorLabelPositionSet::AllDirectionsRotated => {
+							ButtonColorLabelPosition::AngleRotated(target_angle)
+						}
+					};
+					*appearence = ButtonColorLabelAppearence {
+						position,
+						has_arrow_tip: p.has_arrow_tip,
+					};
 				}
 			}
 		}
@@ -1458,7 +1417,6 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order."),
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
-			Self::NoButtonWithColorAtVertex(i) => write!(f, "Cannot adjust color label at vertex {i} because there is no colored button there."),
 			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle.")
 		}
 	}
