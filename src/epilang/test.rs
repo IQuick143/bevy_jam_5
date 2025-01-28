@@ -86,7 +86,7 @@ fn undeclared_variable() {
 	assert_eq!(
 		err,
 		InterpreterError::LogicError(
-			LogicError::VariableDoesNotExist("a".to_owned()),
+			Box::new(LogicError::VariableDoesNotExist("a".to_owned())),
 			expected_loc
 		)
 	);
@@ -187,7 +187,10 @@ fn undeclared_function() {
 	assert_eq!(
 		err,
 		InterpreterError::LogicError(
-			LogicError::FunctionCall(FunctionCallError::FunctionDoesNotExist, "f".to_owned()),
+			Box::new(LogicError::FunctionCall(
+				FunctionCallError::FunctionDoesNotExist,
+				"f".to_owned()
+			)),
 			expected_loc
 		)
 	);
@@ -598,7 +601,7 @@ fn conditional_type_errors() {
 	assert_eq!(
 		interpreter.run(1000).unwrap_err(),
 		InterpreterError::LogicError(
-			LogicError::IllegalConditionType(VariableType::String),
+			Box::new(LogicError::IllegalConditionType(VariableType::String)),
 			expected_loc
 		)
 	);
@@ -611,7 +614,7 @@ fn negative_int_pow() {
 	let expected_loc = SourceLocation::new(0, 0)..SourceLocation::new(0, 8);
 	assert_eq!(
 		interpreter.run(1000).unwrap_err(),
-		InterpreterError::LogicError(LogicError::NegativeIntPow, expected_loc)
+		InterpreterError::LogicError(Box::new(LogicError::NegativeIntPow), expected_loc)
 	);
 }
 
@@ -624,10 +627,10 @@ fn abs_integer_overflow() {
 	assert_eq!(
 		err,
 		InterpreterError::LogicError(
-			LogicError::FunctionCall(
+			Box::new(LogicError::FunctionCall(
 				FunctionCallError::Domain(ArithmeticOverflowError),
 				"abs".to_owned()
-			),
+			)),
 			expected_loc
 		)
 	);

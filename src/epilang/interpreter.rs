@@ -6,8 +6,9 @@ use std::ops::Range;
 pub enum InterpreterError<E: std::error::Error, T: DomainVariableType> {
 	/// One of the interpreter stacks has overflown.
 	StackOverflow,
-	/// An error bound to a specific place in the source code.
-	LogicError(LogicError<E, T>, Range<SourceLocation>),
+	/// An error bound to a specific place in the source code
+	/// Boxed to avoid returning very large types
+	LogicError(Box<LogicError<E, T>>, Range<SourceLocation>),
 }
 
 impl<E: std::error::Error, T: DomainVariableType> std::error::Error for InterpreterError<E, T> {}
@@ -375,7 +376,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 					}
 					None => {
 						return Err(InterpreterError::LogicError(
-							LogicError::VariableDoesNotExist(name.to_owned()),
+							Box::new(LogicError::VariableDoesNotExist(name.to_owned())),
 							expression.loc.clone(),
 						))
 					}
@@ -483,7 +484,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				let else_body = self.instruction_stack.expect_pop();
 				let is_condition_true: bool = condition.value.try_into().map_err(|actual| {
 					InterpreterError::LogicError(
-						LogicError::IllegalConditionType(actual),
+						Box::new(LogicError::IllegalConditionType(actual)),
 						condition.loc,
 					)
 				})?;
@@ -527,7 +528,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						}
 						Err(err) => {
 							return Err(InterpreterError::LogicError(
-								LogicError::FunctionCall(err, instruction.function_name.to_owned()),
+								Box::new(LogicError::FunctionCall(
+									err,
+									instruction.function_name.to_owned(),
+								)),
 								instruction.loc,
 							))
 						}
@@ -549,10 +553,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						VariableValue::Bool(value) => VariableValue::Bool(!value),
 						_ => {
 							return Err(InterpreterError::LogicError(
-								LogicError::IllegalTypeInUnaryOperator(
+								Box::new(LogicError::IllegalTypeInUnaryOperator(
 									operator,
 									operand.value.get_type(),
-								),
+								)),
 								loc,
 							))
 						}
@@ -561,10 +565,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						VariableValue::Int(_) | VariableValue::Float(_) => operand.value,
 						_ => {
 							return Err(InterpreterError::LogicError(
-								LogicError::IllegalTypeInUnaryOperator(
+								Box::new(LogicError::IllegalTypeInUnaryOperator(
 									operator,
 									operand.value.get_type(),
-								),
+								)),
 								loc,
 							))
 						}
@@ -573,7 +577,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						VariableValue::Int(value) => {
 							VariableValue::Int(value.checked_neg().ok_or_else(|| {
 								InterpreterError::LogicError(
-									LogicError::ArithmeticOverflow,
+									Box::new(LogicError::ArithmeticOverflow),
 									loc.clone(),
 								)
 							})?)
@@ -581,10 +585,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						VariableValue::Float(value) => VariableValue::Float(-value),
 						_ => {
 							return Err(InterpreterError::LogicError(
-								LogicError::IllegalTypeInUnaryOperator(
+								Box::new(LogicError::IllegalTypeInUnaryOperator(
 									operator,
 									operand.value.get_type(),
-								),
+								)),
 								loc,
 							))
 						}
@@ -601,7 +605,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							Some(NumericPair::Int(left, right)) => {
 								VariableValue::Int(left.checked_add(right).ok_or_else(|| {
 									InterpreterError::LogicError(
-										LogicError::ArithmeticOverflow,
+										Box::new(LogicError::ArithmeticOverflow),
 										loc.clone(),
 									)
 								})?)
@@ -611,11 +615,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -626,7 +630,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							Some(NumericPair::Int(left, right)) => {
 								VariableValue::Int(left.checked_sub(right).ok_or_else(|| {
 									InterpreterError::LogicError(
-										LogicError::ArithmeticOverflow,
+										Box::new(LogicError::ArithmeticOverflow),
 										loc.clone(),
 									)
 								})?)
@@ -636,11 +640,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -651,7 +655,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							Some(NumericPair::Int(left, right)) => {
 								VariableValue::Int(left.checked_mul(right).ok_or_else(|| {
 									InterpreterError::LogicError(
-										LogicError::ArithmeticOverflow,
+										Box::new(LogicError::ArithmeticOverflow),
 										loc.clone(),
 									)
 								})?)
@@ -661,11 +665,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -677,11 +681,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							VariableValue::Float(val) => val,
 							_ => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -691,11 +695,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							VariableValue::Float(val) => val,
 							_ => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -707,7 +711,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							VariableValue::Int(left_val.checked_div(right_val).ok_or_else(
 								|| {
 									InterpreterError::LogicError(
-										LogicError::ArithmeticOverflow,
+										Box::new(LogicError::ArithmeticOverflow),
 										loc.clone(),
 									)
 								},
@@ -715,11 +719,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						}
 						_ => {
 							return Err(InterpreterError::LogicError(
-								LogicError::IllegalTypeInBinaryOperator(
+								Box::new(LogicError::IllegalTypeInBinaryOperator(
 									operator,
 									left.value.get_type(),
 									right.value.get_type(),
-								),
+								)),
 								loc,
 							))
 						}
@@ -729,7 +733,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							VariableValue::Int(left_val.checked_rem(right_val).ok_or_else(
 								|| {
 									InterpreterError::LogicError(
-										LogicError::ArithmeticOverflow,
+										Box::new(LogicError::ArithmeticOverflow),
 										loc.clone(),
 									)
 								},
@@ -737,11 +741,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						}
 						_ => {
 							return Err(InterpreterError::LogicError(
-								LogicError::IllegalTypeInBinaryOperator(
+								Box::new(LogicError::IllegalTypeInBinaryOperator(
 									operator,
 									left.value.get_type(),
 									right.value.get_type(),
-								),
+								)),
 								loc,
 							))
 						}
@@ -751,13 +755,13 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							Some(NumericPair::Int(left, right)) => {
 								let right = right.try_into().map_err(|_| {
 									InterpreterError::LogicError(
-										LogicError::NegativeIntPow,
+										Box::new(LogicError::NegativeIntPow),
 										loc.clone(),
 									)
 								})?;
 								VariableValue::Int(left.checked_pow(right).ok_or_else(|| {
 									InterpreterError::LogicError(
-										LogicError::ArithmeticOverflow,
+										Box::new(LogicError::ArithmeticOverflow),
 										loc.clone(),
 									)
 								})?)
@@ -767,11 +771,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -787,11 +791,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -807,11 +811,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -827,11 +831,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -847,11 +851,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -867,11 +871,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
@@ -887,11 +891,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							}
 							None => {
 								return Err(InterpreterError::LogicError(
-									LogicError::IllegalTypeInBinaryOperator(
+									Box::new(LogicError::IllegalTypeInBinaryOperator(
 										operator,
 										left.value.get_type(),
 										right.value.get_type(),
-									),
+									)),
 									loc,
 								))
 							}
