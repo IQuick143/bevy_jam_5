@@ -38,7 +38,7 @@ impl std::fmt::Display for ArithmeticOverflowError {
 pub enum NoDomainValue {}
 
 impl std::fmt::Display for NoDomainValue {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		unreachable!("This type cannot be constructed")
 	}
 }
@@ -70,20 +70,17 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 		ReturnValue<'a, Self::Value>,
 		FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
 	> {
-		Self::call_function(function_name, args)
+		Self::call_function::<Self::Value>(function_name, args)
 	}
 }
 
 impl DefaultInterpreterBackend {
-	pub fn call_function<'a>(
+	pub fn call_function<T: DomainVariableValue>(
 		function_name: &str,
-		args: &[ArgumentValue<'a, <Self as InterpreterBackend>::Value>],
+		args: &[ArgumentValue<T>],
 	) -> Result<
-		ReturnValue<'a, <Self as InterpreterBackend>::Value>,
-		FunctionCallError<
-			<Self as InterpreterBackend>::Error,
-			<<Self as InterpreterBackend>::Value as DomainVariableValue>::Type,
-		>,
+		ReturnValue<'static, <Self as InterpreterBackend>::Value>,
+		FunctionCallError<<Self as InterpreterBackend>::Error, T::Type>,
 	> {
 		match function_name {
 			"sqrt" => float_method!(sqrt(args)),
@@ -99,14 +96,11 @@ impl DefaultInterpreterBackend {
 		}
 	}
 
-	fn abs(
-		args: &[ArgumentValue<<Self as InterpreterBackend>::Value>],
+	fn abs<T: DomainVariableValue>(
+		args: &[ArgumentValue<T>],
 	) -> Result<
 		VariableValue<'static, <Self as InterpreterBackend>::Value>,
-		FunctionCallError<
-			<Self as InterpreterBackend>::Error,
-			<<Self as InterpreterBackend>::Value as DomainVariableValue>::Type,
-		>,
+		FunctionCallError<<Self as InterpreterBackend>::Error, T::Type>,
 	> {
 		match args {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => i
@@ -119,14 +113,11 @@ impl DefaultInterpreterBackend {
 		}
 	}
 
-	fn int(
-		args: &[ArgumentValue<<Self as InterpreterBackend>::Value>],
+	fn int<T: DomainVariableValue>(
+		args: &[ArgumentValue<T>],
 	) -> Result<
 		VariableValue<'static, <Self as InterpreterBackend>::Value>,
-		FunctionCallError<
-			<Self as InterpreterBackend>::Error,
-			<<Self as InterpreterBackend>::Value as DomainVariableValue>::Type,
-		>,
+		FunctionCallError<<Self as InterpreterBackend>::Error, T::Type>,
 	> {
 		match args {
 			[ArgumentValue::Argument(VariableValue::Int(i))] => Ok(VariableValue::Int(*i)),
