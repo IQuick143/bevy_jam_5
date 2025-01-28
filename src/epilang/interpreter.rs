@@ -1,4 +1,4 @@
-use super::{ast::*, lex::NeverTag, values::*, SourceLocation};
+use super::{ast::*, values::*, SourceLocation};
 use bevy::utils::HashMap;
 use std::ops::Range;
 
@@ -178,6 +178,7 @@ impl<'a, E: std::error::Error> WarningSink<'a, E> {
 		});
 	}
 
+	#[allow(unused)]
 	pub fn reborrow(&'a mut self) -> Self {
 		Self {
 			warning_stash: self.warning_stash,
@@ -196,6 +197,7 @@ pub enum InterpreterEndState<E: std::error::Error, T: DomainVariableType> {
 	Timeout,
 }
 
+#[allow(unused)]
 impl<E: std::error::Error, T: DomainVariableType> InterpreterEndState<E, T> {
 	pub fn is_ok(&self) -> bool {
 		matches!(self, Self::Halted(Ok(())))
@@ -267,9 +269,9 @@ pub trait InterpreterBackend {
 	/// Performs side effects of the function (if any) and returns the value returned by it.
 	fn call_function<'a>(
 		&mut self,
-		function_name: &str,
-		args: &[ArgumentValue<'a, Self::Value>],
-		warnings: WarningSink<Self::Warning>,
+		_function_name: &str,
+		_args: &[ArgumentValue<'a, Self::Value>],
+		_warnings: WarningSink<Self::Warning>,
 	) -> Result<
 		ReturnValue<'a, Self::Value>,
 		FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
@@ -293,10 +295,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 
 	pub fn new(ast: &'ast Module, backend: T) -> Self {
 		Self {
-			value_stack: InterpreterStack {
-				values: Vec::new(),
-				max_height: Self::DEFAULT_VALUE_STACK_LIMIT,
-			},
+			value_stack: InterpreterStack::new(Self::DEFAULT_VALUE_STACK_LIMIT),
 			instruction_stack: InterpreterStack {
 				values: vec![Instruction::Execute(&ast.0 .0)],
 				max_height: Self::DEFAULT_INSTRUCTION_STACK_LIMIT,
@@ -308,11 +307,11 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 		}
 	}
 
-	pub fn set_value_stack_limit(&mut self, new_limit: usize) {
+	pub fn _set_value_stack_limit(&mut self, new_limit: usize) {
 		self.value_stack.max_height = new_limit;
 	}
 
-	pub fn set_instruction_stack_limit(&mut self, new_limit: usize) {
+	pub fn _set_instruction_stack_limit(&mut self, new_limit: usize) {
 		self.instruction_stack.max_height = new_limit;
 	}
 

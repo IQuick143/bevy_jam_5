@@ -116,7 +116,7 @@ a = fn {
 fn functions() {
 	struct MockBackend {
 		invocation_count: u32,
-	};
+	}
 
 	impl InterpreterBackend for MockBackend {
 		type Error = std::convert::Infallible;
@@ -127,7 +127,7 @@ fn functions() {
 			&mut self,
 			function_name: &str,
 			args: &[ArgumentValue<'a, Self::Value>],
-			warnings: WarningSink<Self::Warning>,
+			_: WarningSink<Self::Warning>,
 		) -> Result<
 			ReturnValue<'a, Self::Value>,
 			FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
