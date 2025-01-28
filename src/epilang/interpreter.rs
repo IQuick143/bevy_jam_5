@@ -96,6 +96,32 @@ impl<E: std::error::Error, T: DomainVariableType> From<E> for FunctionCallError<
 	}
 }
 
+impl<E: std::error::Error, T: DomainVariableType> FunctionCallError<E, T> {
+	pub fn map_domain<F: std::error::Error>(
+		self,
+		map: impl FnOnce(E) -> F,
+	) -> FunctionCallError<F, T> {
+		match self {
+			Self::FunctionDoesNotExist => FunctionCallError::FunctionDoesNotExist,
+			Self::BadArgumentCount => FunctionCallError::BadArgumentCount,
+			Self::TypeError(t) => FunctionCallError::TypeError(t),
+			Self::Domain(x) => FunctionCallError::Domain(map(x)),
+		}
+	}
+
+	pub fn _map_type_domain<U: DomainVariableType>(
+		self,
+		map: impl FnOnce(T) -> U,
+	) -> FunctionCallError<E, U> {
+		match self {
+			Self::FunctionDoesNotExist => FunctionCallError::FunctionDoesNotExist,
+			Self::BadArgumentCount => FunctionCallError::BadArgumentCount,
+			Self::TypeError(t) => FunctionCallError::TypeError(t.map_domain(map)),
+			Self::Domain(x) => FunctionCallError::Domain(x),
+		}
+	}
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InterpreterWarning<E: std::error::Error> {
 	pub warning_code: WarningCode<E>,
@@ -183,11 +209,15 @@ impl<E: std::error::Error, T: DomainVariableType> InterpreterEndState<E, T> {
 		matches!(self, Self::Timeout)
 	}
 
-	pub fn unwrap_err(self) -> InterpreterError<E, T> {
+	pub fn unwrap_halted(self) -> Result<(), InterpreterError<E, T>> {
 		match self {
-			Self::Halted(Err(err)) => err,
-			other => panic!("unwrap_err called on a value of {other:?}"),
+			Self::Halted(r) => r,
+			other => panic!("unwrap_halted called on a value of {other:?}"),
 		}
+	}
+
+	pub fn unwrap_err(self) -> InterpreterError<E, T> {
+		self.unwrap_halted().unwrap_err()
 	}
 }
 
@@ -213,6 +243,13 @@ impl<'a, T: DomainVariableValue + 'a> ReturnValue<'a, T> {
 
 	pub fn with_side_effect(value: VariableValue<'a, T>) -> Self {
 		Self::new(value, false)
+	}
+
+	pub fn map_domain<U: DomainVariableValue + 'a>(
+		self,
+		map: impl FnOnce(T) -> U,
+	) -> ReturnValue<'a, U> {
+		ReturnValue::new(self.value.map_domain(map), self.must_use)
 	}
 }
 
