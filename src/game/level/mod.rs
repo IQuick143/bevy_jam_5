@@ -198,9 +198,10 @@ pub enum ThingData {
 }
 
 /// Defines conditions under which a cycle may be turned
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Reflect)]
 pub enum CycleTurnability {
 	/// Cycle may be turned anytime
+	#[default]
 	Always,
 	/// Cycle may be turned when an [`ObjectType::Player`] object lies on one of its vertices
 	WithPlayer,
@@ -209,9 +210,10 @@ pub enum CycleTurnability {
 }
 
 /// Relative direction of two cycles that are to turn together
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum LinkedCycleDirection {
 	/// The cycles will turn in the same direction
+	#[default]
 	Coincident,
 	/// The cycles will turn in opposite directions
 	Inverse,
