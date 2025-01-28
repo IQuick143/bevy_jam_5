@@ -38,7 +38,7 @@ macro_rules! add_operator_rules {
 		$macro! {
 			$($pom)*
 			$(
-				expr ::= $uname(start_loc) expr(expr) $([$uprec])? {
+				compound_expr ::= $uname(start_loc) expr(expr) $([$uprec])? {
 					ExpressionNode::new(start_loc.start..expr.loc.end, UnaryOperatorExpression {
 						operand: expr,
 						operator: UnaryOperator::$uname,
@@ -46,7 +46,7 @@ macro_rules! add_operator_rules {
 				}
 			)*
 			$(
-				expr ::= expr(left) $bname expr(right) {
+				compound_expr ::= expr(left) $bname expr(right) {
 					ExpressionNode::new(left.loc.start..right.loc.end, BinaryOperatorExpression {
 						left,
 						right,
@@ -114,38 +114,51 @@ add_operator_rules! {
 		condition_tail ::= Else OpenBrace block(tail) CloseBrace { tail }
 
 		%type expr ExpressionNode;
-		expr ::= OpenParen expr(expr) CloseParen { expr }
-		expr ::= Blank(loc) { ExpressionNode::new(loc, Expression::BlankLiteral) }
-		expr ::= IntLiteral((loc, value)) { ExpressionNode::new(loc, Expression::IntLiteral(value)) }
-		expr ::= FloatLiteral((loc, value)) { ExpressionNode::new(loc, Expression::FloatLiteral(value)) }
-		expr ::= StringLiteral((loc, value)) { ExpressionNode::new(loc, Expression::StringLiteral(value)) }
-		expr ::= Identifier((loc, name)) { ExpressionNode::new(loc, Expression::VariableValue(name)) }
+		%type atom_expr ExpressionNode;
+		%type compound_expr ExpressionNode;
+		expr ::= atom_expr(expr) { expr }
+		expr ::= compound_expr(expr) { expr }
 
-		expr ::= Fn(start_loc) OpenBrace block(block) CloseBrace(end_loc) {
+		compound_expr ::= OpenParen expr(expr) CloseParen { expr }
+		atom_expr ::= Blank(loc) { ExpressionNode::new(loc, Expression::BlankLiteral) }
+		atom_expr ::= IntLiteral((loc, value)) { ExpressionNode::new(loc, Expression::IntLiteral(value)) }
+		atom_expr ::= FloatLiteral((loc, value)) { ExpressionNode::new(loc, Expression::FloatLiteral(value)) }
+		atom_expr ::= StringLiteral((loc, value)) { ExpressionNode::new(loc, Expression::StringLiteral(value)) }
+		atom_expr ::= Identifier((loc, name)) { ExpressionNode::new(loc, Expression::VariableValue(name)) }
+
+		atom_expr ::= Fn(start_loc) OpenBrace block(block) CloseBrace(end_loc) {
 			ExpressionNode::new(start_loc.start..end_loc.end, Expression::Callback(Module(block)))
 		}
 
-		expr ::= Identifier((start_loc, left)) Assign expr(right) {
+		compound_expr ::= Identifier((start_loc, left)) Assign expr(right) {
 			ExpressionNode::new(start_loc.start..right.loc.end, AssignmentExpression { left, right }.into())
 		}
 
-		expr ::= Identifier((start_loc, function)) OpenParen callargs(arguments) CloseParen(end_loc) {
+		atom_expr ::= Identifier((start_loc, function)) OpenParen callargs(arguments) CloseParen(end_loc) {
 			ExpressionNode::new(start_loc.start..end_loc.end, CallExpression { function, arguments }.into())
 		}
 		%type callargs Vec<ArgumentItem>;
 		%type callargs_expr Vec<ArgumentItem>;
+		%type callargs_atom Vec<ArgumentItem>;
 		%type callargs_comma Vec<ArgumentItem>;
 		%type callargs_semi Vec<ArgumentItem>;
 		callargs ::= { Vec::new() }
 		callargs ::= callargs_expr(args) { args }
+		callargs ::= callargs_atom(args) { args }
 		callargs ::= callargs_comma(args) { args }
 		callargs ::= callargs_semi(args) { args }
-		callargs_expr ::= expr(expr) { vec![ArgumentItem::Argument(expr)] }
-		callargs_expr ::= callargs_comma(mut args) expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
-		callargs_expr ::= callargs_semi(mut args) expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
+		callargs_expr ::= compound_expr(expr) { vec![ArgumentItem::Argument(expr)] }
+		callargs_expr ::= callargs_comma(mut args) compound_expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
+		callargs_expr ::= callargs_semi(mut args) compound_expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
+		callargs_atom ::= atom_expr(expr) { vec![ArgumentItem::Argument(expr)] }
+		callargs_atom ::= callargs_atom(mut args) atom_expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
+		callargs_atom ::= callargs_comma(mut args) atom_expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
+		callargs_atom ::= callargs_semi(mut args) atom_expr(expr) { args.push(ArgumentItem::Argument(expr)); args }
 		callargs_comma ::= callargs_expr(args) Comma { args }
+		callargs_comma ::= callargs_atom(args) Comma { args }
 		callargs_semi ::= Semicolon { vec![ArgumentItem::Separator] }
 		callargs_semi ::= callargs_expr(mut args) Semicolon { args.push(ArgumentItem::Separator); args }
+		callargs_semi ::= callargs_atom(mut args) Semicolon { args.push(ArgumentItem::Separator); args }
 		callargs_semi ::= callargs_semi(mut args) Semicolon { args.push(ArgumentItem::Separator); args }
 	}
 	UnaryOperator {
