@@ -13,7 +13,7 @@ pub use ast::{BinaryOperator, Module, UnaryOperator};
 pub use compile::{compile, CompileError};
 pub use interpreter::Interpreter;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct SourceLocation {
 	pub line: usize,
 	pub column: usize,
@@ -28,5 +28,11 @@ impl SourceLocation {
 impl std::fmt::Display for SourceLocation {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_fmt(format_args!("{}:{}", self.line + 1, self.column + 1))
+	}
+}
+
+impl std::fmt::Debug for SourceLocation {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{self}")
 	}
 }
