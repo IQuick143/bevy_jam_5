@@ -9,9 +9,9 @@ mod parser;
 mod test;
 pub mod values;
 
-pub use ast::{BinaryOperator, Module, UnaryOperator};
+pub use ast::Module;
 pub use compile::{compile, CompileError};
-pub use interpreter::Interpreter;
+pub use interpreter::{Interpreter, InterpreterEndState, InterpreterError};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct SourceLocation {
