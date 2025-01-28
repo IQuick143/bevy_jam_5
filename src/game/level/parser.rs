@@ -1,452 +1,599 @@
+use super::{builder::*, *};
+use crate::epilang::{
+	self,
+	interpreter::{ArgumentValue::*, FunctionCallError::*, *},
+	values::*,
+};
 use std::f32::consts::PI;
 
-use super::{builder::*, lex::*, *};
-use bevy::utils::hashbrown::HashMap;
-use itertools::Itertools as _;
+const MAX_INTERPRETER_ITERATIONS: u32 = 2000;
 
 pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
-	let mut state = ParserState::new();
-	let mut last_line_number = 0;
-
-	for line in lex::parse(level_file) {
-		let (line_number, statement) = line?;
-		last_line_number = line_number;
-		let result = parse_statement(statement, &mut state);
-		if let Err(err) = result {
-			return Err(err.at_line(line_number));
-		}
-	}
-
-	match state.builder.build() {
-		Ok(level) => Ok(level),
-		Err(err) => Err(LevelParsingErrorCode::BuilderError(err).at_line(last_line_number)),
-	}
+	parse_with_warnings(level_file, |_| {})
 }
 
-/// Global state of the parser, to avoid making functions with many parameters
-struct ParserState {
-	builder: LevelBuilder,
-	vertex_names: HashMap<String, usize>,
-	cycle_names: HashMap<String, usize>,
-	override_palette: Vec<LogicalColor>,
-	default_box_color: Option<LogicalColor>,
-	default_button_color: Option<LogicalColor>,
-}
-
-impl ParserState {
-	fn new() -> Self {
-		Self {
-			builder: LevelBuilder::new(),
-			vertex_names: HashMap::new(),
-			cycle_names: HashMap::new(),
-			override_palette: Vec::new(),
-			default_box_color: None,
-			default_button_color: None,
-		}
+pub fn parse_with_warnings(
+	level_file: &str,
+	mut warning_handler: impl FnMut(LevelParsingWarning),
+) -> Result<LevelData, LevelParsingError> {
+	let module = epilang::compile(level_file)?;
+	let mut interpreter = epilang::Interpreter::new(&module, LevelBuilder::new());
+	interpreter.variable_pool = epilang::builtins::default_builtin_variables();
+	match interpreter.run(MAX_INTERPRETER_ITERATIONS) {
+		epilang::InterpreterEndState::Timeout => return Err(LevelParsingError::Timeout),
+		epilang::InterpreterEndState::Halted(result) => result?,
 	}
-}
-
-fn parse_statement(
-	statement: RawStatement,
-	state: &mut ParserState,
-) -> Result<(), LevelParsingErrorCode> {
-	let ParserState {
-		builder,
-		vertex_names,
-		cycle_names,
-		override_palette,
-		default_box_color,
-		default_button_color,
-	} = state;
-	match statement {
-		RawStatement::Assignment(statement) => match statement.key.to_ascii_lowercase().as_str() {
-			"name" => builder.set_level_name(statement.value.to_owned())?,
-			"hint" => builder.set_level_hint(statement.value.to_owned())?,
-			_ => {
-				return Err(LevelParsingErrorCode::InvalidMetaVariable(
-					statement.key.to_owned(),
-				));
-			}
-		},
-		RawStatement::Action(statement) => match statement.verb {
-			"VERTEX" => {
-				if !statement.modifier.is_empty() {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						0,
-						statement.modifier.len(),
-					));
-				}
-				for name in statement.values {
-					if vertex_names.contains_key(name) {
-						continue;
-					}
-					let vertex = builder.add_vertex()?;
-					vertex_names.insert(name.to_owned(), vertex);
-				}
-			}
-			"CYCLE" => {
-				if statement.modifier.len() > 1 {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						1,
-						statement.modifier.len(),
-					));
-				}
-				let turnability = match statement.modifier.first().copied() {
-					None => CycleTurnability::Always,
-					Some("MANUAL") => CycleTurnability::WithPlayer,
-					Some("ENGINE") => CycleTurnability::Always,
-					Some("STILL") => CycleTurnability::Never,
-					Some(m) => return Err(LevelParsingErrorCode::InvalidModifier(m.to_string())),
-				};
-				let mut values = statement.values.into_iter();
-				let name = values
-					.next()
-					.ok_or(LevelParsingErrorCode::NotEnoughArguments(1, 0))?;
-				if cycle_names.contains_key(name) {
-					return Err(LevelParsingErrorCode::RedefinedCycle(name.to_owned()));
-				}
-				let vertices = values
-					.map(|name| {
-						vertex_names.get(name).copied().ok_or_else(|| {
-							LevelParsingErrorCode::UnknownVertexName(name.to_owned())
-						})
-					})
-					.collect::<Result<Vec<_>, _>>()?;
-				let cycle = builder.add_cycle(turnability, vertices)?;
-				cycle_names.insert(name.to_owned(), cycle);
-			}
-			"LINK" | "ONEWAY" => {
-				if statement.modifier.len() > 1 {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						1,
-						statement.modifier.len(),
-					));
-				}
-				let direction = match statement.modifier.first().copied() {
-					None => LinkedCycleDirection::Coincident,
-					Some("STRAIGHT") => LinkedCycleDirection::Coincident,
-					Some("CROSSED") => LinkedCycleDirection::Inverse,
-					Some(m) => return Err(LevelParsingErrorCode::InvalidModifier(m.to_string())),
-				};
-				let cycles = statement
-					.values
-					.into_iter()
-					.map(|name| {
-						cycle_names
-							.get(name)
-							.copied()
-							.ok_or_else(|| LevelParsingErrorCode::UnknownCycleName(name.to_owned()))
-					})
-					.collect::<Result<Vec<_>, _>>()?;
-				for (source, dest) in cycles.into_iter().tuple_windows() {
-					match statement.verb {
-						"LINK" => {
-							builder.link_cycles(source, dest, direction)?;
-						}
-						"ONEWAY" => {
-							builder.one_way_link_cycles(source, dest, direction)?;
-						}
-						_ => {
-							unreachable!("LINK and ONEWAY are the only paths to this branch.")
-						}
-					}
-				}
-			}
-			"OBJECT" => {
-				let object_kind = match statement.modifier.first().copied() {
-					Some("BOX") => ThingType::Object(ObjectType::Box),
-					Some("PLAYER") => ThingType::Object(ObjectType::Player),
-					Some("BUTTON") => ThingType::Glyph(GlyphType::Button),
-					Some("FLAG") => ThingType::Glyph(GlyphType::Flag),
-					Some(other) => {
-						return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
-					}
-					None => return Err(LevelParsingErrorCode::MissingModifier),
-				};
-				let expected_modifiers = match object_kind {
-					ThingType::Object(ObjectType::Box) => 2,
-					ThingType::Object(ObjectType::Player) => 1,
-					ThingType::Glyph(GlyphType::Button) => 2,
-					ThingType::Glyph(GlyphType::Flag) => 1,
-				};
-				if statement.modifier.len() > expected_modifiers {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						expected_modifiers,
-						statement.modifier.len(),
-					));
-				}
-				let color = if let Some(color_name) = statement.modifier.get(1).copied() {
-					if let Ok(color) = parse_logical_color(&color_name.to_ascii_lowercase()) {
-						color.map(|color| {
-							// Override numeric color by palette if present
-							if !color.is_pictogram {
-								override_palette
-									.get(color.color_index)
-									.copied()
-									.unwrap_or(color)
-							} else {
-								color
-							}
-						})
-					} else {
-						return Err(LevelParsingErrorCode::UnknownColorName(
-							color_name.to_owned(),
-						));
-					}
-				} else {
-					// If no color is specified, use the default for the given object type
-					match object_kind {
-						ThingType::Object(ObjectType::Box) => *default_box_color,
-						ThingType::Glyph(GlyphType::Button) => *default_button_color,
-						_ => None,
-					}
-				};
-				let to_insert = match object_kind {
-					ThingType::Object(ObjectType::Box) => ThingData::Object(ObjectData::Box(color)),
-					ThingType::Object(ObjectType::Player) => ThingData::Object(ObjectData::Player),
-					ThingType::Glyph(GlyphType::Button) => {
-						ThingData::Glyph(GlyphData::Button(color.map(|color| (color, default()))))
-					}
-					ThingType::Glyph(GlyphType::Flag) => ThingData::Glyph(GlyphData::Flag),
-				};
-				for vertex_name in statement.values {
-					let Some(vertex) = vertex_names.get(vertex_name).copied() else {
-						return Err(LevelParsingErrorCode::UnknownVertexName(
-							vertex_name.to_owned(),
-						));
-					};
-					match to_insert {
-						ThingData::Object(object) => builder.add_object(vertex, object)?,
-						ThingData::Glyph(glyph) => builder.add_glyph(vertex, glyph)?,
-					}
-				}
-			}
-			"PLACE" => {
-				if !statement.modifier.is_empty() {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						0,
-						statement.modifier.len(),
-					));
-				}
-				if statement.values.len() < 4 {
-					return Err(LevelParsingErrorCode::NotEnoughArguments(
-						4,
-						statement.values.len(),
-					));
-				}
-				let cycle_name = statement.values[0];
-				let x_str = statement.values[1].replace(',', ".");
-				let y_str = statement.values[2].replace(',', ".");
-				let r_str = statement.values[3].replace(',', ".");
-				let Some(cycle_id) = cycle_names.get(cycle_name).copied() else {
-					return Err(LevelParsingErrorCode::UnknownCycleName(
-						cycle_name.to_string(),
-					));
-				};
-				let Ok(x) = x_str.parse::<f32>() else {
-					return Err(LevelParsingErrorCode::ArgumentIsNotANumber(x_str));
-				};
-				let Ok(y) = y_str.parse::<f32>() else {
-					return Err(LevelParsingErrorCode::ArgumentIsNotANumber(y_str));
-				};
-				let Ok(r) = r_str.parse::<f32>() else {
-					return Err(LevelParsingErrorCode::ArgumentIsNotANumber(r_str));
-				};
-				let hints = statement.values[4..]
-					.iter()
-					.map(|name| {
-						vertex_names
-							.get(*name)
-							.copied()
-							.ok_or(LevelParsingErrorCode::UnknownVertexName(name.to_string()))
-					})
-					.collect::<Result<Vec<_>, _>>()?;
-				builder.place_cycle(cycle_id, Vec2::new(x, y), r, &hints)?;
-			}
-			"PLACE_VERT" => {
-				if !statement.modifier.is_empty() {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						0,
-						statement.modifier.len(),
-					));
-				}
-				match statement.values.len().cmp(&2) {
-					std::cmp::Ordering::Less => {
-						return Err(LevelParsingErrorCode::NotEnoughArguments(
-							2,
-							statement.values.len(),
-						))
-					}
-					std::cmp::Ordering::Greater => {
-						return Err(LevelParsingErrorCode::ExtraneousArguments(
-							2,
-							statement.values.len(),
-						))
-					}
-					std::cmp::Ordering::Equal => {}
-				}
-				let vertex_name = statement.values[0];
-				let angle_str = statement.values[1].replace(',', ".");
-				let Some(vertex_id) = vertex_names.get(vertex_name).copied() else {
-					return Err(LevelParsingErrorCode::UnknownVertexName(
-						vertex_name.to_string(),
-					));
-				};
-				let Ok(angle) = angle_str.parse::<f32>() else {
-					return Err(LevelParsingErrorCode::ArgumentIsNotANumber(angle_str));
-				};
-				builder.place_vertex(vertex_id, angle)?;
-			}
-			"PALETTE" => {
-				if statement.modifier.len() > 1 {
-					return Err(LevelParsingErrorCode::ExtraneousModifier(
-						1,
-						statement.modifier.len(),
-					));
-				}
-				let colors = statement
-					.values
-					.into_iter()
-					.map(|color_name| {
-						parse_logical_color(&color_name.to_ascii_lowercase())
-							.map(|color| {
-								color.expect("Lexer ensures that no empty strings are passed")
-							})
-							.map_err(|_| {
-								LevelParsingErrorCode::UnknownColorName(color_name.to_owned())
-							})
-					})
-					.collect::<Result<Vec<_>, _>>()?;
-				match statement.modifier.first().copied() {
-					None => {}
-					Some("DEFAULT_BOX") => *default_box_color = colors.first().copied(),
-					Some("DEFAULT_BUTTON") => *default_button_color = colors.first().copied(),
-					Some("DEFAULT") => {
-						let new_default = colors.first().copied();
-						*default_box_color = new_default;
-						*default_button_color = new_default;
-					}
-					Some(other) => {
-						return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
-					}
-				}
-				*override_palette = colors;
-			}
-			"COLORLABEL" => match statement.modifier.first().copied() {
-				Some("VERTEX" | "") | None => {
-					if statement.modifier.len() > 3 {
-						return Err(LevelParsingErrorCode::ExtraneousModifier(
-							3,
-							statement.modifier.len(),
-						));
-					}
-					let position = match statement.modifier.get(1).copied() {
-						Some("inside" | "") | None => ButtonColorLabelPosition::Inside,
-						Some("above") => ButtonColorLabelPosition::AnglePlaced(0.0),
-						Some("left") => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
-						Some("below") => ButtonColorLabelPosition::AnglePlaced(PI),
-						Some("right") => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
-						Some(other) => {
-							if let Ok(angle) = other.parse::<f32>() {
-								ButtonColorLabelPosition::AnglePlaced(angle * PI / 180.0)
-							} else if let Some(Ok(angle)) =
-								other.strip_prefix('r').map(str::parse::<f32>)
-							{
-								ButtonColorLabelPosition::AngleRotated(angle * PI / 180.0)
-							} else {
-								return Err(LevelParsingErrorCode::InvalidModifier(
-									other.to_owned(),
-								));
-							}
-						}
-					};
-					let has_arrow_tip = match statement.modifier.get(2).copied() {
-						Some("square" | "") | None => false,
-						Some("arrow") => true,
-						Some(other) => {
-							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
-						}
-					};
-					let appearence = ButtonColorLabelAppearence {
-						position,
-						has_arrow_tip,
-					};
-					for vertex_name in statement.values {
-						let Some(vertex) = vertex_names.get(vertex_name).copied() else {
-							return Err(LevelParsingErrorCode::UnknownVertexName(
-								vertex_name.to_owned(),
-							));
-						};
-						builder.set_color_label_appearence(vertex, appearence)?;
-					}
-				}
-				Some("CYCLE") => {
-					if statement.modifier.len() > 4 {
-						return Err(LevelParsingErrorCode::ExtraneousModifier(
-							4,
-							statement.modifier.len(),
-						));
-					}
-					let positions = match statement.modifier.get(1).copied() {
-						Some("lr") => CycleBoundColorLabelPositionSet::LeftRight,
-						Some("tb") => CycleBoundColorLabelPositionSet::AboveBelow,
-						Some("quad") => CycleBoundColorLabelPositionSet::CardinalDirections,
-						Some("any") => CycleBoundColorLabelPositionSet::AllDirections,
-						Some("rot") => CycleBoundColorLabelPositionSet::AllDirectionsRotated,
-						Some(other) => {
-							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()));
-						}
-						None => return Err(LevelParsingErrorCode::MissingModifier),
-					};
-					let place_outside_cycle = match statement.modifier.get(2).copied() {
-						Some("out" | "") | None => true,
-						Some("in") => false,
-						Some(other) => {
-							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
-						}
-					};
-					let has_arrow_tip = match statement.modifier.get(3).copied() {
-						Some("square" | "") | None => false,
-						Some("arrow") => true,
-						Some(other) => {
-							return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
-						}
-					};
-					for cycle_name in statement.values {
-						let Some(cycle) = cycle_names.get(cycle_name).copied() else {
-							return Err(LevelParsingErrorCode::UnknownVertexName(
-								cycle_name.to_owned(),
-							));
-						};
-						builder.set_color_label_appearences_for_cycle(
-							cycle,
-							positions,
-							place_outside_cycle,
-							has_arrow_tip,
-						)?;
-					}
-				}
-				Some(other) => {
-					return Err(LevelParsingErrorCode::InvalidModifier(other.to_owned()))
-				}
-			},
-			other => return Err(LevelParsingErrorCode::InvalidKeyword(other.to_owned())),
-		},
+	for warning in interpreter.get_warnings() {
+		warning_handler(LevelParsingWarning::RuntimeWarning(warning));
 	}
-	Ok(())
-}
-
-fn parse_logical_color(key: &str) -> Result<Option<LogicalColor>, ()> {
-	if key.is_empty() {
-		Ok(None)
-	} else if let Ok(color_index) = key.parse() {
-		Ok(Some(LogicalColor::new(color_index)))
-	} else if let Some(Ok(color_index)) = key.strip_prefix('p').map(str::parse) {
-		Ok(Some(LogicalColor::pictogram(color_index)))
-	} else if let Ok(color_index) = pictogram_name_to_id(key) {
-		Ok(Some(LogicalColor::pictogram(color_index)))
+	if let Some(level_name) = interpreter.variable_pool.get("name") {
+		interpreter.backend.set_level_name(
+			<&str>::try_from(&level_name.value)
+				.map_err(|actual| {
+					LevelParsingError::SemanticVariableTypeError("name".to_owned(), actual)
+				})?
+				.to_owned(),
+		)?;
 	} else {
-		Err(())
+		warning_handler(LevelParsingWarning::LevelNameNotSet);
+	}
+	if let Some(level_hint) = interpreter.variable_pool.get("hint") {
+		interpreter.backend.set_level_hint(
+			<&str>::try_from(&level_hint.value)
+				.map_err(|actual| {
+					LevelParsingError::SemanticVariableTypeError("hint".to_owned(), actual)
+				})?
+				.to_owned(),
+		)?;
+	}
+	Ok(interpreter.backend.build()?)
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum DomainValue {
+	Vertex(usize),
+	Cycle(usize),
+	Flag,
+	Player,
+	Box(Option<LogicalColor>),
+	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
+	Color(LogicalColor),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DomainType {
+	Vertex,
+	Cycle,
+	Flag,
+	Player,
+	Box,
+	Button,
+	Color,
+}
+
+impl std::fmt::Display for DomainType {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Vertex => f.write_str("vertex"),
+			Self::Cycle => f.write_str("cycle"),
+			Self::Flag => f.write_str("flag"),
+			Self::Player => f.write_str("player"),
+			Self::Box => f.write_str("box"),
+			Self::Button => f.write_str("button"),
+			Self::Color => f.write_str("color"),
+		}
+	}
+}
+
+impl epilang::values::DomainVariableValue for DomainValue {
+	type Type = DomainType;
+
+	fn get_type(&self) -> Self::Type {
+		match self {
+			Self::Vertex(_) => Self::Type::Vertex,
+			Self::Cycle(_) => Self::Type::Cycle,
+			Self::Flag => Self::Type::Flag,
+			Self::Player => Self::Type::Player,
+			Self::Box(_) => Self::Type::Box,
+			Self::Button(_) => Self::Type::Button,
+			Self::Color(_) => Self::Type::Color,
+		}
+	}
+}
+
+impl InterpreterBackend for LevelBuilder {
+	type Error = RuntimeError;
+	type Warning = RuntimeWarning;
+	type Value = DomainValue;
+
+	fn call_function<'a>(
+		&mut self,
+		function_name: &str,
+		args: &[ArgumentValue<'a, Self::Value>],
+		warnings: WarningSink<Self::Warning>,
+	) -> Result<
+		ReturnValue<'a, Self::Value>,
+		FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
+	> {
+		// Use the default built-in math functions first, only proceed if none match
+		let builtin_function_result =
+			epilang::builtins::DefaultInterpreterBackend::call_function(function_name, args);
+		if !matches!(builtin_function_result, Err(FunctionDoesNotExist)) {
+			return Ok(builtin_function_result
+				.map_err(|err| err.map_domain(Into::into))?
+				.map_domain(|_| unreachable!()));
+		}
+
+		match function_name {
+			"color" => Self::call_color(args),
+			"pict" => Self::call_pict(args),
+			"flag" => Self::call_flag(args),
+			"player" => Self::call_player(args),
+			"box" => Self::call_box(args),
+			"button" => Self::call_button(args),
+			"vertex" => self.call_vertex(args),
+			"cycle" => self.call_cycle(args),
+			"circle" => self.call_circle(args),
+			"set_vertex_angle" => self.call_set_vertex_angle(args),
+			"link" => self.call_link(false, args, warnings),
+			"oneway" => self.call_link(true, args, warnings),
+			"cycle_color_labels" => self.call_cycle_color_labels(args),
+			_ => Err(FunctionDoesNotExist),
+		}
+	}
+}
+
+impl LevelBuilder {
+	fn construct_color(
+		arg: &VariableValue<DomainValue>,
+		force_pictogram: bool,
+	) -> Result<LogicalColor, FunctionCallError<RuntimeError, DomainType>> {
+		use VariableValue::*;
+		match arg {
+			Int(i) => {
+				let color_index = (*i)
+					.try_into()
+					.map_err(|_| RuntimeError::InvalidColorIndex(*i))?;
+				Ok((if force_pictogram {
+					LogicalColor::pictogram
+				} else {
+					LogicalColor::new
+				})(color_index))
+			}
+			String(name) => Ok(LogicalColor::pictogram(
+				pictogram_name_to_id(name)
+					.map_err(|_| RuntimeError::UnknownColorName(name.to_string()))?,
+			)),
+			other => Err(TypeError(other.get_type())),
+		}
+	}
+
+	fn match_or_construct_color(
+		arg: &VariableValue<DomainValue>,
+	) -> Result<LogicalColor, FunctionCallError<RuntimeError, DomainType>> {
+		match arg {
+			VariableValue::Domain(DomainValue::Color(color)) => Ok(*color),
+			_ => Self::construct_color(arg, false),
+		}
+	}
+
+	fn construct_label_position(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ButtonColorLabelAppearence, FunctionCallError<RuntimeError, DomainType>> {
+		use VariableValue::*;
+		let mut args = args.iter();
+
+		let position = match args.next() {
+			None | Some(Argument(Blank)) => ButtonColorLabelPosition::Inside,
+			Some(Separator) => return Err(BadArgumentCount),
+			Some(Argument(Int(i))) => ButtonColorLabelPosition::AnglePlaced(PI * *i as f32 / 180.0),
+			Some(Argument(Float(f))) => ButtonColorLabelPosition::AnglePlaced(PI * *f / 180.0),
+			Some(Argument(String("left"))) => ButtonColorLabelPosition::AnglePlaced(-PI / 2.0),
+			Some(Argument(String("above"))) => ButtonColorLabelPosition::AnglePlaced(0.0),
+			Some(Argument(String("right"))) => ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+			Some(Argument(String("below"))) => ButtonColorLabelPosition::AnglePlaced(PI),
+			Some(Argument(String("rot"))) => match args.next() {
+				Some(Argument(Int(i))) => {
+					ButtonColorLabelPosition::AngleRotated(PI * *i as f32 / 180.0)
+				}
+				Some(Argument(Float(f))) => ButtonColorLabelPosition::AngleRotated(PI * *f / 180.0),
+				Some(Argument(other)) => return Err(TypeError(other.get_type())),
+				_ => return Err(BadArgumentCount),
+			},
+			Some(Argument(String(other))) => {
+				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
+			}
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+		};
+
+		let has_arrow_tip = match args.next() {
+			None | Some(Argument(Blank)) | Some(Argument(String("square"))) => false,
+			Some(Argument(String("arrow"))) => true,
+			Some(Argument(String(other))) => {
+				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
+			}
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			Some(Separator) => return Err(BadArgumentCount),
+		};
+
+		if args.next().is_some() {
+			return Err(BadArgumentCount);
+		}
+
+		Ok(ButtonColorLabelAppearence {
+			position,
+			has_arrow_tip,
+		})
+	}
+
+	fn try_as_int_or_float(
+		arg: &VariableValue<DomainValue>,
+	) -> Result<f32, FunctionCallError<RuntimeError, DomainType>> {
+		match arg {
+			VariableValue::Int(i) => Ok(*i as f32),
+			VariableValue::Float(f) => Ok(*f),
+			_ => Err(TypeError(arg.get_type())),
+		}
+	}
+
+	fn call_color(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		match args {
+			[Argument(arg)] => Self::construct_color(arg, false)
+				.map(DomainValue::Color)
+				.map(VariableValue::from)
+				.map(ReturnValue::pure),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_pict(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		match args {
+			[Argument(arg)] => Self::construct_color(arg, true)
+				.map(DomainValue::Color)
+				.map(VariableValue::from)
+				.map(ReturnValue::pure),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_flag(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		match args {
+			[] => Ok(ReturnValue::pure(DomainValue::Flag.into())),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_player(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		match args {
+			[] => Ok(ReturnValue::pure(DomainValue::Player.into())),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_box(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use VariableValue::*;
+		match args {
+			[] | [Argument(Blank)] => Ok(ReturnValue::pure(DomainValue::Box(None).into())),
+			[Argument(arg)] => Ok(ReturnValue::pure(
+				DomainValue::Box(Some(Self::match_or_construct_color(arg)?)).into(),
+			)),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_button(
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use VariableValue::*;
+		match args {
+			[] | [Argument(Blank)] => Ok(ReturnValue::pure(DomainValue::Button(None).into())),
+			[Argument(arg)] => Ok(ReturnValue::pure(
+				DomainValue::Button(Some((
+					Self::match_or_construct_color(arg)?,
+					Default::default(),
+				)))
+				.into(),
+			)),
+			[Argument(arg), Separator, rest @ ..] => Ok(ReturnValue::pure(
+				DomainValue::Button(Some((
+					Self::match_or_construct_color(arg)?,
+					Self::construct_label_position(rest)?,
+				)))
+				.into(),
+			)),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_vertex(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		let mut object = None;
+		let mut glyph = None;
+
+		let mut handle_argument = |arg: &VariableValue<DomainValue>| {
+			match arg {
+				Blank => {}
+				Domain(Box(color)) if object.is_none() => object = Some(ObjectData::Box(*color)),
+				Domain(Player) if object.is_none() => object = Some(ObjectData::Player),
+				Domain(Button(color_info)) if glyph.is_none() => {
+					glyph = Some(GlyphData::Button(*color_info))
+				}
+				Domain(Flag) if glyph.is_none() => glyph = Some(GlyphData::Flag),
+				_ => return Err(TypeError(arg.get_type())),
+			}
+			Ok(())
+		};
+
+		match args {
+			[] => {}
+			[Argument(arg)] => handle_argument(arg)?,
+			[Argument(left), Argument(right)] => {
+				handle_argument(left)?;
+				handle_argument(right)?;
+			}
+			_ => return Err(BadArgumentCount),
+		}
+
+		let vertex_id = self.add_vertex()?;
+		if let Some(object) = object {
+			self.add_object(vertex_id, object)?;
+		}
+		if let Some(glyph) = glyph {
+			self.add_glyph(vertex_id, glyph)?;
+		}
+		Ok(ReturnValue::pure(Vertex(vertex_id).into()))
+	}
+
+	fn call_cycle(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+		let mut args = args.iter();
+		let mut vertices = Vec::new();
+		let mut turnability = None;
+
+		while let Some(arg) = args.next() {
+			match arg {
+				Argument(Blank) => vertices.push(self.add_vertex()?),
+				Argument(Domain(Box(color))) => {
+					let vertex_id = self.add_vertex()?;
+					self.add_object(vertex_id, ObjectData::Box(*color))?;
+					vertices.push(vertex_id);
+				}
+				Argument(Domain(Player)) => {
+					let vertex_id = self.add_vertex()?;
+					self.add_object(vertex_id, ObjectData::Player)?;
+					vertices.push(vertex_id);
+				}
+				Argument(Domain(Button(color_info))) => {
+					let vertex_id = self.add_vertex()?;
+					self.add_glyph(vertex_id, GlyphData::Button(*color_info))?;
+					vertices.push(vertex_id);
+				}
+				Argument(Domain(Flag)) => {
+					let vertex_id = self.add_vertex()?;
+					self.add_glyph(vertex_id, GlyphData::Flag)?;
+					vertices.push(vertex_id);
+				}
+				Argument(Domain(Vertex(id))) => vertices.push(*id),
+				Argument(String(flag)) => {
+					// Flag is only valid as the first argument
+					// This is a type error otherwise
+					if !vertices.is_empty() || turnability.is_some() {
+						return Err(TypeError(epilang::values::VariableType::String));
+					}
+					turnability = Some(match *flag {
+						"manual" => CycleTurnability::WithPlayer,
+						"auto" => CycleTurnability::Always,
+						"still" => CycleTurnability::Never,
+						_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
+					});
+					// A semicolon is expected next
+					match args.next() {
+						None | Some(Separator) => {}
+						Some(Argument(_)) => return Err(BadArgumentCount),
+					}
+				}
+				Argument(other) => return Err(TypeError(other.get_type())),
+				Separator => {
+					// Only a leading semicolon is allowed (indicates empty flag section)
+					if !vertices.is_empty() || turnability.is_some() {
+						return Err(BadArgumentCount);
+					}
+					// Mark the turnability flag as set to prevent setting it again
+					turnability = Some(CycleTurnability::default());
+				}
+			}
+		}
+
+		let cycle_id = self.add_cycle(turnability.unwrap_or_default(), vertices)?;
+		Ok(ReturnValue::with_side_effect(Domain(Cycle(cycle_id))))
+	}
+
+	fn call_circle(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		match args {
+			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(arg1), Argument(arg2), Argument(arg3)] =>
+			{
+				let x = Self::try_as_int_or_float(arg1)?;
+				let y = Self::try_as_int_or_float(arg2)?;
+				let r = Self::try_as_int_or_float(arg3)?;
+				self.place_cycle(*cycle_id, Vec2::new(x, y), r, &[])?;
+				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
+			}
+			[Argument(other), Separator, Argument(_), Argument(_), Argument(_)] => {
+				Err(TypeError(other.get_type()))
+			}
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_set_vertex_angle(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		match args {
+			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1)] => {
+				let angle = Self::try_as_int_or_float(arg1)?;
+				self.place_vertex(*vertex_id, angle)?;
+				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
+			}
+			[Argument(other), Separator, Argument(_), Argument(_), Argument(_)] => {
+				Err(TypeError(other.get_type()))
+			}
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_link(
+		&mut self,
+		one_way: bool,
+		args: &[ArgumentValue<DomainValue>],
+		mut warnings: WarningSink<RuntimeWarning>,
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		let mut args = args.iter();
+		let mut direction = None;
+		let mut prev_cycle_id = None;
+		let mut cycles_linked = false;
+
+		while let Some(arg) = args.next() {
+			match arg {
+				Argument(String(flag)) => {
+					// Flags can appear as the first argument
+					if direction.is_some() || prev_cycle_id.is_some() {
+						return Err(TypeError(epilang::values::VariableType::String));
+					}
+					direction = Some(match *flag {
+						"coincident" => LinkedCycleDirection::Coincident,
+						"invert" => LinkedCycleDirection::Inverse,
+						_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
+					});
+					// A semicolon is expected next
+					match args.next() {
+						None | Some(Separator) => {}
+						Some(Argument(_)) => return Err(BadArgumentCount),
+					}
+				}
+				Separator => {
+					// Only a leading semicolon is allowed (indicates empty flag section)
+					if direction.is_some() || prev_cycle_id.is_some() {
+						return Err(BadArgumentCount);
+					}
+					// Mark the turnability flag as set to prevent setting it again
+					direction = Some(default());
+				}
+				Argument(Domain(Cycle(cycle_id))) => {
+					if let Some(prev_id) = prev_cycle_id {
+						if one_way {
+							self.one_way_link_cycles(
+								prev_id,
+								*cycle_id,
+								direction.unwrap_or_default(),
+							)?;
+							cycles_linked = true;
+						} else {
+							self.link_cycles(prev_id, *cycle_id, direction.unwrap_or_default())?;
+						}
+					}
+					prev_cycle_id = Some(*cycle_id);
+				}
+				Argument(other) => return Err(TypeError(other.get_type())),
+			}
+		}
+
+		if !cycles_linked {
+			warnings.emit(RuntimeWarning::EmptyLink.into());
+		}
+
+		Ok(ReturnValue::with_side_effect(Blank))
+	}
+
+	fn call_cycle_color_labels(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		let mut args = args.iter();
+
+		let cycle_id = match args.next() {
+			Some(Argument(Domain(Cycle(id)))) => *id,
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			Some(Separator) | None => return Err(BadArgumentCount),
+		};
+		if !matches!(args.next(), Some(Separator)) {
+			return Err(BadArgumentCount);
+		}
+		let positions = match args.next() {
+			Some(Argument(String("lr"))) => CycleBoundColorLabelPositionSet::LeftRight,
+			Some(Argument(String("tb"))) => CycleBoundColorLabelPositionSet::AboveBelow,
+			Some(Argument(String("quad"))) => CycleBoundColorLabelPositionSet::CardinalDirections,
+			Some(Argument(String("any"))) => CycleBoundColorLabelPositionSet::AllDirections,
+			Some(Argument(String("rot"))) => CycleBoundColorLabelPositionSet::AllDirectionsRotated,
+			Some(Argument(String(other))) => {
+				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
+			}
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			Some(Separator) | None => return Err(BadArgumentCount),
+		};
+		let place_outside_cycle = match args.next() {
+			Some(Argument(String("out"))) | None => true,
+			Some(Argument(String("in"))) => false,
+			Some(Argument(String(other))) => {
+				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
+			}
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			Some(Separator) => return Err(BadArgumentCount),
+		};
+		let has_arrow_tip = match args.next() {
+			Some(Argument(String("square"))) | None => false,
+			Some(Argument(String("arrow"))) => true,
+			Some(Argument(String(other))) => {
+				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
+			}
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			Some(Separator) => return Err(BadArgumentCount),
+		};
+		if args.next().is_some() {
+			return Err(BadArgumentCount);
+		}
+
+		self.set_color_label_appearences_for_cycle(
+			cycle_id,
+			positions,
+			place_outside_cycle,
+			has_arrow_tip,
+		)?;
+		Ok(ReturnValue::with_side_effect(Blank))
 	}
 }
 
@@ -506,101 +653,123 @@ fn pictogram_name_to_id(name: &str) -> Result<usize, ()> {
 	}
 }
 
-#[derive(Debug, PartialEq)]
-pub enum LevelParsingErrorCode {
-	InvalidKeyword(String),
-	InvalidModifier(String),
-	UnknownVertexName(String),
-	UnknownCycleName(String),
-	RedefinedCycle(String),
-	LexError(LexErrorCode),
-	MissingModifier,
-	ArgumentIsNotANumber(String),
-	InvalidMetaVariable(String),
+#[derive(Clone, PartialEq, Debug)]
+pub enum RuntimeError {
+	ArithmeticOverflow,
 	BuilderError(LevelBuilderError),
-	NotEnoughArguments(usize, usize),
-	ExtraneousArguments(usize, usize),
-	ExtraneousModifier(usize, usize),
 	UnknownColorName(String),
+	InvalidColorIndex(i32),
+	InvalidFlag(String),
 }
 
-#[derive(Debug, PartialEq)]
-pub struct LevelParsingError {
-	pub code: LevelParsingErrorCode,
-	pub line_number: usize,
-}
-
-impl LevelParsingErrorCode {
-	pub fn at_line(self, line_number: usize) -> LevelParsingError {
-		LevelParsingError {
-			code: self,
-			line_number,
-		}
+impl From<epilang::builtins::ArithmeticOverflowError> for RuntimeError {
+	fn from(_: epilang::builtins::ArithmeticOverflowError) -> Self {
+		Self::ArithmeticOverflow
 	}
 }
 
-impl From<LexError> for LevelParsingError {
-	fn from(value: LexError) -> Self {
-		LevelParsingErrorCode::LexError(value.code).at_line(value.line_number)
-	}
-}
-
-impl From<LevelBuilderError> for LevelParsingErrorCode {
+impl From<LevelBuilderError> for RuntimeError {
 	fn from(value: LevelBuilderError) -> Self {
 		Self::BuilderError(value)
 	}
 }
 
-impl std::error::Error for LevelParsingError {}
-
-impl std::fmt::Display for LevelParsingErrorCode {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::InvalidKeyword(k) => write!(f, "The keyword {} is invalid.", k)?,
-			Self::InvalidModifier(m) => write!(f, "The modifier [{}] is invalid.", m)?,
-			Self::UnknownVertexName(name) => write!(
-				f,
-				"A vertex with name {} was referenced, but not defined.",
-				name
-			)?,
-			Self::UnknownCycleName(name) => write!(
-				f,
-				"A cycle with name {} was referenced, but not defined.",
-				name
-			)?,
-			Self::RedefinedCycle(name) => {
-				write!(f, "A cycle with name {} was defined multiple times.", name)?
-			}
-			Self::LexError(e) => e.fmt(f)?,
-			Self::MissingModifier => write!(f, "Statement is missing a modifier.")?,
-			Self::ArgumentIsNotANumber(arg) => {
-				write!(f, "Expected a numeric argument, got {arg}.")?
-			}
-			Self::InvalidMetaVariable(name) => {
-				write!(f, "{name} is not a valid meta variable name")?
-			}
-			Self::BuilderError(e) => e.fmt(f)?,
-			Self::NotEnoughArguments(needed, got) => write!(
-				f,
-				"Statement found {got} arguments, needs at least {needed}."
-			)?,
-			Self::ExtraneousArguments(expected, got) => write!(
-				f,
-				"Statement found {got} arguments, expected at most {expected}."
-			)?,
-			Self::ExtraneousModifier(expected, got) => write!(
-				f,
-				"Statement found {got} modifiers, expected at most {expected}."
-			)?,
-			Self::UnknownColorName(name) => write!(f, "{name} is not a valid color name.")?,
-		}
-		Ok(())
+impl From<LevelBuilderError> for FunctionCallError<RuntimeError, DomainType> {
+	fn from(value: LevelBuilderError) -> Self {
+		RuntimeError::from(value).into()
 	}
 }
 
+impl std::error::Error for RuntimeError {}
+
+impl std::fmt::Display for RuntimeError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::ArithmeticOverflow => f.write_str("arithmetic overflow"),
+			Self::BuilderError(e) => write!(f, "while finishing level build: {e}"),
+			Self::UnknownColorName(name) => write!(f, "'{name}' is not a valid color name"),
+			Self::InvalidColorIndex(i) => write!(f, "{i} is not a valid color index"),
+			Self::InvalidFlag(flag) => write!(f, "'{flag}' is not a valid flag for this function"),
+		}
+	}
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LevelParsingError {
+	CompileError(epilang::CompileError),
+	RuntimeError(epilang::InterpreterError<RuntimeError, DomainType>),
+	Timeout,
+	BuilderError(LevelBuilderError),
+	SemanticVariableTypeError(String, VariableType<DomainType>),
+}
+
+impl From<LevelBuilderError> for LevelParsingError {
+	fn from(value: LevelBuilderError) -> Self {
+		Self::BuilderError(value)
+	}
+}
+
+impl From<epilang::CompileError> for LevelParsingError {
+	fn from(value: epilang::CompileError) -> Self {
+		Self::CompileError(value)
+	}
+}
+
+impl From<epilang::InterpreterError<RuntimeError, DomainType>> for LevelParsingError {
+	fn from(value: epilang::InterpreterError<RuntimeError, DomainType>) -> Self {
+		Self::RuntimeError(value)
+	}
+}
+
+impl std::error::Error for LevelParsingError {}
+
 impl std::fmt::Display for LevelParsingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "Line {}: {}", self.line_number + 1, self.code)
+		match self {
+			Self::CompileError(e) => e.fmt(f),
+			Self::Timeout => f.write_str("epilang script execution timed out"),
+			Self::RuntimeError(e) => e.fmt(f),
+			Self::BuilderError(e) => e.fmt(f),
+			Self::SemanticVariableTypeError(name, actual) => {
+				write!(f, "exported variable {name} has invalid type {actual}")
+			}
+		}
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum RuntimeWarning {
+	/// A link function was called with less than two cycles,
+	/// creating no links
+	EmptyLink,
+}
+
+impl std::error::Error for RuntimeWarning {}
+
+impl std::fmt::Display for RuntimeWarning {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::EmptyLink => f.write_str("Too few vertices to actually create a link"),
+		}
+	}
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum LevelParsingWarning {
+	/// A warning triggered by the Epilang interpreter
+	RuntimeWarning(InterpreterWarning<RuntimeWarning>),
+	/// Level name has not been set
+	LevelNameNotSet,
+}
+
+impl std::error::Error for LevelParsingWarning {}
+
+impl std::fmt::Display for LevelParsingWarning {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::RuntimeWarning(w) => w.fmt(f),
+			Self::LevelNameNotSet => f.write_str("no level name has been set"),
+		}
 	}
 }
 
@@ -608,7 +777,11 @@ impl std::fmt::Display for LevelParsingError {
 mod test {
 	use super::{
 		parse, ButtonColorLabelAppearence, ButtonColorLabelPosition, LevelBuilderError,
-		LevelParsingErrorCode, LexErrorCode, LogicalColor, OverlappedLinkedCyclesError,
+		LevelParsingError, LogicalColor, OverlappedLinkedCyclesError, RuntimeError,
+	};
+	use crate::epilang::{
+		interpreter::{FunctionCallError, LogicError},
+		InterpreterError,
 	};
 	use std::f32::consts::PI;
 
@@ -616,268 +789,58 @@ mod test {
 		($left:expr, $right:expr) => {
 			let left = $left;
 			let right = $right;
-			let err = left
-				.expect_err("Negative test sample parrsed without error!")
-				.code;
-			assert_eq!(err, right);
+			let err = left.expect_err("Negative test sample parrsed without error!");
+			let builder_error = match err {
+				LevelParsingError::RuntimeError(InterpreterError::LogicError(err, _)) => match *err
+				{
+					LogicError::FunctionCall(
+						FunctionCallError::Domain(RuntimeError::BuilderError(err)),
+						_,
+					) => err,
+					_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+				},
+				LevelParsingError::BuilderError(err) => err,
+				_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+			};
+			assert_eq!(builder_error, right);
 		};
 	}
 
 	#[test]
 	fn basic_test() {
 		let data = r"
-NAME=?!#_AAA 648
-HINT=This should parse correctly!
+name = '?!#_AAA 648';
+hint = 'This should parse correctly!';
 
 # Here we declare all the vertex names
-# Just list them after the VERTEX, separating by space
-VERTEX a b c x 1 2 3 k l m
+# The vertex function returns a value of type vertex
+# Vertices have reference semantics (a copy of the variable will represent the same vertex)
+x = vertex(box());
 
 # Here we declare cycles
 # First one declares a cycle, with a modifier specifying whether it needs a player
 # Leaving the modifier out defaults to an automatic playerless cycle
-# Next comes an identifier for the cycle itself and then a list of vertices which lie on the circle
-# in a clockwise order.
-CYCLE[MANUAL] cycle_a a b c x
-CYCLE[ENGINE] cycle_b x 1 2 3
-
-# To place objects we use OBJECT directives, specifying the desired object in the modifier
-# Then we list the vertices upon which the objects should get placed
-OBJECT[BOX] x a
-OBJECT[FLAG] 2
-OBJECT[PLAYER] b
-OBJECT[BUTTON] b
+# Next comes a list of vertices which lie on the circle in a clockwise order.
+# They can be actual vertices, objects, glyphs, or blank values (underscores).
+# For all types except a pre-existing vertex, the cycle function creates a new vertex at call time.
+# Cycles also have reference semantics
+cycle_a = cycle('manual'; box() vertex(player(), button()) _ x);
+cycle_b = cycle('auto'; x _ flag() _);
 
 # Oops, we forgot a cycle, let's add one
 # This defaults to an automatic cycle
-CYCLE cycle_extra k l m
+cycle_extra = cycle(_ _ _);
 
 # Cycles can be linked together
-LINK cycle_a cycle_extra
+link(cycle_a cycle_extra);
 
 # We have to position the cycles with x y radius data
-PLACE cycle_a -100 0.0 100
-PLACE cycle_b +100 0,0 100
-
-PLACE cycle_extra -100 100 50
+circle(cycle_a; -100, 0.0, 100);
+circle(cycle_b; +100, 0, 100);
+circle(cycle_extra; -100, 100, sqrt(41));
 ";
 		let level = parse(data).expect("Test sample did not parse correctly!");
 		assert_eq!(level.name, "?!#_AAA 648");
-	}
-
-	#[test]
-	fn undeclared_identifiers_test() {
-		let data = r"
-# Undeclared vertex in cycle definition. This should not parse.
-CYCLE a b c
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::UnknownVertexName("b".to_owned())
-		);
-
-		let data = r"
-# Undeclared vertex in object definition. This should not parse.
-OBJECT[BOX] a b c
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::UnknownVertexName("a".to_owned())
-		);
-
-		let data = r"
-# Undeclared vertex in place command. This should not parse.
-PLACE_VERT a 1
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::UnknownVertexName("a".to_owned())
-		);
-
-		let data = r"
-# Undeclared vertex in cycle placement hint. This should not parse.
-VERTEX a b c
-CYCLE k a b c
-PLACE k 0 0 100 b d
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::UnknownVertexName("d".to_owned())
-		);
-
-		let data = r"
-# Undeclared cycle in link definition. This should not parse.
-LINK a b c
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::UnknownCycleName("a".to_owned())
-		);
-
-		let data = r"
-# Undeclared cycle in place command. This should not parse.
-PLACE a 0 0 100
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::UnknownCycleName("a".to_owned())
-		);
-	}
-
-	#[test]
-	fn garbage_test() {
-		let data = "InvalidKeyword";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::InvalidKeyword("InvalidKeyword".to_owned())
-		);
-
-		let data = "OBJECT[InvalidModifier]";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::InvalidModifier("InvalidModifier".to_owned())
-		);
-
-		let data = "InvalidMetaVariable=";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::InvalidMetaVariable("InvalidMetaVariable".to_owned())
-		);
-
-		let data = "\u{202e}";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::LexError(LexErrorCode::NonAsciiLine)
-		);
-
-		let data = "@";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::LexError(LexErrorCode::MalformedStatement)
-		);
-	}
-
-	#[test]
-	fn redefined_identifiers_test() {
-		let data = r"
-VERTEX a b c
-CYCLE k a b c
-# Define the cycle again. This should not parse.
-CYCLE k a b
-";
-		assert_err_eq!(
-			parse(data),
-			LevelParsingErrorCode::RedefinedCycle("k".to_owned())
-		);
-
-		let data = r"
-# Use the same vertex name multiple times.
-# This is fine, but it should not create a new vertex.
-VERTEX a a b a c
-VERTEX a
-";
-		let level = parse(data).expect("Test sample did not parse correctly!");
-		assert_eq!(level.vertices.len(), 3);
-	}
-
-	#[test]
-	fn bad_command_syntax_test() {
-		let test_cases = r"
-# Cycle is missing a name
-CYCLE
-
-# Place command is missing a vertex
-PLACE_VERT
-
-# Place command is missing a value
-VERTEX a
-CYCLE k a
-PLACE k 0 0 100
-PLACE_VERT a
-
-# Place command is missing a cycle
-PLACE
-
-# Place command is missing a value
-VERTEX a
-CYCLE k a
-PLACE k 0 0
-
-# Object without explicit type is not valid
-VERTEX a
-OBJECT a
-
-# Placement is not a number
-VERTEX a
-CYCLE k a
-PLACE k 0 0 100
-PLACE_VERT a b
-
-# Placement is not a number
-VERTEX a
-CYCLE k a
-PLACE k a b c
-
-# Place command cannot take modifiers
-VERTEX a
-CYCLE k a
-PLACE[InvalidModifier] k 0 0 100
-
-# Place command cannot take modifiers
-VERTEX a
-CYCLE k a
-PLACE k 0 0 100
-PLACE_VERT[InvalidModifier] a 0
-
-# Vertex command cannot take modifiers
-VERTEX[InvalidModifier] a
-
-# Cycle command cannot have more than one modifier
-VERTEX a
-CYCLE[MANUAL:ExtraModifier] k a
-
-# Link command cannot have more than one modifier
-VERTEX a b
-CYCLE k a
-CYCLE l b
-LINK[STRAIGHT:ExtraModifier] k l
-
-# Player objects cannot have color
-VERTEX a
-OBJECT[PLAYER:0] a
-
-# Box objects can have color, but not anything past that
-VERTEX a
-OBJECT[BOX:0:ExtraModifier] a
-
-# Vertex placement command cannot have more arguments
-VERTEX a
-CYCLE k a
-PLACE k 0 0 100
-PLACE_VERT a 0 0
-";
-		let expected_results = [
-			LevelParsingErrorCode::NotEnoughArguments(1, 0),
-			LevelParsingErrorCode::NotEnoughArguments(2, 0),
-			LevelParsingErrorCode::NotEnoughArguments(2, 1),
-			LevelParsingErrorCode::NotEnoughArguments(4, 0),
-			LevelParsingErrorCode::NotEnoughArguments(4, 3),
-			LevelParsingErrorCode::MissingModifier,
-			LevelParsingErrorCode::ArgumentIsNotANumber("b".to_owned()),
-			LevelParsingErrorCode::ArgumentIsNotANumber("a".to_owned()),
-			LevelParsingErrorCode::ExtraneousModifier(0, 1),
-			LevelParsingErrorCode::ExtraneousModifier(0, 1),
-			LevelParsingErrorCode::ExtraneousModifier(0, 1),
-			LevelParsingErrorCode::ExtraneousModifier(1, 2),
-			LevelParsingErrorCode::ExtraneousModifier(1, 2),
-			LevelParsingErrorCode::ExtraneousModifier(1, 2),
-			LevelParsingErrorCode::ExtraneousModifier(2, 3),
-			LevelParsingErrorCode::ExtraneousArguments(2, 3),
-		];
-
-		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
-			assert_err_eq!(parse(data), expected);
-		}
 	}
 
 	#[test]
@@ -885,49 +848,43 @@ PLACE_VERT a 0 0
 		let test_cases = r"
 # Linking a cycle to itself is already weird, but legal.
 # The link, however, cannot be inverted.
-VERTEX a b
-CYCLE 1 a b
-LINK[CROSSED] 1 1
+a = cycle(_ _);
+link('invert'; a a);
 
 # Intersecting cycles cannot be linked.
-VERTEX a b c
-CYCLE 1 a b
-CYCLE 2 a c
-LINK 1 2
+a = cycle(x = vertex(), _);
+b = cycle(x _);
+link(a b);
 
 # Two (declared) links between the same two cycles may exist as well,
 # but they cannot be conflicting like this.
-VERTEX a b c d
-CYCLE 1 a b
-CYCLE 2 c d
-LINK 1 2
-LINK[CROSSED] 2 1
+a = cycle(_ _);
+b = cycle(_ _);
+link(a b);
+link('invert'; b a);
 
 # Three cycles linked in a triangle.
 # Again, this is legal, but the links must be compatible.
-VERTEX a b c d e f
-CYCLE 1 a b
-CYCLE 2 c d
-CYCLE 3 e f
-LINK 1 2 3
-LINK[CROSSED] 1 3
+a = cycle(_ _);
+b = cycle(_ _);
+c = cycle(_ _);
+link(a b c);
+link('invert'; a c);
 
 # Same with four cycles
-VERTEX a b c d e f g h
-CYCLE 1 a b
-CYCLE 2 c d
-CYCLE 3 e f
-CYCLE 4 g h
-LINK 1 2 3 4
-LINK[CROSSED] 1 4
+a = cycle(_ _);
+b = cycle(_ _);
+c = cycle(_ _);
+d = cycle(_ _);
+link(a b c d);
+link('invert'; a d);
 
 # Cycles 1 and 3 share a vertex.
 # They are not linked directly, but the links connect them transitively.
-VERTEX a b c d e
-CYCLE 1 a b
-CYCLE 2 c d
-CYCLE 3 e a
-LINK 1 2 3
+a = cycle(x = vertex(), _);
+b = cycle(_ _);
+c = cycle(_ x);
+link(a b c);
 ";
 
 		let expected_results = [
@@ -948,59 +905,27 @@ LINK 1 2 3
 		];
 
 		for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
-			assert_err_eq!(parse(data), expected.into());
+			assert_err_eq!(parse(data), expected);
 		}
 	}
 
 	#[test]
 	fn logical_colors_test() {
 		let data = r"
-VERTEX a b c d e f g i j k l m n
-
-# Default, with no color
-OBJECT[BOX] a
+# Default, with no call_color
+vertex(box());
 
 # Numeric colors are specified with numbers
-OBJECT[BOX:42] b
+vertex(box(42));
 
 # Pictogram colors are specified by name
-OBJECT[BOX:star] c
+vertex(box('star'));
 
 # Pictogram colors may also be specified by their id
-OBJECT[BOX:p16] d
+vertex(box(pict(16)));
 
-# Palette command defines substitutions for numeric color declarations
-PALETTE p3 p4 2048
-OBJECT[BOX:0] e
-
-# Palettes can substitute numeric colors as well
-OBJECT[BOX:2] f
-
-# Anything out of range will remain a number
-OBJECT[BOX:3] g
-
-# First color of a palette may be set as the default color
-# for when a color specifier is omited
-PALETTE[DEFAULT] p12 2
-OBJECT[BOX] i
-
-# Colorless object can be forced by explicit empty color specifier
-OBJECT[BOX:] j
-
-# Palette commands ignore any pre-existing palettes.
-# The '2', as declared above, is actually the numeric color 2
-OBJECT[BOX:1] k
-
-# Palette is cleared by omiting the arguments
-PALETTE
-OBJECT[BOX:1] l
-
-# This does not affect the default color unless the modifier is used again
-OBJECT[BOX] m
-
-# Empty palette command with modifier clears default color as well
-PALETTE[DEFAULT]
-OBJECT[BOX] n
+# Colorless object can be forced by explicit blank color value
+vertex(box(_));
 ";
 
 		let expected_colors = [
@@ -1008,81 +933,76 @@ OBJECT[BOX] n
 			Some(LogicalColor::new(42)),
 			Some(LogicalColor::pictogram(36)),
 			Some(LogicalColor::pictogram(16)),
-			Some(LogicalColor::pictogram(3)),
-			Some(LogicalColor::new(2048)),
-			Some(LogicalColor::new(3)),
-			Some(LogicalColor::pictogram(12)),
-			None,
-			Some(LogicalColor::new(2)),
-			Some(LogicalColor::new(1)),
-			Some(LogicalColor::pictogram(12)),
 			None,
 		];
 
 		let level = parse(data).expect("Test sample did not parse correctly!");
 		for (vertex, expected_color) in level.vertices.iter().zip(expected_colors) {
-			let Some(super::ObjectData::Box(color)) = vertex.object else {
+			let Some(super::ObjectData::Box(call_color)) = vertex.object else {
 				panic!("Vertex does not contain a box.");
 			};
-			assert_eq!(color, expected_color);
+			assert_eq!(call_color, expected_color);
 		}
 	}
 
 	#[test]
 	fn color_labels_test() {
 		let data = r"
-PALETTE[DEFAULT] 0
-VERTEX a b c d g h i j k l m n o p q r s t
-OBJECT[BUTTON] a b c d g h i j k l m n o p q r s
-CYCLE x m n o p
-CYCLE y q r s t
-PLACE x 0 0 100
-PLACE y 0 0 100
-PLACE_VERT m 0.5
-PLACE_VERT q 0.5
+col = color(0);
 
-# Color labels can be repositioned to a set of
+# Color labels can be placed to a set of
 # predefined positions
-COLORLABEL[:left] a
-COLORLABEL[:right] b
-COLORLABEL[:above] c
-COLORLABEL[:below] d
+a = vertex(button(col; 'left'));
+b = vertex(button(col; 'right'));
+c = vertex(button(col; 'above'));
+d = vertex(button(col; 'below'));
 
 # The default position is inside the button.
 # This can also be forced manually
-COLORLABEL[:inside] g
-# (note: vertex h remains at default position)
+g = vertex(button(col; _));
+h = vertex(button(col));
 
 # Position can be specified manually as rotation
 # (as clock angle in degrees)
-COLORLABEL[:30] i
+i = vertex(button(col; 30));
 
-# Adding the 'r' prefix means the label itself will be
+# Adding the 'rot' flag means the label itself will be
 # rotated, not just positioned
-COLORLABEL[:r60] j
+j = vertex(button(col; 'rot' 60));
 
 # Finally, any option can be combined with a shape specifier
 # to choose between square label (default) or an arrow-tipped one
-COLORLABEL[:above:square] k
-COLORLABEL[::arrow] l
+k = vertex(button(col; 'above' 'square'));
+l = vertex(button(col; _ 'arrow'));
+
+m = vertex(button(col));
+n = vertex(button(col));
+o = vertex(button(col));
+p = vertex(button(col));
+q = vertex(button(col));
+r = vertex(button(col));
+s = vertex(button(col));
+t = vertex(button(col));
+
+x = cycle(m, n, o, p);
+y = cycle(q, r, s, t);
+circle(x; 0, 0, 100);
+circle(y; 0, 0, 100);
+
+set_vertex_angle(m; 0.5);
+set_vertex_angle(q; 0.5);
 
 # Labels can be positioned symmetrically around a cycle,
 # with respect to where they are relative to the cycle center
-COLORLABEL[CYCLE:quad] x
+cycle_color_labels(x; 'quad');
 
 # Cycle-wide label placement may also be done inside the cycle
 # and with arrow labels if desired
-COLORLABEL[CYCLE:lr:in:arrow] y
-
-# Labels can be explicitly overridden at each vertex
-COLORLABEL q r
-
-# If a button is added later, prior cycle-wide setting does not affect it
-OBJECT[BUTTON] t
+cycle_color_labels(y; 'lr' 'in' 'arrow');
 ";
 		let expected_appearences = [
 			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+				position: ButtonColorLabelPosition::AnglePlaced(-PI / 2.0),
 				has_arrow_tip: false,
 			},
 			ButtonColorLabelAppearence {
@@ -1138,20 +1058,20 @@ OBJECT[BUTTON] t
 				has_arrow_tip: false,
 			},
 			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::Inside,
-				has_arrow_tip: false,
+				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+				has_arrow_tip: true,
 			},
 			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::Inside,
-				has_arrow_tip: false,
+				position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+				has_arrow_tip: true,
 			},
 			ButtonColorLabelAppearence {
 				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
 				has_arrow_tip: true,
 			},
 			ButtonColorLabelAppearence {
-				position: ButtonColorLabelPosition::Inside,
-				has_arrow_tip: false,
+				position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+				has_arrow_tip: true,
 			},
 		];
 
@@ -1167,148 +1087,155 @@ OBJECT[BUTTON] t
 	#[test]
 	fn one_way_parse_test() {
 		let level_header = r"
-VERTEX v1 v2 v3 v4 v5 v6 vx vy
-CYCLE y vy
-CYCLE 1 v1
-CYCLE 2 v2
-CYCLE 3 v3
-CYCLE 4 v4
-CYCLE 5 v5
-CYCLE 6 v6
-CYCLE x vx
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+vx = vertex();
+vy = vertex();
+y = cycle(vy);
+c1 = cycle(v1);
+c2 = cycle(v2);
+c3 = cycle(v3);
+c4 = cycle(v4);
+c5 = cycle(v5);
+c6 = cycle(v6);
+x = cycle(vx);
 
-LINK 6 x
-LINK[CROSSED] 1 y
+link(c6 x);
+link('invert'; c1 y);
 
-PLACE 1 0 0 100
-PLACE 2 0 0 100
-PLACE 3 0 0 100
-PLACE 4 0 0 100
-PLACE 5 0 0 100
-PLACE 6 0 0 100
-PLACE x 0 0 100
-PLACE y 0 0 100
+circle(c1; 0 0 100);
+circle(c2; 0 0 100);
+circle(c3; 0 0 100);
+circle(c4; 0 0 100);
+circle(c5; 0 0 100);
+circle(c6; 0 0 100);
+circle(x; 0 0 100);
+circle(y; 0 0 100);
 ";
 		let linkages = r"
 # CHAIN
-ONEWAY 1 2
-ONEWAY 2 3
-ONEWAY 3 4
-ONEWAY 4 5
-ONEWAY 5 6
+oneway(c1 c2);
+oneway(c2 c3);
+oneway(c3 c4);
+oneway(c4 c5);
+oneway(c5 c6);
 
 # CHAIN, inversely written
-ONEWAY 5 6
-ONEWAY 4 5
-ONEWAY 3 4
-ONEWAY 2 3
-ONEWAY 1 2
+oneway(c5 c6);
+oneway(c4 c5);
+oneway(c3 c4);
+oneway(c2 c3);
+oneway(c1 c2);
 
 # CHAIN, weird order
-ONEWAY 3 4
-ONEWAY 2 3
-ONEWAY 4 5
-ONEWAY 1 2
-ONEWAY 5 6
+oneway(c3 c4);
+oneway(c2 c3);
+oneway(c4 c5);
+oneway(c1 c2);
+oneway(c5 c6);
 
 # CHAIN, reverse
-ONEWAY 2 1
-ONEWAY 3 2
-ONEWAY 4 3
-ONEWAY 5 4
-ONEWAY 6 5
+oneway(c2 c1);
+oneway(c3 c2);
+oneway(c4 c3);
+oneway(c5 c4);
+oneway(c6 c5);
 
 # TREE
-ONEWAY 1 2
-ONEWAY 1 3
-ONEWAY 2 4
-ONEWAY 2 5
-ONEWAY 3 6
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c3 c6);
 
 # TREE, different order
-ONEWAY 2 4
-ONEWAY 2 5
-ONEWAY 1 2
-ONEWAY 1 3
-ONEWAY 3 6
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c3 c6);
 
 # DIAMOND
-ONEWAY 1 2
-ONEWAY 1 3
-ONEWAY 2 4
-ONEWAY 3 4
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c2 c4);
+oneway(c3 c4);
 
 # DIAMOND, different order
-ONEWAY 2 4
-ONEWAY 3 4
-ONEWAY 1 2
-ONEWAY 1 3
+oneway(c2 c4);
+oneway(c3 c4);
+oneway(c1 c2);
+oneway(c1 c3);
 
 # COMPLETE GRAPH
-ONEWAY 1 2
-ONEWAY 1 3
-ONEWAY 1 4
-ONEWAY 1 5
-ONEWAY 1 6
-ONEWAY 2 3
-ONEWAY 2 4
-ONEWAY 2 5
-ONEWAY 2 6
-ONEWAY 3 4
-ONEWAY 3 5
-ONEWAY 3 6
-ONEWAY 4 5
-ONEWAY 4 6
-ONEWAY 5 6
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c1 c4);
+oneway(c1 c5);
+oneway(c1 c6);
+oneway(c2 c3);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c2 c6);
+oneway(c3 c4);
+oneway(c3 c5);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c4 c6);
+oneway(c5 c6);
 
 # COMPLETE GRAPH, different order
-ONEWAY 1 2
-ONEWAY 2 4
-ONEWAY 2 5
-ONEWAY 1 6
-ONEWAY 2 6
-ONEWAY 4 6
-ONEWAY 1 3
-ONEWAY 3 5
-ONEWAY 3 4
-ONEWAY 5 6
-ONEWAY 2 3
-ONEWAY 3 6
-ONEWAY 4 5
-ONEWAY 1 4
-ONEWAY 1 5
+oneway(c1 c2);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c1 c6);
+oneway(c2 c6);
+oneway(c4 c6);
+oneway(c1 c3);
+oneway(c3 c5);
+oneway(c3 c4);
+oneway(c5 c6);
+oneway(c2 c3);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c1 c4);
+oneway(c1 c5);
 
 # COMPLETE GRAPH, DOUBLED LINKS
-ONEWAY 1 2
-ONEWAY 1 3
-ONEWAY 1 4
-ONEWAY 1 5
-ONEWAY 1 6
-ONEWAY 2 3
-ONEWAY 2 4
-ONEWAY 2 5
-ONEWAY 2 6
-ONEWAY 3 4
-ONEWAY 3 5
-ONEWAY 3 6
-ONEWAY 4 5
-ONEWAY 4 6
-ONEWAY 5 6
-ONEWAY 1 2
-ONEWAY 2 4
-ONEWAY 2 5
-ONEWAY 1 6
-ONEWAY 2 6
-ONEWAY 4 6
-ONEWAY 1 3
-ONEWAY 3 5
-ONEWAY 3 4
-ONEWAY 5 6
-ONEWAY 2 3
-ONEWAY 3 6
-ONEWAY 4 5
-ONEWAY 1 4
-ONEWAY 1 5
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c1 c4);
+oneway(c1 c5);
+oneway(c1 c6);
+oneway(c2 c3);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c2 c6);
+oneway(c3 c4);
+oneway(c3 c5);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c4 c6);
+oneway(c5 c6);
+oneway(c1 c2);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c1 c6);
+oneway(c2 c6);
+oneway(c4 c6);
+oneway(c1 c3);
+oneway(c3 c5);
+oneway(c3 c4);
+oneway(c5 c6);
+oneway(c2 c3);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c1 c4);
+oneway(c1 c5);
 "
 		.split("\n\n");
 
@@ -1322,67 +1249,70 @@ ONEWAY 1 5
 	#[test]
 	fn one_way_validation_test() {
 		let level_header = r"
-VERTEX v1 v2 v3 v4 v5 v6 vx vy
-CYCLE y vy
-CYCLE 1 v1
-CYCLE 2 v2
-CYCLE 3 v3
-CYCLE 4 v4
-CYCLE 5 v5
-CYCLE 6 v6
-CYCLE x vx
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+vx = vertex();
+vy = vertex();
+y = cycle(vy);
+c1 = cycle(v1);
+c2 = cycle(v2);
+c3 = cycle(v3);
+c4 = cycle(v4);
+c5 = cycle(v5);
+c6 = cycle(v6);
+x = cycle(vx);
 
-LINK 6 x
-LINK[CROSSED] 1 y
+link(c6, x);
+link('invert'; c1 y);
 
-PLACE 1 0 0 100
-PLACE 2 0 0 100
-PLACE 3 0 0 100
-PLACE 4 0 0 100
-PLACE 5 0 0 100
-PLACE 6 0 0 100
-PLACE x 0 0 100
-PLACE y 0 0 100
+circle(c1; 0 0 100);
+circle(c2; 0 0 100);
+circle(c3; 0 0 100);
+circle(c4; 0 0 100);
+circle(c5; 0 0 100);
+circle(c6; 0 0 100);
+circle(x; 0 0 100);
+circle(y; 0 0 100);
 ";
 		let linkages = r"
 # CHAIN with LOOP
-ONEWAY 1 2
-ONEWAY 2 3
-ONEWAY 3 4
-ONEWAY 4 5
-ONEWAY 5 6
-ONEWAY 6 1
+oneway(c1 c2);
+oneway(c2 c3);
+oneway(c3 c4);
+oneway(c4 c5);
+oneway(c5 c6);
+oneway(c6 c1);
 
 # CHAIN with LINK LOOP
-ONEWAY 1 2
-ONEWAY 2 3
-ONEWAY 3 4
-ONEWAY 4 5
-ONEWAY 5 6
-LINK[CROSSED] 2 5
+oneway(c1 c2);
+oneway(c2 c3);
+oneway(c3 c4);
+oneway(c4 c5);
+oneway(c5 c6);
+link('invert'; c2 c5);
 
 # OVERLAPPING LINK AND ONEWAY
-ONEWAY 1 2
-LINK 1 2
+oneway(c1 c2);
+link(c1 c2);
 
 # OVERLAPPING ONEWAYS
-ONEWAY 1 2
-ONEWAY 2 1
+oneway(c1 c2);
+oneway(c2 c1);
 
 # TRIANGLE
-ONEWAY 1 2
-ONEWAY 3 1
-ONEWAY 2 3
+oneway(c1 c2);
+oneway(c3 c1);
+oneway(c2 c3);
 "
 		.split("\n\n");
 
 		for data in linkages {
 			let level = format!("{}\n{}", level_header, data);
-			let output = parse(&level);
-			assert_err_eq!(
-				output,
-				LevelParsingErrorCode::BuilderError(LevelBuilderError::OneWayLinkLoop)
-			);
+			assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
 		}
 	}
 }
