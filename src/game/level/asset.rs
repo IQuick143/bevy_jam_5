@@ -59,7 +59,7 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			let level_data = parser::parse(&s)?;
+			let level_data = parser::parse(&s, |w| warn!("{w}"))?;
 			Ok(level_data)
 		}
 	}

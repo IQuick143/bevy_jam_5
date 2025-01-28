@@ -73,7 +73,7 @@ mod utils {
 		mut asset_server: ResMut<Assets<LevelData>>,
 		mut spawn_trigger: EventWriter<EnterLevel>,
 	) -> Result<(), parser::LevelParsingError> {
-		let level = parser::parse(level_data)?;
+		let level = parser::parse(level_data, |_| {})?;
 		let handle = asset_server.add(level);
 		spawn_trigger.send(EnterLevel(Some(handle)));
 		Ok(())

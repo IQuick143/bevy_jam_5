@@ -8,11 +8,7 @@ use std::f32::consts::PI;
 
 const MAX_INTERPRETER_ITERATIONS: u32 = 2000;
 
-pub fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
-	parse_with_warnings(level_file, |_| {})
-}
-
-pub fn parse_with_warnings(
+pub fn parse(
 	level_file: &str,
 	mut warning_handler: impl FnMut(LevelParsingWarning),
 ) -> Result<LevelData, LevelParsingError> {
@@ -518,10 +514,10 @@ impl LevelBuilder {
 								*cycle_id,
 								direction.unwrap_or_default(),
 							)?;
-							cycles_linked = true;
 						} else {
 							self.link_cycles(prev_id, *cycle_id, direction.unwrap_or_default())?;
 						}
+						cycles_linked = true;
 					}
 					prev_cycle_id = Some(*cycle_id);
 				}
@@ -776,14 +772,15 @@ impl std::fmt::Display for LevelParsingWarning {
 #[cfg(test)]
 mod test {
 	use super::{
-		parse, ButtonColorLabelAppearence, ButtonColorLabelPosition, LevelBuilderError,
-		LevelParsingError, LogicalColor, OverlappedLinkedCyclesError, RuntimeError,
-	};
-	use crate::epilang::{
-		interpreter::{FunctionCallError, LogicError},
-		InterpreterError,
+		ButtonColorLabelAppearence, ButtonColorLabelPosition, FunctionCallError, InterpreterError,
+		LevelBuilderError, LevelData, LevelParsingError, LogicError, LogicalColor,
+		OverlappedLinkedCyclesError, RuntimeError,
 	};
 	use std::f32::consts::PI;
+
+	fn parse(level_file: &str) -> Result<LevelData, LevelParsingError> {
+		super::parse(level_file, |_| {})
+	}
 
 	macro_rules! assert_err_eq {
 		($left:expr, $right:expr) => {
