@@ -23,10 +23,10 @@ pub fn compile(source: &str) -> Result<Module, CompileError> {
 	Ok(module?)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct CompileError(CompileErrorData);
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 enum CompileErrorData {
 	Lex(LexerError),
 	Parse(ParseError),

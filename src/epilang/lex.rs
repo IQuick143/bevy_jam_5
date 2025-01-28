@@ -8,7 +8,7 @@ pub fn lex(
 	LexerWrapper(Token::lexer(source))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct LexerError {
 	pub error_code: LexerErrorCode,
 	pub slice: String,
