@@ -39,7 +39,7 @@ pub enum NeverTag {}
 pub enum Token {
 	#[regex(r"(#[^\n]*)?\n", |lex| {
 		lex.extras.line_index += 1;
-		lex.extras.line_start_offset = 0;
+		lex.extras.line_start_offset = lex.span().end;
 		logos::Filter::Skip
 	})]
 	Eol(NeverTag),
