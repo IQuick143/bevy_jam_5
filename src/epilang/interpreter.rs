@@ -49,7 +49,7 @@ impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for LogicErr
 				"value of invalid type {ty} passed to a condition"
 			)),
 			Self::VariableDoesNotExist(name) => {
-				f.write_fmt(format_args!("variable {name} foes not exist"))
+				f.write_fmt(format_args!("variable {name} does not exist"))
 			}
 			Self::IllegalTypeInUnaryOperator(op, ty) => f.write_fmt(format_args!(
 				"value of invalid type {ty} passed to unary operator {op}"
