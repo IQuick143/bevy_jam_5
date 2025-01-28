@@ -397,7 +397,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				Expression::BinaryOperator(expr) => match expr.operator {
 					BinaryOperator::And => {
 						self.instruction_stack
-							.push(Instruction::Repush(expression.loc.clone()));
+							.push(Instruction::Repush(expression.loc.clone()))?;
 						self.instruction_stack
 							.push(Instruction::Evaluate(&expr.right))?;
 						self.instruction_stack
@@ -412,7 +412,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 					}
 					BinaryOperator::Or => {
 						self.instruction_stack
-							.push(Instruction::Repush(expression.loc.clone()));
+							.push(Instruction::Repush(expression.loc.clone()))?;
 						self.instruction_stack
 							.push(Instruction::Push(VariableValueFrame {
 								value: VariableValue::Bool(true),
