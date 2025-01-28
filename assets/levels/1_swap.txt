@@ -1,16 +1,9 @@
-Name=Swap
+name = 'Swap';
 
-PALETTE[DEFAULT_BOX] checker_asc
+col = 'checker_asc';
+f = vertex();
+main = cycle(_ player() flag() _ _ f);
+side = cycle('manual'; f _ box(col) button() _ _);
 
-VERTEX a b c d e f g h i j k
-
-CYCLE main a b c d e f
-CYCLE[MANUAL] side f g h i j k
-
-OBJECT[PLAYER] b
-OBJECT[FLAG] c
-OBJECT[BOX] h
-OBJECT[BUTTON] i
-
-PLACE main 0 0 100
-PLACE side 160 -120 100
+circle(main; 0 0 100);
+circle(side; 160, -120, 100);

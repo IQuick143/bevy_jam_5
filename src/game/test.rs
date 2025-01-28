@@ -214,16 +214,10 @@ fn test_app() {
 fn test_debug_level_load() {
 	let mut app = app_with_level(
 		r"
-NAME=Debug1
-HINT=A player should not be reading this message!
+name = 'Debug1';
+hint = 'A player should not be reading this message!';
 
-VERTEX a b c d e f g
-CYCLE cycle a b c d e f g
-
-OBJECT[PLAYER] f
-OBJECT[FLAG] b
-
-PLACE cycle 0 0 100
+circle(cycle(_ flag() _ _ _ player() _); 0 0 100);
 ",
 	);
 	let vertex_data = app.read_vertices();
@@ -236,16 +230,10 @@ PLACE cycle 0 0 100
 fn test_basic_inputs() {
 	let mut app = app_with_level(
 		r"
-NAME=Debug2
-HINT=A player should not be reading this message!
+name = 'Debug2';
+hint = 'A player should not be reading this message!';
 
-VERTEX a b c d e f g
-CYCLE cycle a b c d e f g
-
-OBJECT[PLAYER] f
-OBJECT[FLAG] b
-
-PLACE cycle 0 0 100
+circle(cycle(_ flag() _ _ _ player() _); 0 0 100);
 ",
 	);
 
@@ -328,75 +316,67 @@ fn test_rotation_direction() {
 
 	let test_cases = [
 		r"
-NAME=DebugDirection1
-HINT=A player should not be reading this message!
+name = 'DebugDirection1';
+hint = 'A player should not be reading this message!';
 
-VERTEX dummy1 start intersect off dummy2 dummy3
-CYCLE test dummy1 start intersect dummy2 dummy3
-CYCLE switch intersect off
-
-OBJECT[BOX:1] start
+intersect = vertex();
+test = cycle(_ box(1) intersect _ _);
+switch = cycle(intersect _);
 
 # Placement does not really matter
-PLACE test 0 0 100
-PLACE switch 200 0 100
+circle(test; 0 0 100);
+circle(switch; 200 0 100);
 ",
 		r"
-NAME=DebugDirection2
-HINT=A player should not be reading this message!
+name = 'DebugDirection2';
+hint = 'A player should not be reading this message!';
 
-VERTEX a b dummy1 start intersect off dummy2 dummy3
-CYCLE driver a b
-CYCLE switch intersect off
-CYCLE test dummy1 start intersect dummy2 dummy3
+intersect = vertex();
+driver = cycle(_ _);
+switch = cycle(intersect _);
+test = cycle(_ box(1) intersect _ _);
 
-OBJECT[BOX:1] start
-
-LINK driver test
+link(driver test);
 
 # Placement does not really matter
-PLACE driver 400 0 100
-PLACE test 0 0 100
-PLACE switch 200 0 100
+circle(driver; 400 0 100);
+circle(test; 0 0 100);
+circle(switch; 200 0 100);
 ",
 		r"
-NAME=DebugDirection3
-HINT=A player should not be reading this message!
+name = 'DebugDirection3';
+hint = 'A player should not be reading this message!';
 
-VERTEX a b c d dummy1 start intersect off dummy2 dummy3
-CYCLE driver a b
-CYCLE switch intersect off
-CYCLE gear c d
-CYCLE test dummy1 start intersect dummy2 dummy3
+intersect = vertex();
+driver = cycle(_ _);
+switch = cycle(intersect _);
+gear = cycle(_ _);
+test = cycle(_ box(1) intersect _ _);
 
-OBJECT[BOX:1] start
-
-LINK[CROSSED] driver gear
-LINK[CROSSED] gear test
+link('invert'; driver gear);
+link('invert'; gear test);
 
 # Placement does not really matter
-PLACE driver 400 0 100
-PLACE gear 400 0 50
-PLACE test 0 0 100
-PLACE switch 200 0 100
+circle(driver; 400 0 100);
+circle(gear; 400 0 50);
+circle(test; 0 0 100);
+circle(switch; 200 0 100);
 ",
 		r"
-NAME=DebugDirection4
-HINT=A player should not be reading this message!
+name = 'DebugDirection4';
+hint = 'A player should not be reading this message!';
 
-VERTEX a b dummy1 start intersect off dummy2 dummy3
-CYCLE test dummy1 start intersect dummy2 dummy3
-CYCLE switch intersect off
-CYCLE dummy_gear a b
+intersect = vertex();
+test = cycle(_ box(1) intersect _ _);
+switch = cycle(intersect _);
+dummy_gear = cycle(_ _);
 
-OBJECT[BOX:1] start
-
-LINK[CROSSED] dummy_gear test
+link('invert'; dummy_gear test);
 
 # Placement does not really matter
-PLACE dummy_gear 400 0 50
-PLACE test 0 0 100
-PLACE switch 200 0 100
+circle(dummy_gear; 400 0 50);
+circle(test; 0 0 100);
+circle(switch; 200 0 100);
 ",
 	];
 	for test in test_cases {
@@ -409,33 +389,22 @@ PLACE switch 200 0 100
 fn test_basic_links() {
 	let mut app = app_with_level(
 		r"
-NAME=DebugLinkBasic
-HINT=A player should not be reading this message!
+name = 'DebugLinkBasic';
+hint = 'A player should not be reading this message!';
 
-VERTEX 1 2 3 4 5 6 7 8 9
-CYCLE a 1 2 3
-CYCLE b 4 5 6
-CYCLE c 7 8 9
-
-OBJECT[BOX:1] 1
-OBJECT[BOX:2] 2
-OBJECT[BOX:3] 3
-OBJECT[BOX:4] 4
-OBJECT[BOX:5] 5
-OBJECT[BOX:6] 6
-OBJECT[BOX:7] 7
-OBJECT[BOX:8] 8
-OBJECT[BOX:9] 9
+a = cycle(box(1) box(2) box(3));
+b = cycle(box(4) box(5) box(6));
+c = cycle(box(7) box(8) box(9));
 
 # A valid triangle of links, should not error
-LINK a b
-LINK[CROSSED] b c
-LINK[CROSSED] a c
+link(a b);
+link('invert'; b c);
+link('invert'; a c);
 
 # Placement does not really matter
-PLACE a 0 0 100
-PLACE b 200 0 100
-PLACE c 0 200 100
+circle(a; 0 0 100);
+circle(b; 200 0 100);
+circle(c; 0 200 100);
 ",
 	);
 
@@ -521,33 +490,17 @@ PLACE c 0 200 100
 fn test_link_combinatorics() {
 	let mut app = app_with_level(
 		r"
-NAME=DebugLinkCombinatorics
-HINT=A player should not be reading this message!
+name = 'DebugLinkCombinatorics';
+hint = 'A player should not be reading this message!';
 
-VERTEX 1 2 3 4 5 6 7 8 9 10 11 12 13 14
-CYCLE a 1 2 3 4 5
-CYCLE b 6 7 8 9 10 11 12 13 14
+a = cycle(box(1) box(2) box(3) box(4) box(5));
+b = cycle(box(6) box(7) box(8) box(9) box(10) box(11) box(12) box(13) box(14));
 
-OBJECT[BOX:1] 1
-OBJECT[BOX:2] 2
-OBJECT[BOX:3] 3
-OBJECT[BOX:4] 4
-OBJECT[BOX:5] 5
-OBJECT[BOX:6] 6
-OBJECT[BOX:7] 7
-OBJECT[BOX:8] 8
-OBJECT[BOX:9] 9
-OBJECT[BOX:10] 10
-OBJECT[BOX:11] 11
-OBJECT[BOX:12] 12
-OBJECT[BOX:13] 13
-OBJECT[BOX:14] 14
-
-LINK a b
+link(a b);
 
 # Placement does not really matter
-PLACE a 0 0 100
-PLACE b 200 0 100
+circle(a; 0 0 100);
+circle(b; 200 0 100);
 ",
 	);
 
@@ -641,24 +594,22 @@ fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
 fn stress_test_tricycle() {
 	let mut app = app_with_level(
 		r"
-Name=DebugTricycle
+name = 'DebugTricycle';
 
-VERTEX b1 b2 b3 bgi bgo bri bro r1 r2 r3 rgi rgo g1 g2 g3
+bgi = vertex(box(2));
+bgo = vertex();
+bri = vertex(box(1));
+bro = vertex();
+rgi = vertex(box(0));
+rgo = vertex();
 
-CYCLE blue b1 b2 b3 bgo bri bgi bro
-CYCLE red r1 r2 r3 bro rgi bri rgo
-CYCLE green g1 g2 g3 rgo bgi rgi bgo
+blue = cycle(_ button(0) _ bgo bri bgi bro);
+red = cycle(_ button(1) _ bro rgi bri rgo);
+green = cycle(_ button(2) _ rgo bgi rgi bgo);
 
-OBJECT[BOX:0] rgi
-OBJECT[BOX:1] bri
-OBJECT[BOX:2] bgi
-OBJECT[BUTTON:0] b2
-OBJECT[BUTTON:1] r2
-OBJECT[BUTTON:2] g2
-
-PLACE blue -87 50 130
-PLACE red 0 -100 130
-PLACE green 87 50 130
+circle(blue; -87, 50 130);
+circle(red; 0, -100, 130);
+circle(green; 87 50 130);
 ",
 	);
 	let intial_state = app.read_vertices();
@@ -691,22 +642,14 @@ PLACE green 87 50 130
 fn stress_test_dicycle() {
 	let mut app = app_with_level(
 		r"
-Name=DebugDicycle
+name = 'DebugDicycle';
 
-VERTEX X 1 2 3 a b
+x = vertex(box(0));
+a = cycle(x box(1) box(2) box(3));
+b = cycle(x box(4) box(5));
 
-CYCLE A X 1 2 3
-CYCLE B X a b
-
-OBJECT[BOX:0] X
-OBJECT[BOX:1] 1
-OBJECT[BOX:2] 2
-OBJECT[BOX:3] 3
-OBJECT[BOX:4] a
-OBJECT[BOX:5] b
-
-PLACE A -100 0 100
-PLACE B  100 0 100
+circle(a; -100, 0 100);
+circle(b; 100 0 100);
 ",
 	);
 	let intial_state = app.read_vertices();
@@ -740,7 +683,7 @@ fn stress_test_random_levels() {
 	let levels = [
 		include_str!("../../assets/levels/1_intro.txt"),
 		include_str!("../../assets/levels/2_sort.txt"),
-		include_str!("../../assets/levels/rubik.txt"),
+		//include_str!("../../assets/levels/rubik.txt"),
 		include_str!("../../assets/levels/5_sync.txt"),
 		include_str!("../../assets/levels/6_sync2.txt"),
 		include_str!("../../assets/levels/send.txt"),

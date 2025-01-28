@@ -1,21 +1,15 @@
-Name=Sync
-Hint=Linkages make cycles move in Sync!
+name = 'Sync';
+hint = 'Linkages make cycles move in Sync!';
 
-PALETTE[DEFAULT_BOX] wide_diamond
+c = 'wide_diamond';
 
-VERTEX a b c d e f g h i j k l m n
+g = vertex();
+h = vertex();
+main = cycle(_ _ flag() _ player() _ g h);
+spin = cycle('manual'; h g);
+side = cycle('still'; _ box(c) _ button() _ _);
+link(spin side);
 
-CYCLE main a b c d e f g h
-CYCLE[MANUAL] spin h g
-CYCLE[STILL] side i j k l m n
-
-OBJECT[PLAYER] e
-OBJECT[FLAG] c
-OBJECT[BOX] j
-OBJECT[BUTTON] l
-
-LINK spin side
-
-PLACE main 0 0 100
-PLACE spin 110 0 40
-PLACE side 240 0 60
+circle(main; 0 0 100);
+circle(spin; 110 0 40);
+circle(side; 240 0 60);

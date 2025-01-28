@@ -1,12 +1,5 @@
-NAME=Transfer
+name = 'Transfer';
 
-VERTEX a b c d e f g h i j
-
-CYCLE A a b c d e f
-CYCLE B f g h i j
-
-OBJECT[PLAYER] c
-OBJECT[FLAG] h
-
-PLACE A 0 0 100
-PLACE B 144 108 80
+f = vertex();
+circle(cycle(_ _ player() _ _ f); 0 0 100);
+circle(cycle(f _ flag() _ _); 144 108 80);

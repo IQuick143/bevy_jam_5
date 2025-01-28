@@ -1,11 +1,4 @@
-NAME=Intro
-HINT=Left/Right click a cycle center to turn it!
+name = 'Intro';
+hint = 'Left/Right click a cycle center to turn it!';
 
-VERTEX a b c d e f g
-
-CYCLE cycle a b c d e f g
-
-OBJECT[PLAYER] f
-OBJECT[FLAG] b
-
-PLACE cycle 0 0 100
+circle(cycle(_ flag() _ _ _ player() _); 0 0 100);

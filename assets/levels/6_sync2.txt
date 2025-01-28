@@ -1,20 +1,14 @@
-Name=Sync2
+name = 'Sync2';
 
-PALETTE[DEFAULT_BOX] x
+c = 'x';
 
-VERTEX a b c d e f g h i j k l m n
+a = vertex();
+b = vertex();
+main = cycle(a b flag() _ player() _ _);
+spin = cycle(b a);
+side = cycle('still'; _ _ box(c) _ button() _ _);
+link(main side);
 
-CYCLE main a b c d e f g
-CYCLE spin b a
-CYCLE[STILL] side h i j k l m n
-
-OBJECT[PLAYER] e
-OBJECT[FLAG] c
-OBJECT[BOX] j
-OBJECT[BUTTON] l
-
-LINK main side
-
-PLACE main 0 0 100
-PLACE spin -110 0 40
-PLACE side 200 0 60
+circle(main; 0 0 100);
+circle(spin; -110, 0 40);
+circle(side; 200 0 60);
