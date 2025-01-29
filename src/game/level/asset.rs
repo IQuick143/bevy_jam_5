@@ -54,12 +54,12 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		&self,
 		reader: &mut dyn bevy::asset::io::Reader,
 		_settings: &Self::Settings,
-		_load_context: &mut bevy::asset::LoadContext,
+		load_context: &mut bevy::asset::LoadContext,
 	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			let level_data = parser::parse(&s, |w| warn!("{w}"))?;
+			let level_data = parser::parse(&s, |w| warn!("{}: {w}", load_context.asset_path()))?;
 			Ok(level_data)
 		}
 	}

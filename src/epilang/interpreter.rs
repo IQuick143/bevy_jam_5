@@ -23,9 +23,7 @@ impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for Interpre
 		match self {
 			Self::StackOverflow => f.write_str("Interpreter stack overflow"),
 			Self::InternalError => f.write_str("internal interpreter error"),
-			Self::LogicError(err, loc) => {
-				f.write_fmt(format_args!("{}..{}: {err}", loc.start, loc.end))
-			}
+			Self::LogicError(err, loc) => f.write_fmt(format_args!("{}: {err}", loc.start)),
 		}
 	}
 }
