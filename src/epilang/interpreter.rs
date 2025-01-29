@@ -6,6 +6,11 @@ use std::ops::Range;
 pub enum InterpreterError<E: std::error::Error, T: DomainVariableType> {
 	/// One of the interpreter stacks has overflown.
 	StackOverflow,
+	/// An invariant of the interpreter has been unexpectedly violated.
+	/// This indicates a bug in the interpreter and should never be seen.
+	/// It is a valid approach to panic in this situation, but it can
+	/// also be handled in a different way.
+	InternalError,
 	/// An error bound to a specific place in the source code
 	/// Boxed to avoid returning very large types
 	LogicError(Box<LogicError<E, T>>, Range<SourceLocation>),
@@ -17,6 +22,7 @@ impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for Interpre
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::StackOverflow => f.write_str("Interpreter stack overflow"),
+			Self::InternalError => f.write_str("internal interpreter error"),
 			Self::LogicError(err, loc) => {
 				f.write_fmt(format_args!("{}..{}: {err}", loc.start, loc.end))
 			}
@@ -341,8 +347,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				return InterpreterEndState::Timeout;
 			}
 		}
-		assert!(self.value_stack.is_empty(), "Epilang program terminated, but the interpreter's stack is not empty (this is a bug in the interpreter)");
 		self.is_halted = true;
+		if !self.value_stack.is_empty() {
+			return InterpreterEndState::Halted(Err(InterpreterError::InternalError));
+		}
 		InterpreterEndState::Halted(Ok(()))
 	}
 
@@ -484,7 +492,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				}
 			},
 			Instruction::Discard => {
-				let discarded_value = self.value_stack.expect_pop();
+				let discarded_value = self
+					.value_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
 				if discarded_value.must_use {
 					self.emit_warning(WarningCode::DiscardedMustUse, discarded_value.loc);
 				}
@@ -493,12 +504,18 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				self.value_stack.push(value)?;
 			}
 			Instruction::Repush(loc) => {
-				let value = self.value_stack.expect_top_mut();
+				let value = self
+					.value_stack
+					.top_mut()
+					.ok_or(InterpreterError::InternalError)?;
 				value.loc = loc;
 				value.must_use = true;
 			}
 			Instruction::Store(variable_name, loc) => {
-				let value = self.value_stack.expect_top_mut();
+				let value = self
+					.value_stack
+					.top_mut()
+					.ok_or(InterpreterError::InternalError)?;
 				let old_value = self.variable_pool.insert(
 					variable_name,
 					VariableSlot {
@@ -516,8 +533,14 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				}
 			}
 			Instruction::Switch => {
-				let condition = self.value_stack.expect_pop();
-				let else_body = self.instruction_stack.expect_pop();
+				let condition = self
+					.value_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
+				let else_body = self
+					.instruction_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
 				let is_condition_true: bool = condition.value.try_into().map_err(|actual| {
 					InterpreterError::LogicError(
 						Box::new(LogicError::IllegalConditionType(actual)),
@@ -525,7 +548,9 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 					)
 				})?;
 				if !is_condition_true {
-					self.instruction_stack.expect_pop();
+					self.instruction_stack
+						.pop()
+						.ok_or(InterpreterError::InternalError)?;
 					self.instruction_stack.push(else_body)?;
 				}
 			}
@@ -575,7 +600,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				}
 			}
 			Instruction::PassArgument(mut instruction) => {
-				let argument_value = self.value_stack.expect_pop();
+				let argument_value = self
+					.value_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
 				instruction
 					.argument_values
 					.push(ArgumentValue::Argument(argument_value.value));
@@ -583,7 +611,10 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 					.push(Instruction::Call(instruction))?;
 			}
 			Instruction::UnaryOperator(operator, loc) => {
-				let operand = self.value_stack.expect_pop();
+				let operand = self
+					.value_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
 				let value = match operator {
 					UnaryOperator::Not => match operand.value {
 						VariableValue::Bool(value) => VariableValue::Bool(!value),
@@ -633,8 +664,14 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				self.construct_value(value, loc)?;
 			}
 			Instruction::BinaryOperator(operator, loc) => {
-				let right = self.value_stack.expect_pop();
-				let left = self.value_stack.expect_pop();
+				let right = self
+					.value_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
+				let left = self
+					.value_stack
+					.pop()
+					.ok_or(InterpreterError::InternalError)?;
 				let value = match operator {
 					BinaryOperator::Plus => {
 						match NumericPair::convert_from(&left.value, &right.value) {
@@ -938,7 +975,9 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 						}
 					}
 					BinaryOperator::And | BinaryOperator::Or => {
-						panic!("Binary operator {operator:?} was handled as a typical operator instead of short-circuiting (this is a bug in the interpreter)");
+						// These operators should be handled by short-circuiting
+						// and should never make it here
+						return Err(InterpreterError::InternalError);
 					}
 				};
 				self.construct_value(value, loc)?;
@@ -998,16 +1037,8 @@ impl<T> InterpreterStack<T> {
 		self.values.pop()
 	}
 
-	fn expect_pop(&mut self) -> T {
-		self.pop().expect(
-			"Interpreter stack is empty but it should not be (this is a bug in the interpreter)",
-		)
-	}
-
-	fn expect_top_mut(&mut self) -> &mut T {
-		self.values.last_mut().expect(
-			"Interpreter stack is empty but it should not be (this is a bug in the interpreter)",
-		)
+	fn top_mut(&mut self) -> Option<&mut T> {
+		self.values.last_mut()
 	}
 }
 
@@ -1053,12 +1084,12 @@ enum Instruction<'ast, T: DomainVariableValue + 'ast> {
 	/// Pops the top value from the stack and discards it.
 	/// A warning is emitted if [`VariableValueFrame::must_use`] is true.
 	///
-	/// Panics if the stack is empty.
+	/// Fails if the stack is empty.
 	Discard,
 	/// Updates the top value in the stack with a new source location
 	/// and sets its [`VariableValueFrame::must_use`] to true.
 	///
-	/// Panics if the stack is empty.
+	/// Fails if the stack is empty.
 	Repush(Range<SourceLocation>),
 	/// Pops the top value from the stack. If it is true, cancels the top
 	/// instruction in the instruction stack. If it is false, cancels the second-from-top
@@ -1068,7 +1099,7 @@ enum Instruction<'ast, T: DomainVariableValue + 'ast> {
 	///
 	/// Fails if the popped value is not boolean.
 	///
-	/// Panics if there are not enough instructions on the stack.
+	/// Fails if there are not enough instructions on the stack.
 	/// ```
 	/// instruction_stack.push(action_if_true);
 	/// instruction_stack.push(action_if_false);
@@ -1078,17 +1109,17 @@ enum Instruction<'ast, T: DomainVariableValue + 'ast> {
 	/// Reads the top value from the stack and stores it in a variable
 	/// with the given name. The value is left on the stack.
 	///
-	/// Panics if the stack is empty.
+	/// Fails if the stack is empty.
 	Store(&'ast str, Range<SourceLocation>),
 	/// Pops the top value from the stack and evaluates the operation
 	/// associated with the given operator, then pushes the result onto the stack.
 	///
-	/// Panics if the stack is empty.
+	/// Fails if the stack is empty.
 	UnaryOperator(UnaryOperator, Range<SourceLocation>),
 	/// Pops the top two values from the stack and evaluates the operation
 	/// associated with the given operator, then pushes the result onto the stack.
 	///
-	/// Panics if the stack does not contain at least two values.
+	/// Fails if the stack does not contain at least two values.
 	BinaryOperator(BinaryOperator, Range<SourceLocation>),
 	/// Calls a function with provided arguments.
 	Call(CallInstruction<'ast, T>),
