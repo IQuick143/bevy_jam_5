@@ -17,10 +17,14 @@ macro_rules! float_method {
 
 pub fn default_builtin_variables<'a, T: DomainVariableValue + 'a>(
 ) -> HashMap<&'a str, VariableSlot<'a, T>> {
-	HashMap::from_iter([(
-		"pi",
-		VariableSlot::builtin(VariableValue::Float(std::f32::consts::PI)),
-	)])
+	HashMap::from_iter([
+		(
+			"pi",
+			VariableSlot::builtin(VariableValue::Float(std::f32::consts::PI)),
+		),
+		("true", VariableSlot::builtin(VariableValue::Bool(true))),
+		("false", VariableSlot::builtin(VariableValue::Bool(false))),
+	])
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
