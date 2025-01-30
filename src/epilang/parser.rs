@@ -201,8 +201,8 @@ impl std::fmt::Display for ParseError {
 impl std::fmt::Display for UnexpectedTokenError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_fmt(format_args!(
-			"Unexpected token {:?} at {}..{}",
-			self.token, self.loc.start, self.loc.end
+			"Unexpected token {:?} at {}",
+			self.token, self.loc.start,
 		))
 	}
 }

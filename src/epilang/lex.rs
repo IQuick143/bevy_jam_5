@@ -166,8 +166,8 @@ impl std::fmt::Display for LexerErrorCode {
 impl std::fmt::Display for LexerError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_fmt(format_args!(
-			"{} at {}..{} {:?}",
-			self.error_code, self.loc.start, self.loc.end, self.slice
+			"{} at {} {:?}",
+			self.error_code, self.loc.start, self.slice,
 		))
 	}
 }

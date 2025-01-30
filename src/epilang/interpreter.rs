@@ -134,10 +134,7 @@ pub struct InterpreterWarning<E: std::error::Error> {
 
 impl<E: std::error::Error> std::fmt::Display for InterpreterWarning<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_fmt(format_args!(
-			"{}..{}: {}",
-			self.loc.start, self.loc.end, self.warning_code
-		))
+		f.write_fmt(format_args!("{}: {}", self.loc.start, self.warning_code))
 	}
 }
 
