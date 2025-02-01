@@ -21,6 +21,7 @@ pub enum LexerErrorCode {
 	Generic,
 	IntParseFailure,
 	FloatParseFailure,
+	InvalidEscapeCharacter(char),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -56,6 +57,9 @@ pub enum Token {
 
 	#[regex(r"'([^'\n]|'')*'", |lex| {
 		parse_escape_sequences_single_quoted(&lex.slice()[1..lex.slice().len() - 1])
+	})]
+	#[regex(r#""([^"\n\\]|\\[^\n])*""#, |lex| {
+		parse_escape_sequences_double_quoted(&lex.slice()[1..lex.slice().len() - 1])
 	})]
 	StringLiteral(String),
 
@@ -115,6 +119,17 @@ pub enum Token {
 	GreaterEquals,
 }
 
+/// Error that indicates an invalid escape sequence
+/// in a double-quoted string literal
+#[derive(Clone, PartialEq, Eq, Debug)]
+struct InvalidEscapeCharacter(char);
+
+impl From<InvalidEscapeCharacter> for LexerErrorCode {
+	fn from(value: InvalidEscapeCharacter) -> Self {
+		Self::InvalidEscapeCharacter(value.0)
+	}
+}
+
 /// Parses escape sequences of a single-quoted string literal
 /// and creates a real string representation of it
 fn parse_escape_sequences_single_quoted(s: &str) -> String {
@@ -131,6 +146,31 @@ fn parse_escape_sequences_single_quoted(s: &str) -> String {
 		}
 	}
 	r
+}
+
+/// Parses escape sequences of a double-quoted string literal
+/// and creates a real string representation of it
+fn parse_escape_sequences_double_quoted(s: &str) -> Result<String, InvalidEscapeCharacter> {
+	let mut r = String::with_capacity(s.len());
+	let mut escape_sequence = false;
+	for c in s.chars() {
+		if !escape_sequence {
+			if c == '\\' {
+				escape_sequence = true;
+			} else {
+				r.push(c);
+			}
+		} else {
+			match c {
+				'\\' | '"' => r.push(c),
+				'n' => r.push('\n'),
+				't' => r.push('\t'),
+				_ => return Err(InvalidEscapeCharacter(c)),
+			}
+			escape_sequence = false;
+		}
+	}
+	Ok(r)
 }
 
 struct LexerWrapper<'a>(logos::Lexer<'a, Token>);
@@ -179,6 +219,7 @@ impl std::fmt::Display for LexerErrorCode {
 			Self::Generic => f.write_str("Generic lexer error"),
 			Self::FloatParseFailure => f.write_str("Invalid float literal"),
 			Self::IntParseFailure => f.write_str("Invalid integer literal"),
+			Self::InvalidEscapeCharacter(c) => write!(f, "invalid escape sequence: '\\{c}'"),
 		}
 	}
 }

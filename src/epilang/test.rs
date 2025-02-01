@@ -80,13 +80,55 @@ f = 'hello';
 
 #[test]
 fn string_escape_sequences() {
-	let module = compile("a = 'Hello''World';").unwrap();
+	let module = compile(
+		r#"
+a = 'Hello''World';
+b = 'Hello''''';
+c = "\n\"\\\"\\\\";
+	"#,
+	)
+	.unwrap();
 	let mut interpreter = Interpreter::new(&module, NoBackend);
 	assert!(interpreter.run(1000).is_ok());
 	assert!(matches!(
 		variable!(interpreter.a),
 		VariableValue::String("Hello'World")
 	));
+	assert!(matches!(
+		variable!(interpreter.b),
+		VariableValue::String("Hello''")
+	));
+	assert!(matches!(
+		variable!(interpreter.c),
+		VariableValue::String("\n\"\\\"\\\\")
+	));
+}
+
+#[test]
+fn invalid_escape_sequences() {
+	use super::lex::{LexerError, LexerErrorCode};
+	assert_eq!(
+		compile(r#"a = "\w";"#).unwrap_err(),
+		LexerError {
+			error_code: LexerErrorCode::InvalidEscapeCharacter('w'),
+			slice: r#""\w""#.to_owned(),
+			loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 8),
+		}
+		.into()
+	);
+	assert_eq!(
+		compile(
+			r#"a = "abc\
+	""#
+		)
+		.unwrap_err(),
+		LexerError {
+			error_code: LexerErrorCode::Generic,
+			slice: r#""abc"#.to_owned(),
+			loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 8),
+		}
+		.into()
+	);
 }
 
 #[test]
