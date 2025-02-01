@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::level::LevelData,
+	game::level::{list_asset::LevelListAsset, LevelData},
 	ui::prelude::*,
 };
 
@@ -27,7 +27,11 @@ fn spawn_screen(
 	levels: Res<LoadedLevelList>,
 	font: Res<GlobalFont>,
 	level_assets: Res<Assets<LevelData>>,
+	level_list_asset: Res<Assets<LevelListAsset>>,
 ) {
+	let levels = level_list_asset
+		.get(&levels.0)
+		.expect("The LevelList asset should be valid");
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::LevelSelect))

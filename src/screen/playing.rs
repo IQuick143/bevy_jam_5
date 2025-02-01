@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::prelude::*,
+	game::{level::list_asset::LevelListAsset, prelude::*},
 	send_event,
 	ui::prelude::*,
 	AppSet,
@@ -201,13 +201,19 @@ fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
 	playing_level: Res<State<PlayingLevel>>,
 	level_list: Res<LoadedLevelList>,
+	level_list_asset: Res<Assets<LevelListAsset>>,
 	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
 	let level_index = playing_level
 		.get()
 		.0
 		.expect("When in Screen::Playing state, PlayingLevel must also be set");
-	let is_last_level = level_index + 1 == level_list.levels.len();
+	let is_last_level = level_index + 1
+		== level_list_asset
+			.get(&level_list.0)
+			.expect("The LevelList asset should be valid")
+			.levels
+			.len();
 	let display = if is_level_completed.0 && !is_last_level {
 		Display::DEFAULT
 	} else {
@@ -247,6 +253,7 @@ fn update_level_name_display(
 
 fn load_level(
 	level_list: Res<LoadedLevelList>,
+	level_list_asset: Res<Assets<LevelListAsset>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut events: EventWriter<EnterLevel>,
 ) {
@@ -254,7 +261,9 @@ fn load_level(
 		.get()
 		.0
 		.expect("Systems that transition into Screen::Playing must also set PlayingLevel state");
-	let level_handle = level_list
+	let level_handle = level_list_asset
+		.get(&level_list.0)
+		.expect("The LevelList asset should be valid")
 		.levels
 		.get(level_index)
 		.expect("PlayingLevel is out of range");
