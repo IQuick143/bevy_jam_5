@@ -79,6 +79,17 @@ f = 'hello';
 }
 
 #[test]
+fn string_escape_sequences() {
+	let module = compile("a = 'Hello''World';").unwrap();
+	let mut interpreter = Interpreter::new(&module, NoBackend);
+	assert!(interpreter.run(1000).is_ok());
+	assert!(matches!(
+		variable!(interpreter.a),
+		VariableValue::String("Hello'World")
+	));
+}
+
+#[test]
 fn undeclared_variable() {
 	let module = compile("a;").unwrap();
 	let err = Interpreter::new(&module, NoBackend).run(1000).unwrap_err();

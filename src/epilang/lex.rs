@@ -54,7 +54,9 @@ pub enum Token {
 	#[regex(r"(\d*\.\d+|\d+\.)([eE][+\-]?\d+)?|\d+[eE][+\-]\d+", |lex| lex.slice().parse())]
 	FloatLiteral(f32),
 
-	#[regex(r"'[^'\n]*'", |lex| lex.slice()[1..lex.slice().len() - 1].to_owned())]
+	#[regex(r"'([^'\n]|'')*'", |lex| {
+		parse_escape_sequences_single_quoted(&lex.slice()[1..lex.slice().len() - 1])
+	})]
 	StringLiteral(String),
 
 	#[token("_")]
@@ -111,6 +113,24 @@ pub enum Token {
 	Greater,
 	#[token(">=")]
 	GreaterEquals,
+}
+
+/// Parses escape sequences of a single-quoted string literal
+/// and creates a real string representation of it
+fn parse_escape_sequences_single_quoted(s: &str) -> String {
+	let mut r = String::with_capacity(s.len());
+	let mut skip_next = false;
+	for c in s.chars() {
+		if !skip_next {
+			r.push(c);
+			if c == '\'' {
+				skip_next = true;
+			}
+		} else {
+			skip_next = false;
+		}
+	}
+	r
 }
 
 struct LexerWrapper<'a>(logos::Lexer<'a, Token>);
