@@ -682,7 +682,7 @@ impl std::fmt::Display for RuntimeError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::ArithmeticOverflow => f.write_str("arithmetic overflow"),
-			Self::BuilderError(e) => write!(f, "while finishing level build: {e}"),
+			Self::BuilderError(e) => e.fmt(f),
 			Self::UnknownColorName(name) => write!(f, "'{name}' is not a valid color name"),
 			Self::InvalidColorIndex(i) => write!(f, "{i} is not a valid color index"),
 			Self::InvalidFlag(flag) => write!(f, "'{flag}' is not a valid flag for this function"),
@@ -725,7 +725,7 @@ impl std::fmt::Display for LevelParsingError {
 			Self::CompileError(e) => e.fmt(f),
 			Self::Timeout => f.write_str("epilang script execution timed out"),
 			Self::RuntimeError(e) => e.fmt(f),
-			Self::BuilderError(e) => e.fmt(f),
+			Self::BuilderError(e) => write!(f, "while finishing level build: {e}"),
 			Self::SemanticVariableTypeError(name, actual) => {
 				write!(f, "exported variable {name} has invalid type {actual}")
 			}
