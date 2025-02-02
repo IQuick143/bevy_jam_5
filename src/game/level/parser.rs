@@ -45,10 +45,8 @@ pub fn parse(
 pub enum DomainValue {
 	Vertex(usize),
 	Cycle(usize),
-	Flag,
-	Player,
-	Box(Option<LogicalColor>),
-	Button(Option<(LogicalColor, ButtonColorLabelAppearence)>),
+	Object(ObjectData),
+	Glyph(GlyphData),
 	Color(LogicalColor),
 }
 
@@ -56,10 +54,8 @@ pub enum DomainValue {
 pub enum DomainType {
 	Vertex,
 	Cycle,
-	Flag,
-	Player,
-	Box,
-	Button,
+	Object,
+	Glyph,
 	Color,
 }
 
@@ -68,10 +64,8 @@ impl std::fmt::Display for DomainType {
 		match self {
 			Self::Vertex => f.write_str("vertex"),
 			Self::Cycle => f.write_str("cycle"),
-			Self::Flag => f.write_str("flag"),
-			Self::Player => f.write_str("player"),
-			Self::Box => f.write_str("box"),
-			Self::Button => f.write_str("button"),
+			Self::Object => f.write_str("object"),
+			Self::Glyph => f.write_str("glyph"),
 			Self::Color => f.write_str("color"),
 		}
 	}
@@ -84,10 +78,8 @@ impl epilang::values::DomainVariableValue for DomainValue {
 		match self {
 			Self::Vertex(_) => Self::Type::Vertex,
 			Self::Cycle(_) => Self::Type::Cycle,
-			Self::Flag => Self::Type::Flag,
-			Self::Player => Self::Type::Player,
-			Self::Box(_) => Self::Type::Box,
-			Self::Button(_) => Self::Type::Button,
+			Self::Object(_) => Self::Type::Object,
+			Self::Glyph(_) => Self::Type::Glyph,
 			Self::Color(_) => Self::Type::Color,
 		}
 	}
@@ -248,7 +240,9 @@ impl LevelBuilder {
 		args: &[ArgumentValue<DomainValue>],
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
 		match args {
-			[] => Ok(ReturnValue::pure(DomainValue::Flag.into())),
+			[] => Ok(ReturnValue::pure(
+				DomainValue::Glyph(GlyphData::Flag).into(),
+			)),
 			_ => Err(BadArgumentCount),
 		}
 	}
@@ -257,7 +251,9 @@ impl LevelBuilder {
 		args: &[ArgumentValue<DomainValue>],
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
 		match args {
-			[] => Ok(ReturnValue::pure(DomainValue::Player.into())),
+			[] => Ok(ReturnValue::pure(
+				DomainValue::Object(ObjectData::Player).into(),
+			)),
 			_ => Err(BadArgumentCount),
 		}
 	}
@@ -267,9 +263,12 @@ impl LevelBuilder {
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
 		use VariableValue::*;
 		match args {
-			[] | [Argument(Blank)] => Ok(ReturnValue::pure(DomainValue::Box(None).into())),
+			[] | [Argument(Blank)] => Ok(ReturnValue::pure(
+				DomainValue::Object(ObjectData::Box(None)).into(),
+			)),
 			[Argument(arg)] => Ok(ReturnValue::pure(
-				DomainValue::Box(Some(Self::match_or_construct_color(arg)?)).into(),
+				DomainValue::Object(ObjectData::Box(Some(Self::match_or_construct_color(arg)?)))
+					.into(),
 			)),
 			_ => Err(BadArgumentCount),
 		}
@@ -280,19 +279,21 @@ impl LevelBuilder {
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
 		use VariableValue::*;
 		match args {
-			[] | [Argument(Blank)] => Ok(ReturnValue::pure(DomainValue::Button(None).into())),
+			[] | [Argument(Blank)] => Ok(ReturnValue::pure(
+				DomainValue::Glyph(GlyphData::Button(None)).into(),
+			)),
 			[Argument(arg)] => Ok(ReturnValue::pure(
-				DomainValue::Button(Some((
+				DomainValue::Glyph(GlyphData::Button(Some((
 					Self::match_or_construct_color(arg)?,
 					Default::default(),
-				)))
+				))))
 				.into(),
 			)),
 			[Argument(arg), Separator, rest @ ..] => Ok(ReturnValue::pure(
-				DomainValue::Button(Some((
+				DomainValue::Glyph(GlyphData::Button(Some((
 					Self::match_or_construct_color(arg)?,
 					Self::construct_label_position(rest)?,
-				)))
+				))))
 				.into(),
 			)),
 			_ => Err(BadArgumentCount),
@@ -312,12 +313,8 @@ impl LevelBuilder {
 		let mut handle_argument = |arg: &VariableValue<DomainValue>| {
 			match arg {
 				Blank => {}
-				Domain(Box(color)) if object.is_none() => object = Some(ObjectData::Box(*color)),
-				Domain(Player) if object.is_none() => object = Some(ObjectData::Player),
-				Domain(Button(color_info)) if glyph.is_none() => {
-					glyph = Some(GlyphData::Button(*color_info))
-				}
-				Domain(Flag) if glyph.is_none() => glyph = Some(GlyphData::Flag),
+				Domain(Object(o)) if object.is_none() => object = Some(*o),
+				Domain(Glyph(g)) if glyph.is_none() => glyph = Some(*g),
 				_ => return Err(TypeError(arg.get_type())),
 			}
 			Ok(())
@@ -364,24 +361,14 @@ impl LevelBuilder {
 
 		match args.next() {
 			None | Some(Separator) => return Err(BadArgumentCount),
-			Some(Argument(Domain(Box(color)))) => {
+			Some(Argument(Domain(Object(object)))) => {
 				for vertex in target_vertices {
-					self.set_object(vertex, ObjectData::Box(*color))?;
+					self.set_object(vertex, *object)?;
 				}
 			}
-			Some(Argument(Domain(Player))) => {
+			Some(Argument(Domain(Glyph(glyph)))) => {
 				for vertex in target_vertices {
-					self.set_object(vertex, ObjectData::Player)?;
-				}
-			}
-			Some(Argument(Domain(Button(color_info)))) => {
-				for vertex in target_vertices {
-					self.set_glyph(vertex, GlyphData::Button(*color_info))?;
-				}
-			}
-			Some(Argument(Domain(Flag))) => {
-				for vertex in target_vertices {
-					self.set_glyph(vertex, GlyphData::Flag)?;
+					self.set_glyph(vertex, *glyph)?;
 				}
 			}
 			Some(Argument(other)) => return Err(TypeError(other.get_type())),
@@ -407,24 +394,14 @@ impl LevelBuilder {
 		while let Some(arg) = args.next() {
 			match arg {
 				Argument(Blank) => vertices.push(self.add_vertex()?),
-				Argument(Domain(Box(color))) => {
+				Argument(Domain(Object(object))) => {
 					let vertex_id = self.add_vertex()?;
-					self.set_object(vertex_id, ObjectData::Box(*color))?;
+					self.set_object(vertex_id, *object)?;
 					vertices.push(vertex_id);
 				}
-				Argument(Domain(Player)) => {
+				Argument(Domain(Glyph(glyph))) => {
 					let vertex_id = self.add_vertex()?;
-					self.set_object(vertex_id, ObjectData::Player)?;
-					vertices.push(vertex_id);
-				}
-				Argument(Domain(Button(color_info))) => {
-					let vertex_id = self.add_vertex()?;
-					self.set_glyph(vertex_id, GlyphData::Button(*color_info))?;
-					vertices.push(vertex_id);
-				}
-				Argument(Domain(Flag)) => {
-					let vertex_id = self.add_vertex()?;
-					self.set_glyph(vertex_id, GlyphData::Flag)?;
+					self.set_glyph(vertex_id, *glyph)?;
 					vertices.push(vertex_id);
 				}
 				Argument(Domain(Vertex(id))) => vertices.push(*id),
