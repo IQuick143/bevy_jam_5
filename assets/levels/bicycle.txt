@@ -1,18 +1,7 @@
-Name=Bicycle
+name = 'Bicycle';
 
-PALETTE[DEFAULT_BOX] start
+box = box('start');
 
-VERTEX a b c d e f g h
-
-CYCLE[ENGINE] back_wheel a b c d
-CYCLE[ENGINE] front_wheel e f g h
-CYCLE[MANUAL] chain b h
-
-OBJECT[BOX] f
-OBJECT[BUTTON] d
-OBJECT[PLAYER] d
-OBJECT[FLAG] f
-
-PLACE back_wheel -400 0 300
-PLACE front_wheel 400 0 300
-PLACE chain 0 0 100
+circle(cycle(_, a = vertex(), _ vertex(button(), player())); -4, 0 3);
+circle(cycle(_ vertex(box, flag()) _, b = vertex()); 4 0 3);
+circle(cycle('manual'; a b); 0 0 1);

@@ -1,49 +1,52 @@
-Name=Teamwork
-Hint=Fact: Teamwork makes the dream work, sometimes.
+name = 'Teamwork';
+hint = 'Fact: Teamwork makes the dream work, sometimes.';
 
-PALETTE[DEFAULT_BOX] lr
+box = box('lr');
 
-VERTEX a1 a2 a3 a4 a5 a6 a7 b1 b2 b3 b4 b5 b6 b7
-VERTEX c1 c2 c3 c4 c5 c6 c7 d1 d2 d3 d4 d5 d6 d7
-VERTEX left right
+top_left = cycle('manual';
+    a1 = vertex(), flag(), a3 = vertex(),
+    a4 = vertex(), a5 = vertex(), _ _
+);
+top_right = cycle('manual';
+    b1 = vertex(), player() _,
+    b4 = vertex(), b5 = vertex(), b6 = vertex(), _
+);
+bottom_left = cycle('manual';
+    c1 = vertex(), player(), box,
+    c4 = vertex(), c5 = vertex(), c6 = vertex(), _
+);
+bottom_right = cycle('manual';
+    d1 = vertex(), button(), d3 = vertex(),
+    d4 = vertex(), d5 = vertex(), flag(), _
+);
+top_bridge        = cycle('still';  a1 b1);
+bottom_bridge     = cycle('manual'; c1 d1);
+left_conn_top     = cycle('still';  a3, left = vertex());
+left_conn_bottom  = cycle('still';  c6 left);
+right_conn_top    = cycle('still';  b6, right = vertex());
+right_conn_bottom = cycle('still';  d3 right);
+top_left_swap     = cycle('manual'; a5 a4);
+top_right_swap    = cycle('manual'; b5 b4);
+bottom_left_swap  = cycle('manual'; c5 c4);
+bottom_right_swap = cycle('manual'; d5 d4);
 
-CYCLE[MANUAL] top_left a1 a2 a3 a4 a5 a6 a7
-CYCLE[MANUAL] top_right b1 b2 b3 b4 b5 b6 b7
-CYCLE[MANUAL] bottom_left c1 c2 c3 c4 c5 c6 c7
-CYCLE[MANUAL] bottom_right d1 d2 d3 d4 d5 d6 d7
-CYCLE[STILL] top_bridge a1 b1
-CYCLE[MANUAL] bottom_bridge c1 d1
-CYCLE[STILL] left_conn_top a3 left
-CYCLE[STILL] left_conn_bottom c6 left
-CYCLE[STILL] right_conn_top b6 right
-CYCLE[STILL] right_conn_bottom d3 right
-CYCLE[MANUAL] top_left_swap a5 a4
-CYCLE[MANUAL] top_right_swap b5 b4
-CYCLE[MANUAL] bottom_left_swap c5 c4
-CYCLE[MANUAL] bottom_right_swap d5 d4
+link(top_bridge bottom_bridge);
+link(left_conn_top top_left_swap);
+link(left_conn_bottom bottom_left_swap);
+link(right_conn_top top_right_swap);
+link(right_conn_bottom bottom_right_swap);
 
-OBJECT[PLAYER] b2 c2
-OBJECT[FLAG] a2 d6
-OBJECT[BOX] c3
-OBJECT[BUTTON] d2
-
-LINK top_bridge bottom_bridge
-LINK left_conn_top top_left_swap
-LINK left_conn_bottom bottom_left_swap
-LINK right_conn_top top_right_swap
-LINK right_conn_bottom bottom_right_swap
-
-PLACE top_left -29 32 23
-PLACE top_right 29 32 23
-PLACE bottom_left -29 -32 23
-PLACE bottom_right 29 -32 23
-PLACE top_bridge 0 14.3 11
-PLACE bottom_bridge 0 -14.3 11
-PLACE left_conn_top -55.7 11 11
-PLACE left_conn_bottom -55.7 -11 11
-PLACE right_conn_top 55.7 11 11
-PLACE right_conn_bottom 55.7 -11 11
-PLACE top_left_swap -52 49 12
-PLACE top_right_swap 52 49 12
-PLACE bottom_left_swap -52 -49 12
-PLACE bottom_right_swap 52 -49 12
+circle(top_left;         -29,    32,   23);
+circle(top_right;         29,    32,   23);
+circle(bottom_left;      -29,   -32,   23);
+circle(bottom_right;      29,   -32,   23);
+circle(top_bridge;        0,     14.3, 11);
+circle(bottom_bridge;     0,    -14.3, 11);
+circle(left_conn_top;    -55.7,  11,   11);
+circle(left_conn_bottom; -55.7, -11,   11);
+circle(right_conn_top;    55.7,  11,   11);
+circle(right_conn_bottom; 55.7, -11,   11);
+circle(top_left_swap;    -52,    49,   12);
+circle(top_right_swap;    52,    49,   12);
+circle(bottom_left_swap; -52,   -49,   12);
+circle(bottom_right_swap; 52,   -49,   12);

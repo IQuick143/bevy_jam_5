@@ -1,16 +1,8 @@
-Name=Manual
+name = 'Manual';
 
-PALETTE[DEFAULT_BOX] up
+box = box('up');
 
-VERTEX a b c d e f g h
-
-CYCLE main a b c d e f
-CYCLE[MANUAL] side f e g h
-
-OBJECT[PLAYER] c
-OBJECT[FLAG] a
-OBJECT[BOX] g
-OBJECT[BUTTON] h
-
-PLACE main 0 0 100
-PLACE side 100 60 60
+e = vertex();
+f = vertex();
+circle(cycle(flag() _ player() _ e f); 0 0 100);
+circle(cycle('manual'; f e box button()); 100 60 60);

@@ -1,31 +1,26 @@
-Name=Grid EX
-Hint=I hope you enjoyed Grid.
+name = 'Grid EX';
+Hint = 'I hope you enjoyed Grid.';
 
-PALETTE[DEFAULT_BOX] down_neg
+box = box('down_neg');
 
-VERTEX a b c d e f g h i j k l m n o p q r s t u v w x
-
-CYCLE[MANUAL] top_left a e h d
-CYCLE[MANUAL] top_mid b f i e
-CYCLE[MANUAL] top_right c g j f
-CYCLE[MANUAL] mid_left h l o k
-CYCLE[MANUAL] mid_mid i m p l
-CYCLE[MANUAL] mid_right j n q m
-CYCLE[MANUAL] bot_left o s v r
-CYCLE[MANUAL] bot_mid p t w s
-CYCLE[MANUAL] bot_right q u x t
-
-OBJECT[BOX] a b c       o p q
-OBJECT[BUTTON] h i j       w v x
-OBJECT[PLAYER] i
-# OBJECT[FLAG] g
-
-PLACE top_left -600 600 300
-PLACE top_mid 0 600 300
-PLACE top_right 600 600 300
-PLACE mid_left -600 0 300
-PLACE mid_mid 0 0 300
-PLACE mid_right 600 0 300
-PLACE bot_left -600 -600 300
-PLACE bot_mid 0 -600 300
-PLACE bot_right 600 -600 300
+e = vertex();
+f = vertex();
+h = vertex(button());
+i = vertex(button() player());
+j = vertex(button());
+l = vertex();
+m = vertex();
+o = vertex(box);
+p = vertex(box);
+q = vertex(box);
+s = vertex();
+t = vertex();
+circle(cycle('manual'; box e    h     _); -2,  2, 1);
+circle(cycle('manual'; box f    i     e);  0,  2, 1);
+circle(cycle('manual'; box _    j     f);  2,  2, 1);
+circle(cycle('manual';  h  l    o     _); -2,  0, 1);
+circle(cycle('manual';  i  m    p     l);  0,  0, 1);
+circle(cycle('manual';  j  _    q     m);  2,  0, 1);
+circle(cycle('manual';  o  s button() _); -2, -2, 1);
+circle(cycle('manual';  p  t button() s);  0, -2, 1);
+circle(cycle('manual';  q  _ button() t);  2, -2, 1);

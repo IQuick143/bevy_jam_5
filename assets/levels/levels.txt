@@ -1,21 +1,18 @@
-SECTION rewritten
-Name=Rewritten
-LEVEL 1_intro 2_transfer 5_sync 6_sync2 1_swap 2_sort linked_sort send
+SECTION tutorial
+Name=Tutorial
+LEVEL 1_intro 2_transfer 3_boxes 4_manual 5_sync 6_sync2 7_colors
 
-# SECTION tutorial
-# Name=Tutorial
-# LEVEL 1_intro 2_transfer 3_boxes 4_manual 5_sync 6_sync2 7_colors
+SECTION easy
+Name=Easy
+LEVEL lotus bicycle send 1_swap 2_sort num_sort disrupt
 
-# SECTION easy
-# Name=Easy
-# LEVEL lotus bicycle send 1_swap 2_sort num_sort disrupt
+SECTION medium
+Name=Medium
+LEVEL teamwork tricycle olympic three_row_simple linked_sort
 
-# SECTION medium
-# Name=Medium
-# LEVEL teamwork tricycle olympic three_row_simple linked_sort
-
-# SECTION hard
-# Name=Hard
-# LEVEL cargo cargo_single three_row car rubik
+SECTION hard
+Name=Hard
+LEVEL cargo cargo_single three_row car
+#LEVEL rubik
 
 #REQUIRES 1_intro 2_transfer 3_boxes 4_manual 5_sync 6_sync2 7_colors easy medium hard
