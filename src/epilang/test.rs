@@ -1,5 +1,4 @@
 use super::{builtins::*, compile, interpreter::*, values::*, SourceLocation};
-use bevy::utils::HashMap;
 
 /// Testing interpreter backend that provides no functions
 #[derive(Clone, Copy, Debug, Default)]
@@ -13,7 +12,7 @@ impl InterpreterBackend for NoBackend {
 
 macro_rules! get_variable {
 	( $interpreter:ident . $var:ident ) => {
-		$interpreter.variable_pool.get(stringify!($var))
+		$interpreter.variable_pool.load(stringify!($var))
 	};
 }
 
@@ -21,7 +20,7 @@ macro_rules! get_variable {
 /// Panics if the variable does not exist.
 macro_rules! variable {
 	( $interpreter:ident . $var:ident ) => {
-		get_variable!($interpreter.$var).unwrap().value
+		get_variable!($interpreter.$var).unwrap()
 	};
 }
 
@@ -158,7 +157,7 @@ a = fn {
 	let mut interpreter = Interpreter::new(&module, NoBackend);
 	assert!(interpreter.run(1000).is_ok());
 	assert!(interpreter.get_warnings().next().is_none());
-	let inner_module = (&variable!(interpreter.a)).try_into().unwrap();
+	let inner_module = variable!(interpreter.a).try_into().unwrap();
 	interpreter = Interpreter::new(inner_module, NoBackend);
 	assert!(interpreter.run(1000).is_ok());
 	assert!(matches!(variable!(interpreter.k), VariableValue::Int(42)));
@@ -722,8 +721,7 @@ fn {};
 fn overwritte_builtin_warning() {
 	let module = compile("a = 1;").unwrap();
 	let mut interpreter = Interpreter::new(&module, NoBackend);
-	interpreter.variable_pool =
-		HashMap::from_iter([("a", VariableSlot::builtin(VariableValue::Int(42)))]);
+	interpreter.variable_pool = VariablePool::from_iter([("a", 42.into())]);
 	assert!(interpreter.run(1000).is_ok());
 	let warnings = interpreter
 		.get_warnings()

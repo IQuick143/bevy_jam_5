@@ -22,25 +22,21 @@ pub fn parse(
 	for warning in interpreter.get_warnings() {
 		warning_handler(LevelParsingWarning::RuntimeWarning(warning));
 	}
-	if let Some(level_name) = interpreter.variable_pool.get("name") {
-		interpreter.backend.set_level_name(
-			<&str>::try_from(&level_name.value)
-				.map_err(|actual| {
-					LevelParsingError::SemanticVariableTypeError("name".to_owned(), actual)
-				})?
-				.to_owned(),
-		)?;
+	if let Some(level_name) = interpreter
+		.variable_pool
+		.load_as::<&str>("name")
+		.transpose()?
+	{
+		interpreter.backend.set_level_name(level_name.to_owned())?;
 	} else {
 		warning_handler(LevelParsingWarning::LevelNameNotSet);
 	}
-	if let Some(level_hint) = interpreter.variable_pool.get("hint") {
-		interpreter.backend.set_level_hint(
-			<&str>::try_from(&level_hint.value)
-				.map_err(|actual| {
-					LevelParsingError::SemanticVariableTypeError("hint".to_owned(), actual)
-				})?
-				.to_owned(),
-		)?;
+	if let Some(level_hint) = interpreter
+		.variable_pool
+		.load_as::<&str>("hint")
+		.transpose()?
+	{
+		interpreter.backend.set_level_hint(level_hint.to_owned())?;
 	}
 	Ok(interpreter.backend.build()?)
 }
@@ -724,6 +720,12 @@ impl From<epilang::CompileError> for LevelParsingError {
 impl From<epilang::InterpreterError<RuntimeError, DomainType>> for LevelParsingError {
 	fn from(value: epilang::InterpreterError<RuntimeError, DomainType>) -> Self {
 		Self::RuntimeError(value)
+	}
+}
+
+impl From<epilang::interpreter::LoadedVariableTypeError<DomainType>> for LevelParsingError {
+	fn from(value: epilang::interpreter::LoadedVariableTypeError<DomainType>) -> Self {
+		Self::SemanticVariableTypeError(value.variable_name, value.actual_type)
 	}
 }
 

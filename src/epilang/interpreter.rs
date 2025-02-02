@@ -188,6 +188,109 @@ impl<'a, E: std::error::Error> WarningSink<'a, E> {
 	}
 }
 
+/// Collection of variables accessible to the interpreter
+#[derive(Clone, Debug)]
+pub struct VariablePool<'a, T: DomainVariableValue + 'a>(HashMap<&'a str, VariableSlot<'a, T>>);
+
+impl<'a, T: DomainVariableValue + 'a> VariablePool<'a, T> {
+	/// Constructs an empty variable pool
+	pub fn new() -> Self {
+		Self(HashMap::new())
+	}
+
+	/// Creates a new built-in variable and returns the previous value of that name, if any
+	pub fn insert_builtin(
+		&mut self,
+		name: &'a str,
+		value: impl Into<VariableValue<'a, T>>,
+	) -> Option<VariableSlot<'a, T>> {
+		self.store(name, VariableSlot::builtin(value.into()))
+	}
+
+	/// Loads a variable value
+	pub fn load(&self, name: &str) -> Option<&VariableValue<'a, T>> {
+		self.load_slot(name).map(|slot| &slot.value)
+	}
+
+	/// Loads a variable value and attempts to convert it to a requested type
+	pub fn load_as<U>(&self, name: &str) -> Option<Result<U, LoadedVariableTypeError<T::Type>>>
+	where
+		for<'t> &'t VariableValue<'a, T>: TryInto<U, Error = VariableType<T::Type>>,
+	{
+		self.load(name).map(|v| {
+			v.try_into().map_err(|t| LoadedVariableTypeError {
+				variable_name: name.to_owned(),
+				actual_type: t,
+			})
+		})
+	}
+
+	/// Loads a variable including metadata
+	fn load_slot(&self, name: &str) -> Option<&VariableSlot<'a, T>> {
+		self.0.get(name)
+	}
+
+	/// Stores a variable and returns the previous value of that name, if any
+	///
+	/// Intentionally private, this function should only be used by the interpreter.
+	/// Users should use [`Self::insert_builtin`] to construct built-in variables.
+	fn store(&mut self, name: &'a str, value: VariableSlot<'a, T>) -> Option<VariableSlot<'a, T>> {
+		self.0.insert(name, value)
+	}
+
+	pub fn iter<'s>(&'s self) -> impl Iterator<Item = (&'a str, &'s VariableSlot<'a, T>)> {
+		self.0.iter().map(|(&k, v)| (k, v))
+	}
+
+	pub fn into_keys_and_values(self) -> impl Iterator<Item = (&'a str, VariableValue<'a, T>)> {
+		self.into_iter().map(|(k, v)| (k, v.value))
+	}
+
+	pub fn keys_and_values<'s>(
+		&'s self,
+	) -> impl Iterator<Item = (&'a str, &'s VariableValue<'a, T>)> {
+		self.iter().map(|(k, v)| (k, &v.value))
+	}
+}
+
+impl<'a, T: DomainVariableValue + 'a> Default for VariablePool<'a, T> {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl<'a, T: DomainVariableValue + 'a> FromIterator<(&'a str, VariableValue<'a, T>)>
+	for VariablePool<'a, T>
+{
+	fn from_iter<I: IntoIterator<Item = (&'a str, VariableValue<'a, T>)>>(iter: I) -> Self {
+		Self(HashMap::from_iter(
+			iter.into_iter().map(|(k, v)| (k, VariableSlot::builtin(v))),
+		))
+	}
+}
+
+impl<'a, T: DomainVariableValue + 'a> IntoIterator for VariablePool<'a, T> {
+	type IntoIter = <HashMap<&'a str, VariableSlot<'a, T>> as IntoIterator>::IntoIter;
+	type Item = (&'a str, VariableSlot<'a, T>);
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.into_iter()
+	}
+}
+
+impl<'a, 's, T: DomainVariableValue + 'a> IntoIterator for &'s VariablePool<'a, T> {
+	type IntoIter = <&'s HashMap<&'a str, VariableSlot<'a, T>> as IntoIterator>::IntoIter;
+	type Item = (&'s &'a str, &'s VariableSlot<'a, T>);
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.iter()
+	}
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct LoadedVariableTypeError<T: DomainVariableType> {
+	pub variable_name: String,
+	pub actual_type: VariableType<T>,
+}
+
 /// Describes the reason why the [`Interpreter::run`] has returned
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum InterpreterEndState<E: std::error::Error, T: DomainVariableType> {
@@ -285,7 +388,7 @@ pub struct Interpreter<'ast, T: InterpreterBackend + 'ast> {
 	value_stack: InterpreterStack<VariableValueFrame<'ast, T::Value>>,
 	instruction_stack: InterpreterStack<Instruction<'ast, T::Value>>,
 	is_halted: bool,
-	pub variable_pool: HashMap<&'ast str, VariableSlot<'ast, T::Value>>,
+	pub variable_pool: VariablePool<'ast, T::Value>,
 	pub backend: T,
 	warnings: Vec<InterpreterWarning<T::Warning>>,
 }
@@ -302,7 +405,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				max_height: Self::DEFAULT_INSTRUCTION_STACK_LIMIT,
 			},
 			is_halted: false,
-			variable_pool: HashMap::new(),
+			variable_pool: VariablePool::new(),
 			backend,
 			warnings: Vec::new(),
 		}
@@ -409,17 +512,17 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 				Expression::Callback(body) => {
 					self.construct_value(VariableValue::Callback(body), expression.loc.clone())?
 				}
-				Expression::VariableValue(name) => match self.variable_pool.get(name.as_str()) {
-					Some(value) => {
-						self.construct_value(value.value.clone(), expression.loc.clone())?
+				Expression::VariableValue(name) => {
+					match self.variable_pool.load(name.as_str()).cloned() {
+						Some(value) => self.construct_value(value, expression.loc.clone())?,
+						None => {
+							return Err(InterpreterError::LogicError(
+								Box::new(LogicError::VariableDoesNotExist(name.to_owned())),
+								expression.loc.clone(),
+							))
+						}
 					}
-					None => {
-						return Err(InterpreterError::LogicError(
-							Box::new(LogicError::VariableDoesNotExist(name.to_owned())),
-							expression.loc.clone(),
-						))
-					}
-				},
+				}
 				Expression::Assignment(expr) => {
 					self.instruction_stack
 						.push(Instruction::Store(&expr.left, expression.loc.clone()))?;
@@ -511,7 +614,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 					.value_stack
 					.top_mut()
 					.ok_or(InterpreterError::InternalError)?;
-				let old_value = self.variable_pool.insert(
+				let old_value = self.variable_pool.store(
 					variable_name,
 					VariableSlot {
 						value: value.value.clone(),

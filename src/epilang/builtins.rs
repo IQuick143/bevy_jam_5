@@ -1,5 +1,4 @@
 use super::{interpreter::*, values::*};
-use bevy::utils::HashMap;
 
 macro_rules! float_method {
 	( $name:ident ( $args:expr ) ) => {
@@ -15,15 +14,11 @@ macro_rules! float_method {
 	};
 }
 
-pub fn default_builtin_variables<'a, T: DomainVariableValue + 'a>(
-) -> HashMap<&'a str, VariableSlot<'a, T>> {
-	HashMap::from_iter([
-		(
-			"pi",
-			VariableSlot::builtin(VariableValue::Float(std::f32::consts::PI)),
-		),
-		("true", VariableSlot::builtin(VariableValue::Bool(true))),
-		("false", VariableSlot::builtin(VariableValue::Bool(false))),
+pub fn default_builtin_variables<'a, T: DomainVariableValue + 'a>() -> VariablePool<'a, T> {
+	VariablePool::from_iter([
+		("pi", std::f32::consts::PI.into()),
+		("true", true.into()),
+		("false", false.into()),
 	])
 }
 
