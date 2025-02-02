@@ -22,15 +22,17 @@ pub enum VariableValue<'m, T: DomainVariableValue + 'm> {
 }
 
 macro_rules! impl_try_from_for_variable_value {
-	( $($variant:ident ( $type:ty )),* $(,)? ) => {
+	( $($variant:ident ( $type:ty ) $({ $($extra_pat:pat => $extra_expr:expr),* $(,)? })? ),* $(,)? ) => {
 		$(
 			impl<'m, T: DomainVariableValue> TryFrom<&VariableValue<'m, T>> for $type {
 				type Error = VariableType<T::Type>;
 				fn try_from(value: &VariableValue<'m, T>) -> Result<Self, Self::Error> {
-					match value {
-						VariableValue::$variant(x) => Ok(*x),
-						_ => Err(value.get_type())
-					}
+					use VariableValue::*;
+					Ok(match value {
+						$variant(x) => *x,
+						$($($extra_pat => $extra_expr,)*)?
+						_ => return Err(value.get_type()),
+					})
 				}
 			}
 
@@ -53,7 +55,7 @@ macro_rules! impl_try_from_for_variable_value {
 impl_try_from_for_variable_value! {
 	Bool(bool),
 	Int(i32),
-	Float(f32),
+	Float(f32) { Int(i) => *i as f32 },
 	String(&'m str),
 	Callback(&'m Module),
 }

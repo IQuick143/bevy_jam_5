@@ -223,16 +223,6 @@ impl LevelBuilder {
 		})
 	}
 
-	fn try_as_int_or_float(
-		arg: &VariableValue<DomainValue>,
-	) -> Result<f32, FunctionCallError<RuntimeError, DomainType>> {
-		match arg {
-			VariableValue::Int(i) => Ok(*i as f32),
-			VariableValue::Float(f) => Ok(*f),
-			_ => Err(TypeError(arg.get_type())),
-		}
-	}
-
 	fn call_color(
 		args: &[ArgumentValue<DomainValue>],
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
@@ -434,9 +424,9 @@ impl LevelBuilder {
 		match args {
 			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(arg1), Argument(arg2), Argument(arg3)] =>
 			{
-				let x = Self::try_as_int_or_float(arg1)?;
-				let y = Self::try_as_int_or_float(arg2)?;
-				let r = Self::try_as_int_or_float(arg3)?;
+				let x = arg1.try_into().map_err(FunctionCallError::TypeError)?;
+				let y = arg2.try_into().map_err(FunctionCallError::TypeError)?;
+				let r = arg3.try_into().map_err(FunctionCallError::TypeError)?;
 				self.place_cycle(*cycle_id, Vec2::new(x, y), r, &[])?;
 				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
 			}
@@ -456,7 +446,7 @@ impl LevelBuilder {
 
 		match args {
 			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1)] => {
-				let angle = Self::try_as_int_or_float(arg1)?;
+				let angle: f32 = arg1.try_into().map_err(FunctionCallError::TypeError)?;
 				self.place_vertex_at_angle(*vertex_id, angle * PI / 180.0)?;
 				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
 			}
@@ -474,8 +464,8 @@ impl LevelBuilder {
 
 		match args {
 			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1), Argument(arg2)] => {
-				let x = Self::try_as_int_or_float(arg1)?;
-				let y = Self::try_as_int_or_float(arg2)?;
+				let x = arg1.try_into().map_err(FunctionCallError::TypeError)?;
+				let y = arg2.try_into().map_err(FunctionCallError::TypeError)?;
 				self.place_vertex(*vertex_id, Vec2::new(x, y))?;
 				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
 			}
