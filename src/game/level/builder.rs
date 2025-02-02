@@ -145,9 +145,15 @@ pub enum LevelBuilderError {
 	/// [`place_cycle`](LevelBuilder::place_cycle) was called
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
-	/// [`place_cycle`](LevelBuilder::place_cycle) was called
-	/// on a cycle that contains a vertex that has already been definitively placed,
-	/// and it would not lie on the cycle as being placed
+	/// A vertex or cycle positioning operation was called
+	/// in a way that would cause a vertex to not lie on its cycle.
+	/// ## Causes
+	/// - [`place_cycle`](LevelBuilder::place_cycle) called on a cycle
+	///   that contains a vertex that already has fixed placement
+	///   and it would not lie on the vertex
+	/// - [`place_vertex`](LevelBuilder::place_vertex) called on a vertex
+	///   that lies on a placed cycle with a position that does not lie
+	///   on the cycle
 	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
 	/// Cycles that share a vertex have been placed in a way that they do not intersect
 	CyclesDoNotIntersect(CyclesDoNotIntersectError),
@@ -156,15 +162,27 @@ pub enum LevelBuilderError {
 	CyclesDoNotIntersectTwice(CyclesDoNotIntersectTwiceError),
 	/// Two cycles share more than two vertices
 	TooManyVerticesInCycleIntersection(TooManyVerticesInCycleIntersectionError),
-	/// [`place_vertex`](LevelBuilder::place_vertex) was called
-	/// on a vertex that already has a fixed placement
+	/// A vertex positioning operation was called on a vertex that
+	/// already has a placement too specific to perform the operation
+	/// ## Causes
+	/// - [`place_vertex`](LevelBuilder::place_vertex) or
+	///   [`place_vertex_at_angle`](LevelBuilder::place_vertex_at_angle)
+	///   called on a fully placed vertex
 	VertexAlreadyPlaced(usize),
-	/// [`place_vertex`](LevelBuilder::place_vertex) was called
+	/// [`place_vertex_at_angle`](LevelBuilder::place_vertex) was called
 	/// on a vertex that already has not yet been partially placed
 	VertexNotPartiallyPlaced(usize),
-	/// [`place_cycle`](LevelBuilder::place_cycle) or
-	/// [`place_vertex`](LevelBuilder::place_vertex) was called
-	/// in a way that would place vertices around a cycle out of their rotation order
+	/// A placement operation was called in a way that would place vertices
+	/// around a cycle out of their rotation order
+	/// ## Causes
+	/// - [`place_cycle`](LevelBuilder::place_cycle) called on a cycle that
+	///   shares vertices with a cycle that is already placed, and their
+	///   shared vertices (which would gain fixed placement by this operation)
+	///   would be out-of-order on one of them
+	/// - [`place_vertex`](LevelBuilder::place_vertex) or
+	///   [`place_vertex_at_angle`](LevelBuilder::place_vertex_at_angle)
+	///   called on a vertex on a placed cycle in a way that would place
+	///   the target vertex out of the correct order
 	VertexOrderViolationOnCycle(usize),
 	/// Two cycles are linked, but they share a vertex
 	OverlappedLinkedCycles(OverlappedLinkedCyclesError),
@@ -626,7 +644,7 @@ impl LevelBuilder {
 	/// - `target_vertex` - Index of the vertex to place
 	/// - `clock_angle` - Clock angle between the center of the owning
 	///   cycle and the vertex (zero is up, positive is clockwise)
-	pub fn place_vertex(
+	pub fn place_vertex_at_angle(
 		&mut self,
 		target_vertex: usize,
 		clock_angle: f32,
@@ -658,6 +676,59 @@ impl LevelBuilder {
 					));
 				}
 				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(new_pos);
+				Ok(())
+			}
+		}
+	}
+
+	/// Assigns a fixed placement to a vertex
+	/// ## Parameters
+	/// - `target_vertex` - Index of the vertex to place
+	/// - `position` - Actual position where the vertex should be placed
+	pub fn place_vertex(
+		&mut self,
+		target_vertex: usize,
+		position: Vec2,
+	) -> Result<(), LevelBuilderError> {
+		if target_vertex >= self.vertices.len() {
+			return Err(LevelBuilderError::VertexIndexOutOfRange(target_vertex));
+		}
+		match self.vertices[target_vertex].position {
+			IntermediateVertexPosition::Fixed(_) => {
+				Err(LevelBuilderError::VertexAlreadyPlaced(target_vertex))
+			}
+			IntermediateVertexPosition::Free => {
+				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(position);
+				Ok(())
+			}
+			IntermediateVertexPosition::Partial(p) => {
+				let owner_placement = self.cycles[p.owner_cycle]
+					.placement
+					.expect("Owner cycle of a partially placed vertex should also be placed");
+				// The vertex being placed must lie on its owner cycle
+				let distance_sq_from_center = owner_placement.position.distance_squared(position);
+				if (distance_sq_from_center - owner_placement.radius.powi(2)).abs()
+					> Self::PLACEMENT_VALIDATION_TOLERANCE
+				{
+					return Err(LevelBuilderError::CycleDoesNotContainVertex(
+						CycleDoesNotContainVertexError {
+							placed_cycle: p.owner_cycle,
+							requested_placement: owner_placement,
+							failing_vertex: target_vertex,
+							vertex_position: position,
+						},
+					));
+				}
+				// Check that the placement does not violate the cycle order, then proceed
+				if !self.verify_materialization_against_cycle(
+					p.owner_cycle,
+					std::iter::once((target_vertex, position)),
+				) {
+					return Err(LevelBuilderError::VertexOrderViolationOnCycle(
+						p.owner_cycle,
+					));
+				}
+				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(position);
 				Ok(())
 			}
 		}
@@ -718,6 +789,9 @@ impl LevelBuilder {
 			forbidden_group_pairs,
 		})
 	}
+
+	/// Tolerance in validation of manual placements
+	const PLACEMENT_VALIDATION_TOLERANCE: f32 = 0.001;
 
 	/// Computes and creates the GroupData objects
 	/// Also assigns all cycles into their groups
@@ -1379,7 +1453,7 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::VertexNotPartiallyPlaced(i) => write!(f, "Cannot place vertex {i} because it does not lie on any placed cycle."),
 			Self::CycleDoesNotContainVertex(e) => write!(
 				f,
-				"Cycle {} cannot be placed at {} because it contains vertex {} which has already been placed at {}.",
+				"Placement is not valid because cycle {} placed at {} would not contain vertex {} placed at {}.",
 				e.placed_cycle,
 				e.requested_placement,
 				e.failing_vertex,

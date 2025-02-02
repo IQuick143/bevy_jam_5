@@ -130,6 +130,7 @@ impl InterpreterBackend for LevelBuilder {
 			"vertex" => self.call_vertex(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
+			"put_vertex" => self.call_put_vertex(args),
 			"set_vertex_angle" => self.call_set_vertex_angle(args),
 			"link" => self.call_link(false, args, warnings),
 			"oneway" => self.call_link(true, args, warnings),
@@ -456,10 +457,29 @@ impl LevelBuilder {
 		match args {
 			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1)] => {
 				let angle = Self::try_as_int_or_float(arg1)?;
-				self.place_vertex(*vertex_id, angle)?;
+				self.place_vertex_at_angle(*vertex_id, angle * PI / 180.0)?;
 				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
 			}
-			[Argument(other), Separator, Argument(_), Argument(_), Argument(_)] => {
+			[Argument(other), Separator, Argument(_)] => Err(TypeError(other.get_type())),
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_put_vertex(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		match args {
+			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1), Argument(arg2)] => {
+				let x = Self::try_as_int_or_float(arg1)?;
+				let y = Self::try_as_int_or_float(arg2)?;
+				self.place_vertex(*vertex_id, Vec2::new(x, y))?;
+				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
+			}
+			[Argument(other), Separator, Argument(_), Argument(_)] => {
 				Err(TypeError(other.get_type()))
 			}
 			_ => Err(BadArgumentCount),
