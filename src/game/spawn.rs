@@ -373,20 +373,24 @@ fn create_cycle_visuals(
 	mut meshes: ResMut<Assets<Mesh>>,
 ) {
 	for (id, placement, turnability) in &query {
-		let mesh = Annulus::new(
-			placement.radius - RING_HALF_WIDTH,
-			placement.radius + RING_HALF_WIDTH,
-		)
-		.mesh()
-		.resolution(cycle_ring_mesh_resolution(placement.radius))
-		.build();
-		let outline_mesh = Annulus::new(
-			placement.radius - RING_HALF_WIDTH - RING_OUTLINE_WIDTH,
-			placement.radius + RING_HALF_WIDTH + RING_OUTLINE_WIDTH,
-		)
-		.mesh()
-		.resolution(cycle_ring_mesh_resolution(placement.radius))
-		.build();
+		let mesh;
+		let outline_mesh;
+
+		match placement.shape {
+			CycleShape::Circle(radius) => {
+				mesh = Annulus::new(radius - RING_HALF_WIDTH, radius + RING_HALF_WIDTH)
+					.mesh()
+					.resolution(cycle_ring_mesh_resolution(radius))
+					.build();
+				outline_mesh = Annulus::new(
+					radius - RING_HALF_WIDTH - RING_OUTLINE_WIDTH,
+					radius + RING_HALF_WIDTH + RING_OUTLINE_WIDTH,
+				)
+				.mesh()
+				.resolution(cycle_ring_mesh_resolution(radius))
+				.build();
+			}
+		}
 
 		let ring = commands
 			.spawn((

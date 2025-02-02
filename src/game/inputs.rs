@@ -1,6 +1,10 @@
 use crate::{ui::freeze::ui_not_frozen, AppSet};
 
-use super::{level::CyclePlacement, logic::*, prelude::*};
+use super::{
+	level::{CyclePlacement, CycleShape},
+	logic::*,
+	prelude::*,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -59,11 +63,15 @@ fn cycle_inputs_system(
 					return None;
 				}
 				let d_sq = transform.translation().xy().distance_squared(cursor_pos);
-				let r_sq = placement.radius.powi(2);
-				if d_sq <= r_sq {
-					Some((e, d_sq))
-				} else {
-					None
+
+				match placement.shape {
+					CycleShape::Circle(radius) => {
+						if d_sq <= radius.powi(2) {
+							Some((e, d_sq))
+						} else {
+							None
+						}
+					}
 				}
 			})
 			// Cannot just call min, because IEEE754

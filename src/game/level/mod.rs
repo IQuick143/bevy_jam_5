@@ -45,7 +45,7 @@ pub struct VertexData {
 /// Description of a single cycle
 #[derive(Debug, Clone, Reflect)]
 pub struct CycleData {
-	///  Placement of the cycle
+	/// Placement of the cycle
 	pub placement: CyclePlacement,
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
@@ -154,10 +154,17 @@ impl OneWayLinkData {
 /// Computed placement of a cycle
 #[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub struct CyclePlacement {
-	/// Position of the center point of the cycle
+	/// Position of the cycle center. This is the position of the cycle entity
 	pub position: Vec2,
-	/// Radius of the cycle
-	pub radius: f32,
+	/// Shape of the cycle's perimeter
+	pub shape: CycleShape,
+}
+
+/// Description of the shape of a cycle's perimeter
+#[derive(Clone, Copy, PartialEq, Debug, Reflect)]
+pub enum CycleShape {
+	/// Circle defined by a radius, centered in the cycle's position
+	Circle(f32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
@@ -304,11 +311,11 @@ impl LogicalColor {
 
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"[x={} y={} r={}]",
-			self.position.x, self.position.y, self.radius
-		)
+		match self.shape {
+			CycleShape::Circle(r) => {
+				write!(f, "[x={} y={} r={r}]", self.position.x, self.position.y)
+			}
+		}
 	}
 }
 

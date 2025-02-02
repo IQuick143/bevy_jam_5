@@ -482,7 +482,7 @@ impl LevelBuilder {
 		}
 		let placement = CyclePlacement {
 			position: center,
-			radius,
+			shape: CycleShape::Circle(radius),
 		};
 		// This will be filled with placements of all vertices after the cycle is placed
 		let mut placements_after = Vec::new();
@@ -511,89 +511,97 @@ impl LevelBuilder {
 					let owner_placement = self.cycles[p.owner_cycle]
 						.placement
 						.expect("Owner cycle of a partially placed vertex should also be placed");
-					// Find one intersection of the two cycles, if it exists
-					let intersection = intersect_circles(
-						owner_placement.position,
-						center,
-						owner_placement.radius,
-						radius,
-					);
-					match intersection {
-						Some(One(new_pos)) => {
-							// Cycles intersect tangentially, there is one intersection
-							let replaced =
-								new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
-							// Fail if there is already a vertex there
-							if let Some(existing_vertices) = replaced {
-								return Err(LevelBuilderError::CyclesDoNotIntersectTwice(
-									CyclesDoNotIntersectTwiceError {
-										placed_cycle: target_cycle,
-										requested_placement: placement,
-										existing_cycle: p.owner_cycle,
-										existing_placement: owner_placement,
-										existing_vertex: existing_vertices.first().0,
-										vertex_position: new_pos,
-										failing_vertex: i,
-									},
-								));
-							}
-							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
-						}
-						Some(Two(alt_pos, default_pos)) => {
-							// If there are two intersections, we must choose one of them
-							//
-							// Since the cycles are counterclockwise, the usual best choice
-							// for a vertex is the second intersection, then the first
-							// intersection for the potential second vertex shared with the same other cycle.
-							// If the opposite is desired (for example, on the off chance
-							// that the two shared vertices are split over the start/end of the
-							// vertex list as declared), `double_intersection_hints` can be used
-							// to express this intent
-							let new_pos = match new_fixed_points.entry(p.owner_cycle) {
-								std::collections::btree_map::Entry::Occupied(mut e) => {
-									let val = e.get_mut();
-									let new_pos =
-										if double_intersection_hints.contains(&val.first().0) {
-											default_pos
-										} else {
-											alt_pos
-										};
-									*val = val.add_to_one((i, new_pos)).map_err(
-										|((a, _), (b, _), (c, _))| {
-											LevelBuilderError::TooManyVerticesInCycleIntersection(
-												TooManyVerticesInCycleIntersectionError {
-													placed_cycle: target_cycle,
-													existing_cycle: p.owner_cycle,
-													shared_vertices: [a, b, c],
+					match owner_placement.shape {
+						CycleShape::Circle(owner_radius) => {
+							// Find one intersection of the two cycles, if it exists
+							let intersection = intersect_circles(
+								owner_placement.position,
+								center,
+								owner_radius,
+								radius,
+							);
+							match intersection {
+								Some(One(new_pos)) => {
+									// Cycles intersect tangentially, there is one intersection
+									let replaced =
+										new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
+									// Fail if there is already a vertex there
+									if let Some(existing_vertices) = replaced {
+										return Err(LevelBuilderError::CyclesDoNotIntersectTwice(
+											CyclesDoNotIntersectTwiceError {
+												placed_cycle: target_cycle,
+												requested_placement: placement,
+												existing_cycle: p.owner_cycle,
+												existing_placement: owner_placement,
+												existing_vertex: existing_vertices.first().0,
+												vertex_position: new_pos,
+												failing_vertex: i,
+											},
+										));
+									}
+									placements_after
+										.push(IntermediateVertexPosition::Fixed(new_pos));
+								}
+								Some(Two(alt_pos, default_pos)) => {
+									// If there are two intersections, we must choose one of them
+									//
+									// Since the cycles are counterclockwise, the usual best choice
+									// for a vertex is the second intersection, then the first
+									// intersection for the potential second vertex shared with the same other cycle.
+									// If the opposite is desired (for example, on the off chance
+									// that the two shared vertices are split over the start/end of the
+									// vertex list as declared), `double_intersection_hints` can be used
+									// to express this intent
+									let new_pos = match new_fixed_points.entry(p.owner_cycle) {
+										std::collections::btree_map::Entry::Occupied(mut e) => {
+											let val = e.get_mut();
+											let new_pos = if double_intersection_hints
+												.contains(&val.first().0)
+											{
+												default_pos
+											} else {
+												alt_pos
+											};
+											*val = val.add_to_one((i, new_pos)).map_err(
+												|((a, _), (b, _), (c, _))| {
+													LevelBuilderError::TooManyVerticesInCycleIntersection(
+														TooManyVerticesInCycleIntersectionError {
+															placed_cycle: target_cycle,
+															existing_cycle: p.owner_cycle,
+															shared_vertices: [a, b, c],
+														},
+													)
 												},
-											)
-										},
-									)?;
-									new_pos
-								}
-								std::collections::btree_map::Entry::Vacant(e) => {
-									let new_pos = if double_intersection_hints.contains(&i) {
-										alt_pos
-									} else {
-										default_pos
+											)?;
+											new_pos
+										}
+										std::collections::btree_map::Entry::Vacant(e) => {
+											let new_pos = if double_intersection_hints.contains(&i)
+											{
+												alt_pos
+											} else {
+												default_pos
+											};
+											e.insert(One((i, new_pos)));
+											new_pos
+										}
 									};
-									e.insert(One((i, new_pos)));
-									new_pos
+									placements_after
+										.push(IntermediateVertexPosition::Fixed(new_pos));
 								}
-							};
-							placements_after.push(IntermediateVertexPosition::Fixed(new_pos));
-						}
-						None => {
-							// Fail if the cycles do not intersect
-							return Err(LevelBuilderError::CyclesDoNotIntersect(
-								CyclesDoNotIntersectError {
-									placed_cycle: target_cycle,
-									requested_placement: placement,
-									existing_cycle: p.owner_cycle,
-									existing_placement: owner_placement,
-									failing_vertex: i,
-								},
-							));
+								None => {
+									// Fail if the cycles do not intersect
+									return Err(LevelBuilderError::CyclesDoNotIntersect(
+										CyclesDoNotIntersectError {
+											placed_cycle: target_cycle,
+											requested_placement: placement,
+											existing_cycle: p.owner_cycle,
+											existing_placement: owner_placement,
+											failing_vertex: i,
+										},
+									));
+								}
+							}
 						}
 					}
 				}
@@ -651,20 +659,25 @@ impl LevelBuilder {
 				let owner_placement = self.cycles[p.owner_cycle]
 					.placement
 					.expect("Owner cycle of a partially placed vertex should also be placed");
-				// Recalculate from clock angle to angle of the actual vertor space
-				let real_angle = PI / 2.0 - clock_angle;
-				let new_pos = owner_placement.position
-					+ owner_placement.radius * Vec2::from_angle(real_angle);
-				if !self.verify_materialization_against_cycle(
-					p.owner_cycle,
-					std::iter::once((target_vertex, new_pos)),
-				) {
-					return Err(LevelBuilderError::VertexOrderViolationOnCycle(
-						p.owner_cycle,
-					));
+				match owner_placement.shape {
+					CycleShape::Circle(owner_radius) => {
+						// Recalculate from clock angle to angle of the actual vertor space
+						let real_angle = PI / 2.0 - clock_angle;
+						let new_pos =
+							owner_placement.position + owner_radius * Vec2::from_angle(real_angle);
+						if !self.verify_materialization_against_cycle(
+							p.owner_cycle,
+							std::iter::once((target_vertex, new_pos)),
+						) {
+							return Err(LevelBuilderError::VertexOrderViolationOnCycle(
+								p.owner_cycle,
+							));
+						}
+						self.vertices[target_vertex].position =
+							IntermediateVertexPosition::Fixed(new_pos);
+						Ok(())
+					}
 				}
-				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(new_pos);
-				Ok(())
 			}
 		}
 	}
@@ -693,31 +706,37 @@ impl LevelBuilder {
 				let owner_placement = self.cycles[p.owner_cycle]
 					.placement
 					.expect("Owner cycle of a partially placed vertex should also be placed");
-				// The vertex being placed must lie on its owner cycle
-				let distance_sq_from_center = owner_placement.position.distance_squared(position);
-				if (distance_sq_from_center - owner_placement.radius.powi(2)).abs()
-					> Self::PLACEMENT_VALIDATION_TOLERANCE
-				{
-					return Err(LevelBuilderError::CycleDoesNotContainVertex(
-						CycleDoesNotContainVertexError {
-							placed_cycle: p.owner_cycle,
-							requested_placement: owner_placement,
-							failing_vertex: target_vertex,
-							vertex_position: position,
-						},
-					));
+				match owner_placement.shape {
+					CycleShape::Circle(owner_radius) => {
+						// The vertex being placed must lie on its owner cycle
+						let distance_sq_from_center =
+							owner_placement.position.distance_squared(position);
+						if (distance_sq_from_center - owner_radius.powi(2)).abs()
+							> Self::PLACEMENT_VALIDATION_TOLERANCE
+						{
+							return Err(LevelBuilderError::CycleDoesNotContainVertex(
+								CycleDoesNotContainVertexError {
+									placed_cycle: p.owner_cycle,
+									requested_placement: owner_placement,
+									failing_vertex: target_vertex,
+									vertex_position: position,
+								},
+							));
+						}
+						// Check that the placement does not violate the cycle order, then proceed
+						if !self.verify_materialization_against_cycle(
+							p.owner_cycle,
+							std::iter::once((target_vertex, position)),
+						) {
+							return Err(LevelBuilderError::VertexOrderViolationOnCycle(
+								p.owner_cycle,
+							));
+						}
+						self.vertices[target_vertex].position =
+							IntermediateVertexPosition::Fixed(position);
+						Ok(())
+					}
 				}
-				// Check that the placement does not violate the cycle order, then proceed
-				if !self.verify_materialization_against_cycle(
-					p.owner_cycle,
-					std::iter::once((target_vertex, position)),
-				) {
-					return Err(LevelBuilderError::VertexOrderViolationOnCycle(
-						p.owner_cycle,
-					));
-				}
-				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(position);
-				Ok(())
 			}
 		}
 	}
@@ -1173,80 +1192,87 @@ impl LevelBuilder {
 				// Collect and cast back into iterator so we can modify [`self.vertices`]
 				.collect::<Vec<_>>()
 				.into_iter();
-			if let Some((first_fixed_vertex, first_fixed_pos)) = fixed_vertices.next() {
-				let first_relative_pos = first_fixed_pos - cycle_placement.position;
-				let mut current_fixed_vertex = first_fixed_vertex;
-				let mut current_relative_pos = first_relative_pos;
-				for (next_fixed_vertex, next_fixed_pos) in fixed_vertices {
-					// Materialize all vertices between the marked ones
-					let next_relative_pos = next_fixed_pos - cycle_placement.position;
-					let vertex_count = next_fixed_vertex - current_fixed_vertex;
-					let mut segment_angle = next_relative_pos.angle_to(current_relative_pos);
-					if segment_angle <= 0.0 {
-						segment_angle += 2.0 * PI;
-					}
-					// Distribute the partially-placed vertices uniformly between the fixed ones
-					for (j, i) in ((current_fixed_vertex + 1)..next_fixed_vertex).enumerate() {
-						let target_vertex = cycle_data.vertex_indices[i];
-						let new_pos = cycle_placement.position
-							+ current_relative_pos.rotate(Vec2::from_angle(
-								-segment_angle * (j + 1) as f32 / vertex_count as f32,
-							));
-						Self::checked_materialize(
-							&mut self.vertices[target_vertex].position,
-							new_pos,
-							cycle_index,
-							i,
-						);
-					}
-					// Move to the next segment
-					current_fixed_vertex = next_fixed_vertex;
-					current_relative_pos = next_relative_pos;
-				}
-				// Close the loop; materialize the segment between last and first fixed vertex
-				// Mind the special case when exactly one vertex is fixed
-				// and this segment covers the whole cycle
-				let vertex_count =
-					first_fixed_vertex + cycle_data.vertex_indices.len() - current_fixed_vertex;
-				let mut segment_angle = first_relative_pos.angle_to(current_relative_pos);
-				if first_fixed_vertex == current_fixed_vertex {
-					// I do not trust floats, so set this value explicitly
-					segment_angle = 2.0 * PI;
-				} else if segment_angle <= 0.0 {
-					segment_angle += 2.0 * PI;
-				}
-				// Distribute the partially-placed vertices uniformly between the fixed ones
-				for (j, i) in ((current_fixed_vertex + 1)..cycle_data.vertex_indices.len())
-					.chain(0..first_fixed_vertex)
-					.enumerate()
-				{
-					let target_vertex = cycle_data.vertex_indices[i];
-					let new_pos = cycle_placement.position
-						+ current_relative_pos.rotate(Vec2::from_angle(
-							-segment_angle * (j + 1) as f32 / vertex_count as f32,
-						));
-					Self::checked_materialize(
-						&mut self.vertices[target_vertex].position,
-						new_pos,
-						cycle_index,
-						i,
-					);
-				}
-			} else {
-				// If none of the vertices have fixed placement, distribute them uniformly in clock order
-				let vertex_count = cycle_data.vertex_indices.len();
-				for (i, &j) in cycle_data.vertex_indices.iter().enumerate() {
-					let new_pos = cycle_placement.position
-						+ cycle_placement.radius
-							* Vec2::from_angle(
-								PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32,
+			match cycle_placement.shape {
+				CycleShape::Circle(cycle_radius) => {
+					if let Some((first_fixed_vertex, first_fixed_pos)) = fixed_vertices.next() {
+						let first_relative_pos = first_fixed_pos - cycle_placement.position;
+						let mut current_fixed_vertex = first_fixed_vertex;
+						let mut current_relative_pos = first_relative_pos;
+						for (next_fixed_vertex, next_fixed_pos) in fixed_vertices {
+							// Materialize all vertices between the marked ones
+							let next_relative_pos = next_fixed_pos - cycle_placement.position;
+							let vertex_count = next_fixed_vertex - current_fixed_vertex;
+							let mut segment_angle =
+								next_relative_pos.angle_to(current_relative_pos);
+							if segment_angle <= 0.0 {
+								segment_angle += 2.0 * PI;
+							}
+							// Distribute the partially-placed vertices uniformly between the fixed ones
+							for (j, i) in
+								((current_fixed_vertex + 1)..next_fixed_vertex).enumerate()
+							{
+								let target_vertex = cycle_data.vertex_indices[i];
+								let new_pos = cycle_placement.position
+									+ current_relative_pos.rotate(Vec2::from_angle(
+										-segment_angle * (j + 1) as f32 / vertex_count as f32,
+									));
+								Self::checked_materialize(
+									&mut self.vertices[target_vertex].position,
+									new_pos,
+									cycle_index,
+									i,
+								);
+							}
+							// Move to the next segment
+							current_fixed_vertex = next_fixed_vertex;
+							current_relative_pos = next_relative_pos;
+						}
+						// Close the loop; materialize the segment between last and first fixed vertex
+						// Mind the special case when exactly one vertex is fixed
+						// and this segment covers the whole cycle
+						let vertex_count = first_fixed_vertex + cycle_data.vertex_indices.len()
+							- current_fixed_vertex;
+						let mut segment_angle = first_relative_pos.angle_to(current_relative_pos);
+						if first_fixed_vertex == current_fixed_vertex {
+							// I do not trust floats, so set this value explicitly
+							segment_angle = 2.0 * PI;
+						} else if segment_angle <= 0.0 {
+							segment_angle += 2.0 * PI;
+						}
+						// Distribute the partially-placed vertices uniformly between the fixed ones
+						for (j, i) in ((current_fixed_vertex + 1)..cycle_data.vertex_indices.len())
+							.chain(0..first_fixed_vertex)
+							.enumerate()
+						{
+							let target_vertex = cycle_data.vertex_indices[i];
+							let new_pos = cycle_placement.position
+								+ current_relative_pos.rotate(Vec2::from_angle(
+									-segment_angle * (j + 1) as f32 / vertex_count as f32,
+								));
+							Self::checked_materialize(
+								&mut self.vertices[target_vertex].position,
+								new_pos,
+								cycle_index,
+								i,
 							);
-					Self::checked_materialize(
-						&mut self.vertices[j].position,
-						new_pos,
-						cycle_index,
-						i,
-					);
+						}
+					} else {
+						// If none of the vertices have fixed placement, distribute them uniformly in clock order
+						let vertex_count = cycle_data.vertex_indices.len();
+						for (i, &j) in cycle_data.vertex_indices.iter().enumerate() {
+							let new_pos = cycle_placement.position
+								+ cycle_radius
+									* Vec2::from_angle(
+										PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32,
+									);
+							Self::checked_materialize(
+								&mut self.vertices[j].position,
+								new_pos,
+								cycle_index,
+								i,
+							);
+						}
+					}
 				}
 			}
 		}
@@ -1287,10 +1313,13 @@ impl LevelBuilder {
 		cycle_index: usize,
 		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
 	) -> bool {
-		let cycle_center = self.cycles[cycle_index]
+		let cycle_placement = self.cycles[cycle_index]
 			.placement
-			.expect("Partial materialization checks can only be run on placed cycles")
-			.position;
+			.expect("Partial materialization checks can only be run on placed cycles");
+		// Positions of all checked vertices, in cyclic order
+		// Vertices that were already fixed-placed are included
+		// Vertices that are in points_to_materialize are also included
+		// Other vertices are ignored
 		let fixed_points = self.cycles[cycle_index]
 			.vertex_indices
 			.iter()
@@ -1300,7 +1329,12 @@ impl LevelBuilder {
 					.find_map(|(j, p)| if i == j { Some(p) } else { None })
 					.or_else(|| self.vertices[i].position.get_fixed())
 			});
-		Self::are_points_in_cyclic_order(cycle_center, fixed_points)
+		// What constitues cycle order depends on the shape of the cycle
+		match cycle_placement.shape {
+			CycleShape::Circle(_) => {
+				Self::are_points_in_cyclic_order(cycle_placement.position, fixed_points)
+			}
+		}
 	}
 
 	/// Checks whether a sequence of points is ordered in order of
@@ -1378,12 +1412,20 @@ impl LevelBuilder {
 		let min = self
 			.cycles
 			.iter()
-			.filter_map(|cycle| cycle.placement.map(|p| p.position - Vec2::splat(p.radius)))
+			.filter_map(|cycle| {
+				cycle
+					.placement
+					.map(|p| Self::get_bounding_box_for_cycle(p).min)
+			})
 			.fold(Vec2::INFINITY, Vec2::min);
 		let max = self
 			.cycles
 			.iter()
-			.filter_map(|cycle| cycle.placement.map(|p| p.position + Vec2::splat(p.radius)))
+			.filter_map(|cycle| {
+				cycle
+					.placement
+					.map(|p| Self::get_bounding_box_for_cycle(p).max)
+			})
 			.fold(Vec2::NEG_INFINITY, Vec2::max);
 		let center = (max + min) / 2.0;
 		let mut half = (max - min) / 2.0;
@@ -1397,6 +1439,13 @@ impl LevelBuilder {
 			log::warn!("Level bounding box has zero height.");
 		}
 		Aabb2d::new(center, half)
+	}
+
+	/// Computes the bounding box for a given cycle shape
+	fn get_bounding_box_for_cycle(placement: CyclePlacement) -> Aabb2d {
+		match placement.shape {
+			CycleShape::Circle(radius) => Aabb2d::new(placement.position, Vec2::splat(radius)),
+		}
 	}
 
 	/// Resizes all currently placed objects to fit a bounding box
@@ -1414,9 +1463,12 @@ impl LevelBuilder {
 			}
 		}
 		for cycle in &mut self.cycles {
-			if let Some(p) = &mut cycle.placement {
-				p.position = (p.position - bounds_center) * scale + viewport_center;
-				p.radius *= scale;
+			let Some(p) = &mut cycle.placement else {
+				continue;
+			};
+			p.position = (p.position - bounds_center) * scale + viewport_center;
+			match &mut p.shape {
+				CycleShape::Circle(radius) => *radius *= scale,
 			}
 		}
 	}
