@@ -119,6 +119,7 @@ impl InterpreterBackend for LevelBuilder {
 			"set_thing" => self.call_set_thing(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
+			"put_center" => self.call_put_center(args),
 			"put_vertex" => self.call_put_vertex(args),
 			"set_vertex_angle" => self.call_set_vertex_angle(args),
 			"link" => self.call_link(false, args, warnings),
@@ -458,6 +459,30 @@ impl LevelBuilder {
 			[Argument(other), Separator, Argument(_), Argument(_), Argument(_)] => {
 				Err(TypeError(other.get_type()))
 			}
+			_ => Err(BadArgumentCount),
+		}
+	}
+
+	fn call_put_center(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		match args {
+			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(arg1), Argument(arg2)] => {
+				let x = arg1.try_into().map_err(TypeError)?;
+				let y = arg2.try_into().map_err(TypeError)?;
+				self.place_cycle_center(*cycle_id, Some(Vec2::new(x, y)))?;
+				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
+			}
+			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(Blank)] => {
+				self.place_cycle_center(*cycle_id, None)?;
+				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
+			}
+			[Argument(Domain(Cycle(_))), Separator, Argument(other)]
+			| [Argument(other), Separator, Argument(_), Argument(_)] => Err(TypeError(other.get_type())),
 			_ => Err(BadArgumentCount),
 		}
 	}

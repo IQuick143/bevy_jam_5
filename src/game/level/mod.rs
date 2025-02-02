@@ -47,6 +47,8 @@ pub struct VertexData {
 pub struct CycleData {
 	/// Placement of the cycle
 	pub placement: CyclePlacement,
+	/// Settings of the cycle center sprite
+	pub center_sprite_appearence: CycleCenterSpriteAppearence,
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
@@ -292,6 +294,13 @@ pub enum ButtonColorLabelPosition {
 	/// in combination with rotationally symmetric sprites.
 	AngleRotated(f32),
 }
+
+/// The rendering of a cycle's center sprite
+///
+/// Indicates the center sprite position relative to the cycle position,
+/// or [`None`] if the center sprite is not to be drawn
+#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
+pub struct CycleCenterSpriteAppearence(pub Option<Vec2>);
 
 impl LogicalColor {
 	pub fn new(color_index: usize) -> Self {

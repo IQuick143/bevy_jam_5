@@ -1,6 +1,8 @@
 use std::f32::consts::TAU;
 
-use super::{components::*, drawing::CycleVisualEntities, level::ThingData, logic::*, prelude::*};
+use super::{
+	components::*, drawing::CycleCenterVisualEntities, level::ThingData, logic::*, prelude::*,
+};
 use crate::AppSet;
 use bevy::utils::hashbrown::HashMap;
 use rand::Rng as _;
@@ -299,7 +301,7 @@ fn jump_turn_animation_system(
 const CYCLE_CENTER_ANIMATION_ANGLE: f32 = std::f32::consts::PI / 2.0;
 
 fn cycle_turning_animation_system(
-	cycles_q: Query<&CycleVisualEntities>,
+	cycles_q: Query<&CycleCenterVisualEntities>,
 	mut jump_q: Query<&mut JumpTurnAnimation>,
 	mut events: EventReader<RotateSingleCycle>,
 ) {
@@ -308,7 +310,7 @@ fn cycle_turning_animation_system(
 			log::warn!("RotateSingleCycle event does not target a cycle entity");
 			continue;
 		};
-		let Ok(mut animation) = jump_q.get_mut(visuals.center) else {
+		let Ok(mut animation) = jump_q.get_mut(visuals.sprite) else {
 			log::warn!("Cycle center sprite does not have JumpTurnAnimation component");
 			continue;
 		};
@@ -325,11 +327,11 @@ fn cycle_turning_animation_system(
 
 fn init_cycle_animation(
 	mut commands: Commands,
-	query: Query<&CycleVisualEntities, Added<CycleVisualEntities>>,
+	query: Query<&CycleCenterVisualEntities, Added<CycleCenterVisualEntities>>,
 ) {
 	for visuals in &query {
 		commands
-			.entity(visuals.center)
+			.entity(visuals.sprite)
 			.insert(JumpTurnAnimation::default());
 		commands.entity(visuals.arrow).insert(SpinAnimation {
 			current_phase: rand::thread_rng().gen_range(0.0..std::f32::consts::TAU),

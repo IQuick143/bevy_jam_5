@@ -34,16 +34,22 @@ fn apply_level_hint_text(
 
 fn init_cycle_hover_hints(
 	mut commands: Commands,
-	query: Query<(Entity, &CycleTurnability), Added<CycleTurnability>>,
+	query: Query<
+		(Entity, &CycleTurnability, &CycleCenterSpriteAppearence),
+		Added<CycleTurnability>,
+	>,
 ) {
-	for (id, turnability) in &query {
+	for (id, turnability, center_sprite) in &query {
+		let Some(offset) = center_sprite.0 else {
+			continue;
+		};
 		commands.entity(id).insert(Hoverable {
 			hover_text: match turnability {
 				CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
 				CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
 				CycleTurnability::Never => hover::CYCLE_STILL,
 			},
-			hover_bounding_circle: Some(BoundingCircle::new(Vec2::ZERO, SPRITE_LENGTH / 2.0)),
+			hover_bounding_circle: Some(BoundingCircle::new(offset, SPRITE_LENGTH / 2.0)),
 			hover_bounding_box: None,
 		});
 	}

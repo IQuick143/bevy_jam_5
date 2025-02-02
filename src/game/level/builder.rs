@@ -203,6 +203,15 @@ struct IntermediateVertexData {
 struct IntermediateCycleData {
 	/// Placement of the cycle, if it has been placed yet
 	pub placement: Option<CyclePlacement>,
+	/// Position of the cycle's center indicator, if it has been placed yet
+	///
+	/// Unlike in the level description structures,
+	/// **this is the absolute position in global coordinates**
+	///
+	/// Value of `None` indicates the center has not been placed
+	/// (default position will be used). Value of `Some(None)` indicates
+	/// the center indicator has been explicitly toggled off.
+	pub center_sprite_position: Option<Option<Vec2>>,
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
@@ -367,6 +376,7 @@ impl LevelBuilder {
 		// Add the cycle entry
 		self.cycles.push(IntermediateCycleData {
 			placement: None,
+			center_sprite_position: None,
 			vertex_indices,
 			turnability,
 			linked_cycle: IntermediateLinkStatus::None,
@@ -635,6 +645,20 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	/// Explicitly sets the position of a cycle's center indicator
+	/// or makes it invisible
+	pub fn place_cycle_center(
+		&mut self,
+		target_cycle: usize,
+		position: Option<Vec2>,
+	) -> Result<(), LevelBuilderError> {
+		if target_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
+		}
+		self.cycles[target_cycle].center_sprite_position = Some(position);
+		Ok(())
+	}
+
 	/// Assigns a fixed placement to a partially placed vertex
 	/// ## Parameters
 	/// - `target_vertex` - Index of the vertex to place
@@ -771,6 +795,7 @@ impl LevelBuilder {
 		let forbidden_group_pairs = self.compute_forbidden_groups()?;
 		self.validate_before_build()?;
 		self.materialize_partial_vertex_placements();
+		self.materialize_cycle_center_placements();
 		self.apply_color_label_appearences_to_buttons();
 		self.fit_to_viewport(Aabb2d::new(LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH / 2.0));
 		let cycles = self
@@ -1079,12 +1104,18 @@ impl LevelBuilder {
 		let placement = intermediate
 			.placement
 			.expect("Unplaced cycle in build phase, should have been detected earlier");
+		let center_sprite_position = intermediate.center_sprite_position.expect(
+			"Unplaced cycle center sprite in build phase, should have been materialized earlier",
+		);
+		let center_sprite_appearence =
+			CycleCenterSpriteAppearence(center_sprite_position.map(|p| p - placement.position));
 		let IntermediateLinkStatus::Group(group, relative_direction) = intermediate.linked_cycle
 		else {
 			panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
 		};
 		CycleData {
 			placement,
+			center_sprite_appearence,
 			vertex_indices: intermediate.vertex_indices,
 			turnability: intermediate.turnability,
 			group,
@@ -1278,6 +1309,24 @@ impl LevelBuilder {
 		}
 	}
 
+	/// Iterates through all cycles and sets their center indicator placements
+	/// to a default position for their placement shape if they have not
+	/// been placed explicitly
+	///
+	/// All vertices that are a part of a cycle must have a fixed placement by now
+	fn materialize_cycle_center_placements(&mut self) {
+		for cycle_data in &mut self.cycles {
+			let Some(placement) = cycle_data.placement else {
+				continue;
+			};
+			if cycle_data.center_sprite_position.is_none() {
+				// If center sprite has not been explicitly positioned
+				// or disabled, put it in the cycle center
+				cycle_data.center_sprite_position = Some(Some(placement.position));
+			}
+		}
+	}
+
 	/// Sets a vertex to a fixed placement and checks that it belonged to a particular cycle
 	/// ## Panics
 	/// Panics if the vertex was not previously in [`Partial`](IntermediateVertexPosition::Partial)
@@ -1407,24 +1456,38 @@ impl LevelBuilder {
 		Ok(())
 	}
 
-	/// Calculates the bounding box of all currently placed cycles
+	/// Calculates the bounding box of all currently placed cycles and their center sprites
 	fn get_bounding_box(&self) -> Aabb2d {
 		let min = self
 			.cycles
 			.iter()
-			.filter_map(|cycle| {
+			.map(|cycle| {
 				cycle
 					.placement
 					.map(|p| Self::get_bounding_box_for_cycle(p).min)
+					.unwrap_or(Vec2::INFINITY)
+					.min(
+						cycle
+							.center_sprite_position
+							.and_then(|x| x)
+							.unwrap_or(Vec2::INFINITY),
+					)
 			})
 			.fold(Vec2::INFINITY, Vec2::min);
 		let max = self
 			.cycles
 			.iter()
-			.filter_map(|cycle| {
+			.map(|cycle| {
 				cycle
 					.placement
 					.map(|p| Self::get_bounding_box_for_cycle(p).max)
+					.unwrap_or(Vec2::NEG_INFINITY)
+					.max(
+						cycle
+							.center_sprite_position
+							.and_then(|x| x)
+							.unwrap_or(Vec2::NEG_INFINITY),
+					)
 			})
 			.fold(Vec2::NEG_INFINITY, Vec2::max);
 		let center = (max + min) / 2.0;
@@ -1463,12 +1526,14 @@ impl LevelBuilder {
 			}
 		}
 		for cycle in &mut self.cycles {
-			let Some(p) = &mut cycle.placement else {
-				continue;
-			};
-			p.position = (p.position - bounds_center) * scale + viewport_center;
-			match &mut p.shape {
-				CycleShape::Circle(radius) => *radius *= scale,
+			if let Some(p) = &mut cycle.placement {
+				p.position = (p.position - bounds_center) * scale + viewport_center;
+				match &mut p.shape {
+					CycleShape::Circle(radius) => *radius *= scale,
+				}
+			}
+			if let Some(Some(p)) = &mut cycle.center_sprite_position {
+				*p = (*p - bounds_center) * scale + viewport_center;
 			}
 		}
 	}
