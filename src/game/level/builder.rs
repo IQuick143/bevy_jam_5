@@ -131,12 +131,6 @@ pub enum LevelBuilderError {
 	VertexIndexOutOfRange(usize),
 	/// A vertex shows up multiple times in the same cycle
 	RepeatingVertexInCycle(usize),
-	/// [`add_object`](LevelBuilder::add_object) was called
-	/// more than once on the same vertex
-	VertexAlreadyHasObject(usize),
-	/// [`add_glyph`](LevelBuilder::add_glyph) was called
-	/// more than once on the same vertex
-	VertexAlreadyHasGlyph(usize),
 	/// A cycle has been explicitly assigned negative radius
 	CycleRadiusNotPositive(usize, f32),
 	/// [`build`](LevelBuilder::build) was called
@@ -381,7 +375,7 @@ impl LevelBuilder {
 		Ok(self.cycles.len() - 1)
 	}
 
-	pub fn add_object(
+	pub fn set_object(
 		&mut self,
 		vertex_index: usize,
 		object: ObjectData,
@@ -389,23 +383,17 @@ impl LevelBuilder {
 		if vertex_index >= self.vertices.len() {
 			return Err(LevelBuilderError::VertexIndexOutOfRange(vertex_index));
 		}
-		if self.vertices[vertex_index].object.is_some() {
-			return Err(LevelBuilderError::VertexAlreadyHasObject(vertex_index));
-		}
 		self.vertices[vertex_index].object = Some(object);
 		Ok(())
 	}
 
-	pub fn add_glyph(
+	pub fn set_glyph(
 		&mut self,
 		vertex_index: usize,
 		glyph: GlyphData,
 	) -> Result<(), LevelBuilderError> {
 		if vertex_index >= self.vertices.len() {
 			return Err(LevelBuilderError::VertexIndexOutOfRange(vertex_index));
-		}
-		if self.vertices[vertex_index].glyph.is_some() {
-			return Err(LevelBuilderError::VertexAlreadyHasGlyph(vertex_index));
 		}
 		self.vertices[vertex_index].glyph = Some(glyph);
 		Ok(())
@@ -1444,8 +1432,6 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::VertexIndexOutOfRange(i) => write!(f, "Vertex {i} has been referenced, but there are not that many vertices."),
 			Self::CycleIndexOutOfRange(i) => write!(f, "Cycle {i} has been referenced, but there are not that many cycles."),
 			Self::RepeatingVertexInCycle(i) => write!(f, "Cannot create cycle that contains vertex {i} multiple times."),
-			Self::VertexAlreadyHasObject(i) => write!(f, "Cannot place object at vertex {i} because an object is already there."),
-			Self::VertexAlreadyHasGlyph(i) => write!(f, "Cannot place glyph at vertex {i} because a glyph is already there."),
 			Self::CycleRadiusNotPositive(i, r) => write!(f, "Radius of cycle {i} is not positive ({r})"),
 			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
 			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),

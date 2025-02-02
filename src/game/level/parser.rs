@@ -124,6 +124,7 @@ impl InterpreterBackend for LevelBuilder {
 			"box" => Self::call_box(args),
 			"button" => Self::call_button(args),
 			"vertex" => self.call_vertex(args),
+			"set_thing" => self.call_set_thing(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
 			"put_vertex" => self.call_put_vertex(args),
@@ -334,12 +335,63 @@ impl LevelBuilder {
 
 		let vertex_id = self.add_vertex()?;
 		if let Some(object) = object {
-			self.add_object(vertex_id, object)?;
+			self.set_object(vertex_id, object)?;
 		}
 		if let Some(glyph) = glyph {
-			self.add_glyph(vertex_id, glyph)?;
+			self.set_glyph(vertex_id, glyph)?;
 		}
 		Ok(ReturnValue::pure(Vertex(vertex_id).into()))
+	}
+
+	fn call_set_thing(
+		&mut self,
+		args: &[ArgumentValue<DomainValue>],
+	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
+		use DomainValue::*;
+		use VariableValue::*;
+
+		let mut args = args.iter();
+		let mut target_vertices = Vec::new();
+
+		loop {
+			match args.next() {
+				None => return Err(BadArgumentCount),
+				Some(Separator) => break,
+				Some(Argument(Domain(Vertex(vertex_id)))) => target_vertices.push(*vertex_id),
+				Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			}
+		}
+
+		match args.next() {
+			None | Some(Separator) => return Err(BadArgumentCount),
+			Some(Argument(Domain(Box(color)))) => {
+				for vertex in target_vertices {
+					self.set_object(vertex, ObjectData::Box(*color))?;
+				}
+			}
+			Some(Argument(Domain(Player))) => {
+				for vertex in target_vertices {
+					self.set_object(vertex, ObjectData::Player)?;
+				}
+			}
+			Some(Argument(Domain(Button(color_info)))) => {
+				for vertex in target_vertices {
+					self.set_glyph(vertex, GlyphData::Button(*color_info))?;
+				}
+			}
+			Some(Argument(Domain(Flag))) => {
+				for vertex in target_vertices {
+					self.set_glyph(vertex, GlyphData::Flag)?;
+				}
+			}
+			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+		}
+
+		if args.next().is_some() {
+			return Err(BadArgumentCount);
+		}
+
+		Ok(ReturnValue::with_side_effect(Blank))
 	}
 
 	fn call_cycle(
@@ -357,22 +409,22 @@ impl LevelBuilder {
 				Argument(Blank) => vertices.push(self.add_vertex()?),
 				Argument(Domain(Box(color))) => {
 					let vertex_id = self.add_vertex()?;
-					self.add_object(vertex_id, ObjectData::Box(*color))?;
+					self.set_object(vertex_id, ObjectData::Box(*color))?;
 					vertices.push(vertex_id);
 				}
 				Argument(Domain(Player)) => {
 					let vertex_id = self.add_vertex()?;
-					self.add_object(vertex_id, ObjectData::Player)?;
+					self.set_object(vertex_id, ObjectData::Player)?;
 					vertices.push(vertex_id);
 				}
 				Argument(Domain(Button(color_info))) => {
 					let vertex_id = self.add_vertex()?;
-					self.add_glyph(vertex_id, GlyphData::Button(*color_info))?;
+					self.set_glyph(vertex_id, GlyphData::Button(*color_info))?;
 					vertices.push(vertex_id);
 				}
 				Argument(Domain(Flag)) => {
 					let vertex_id = self.add_vertex()?;
-					self.add_glyph(vertex_id, GlyphData::Flag)?;
+					self.set_glyph(vertex_id, GlyphData::Flag)?;
 					vertices.push(vertex_id);
 				}
 				Argument(Domain(Vertex(id))) => vertices.push(*id),
@@ -838,7 +890,10 @@ cycle_b = cycle('auto'; x _ flag() _);
 
 # Oops, we forgot a cycle, let's add one
 # This defaults to an automatic cycle
-cycle_extra = cycle(_ _ _);
+cycle_extra = cycle(q = vertex(), r = vertex(), s = vertex());
+
+# Objects and glaphs can also be added subsequently
+set_thing(q r; box());
 
 # Cycles can be linked together
 link(cycle_a cycle_extra);
