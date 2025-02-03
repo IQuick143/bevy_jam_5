@@ -178,32 +178,25 @@ fn functions() {
 		fn call_function<'a>(
 			&mut self,
 			function_name: &str,
-			args: &[ArgumentValue<'a, Self::Value>],
+			mut args: ArgumentStream<'a, '_, NoDomainValue>,
 			_: WarningSink<Self::Warning>,
 		) -> Result<
 			ReturnValue<'a, Self::Value>,
 			FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
 		> {
 			match self.invocation_count {
-				0 => assert!(matches!(
-					(function_name, args),
-					(
-						"myfun",
-						[ArgumentValue::Argument(VariableValue::Float(0.0))]
-					)
-				)),
-				1 => assert!(matches!(
-					(function_name, args),
-					(
-						"otherfun",
-						[
-							ArgumentValue::Argument(VariableValue::Int(42)),
-							ArgumentValue::Argument(VariableValue::String("hello")),
-							ArgumentValue::Separator,
-							ArgumentValue::Argument(VariableValue::Blank),
-						]
-					)
-				)),
+				0 => {
+					assert_eq!(function_name, "myfun");
+					assert_eq!(args.read_single_as(), Ok(0.0));
+				}
+				1 => {
+					assert_eq!(function_name, "otherfun");
+					assert_eq!(args.read_as(), Ok(42));
+					assert_eq!(args.read_as(), Ok("hello"));
+					assert!(args.read_separator().is_ok());
+					assert!(args.read_blank().is_ok());
+					assert!(args.read_end().is_ok());
+				}
 				2.. => panic!("Function was called more times than expected"),
 			}
 			self.invocation_count += 1;

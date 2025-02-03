@@ -73,10 +73,8 @@ impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for LogicErr
 pub enum FunctionCallError<E: std::error::Error, T: DomainVariableType> {
 	/// No function of the given name exists
 	FunctionDoesNotExist,
-	/// Incorrect number of arguments passed to the function
-	BadArgumentCount,
-	/// Incorrect types of arguments
-	TypeError(VariableType<T>),
+	/// Incorrect arguments were passed
+	ArgumentError(ArgumentError<T>),
 	/// Domain-specific error defined by [`InterpreterBackend`]
 	Domain(E),
 }
@@ -87,8 +85,7 @@ impl<E: std::error::Error, T: DomainVariableType> std::fmt::Display for Function
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::FunctionDoesNotExist => f.write_str("function does not exist"),
-			Self::BadArgumentCount => f.write_str("incorrect number of arguments"),
-			Self::TypeError(ty) => f.write_fmt(format_args!("argument has incorrect type {ty}")),
+			Self::ArgumentError(e) => e.fmt(f),
 			Self::Domain(e) => std::fmt::Display::fmt(e, f),
 		}
 	}
@@ -107,8 +104,7 @@ impl<E: std::error::Error, T: DomainVariableType> FunctionCallError<E, T> {
 	) -> FunctionCallError<F, T> {
 		match self {
 			Self::FunctionDoesNotExist => FunctionCallError::FunctionDoesNotExist,
-			Self::BadArgumentCount => FunctionCallError::BadArgumentCount,
-			Self::TypeError(t) => FunctionCallError::TypeError(t),
+			Self::ArgumentError(e) => FunctionCallError::ArgumentError(e),
 			Self::Domain(x) => FunctionCallError::Domain(map(x)),
 		}
 	}
@@ -119,10 +115,63 @@ impl<E: std::error::Error, T: DomainVariableType> FunctionCallError<E, T> {
 	) -> FunctionCallError<E, U> {
 		match self {
 			Self::FunctionDoesNotExist => FunctionCallError::FunctionDoesNotExist,
-			Self::BadArgumentCount => FunctionCallError::BadArgumentCount,
-			Self::TypeError(t) => FunctionCallError::TypeError(t.map_domain(map)),
+			Self::ArgumentError(e) => FunctionCallError::ArgumentError(e.map_domain(map)),
 			Self::Domain(x) => FunctionCallError::Domain(x),
 		}
+	}
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ArgumentError<T: DomainVariableType> {
+	/// Incorrect number of arguments passed to the function
+	BadArgumentCount,
+	/// Incorrect types of arguments
+	TypeError(VariableType<T>),
+	/// Value of argument is out of range or not usable
+	InvalidValue,
+}
+
+impl<T: DomainVariableType> ArgumentError<T> {
+	pub fn map_domain<U: DomainVariableType>(self, map: impl FnOnce(T) -> U) -> ArgumentError<U> {
+		match self {
+			Self::BadArgumentCount => ArgumentError::BadArgumentCount,
+			Self::TypeError(t) => ArgumentError::TypeError(t.map_domain(map)),
+			Self::InvalidValue => ArgumentError::InvalidValue,
+		}
+	}
+}
+
+impl<T: DomainVariableType> std::fmt::Display for ArgumentError<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::BadArgumentCount => f.write_str("incorrect number of arguments"),
+			Self::TypeError(ty) => write!(f, "argument has incorrect type {ty}"),
+			Self::InvalidValue => f.write_str("argument value is invalid"),
+		}
+	}
+}
+
+impl<E: std::error::Error, T: DomainVariableType> From<ArgumentError<T>>
+	for FunctionCallError<E, T>
+{
+	fn from(value: ArgumentError<T>) -> Self {
+		Self::ArgumentError(value)
+	}
+}
+
+pub trait IntoArgumentError<T: DomainVariableType> {
+	fn into_argument_error(self) -> ArgumentError<T>;
+}
+
+impl<T: DomainVariableType, U: Into<ArgumentError<T>>> IntoArgumentError<T> for U {
+	fn into_argument_error(self) -> ArgumentError<T> {
+		self.into()
+	}
+}
+
+impl<T: DomainVariableType> IntoArgumentError<T> for VariableType<T> {
+	fn into_argument_error(self) -> ArgumentError<T> {
+		ArgumentError::TypeError(self)
 	}
 }
 
@@ -185,6 +234,160 @@ impl<'a, E: std::error::Error> WarningSink<'a, E> {
 			warning_stash: self.warning_stash,
 			loc: self.loc.clone(),
 		}
+	}
+}
+
+/// Container with arguments that gets passed to user implementations of functions
+#[derive(Clone, Debug)]
+pub struct ArgumentStream<'a, 's, T: DomainVariableValue + 'a>(&'s [ArgumentValue<'a, T>]);
+
+impl<'a, 's, T: DomainVariableValue + 'a> ArgumentStream<'a, 's, T> {
+	/// Removes the first argument from the stream if it iis a separator,
+	/// fails otherwise
+	pub fn read_separator(&mut self) -> Result<(), ArgumentError<T::Type>> {
+		match self.peek() {
+			Some(ArgumentValue::Separator) => {
+				self.next();
+				Ok(())
+			}
+			_ => Err(ArgumentError::BadArgumentCount),
+		}
+	}
+
+	pub fn optional_separator(&mut self) {
+		let _ = self.read_separator();
+	}
+
+	/// Fails if there are any remaining arguments, including separators
+	pub fn read_end(&self) -> Result<(), ArgumentError<T::Type>> {
+		if self.peek().is_some() {
+			Err(ArgumentError::BadArgumentCount)
+		} else {
+			Ok(())
+		}
+	}
+
+	/// Removes the first argument from the stream if it iis a separator,
+	/// otherwise fails if there are any arguments left
+	pub fn read_end_or_separator(&mut self) -> Result<(), ArgumentError<T::Type>> {
+		match self.peek() {
+			Some(ArgumentValue::Separator) => {
+				self.next();
+				Ok(())
+			}
+			None => Ok(()),
+			_ => Err(ArgumentError::BadArgumentCount),
+		}
+	}
+
+	/// Attempts to convert the next argument to the specified type,
+	/// fails if there is not an argument or it does not have the correct type
+	pub fn read_as<U>(&mut self) -> Result<U, ArgumentError<T::Type>>
+	where
+		&'s VariableValue<'a, T>: TryInto<U, Error: IntoArgumentError<T::Type>>,
+	{
+		match self.peek() {
+			Some(ArgumentValue::Argument(arg)) => {
+				let result = arg
+					.try_into()
+					.map_err(IntoArgumentError::into_argument_error);
+				if result.is_ok() {
+					self.next();
+				}
+				result
+			}
+			_ => Err(ArgumentError::BadArgumentCount),
+		}
+	}
+
+	pub fn read_single_as<U>(&mut self) -> Result<U, ArgumentError<T::Type>>
+	where
+		&'s VariableValue<'a, T>: TryInto<U, Error: IntoArgumentError<T::Type>>,
+	{
+		if !self.is_on_last_argument() {
+			return Err(ArgumentError::BadArgumentCount);
+		}
+		self.read_as()
+	}
+
+	pub fn read_as_until_end_or_separator<U>(&mut self) -> Result<Option<U>, ArgumentError<T::Type>>
+	where
+		&'s VariableValue<'a, T>: TryInto<U, Error: IntoArgumentError<T::Type>>,
+	{
+		match self.peek() {
+			Some(ArgumentValue::Argument(arg)) => {
+				let result = arg
+					.try_into()
+					.map_err(IntoArgumentError::into_argument_error);
+				if result.is_ok() {
+					self.next();
+				}
+				result.map(Some)
+			}
+			_ => Ok(None),
+		}
+	}
+
+	pub fn optional_read_as<U>(&mut self) -> Option<U>
+	where
+		for<'u> &'u VariableValue<'a, T>: TryInto<U, Error: IntoArgumentError<T::Type>>,
+	{
+		self.read_as().ok()
+	}
+
+	pub fn read_as_or_blank_until_end_or_separator<U>(
+		&mut self,
+	) -> Result<Option<U>, ArgumentError<T::Type>>
+	where
+		&'s VariableValue<'a, T>: TryInto<U, Error: IntoArgumentError<T::Type>>,
+	{
+		self.read_blank()
+			.map(|_| None)
+			.or_else(|_| self.read_as_until_end_or_separator())
+	}
+
+	pub fn read_blank(&mut self) -> Result<(), ArgumentError<T::Type>> {
+		match self.peek() {
+			Some(ArgumentValue::Argument(VariableValue::Blank)) => {
+				self.next();
+				Ok(())
+			}
+			Some(ArgumentValue::Argument(other)) => Err(ArgumentError::TypeError(other.get_type())),
+			_ => Err(ArgumentError::BadArgumentCount),
+		}
+	}
+
+	pub fn read(&mut self) -> Result<&'s VariableValue<'a, T>, ArgumentError<T::Type>> {
+		match self.peek() {
+			Some(ArgumentValue::Argument(arg)) => {
+				self.next();
+				Ok(arg)
+			}
+			_ => Err(ArgumentError::BadArgumentCount),
+		}
+	}
+
+	pub fn read_single(&mut self) -> Result<&'s VariableValue<'a, T>, ArgumentError<T::Type>> {
+		if !self.is_on_last_argument() {
+			return Err(ArgumentError::BadArgumentCount);
+		}
+		self.read()
+	}
+
+	pub fn read_until_end_or_separator(&mut self) -> Option<&'s VariableValue<'a, T>> {
+		self.read().ok()
+	}
+
+	fn is_on_last_argument(&self) -> bool {
+		self.0.len() == 1
+	}
+
+	fn peek(&self) -> Option<&'s ArgumentValue<'a, T>> {
+		self.0.first()
+	}
+
+	fn next(&mut self) {
+		self.0 = &self.0[1..];
 	}
 }
 
@@ -328,11 +531,12 @@ impl<E: std::error::Error, T: DomainVariableType> InterpreterEndState<E, T> {
 }
 
 #[derive(Clone, Debug)]
-pub enum ArgumentValue<'a, T: DomainVariableValue + 'a> {
+enum ArgumentValue<'a, T: DomainVariableValue + 'a> {
 	Argument(VariableValue<'a, T>),
 	Separator,
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct ReturnValue<'a, T: DomainVariableValue + 'a> {
 	pub value: VariableValue<'a, T>,
 	pub must_use: bool,
@@ -349,6 +553,10 @@ impl<'a, T: DomainVariableValue + 'a> ReturnValue<'a, T> {
 
 	pub fn with_side_effect(value: VariableValue<'a, T>) -> Self {
 		Self::new(value, false)
+	}
+
+	pub fn void() -> Self {
+		Self::with_side_effect(VariableValue::Blank)
 	}
 
 	pub fn map_domain<U: DomainVariableValue + 'a>(
@@ -374,7 +582,7 @@ pub trait InterpreterBackend {
 	fn call_function<'a>(
 		&mut self,
 		_function_name: &str,
-		_args: &[ArgumentValue<'a, Self::Value>],
+		_args: ArgumentStream<'a, '_, Self::Value>,
 		_warnings: WarningSink<Self::Warning>,
 	) -> Result<
 		ReturnValue<'a, Self::Value>,
@@ -675,7 +883,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 					};
 					match self.backend.call_function(
 						instruction.function_name,
-						&instruction.argument_values,
+						ArgumentStream(&instruction.argument_values),
 						warning_sink,
 					) {
 						Ok(returned_value) => {

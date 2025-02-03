@@ -1,19 +1,5 @@
 use super::{interpreter::*, values::*};
 
-macro_rules! float_method {
-	( $name:ident ( $args:expr ) ) => {
-		match $args {
-			[ArgumentValue::Argument(VariableValue::Int(i))] => Ok(*i as f32),
-			[ArgumentValue::Argument(VariableValue::Float(f))] => Ok(*f),
-			[ArgumentValue::Argument(other)] => Err(FunctionCallError::TypeError(other.get_type())),
-			_ => Err(FunctionCallError::BadArgumentCount),
-		}
-		.map(f32::$name)
-		.map(VariableValue::Float)
-		.map(ReturnValue::pure)
-	};
-}
-
 pub fn default_builtin_variables<'a, T: DomainVariableValue + 'a>() -> VariablePool<'a, T> {
 	VariablePool::from_iter([
 		("pi", std::f32::consts::PI.into()),
@@ -63,7 +49,7 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 	fn call_function<'a>(
 		&mut self,
 		function_name: &str,
-		args: &[ArgumentValue<'a, Self::Value>],
+		args: ArgumentStream<'a, '_, Self::Value>,
 		_: WarningSink<Self::Warning>,
 	) -> Result<
 		ReturnValue<'a, Self::Value>,
@@ -76,54 +62,55 @@ impl InterpreterBackend for DefaultInterpreterBackend {
 impl DefaultInterpreterBackend {
 	pub fn call_function<T: DomainVariableValue>(
 		function_name: &str,
-		args: &[ArgumentValue<T>],
+		mut args: ArgumentStream<T>,
 	) -> Result<
 		ReturnValue<'static, <Self as InterpreterBackend>::Value>,
 		FunctionCallError<<Self as InterpreterBackend>::Error, T::Type>,
 	> {
-		match function_name {
-			"sqrt" => float_method!(sqrt(args)),
-			"sin" => float_method!(sin(args)),
-			"cos" => float_method!(cos(args)),
-			"tan" => float_method!(tan(args)),
-			"floor" => float_method!(floor(args)),
-			"ceil" => float_method!(ceil(args)),
-			"round" => float_method!(round(args)),
-			"abs" => Self::abs(args).map(ReturnValue::pure),
-			"int" => Self::int(args).map(ReturnValue::pure),
-			_ => Err(FunctionCallError::FunctionDoesNotExist),
-		}
+		let result = match function_name {
+			"sqrt" => args.read_single_as::<f32>()?.sqrt().into(),
+			"sin" => args.read_single_as::<f32>()?.sin().into(),
+			"cos" => args.read_single_as::<f32>()?.cos().into(),
+			"tan" => args.read_single_as::<f32>()?.tan().into(),
+			"floor" => args.read_single_as::<f32>()?.floor().into(),
+			"ceil" => args.read_single_as::<f32>()?.ceil().into(),
+			"round" => args.read_single_as::<f32>()?.round().into(),
+			"abs" => Self::abs(args)?,
+			"int" => Self::int(args)?,
+			_ => return Err(FunctionCallError::FunctionDoesNotExist),
+		};
+		Ok(ReturnValue::pure(result))
 	}
 
 	fn abs<T: DomainVariableValue>(
-		args: &[ArgumentValue<T>],
+		mut args: ArgumentStream<T>,
 	) -> Result<
 		VariableValue<'static, <Self as InterpreterBackend>::Value>,
 		FunctionCallError<<Self as InterpreterBackend>::Error, T::Type>,
 	> {
-		match args {
-			[ArgumentValue::Argument(VariableValue::Int(i))] => i
+		use VariableValue::*;
+		match args.read_single()? {
+			Int(i) => i
 				.checked_abs()
 				.map(VariableValue::Int)
 				.ok_or(ArithmeticOverflowError.into()),
-			[ArgumentValue::Argument(VariableValue::Float(f))] => Ok(VariableValue::Float(f.abs())),
-			[ArgumentValue::Argument(other)] => Err(FunctionCallError::TypeError(other.get_type())),
-			_ => Err(FunctionCallError::BadArgumentCount),
+			Float(f) => Ok(f.abs().into()),
+			other => Err(ArgumentError::TypeError(other.get_type()).into()),
 		}
 	}
 
 	fn int<T: DomainVariableValue>(
-		args: &[ArgumentValue<T>],
+		mut args: ArgumentStream<T>,
 	) -> Result<
 		VariableValue<'static, <Self as InterpreterBackend>::Value>,
 		FunctionCallError<<Self as InterpreterBackend>::Error, T::Type>,
 	> {
-		match args {
-			[ArgumentValue::Argument(VariableValue::Int(i))] => Ok(VariableValue::Int(*i)),
-			[ArgumentValue::Argument(VariableValue::Float(f))] => Ok(VariableValue::Int(*f as i32)),
-			[ArgumentValue::Argument(VariableValue::Bool(b))] => Ok(VariableValue::Int(*b as i32)),
-			[ArgumentValue::Argument(other)] => Err(FunctionCallError::TypeError(other.get_type())),
-			_ => Err(FunctionCallError::BadArgumentCount),
+		use VariableValue::*;
+		match args.read_single()? {
+			Int(i) => Ok((*i).into()),
+			Float(f) => Ok((*f as i32).into()),
+			Bool(b) => Ok((*b as i32).into()),
+			other => Err(ArgumentError::TypeError(other.get_type()).into()),
 		}
 	}
 }

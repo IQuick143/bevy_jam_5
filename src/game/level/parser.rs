@@ -1,9 +1,14 @@
 use super::{builder::*, *};
 use crate::epilang::{
 	self,
-	interpreter::{ArgumentValue::*, FunctionCallError::*, *},
+	interpreter::{
+		ArgumentError::{self, *},
+		FunctionCallError::*,
+		*,
+	},
 	values::*,
 };
+use itertools::Itertools as _;
 use std::f32::consts::PI;
 
 const MAX_INTERPRETER_ITERATIONS: u32 = 2000;
@@ -41,10 +46,16 @@ pub fn parse(
 	Ok(interpreter.backend.build()?)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct VertexId(pub usize);
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct CycleId(pub usize);
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum DomainValue {
-	Vertex(usize),
-	Cycle(usize),
+	Vertex(VertexId),
+	Cycle(CycleId),
 	Object(ObjectData),
 	Glyph(GlyphData),
 	Color(LogicalColor),
@@ -85,6 +96,53 @@ impl epilang::values::DomainVariableValue for DomainValue {
 	}
 }
 
+macro_rules! impl_try_into_for_domain_value {
+	( $( $variant:ident ( $type:ty ) $({ $($extra_pat:pat => $extra_expr:expr),* $(,)? })? ),* $(,)? ) => {
+		$(
+			impl TryFrom<&VariableValue<'_, DomainValue>> for $type {
+				type Error = ArgumentError<DomainType>;
+				fn try_from(value: &VariableValue<DomainValue>) -> Result<Self, Self::Error> {
+					use VariableValue::*;
+					match value {
+						Domain(DomainValue::$variant(x)) => Ok(*x),
+						$($($extra_pat => $extra_expr,)*)?
+						_ => Err(value.get_type().into_argument_error()),
+					}
+				}
+			}
+
+			impl TryFrom<VariableValue<'_, DomainValue>> for $type {
+				type Error = ArgumentError<DomainType>;
+				fn try_from(value: VariableValue<DomainValue>) -> Result<Self, Self::Error> {
+					Self::try_from(&value)
+				}
+			}
+
+			impl From<$type> for VariableValue<'_, DomainValue> {
+				fn from(value: $type) -> Self {
+					Self::Domain(DomainValue::$variant(value))
+				}
+			}
+		)*
+	};
+}
+
+impl_try_into_for_domain_value! {
+	Vertex(VertexId),
+	Cycle(CycleId),
+	Object(ObjectData),
+	Glyph(GlyphData),
+	Color(LogicalColor) {
+		Int(i) => (*i)
+			.try_into()
+			.map(LogicalColor::new)
+			.map_err(|_| InvalidValue),
+		String(s) => pictogram_name_to_id(s)
+			.map(LogicalColor::pictogram)
+			.map_err(|_| InvalidValue),
+	}
+}
+
 impl InterpreterBackend for LevelBuilder {
 	type Error = RuntimeError;
 	type Warning = RuntimeWarning;
@@ -93,15 +151,17 @@ impl InterpreterBackend for LevelBuilder {
 	fn call_function<'a>(
 		&mut self,
 		function_name: &str,
-		args: &[ArgumentValue<'a, Self::Value>],
+		args: ArgumentStream<'a, '_, Self::Value>,
 		warnings: WarningSink<Self::Warning>,
 	) -> Result<
 		ReturnValue<'a, Self::Value>,
 		FunctionCallError<Self::Error, <Self::Value as DomainVariableValue>::Type>,
 	> {
 		// Use the default built-in math functions first, only proceed if none match
-		let builtin_function_result =
-			epilang::builtins::DefaultInterpreterBackend::call_function(function_name, args);
+		let builtin_function_result = epilang::builtins::DefaultInterpreterBackend::call_function(
+			function_name,
+			args.clone(),
+		);
 		if !matches!(builtin_function_result, Err(FunctionDoesNotExist)) {
 			return Ok(builtin_function_result
 				.map_err(|err| err.map_domain(Into::into))?
@@ -131,81 +191,32 @@ impl InterpreterBackend for LevelBuilder {
 }
 
 impl LevelBuilder {
-	fn construct_color(
-		arg: &VariableValue<DomainValue>,
-		force_pictogram: bool,
-	) -> Result<LogicalColor, FunctionCallError<RuntimeError, DomainType>> {
+	fn read_color_label_appearence(
+		args: &mut ArgumentStream<DomainValue>,
+	) -> Result<ButtonColorLabelAppearence, ArgumentError<DomainType>> {
 		use VariableValue::*;
-		match arg {
-			Int(i) => {
-				let color_index = (*i)
-					.try_into()
-					.map_err(|_| RuntimeError::InvalidColorIndex(*i))?;
-				Ok((if force_pictogram {
-					LogicalColor::pictogram
-				} else {
-					LogicalColor::new
-				})(color_index))
+
+		let position = match args.read_until_end_or_separator() {
+			None | Some(Blank) => ButtonColorLabelPosition::Inside,
+			Some(Int(i)) => ButtonColorLabelPosition::AnglePlaced(PI * *i as f32 / 180.0),
+			Some(Float(f)) => ButtonColorLabelPosition::AnglePlaced(PI * *f / 180.0),
+			Some(String("left")) => ButtonColorLabelPosition::AnglePlaced(-PI / 2.0),
+			Some(String("above")) => ButtonColorLabelPosition::AnglePlaced(0.0),
+			Some(String("right")) => ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+			Some(String("below")) => ButtonColorLabelPosition::AnglePlaced(PI),
+			Some(String("rot")) => {
+				let degrees: f32 = args.read_as()?;
+				ButtonColorLabelPosition::AngleRotated(PI * degrees / 180.0)
 			}
-			String(name) => Ok(LogicalColor::pictogram(
-				pictogram_name_to_id(name)
-					.map_err(|_| RuntimeError::UnknownColorName(name.to_string()))?,
-			)),
-			other => Err(TypeError(other.get_type())),
-		}
-	}
-
-	fn match_or_construct_color(
-		arg: &VariableValue<DomainValue>,
-	) -> Result<LogicalColor, FunctionCallError<RuntimeError, DomainType>> {
-		match arg {
-			VariableValue::Domain(DomainValue::Color(color)) => Ok(*color),
-			_ => Self::construct_color(arg, false),
-		}
-	}
-
-	fn construct_label_position(
-		args: &[ArgumentValue<DomainValue>],
-	) -> Result<ButtonColorLabelAppearence, FunctionCallError<RuntimeError, DomainType>> {
-		use VariableValue::*;
-		let mut args = args.iter();
-
-		let position = match args.next() {
-			None | Some(Argument(Blank)) => ButtonColorLabelPosition::Inside,
-			Some(Separator) => return Err(BadArgumentCount),
-			Some(Argument(Int(i))) => ButtonColorLabelPosition::AnglePlaced(PI * *i as f32 / 180.0),
-			Some(Argument(Float(f))) => ButtonColorLabelPosition::AnglePlaced(PI * *f / 180.0),
-			Some(Argument(String("left"))) => ButtonColorLabelPosition::AnglePlaced(-PI / 2.0),
-			Some(Argument(String("above"))) => ButtonColorLabelPosition::AnglePlaced(0.0),
-			Some(Argument(String("right"))) => ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
-			Some(Argument(String("below"))) => ButtonColorLabelPosition::AnglePlaced(PI),
-			Some(Argument(String("rot"))) => match args.next() {
-				Some(Argument(Int(i))) => {
-					ButtonColorLabelPosition::AngleRotated(PI * *i as f32 / 180.0)
-				}
-				Some(Argument(Float(f))) => ButtonColorLabelPosition::AngleRotated(PI * *f / 180.0),
-				Some(Argument(other)) => return Err(TypeError(other.get_type())),
-				_ => return Err(BadArgumentCount),
-			},
-			Some(Argument(String(other))) => {
-				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
-			}
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			Some(String(_)) => return Err(InvalidValue),
+			Some(other) => return Err(TypeError(other.get_type())),
 		};
 
-		let has_arrow_tip = match args.next() {
-			None | Some(Argument(Blank)) | Some(Argument(String("square"))) => false,
-			Some(Argument(String("arrow"))) => true,
-			Some(Argument(String(other))) => {
-				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
-			}
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
-			Some(Separator) => return Err(BadArgumentCount),
+		let has_arrow_tip = match args.read_as_or_blank_until_end_or_separator()? {
+			None | Some("square") => false,
+			Some("arrow") => true,
+			Some(_) => return Err(InvalidValue),
 		};
-
-		if args.next().is_some() {
-			return Err(BadArgumentCount);
-		}
 
 		Ok(ButtonColorLabelAppearence {
 			position,
@@ -214,96 +225,67 @@ impl LevelBuilder {
 	}
 
 	fn call_color(
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		match args {
-			[Argument(arg)] => Self::construct_color(arg, false)
-				.map(DomainValue::Color)
-				.map(VariableValue::from)
-				.map(ReturnValue::pure),
-			_ => Err(BadArgumentCount),
-		}
+		Ok(ReturnValue::pure(
+			args.read_single_as::<LogicalColor>()?.into(),
+		))
 	}
 
 	fn call_pict(
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		match args {
-			[Argument(arg)] => Self::construct_color(arg, true)
-				.map(DomainValue::Color)
-				.map(VariableValue::from)
-				.map(ReturnValue::pure),
-			_ => Err(BadArgumentCount),
-		}
+		let color_index = match args.read_single()? {
+			VariableValue::Int(i) => (*i).try_into().map_err(|_| InvalidValue)?,
+			VariableValue::String(s) => pictogram_name_to_id(s).map_err(|_| InvalidValue)?,
+			other => return Err(TypeError(other.get_type()).into()),
+		};
+		Ok(ReturnValue::pure(
+			LogicalColor::pictogram(color_index).into(),
+		))
 	}
 
 	fn call_flag(
-		args: &[ArgumentValue<DomainValue>],
+		args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		match args {
-			[] => Ok(ReturnValue::pure(
-				DomainValue::Glyph(GlyphData::Flag).into(),
-			)),
-			_ => Err(BadArgumentCount),
-		}
+		args.read_end()?;
+		Ok(ReturnValue::pure(GlyphData::Flag.into()))
 	}
 
 	fn call_player(
-		args: &[ArgumentValue<DomainValue>],
+		args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		match args {
-			[] => Ok(ReturnValue::pure(
-				DomainValue::Object(ObjectData::Player).into(),
-			)),
-			_ => Err(BadArgumentCount),
-		}
+		args.read_end()?;
+		Ok(ReturnValue::pure(ObjectData::Player.into()))
 	}
 
 	fn call_box(
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use VariableValue::*;
-		match args {
-			[] | [Argument(Blank)] => Ok(ReturnValue::pure(
-				DomainValue::Object(ObjectData::Box(None)).into(),
-			)),
-			[Argument(arg)] => Ok(ReturnValue::pure(
-				DomainValue::Object(ObjectData::Box(Some(Self::match_or_construct_color(arg)?)))
-					.into(),
-			)),
-			_ => Err(BadArgumentCount),
-		}
+		let color = args.read_as_or_blank_until_end_or_separator()?;
+		args.read_end()?;
+		Ok(ReturnValue::pure(ObjectData::Box(color).into()))
 	}
 
 	fn call_button(
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use VariableValue::*;
-		match args {
-			[] | [Argument(Blank)] => Ok(ReturnValue::pure(
-				DomainValue::Glyph(GlyphData::Button(None)).into(),
-			)),
-			[Argument(arg)] => Ok(ReturnValue::pure(
-				DomainValue::Glyph(GlyphData::Button(Some((
-					Self::match_or_construct_color(arg)?,
-					Default::default(),
-				))))
-				.into(),
-			)),
-			[Argument(arg), Separator, rest @ ..] => Ok(ReturnValue::pure(
-				DomainValue::Glyph(GlyphData::Button(Some((
-					Self::match_or_construct_color(arg)?,
-					Self::construct_label_position(rest)?,
-				))))
-				.into(),
-			)),
-			_ => Err(BadArgumentCount),
+		if let Some(color) = args.read_as_or_blank_until_end_or_separator()? {
+			args.read_end_or_separator()?;
+			let label_pos = Self::read_color_label_appearence(&mut args)?;
+			args.read_end()?;
+			Ok(ReturnValue::pure(
+				GlyphData::Button(Some((color, label_pos))).into(),
+			))
+		} else {
+			args.read_end()?;
+			Ok(ReturnValue::pure(GlyphData::Button(None).into()))
 		}
 	}
 
 	fn call_vertex(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
 		use DomainValue::*;
 		use VariableValue::*;
@@ -321,15 +303,13 @@ impl LevelBuilder {
 			Ok(())
 		};
 
-		match args {
-			[] => {}
-			[Argument(arg)] => handle_argument(arg)?,
-			[Argument(left), Argument(right)] => {
-				handle_argument(left)?;
-				handle_argument(right)?;
-			}
-			_ => return Err(BadArgumentCount),
-		}
+		args.read_until_end_or_separator()
+			.map(&mut handle_argument)
+			.transpose()?;
+		args.read_until_end_or_separator()
+			.map(&mut handle_argument)
+			.transpose()?;
+		args.read_end()?;
 
 		let vertex_id = self.add_vertex()?;
 		if let Some(object) = object {
@@ -338,310 +318,202 @@ impl LevelBuilder {
 		if let Some(glyph) = glyph {
 			self.set_glyph(vertex_id, glyph)?;
 		}
-		Ok(ReturnValue::pure(Vertex(vertex_id).into()))
+		Ok(ReturnValue::pure(VertexId(vertex_id).into()))
 	}
 
 	fn call_set_thing(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
-
-		let mut args = args.iter();
 		let mut target_vertices = Vec::new();
-
-		loop {
-			match args.next() {
-				None => return Err(BadArgumentCount),
-				Some(Separator) => break,
-				Some(Argument(Domain(Vertex(vertex_id)))) => target_vertices.push(*vertex_id),
-				Some(Argument(other)) => return Err(TypeError(other.get_type())),
-			}
+		while let Some(VertexId(vertex_id)) = args.read_as_until_end_or_separator()? {
+			target_vertices.push(vertex_id);
 		}
+		args.read_separator()?;
 
-		match args.next() {
-			None | Some(Separator) => return Err(BadArgumentCount),
-			Some(Argument(Domain(Object(object)))) => {
+		match args.read()? {
+			VariableValue::Domain(DomainValue::Object(object)) => {
 				for vertex in target_vertices {
 					self.set_object(vertex, *object)?;
 				}
 			}
-			Some(Argument(Domain(Glyph(glyph)))) => {
+			VariableValue::Domain(DomainValue::Glyph(glyph)) => {
 				for vertex in target_vertices {
 					self.set_glyph(vertex, *glyph)?;
 				}
 			}
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
+			other => return Err(TypeError(other.get_type()).into()),
 		}
 
-		if args.next().is_some() {
-			return Err(BadArgumentCount);
-		}
-
-		Ok(ReturnValue::with_side_effect(Blank))
+		args.read_end()?;
+		Ok(ReturnValue::void())
 	}
 
 	fn call_cycle(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
 		use DomainValue::*;
 		use VariableValue::*;
-		let mut args = args.iter();
-		let mut vertices = Vec::new();
-		let mut turnability = None;
 
-		while let Some(arg) = args.next() {
+		let turnability;
+		if let Some(flag) = args.optional_read_as() {
+			turnability = match flag {
+				"manual" => CycleTurnability::WithPlayer,
+				"auto" => CycleTurnability::Always,
+				"still" => CycleTurnability::Never,
+				_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
+			};
+			args.read_end_or_separator()?;
+		} else {
+			turnability = CycleTurnability::default();
+			args.optional_separator();
+		}
+
+		let mut vertices = Vec::new();
+		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {
-				Argument(Blank) => vertices.push(self.add_vertex()?),
-				Argument(Domain(Object(object))) => {
+				Blank => vertices.push(self.add_vertex()?),
+				Domain(Object(object)) => {
 					let vertex_id = self.add_vertex()?;
 					self.set_object(vertex_id, *object)?;
 					vertices.push(vertex_id);
 				}
-				Argument(Domain(Glyph(glyph))) => {
+				Domain(Glyph(glyph)) => {
 					let vertex_id = self.add_vertex()?;
 					self.set_glyph(vertex_id, *glyph)?;
 					vertices.push(vertex_id);
 				}
-				Argument(Domain(Vertex(id))) => vertices.push(*id),
-				Argument(String(flag)) => {
-					// Flag is only valid as the first argument
-					// This is a type error otherwise
-					if !vertices.is_empty() || turnability.is_some() {
-						return Err(TypeError(epilang::values::VariableType::String));
-					}
-					turnability = Some(match *flag {
-						"manual" => CycleTurnability::WithPlayer,
-						"auto" => CycleTurnability::Always,
-						"still" => CycleTurnability::Never,
-						_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
-					});
-					// A semicolon is expected next
-					match args.next() {
-						None | Some(Separator) => {}
-						Some(Argument(_)) => return Err(BadArgumentCount),
-					}
-				}
-				Argument(other) => return Err(TypeError(other.get_type())),
-				Separator => {
-					// Only a leading semicolon is allowed (indicates empty flag section)
-					if !vertices.is_empty() || turnability.is_some() {
-						return Err(BadArgumentCount);
-					}
-					// Mark the turnability flag as set to prevent setting it again
-					turnability = Some(CycleTurnability::default());
-				}
+				Domain(Vertex(VertexId(id))) => vertices.push(*id),
+				other => return Err(TypeError(other.get_type()).into()),
 			}
 		}
 
-		let cycle_id = self.add_cycle(turnability.unwrap_or_default(), vertices)?;
-		Ok(ReturnValue::with_side_effect(Domain(Cycle(cycle_id))))
+		args.read_end()?;
+		let cycle_id = self.add_cycle(turnability, vertices)?;
+		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
 	fn call_circle(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
-
-		match args {
-			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(arg1), Argument(arg2), Argument(arg3)] =>
-			{
-				let x = arg1.try_into().map_err(FunctionCallError::TypeError)?;
-				let y = arg2.try_into().map_err(FunctionCallError::TypeError)?;
-				let r = arg3.try_into().map_err(FunctionCallError::TypeError)?;
-				self.place_cycle(*cycle_id, Vec2::new(x, y), r, &[])?;
-				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
-			}
-			[Argument(other), Separator, Argument(_), Argument(_), Argument(_)] => {
-				Err(TypeError(other.get_type()))
-			}
-			_ => Err(BadArgumentCount),
-		}
+		let CycleId(cycle_id) = args.read_as()?;
+		args.read_separator()?;
+		let x = args.read_as()?;
+		let y = args.read_as()?;
+		let r = args.read_as()?;
+		args.read_end()?;
+		self.place_cycle(cycle_id, Vec2::new(x, y), r, &[])?;
+		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
 	fn call_put_center(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
-
-		match args {
-			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(arg1), Argument(arg2)] => {
-				let x = arg1.try_into().map_err(TypeError)?;
-				let y = arg2.try_into().map_err(TypeError)?;
-				self.place_cycle_center(*cycle_id, Some(Vec2::new(x, y)))?;
-				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
-			}
-			[Argument(Domain(Cycle(cycle_id))), Separator, Argument(Blank)] => {
-				self.place_cycle_center(*cycle_id, None)?;
-				Ok(ReturnValue::with_side_effect(Domain(Cycle(*cycle_id))))
-			}
-			[Argument(Domain(Cycle(_))), Separator, Argument(other)]
-			| [Argument(other), Separator, Argument(_), Argument(_)] => Err(TypeError(other.get_type())),
-			_ => Err(BadArgumentCount),
+		let CycleId(cycle_id) = args.read_as()?;
+		args.read_separator()?;
+		if args.read_blank().is_ok() {
+			args.read_end()?;
+			self.place_cycle_center(cycle_id, None)?
+		} else {
+			let x = args.read_as()?;
+			let y = args.read_as()?;
+			args.read_end()?;
+			self.place_cycle_center(cycle_id, Some(Vec2::new(x, y)))?
 		}
+		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
 	fn call_set_vertex_angle(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
-
-		match args {
-			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1)] => {
-				let angle: f32 = arg1.try_into().map_err(FunctionCallError::TypeError)?;
-				self.place_vertex_at_angle(*vertex_id, angle * PI / 180.0)?;
-				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
-			}
-			[Argument(other), Separator, Argument(_)] => Err(TypeError(other.get_type())),
-			_ => Err(BadArgumentCount),
-		}
+		let VertexId(vertex_id) = args.read_as()?;
+		args.read_separator()?;
+		let degrees: f32 = args.read_single_as()?;
+		self.place_vertex_at_angle(vertex_id, degrees * PI / 180.0)?;
+		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
 	}
 
 	fn call_put_vertex(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
-
-		match args {
-			[Argument(Domain(Vertex(vertex_id))), Separator, Argument(arg1), Argument(arg2)] => {
-				let x = arg1.try_into().map_err(FunctionCallError::TypeError)?;
-				let y = arg2.try_into().map_err(FunctionCallError::TypeError)?;
-				self.place_vertex(*vertex_id, Vec2::new(x, y))?;
-				Ok(ReturnValue::with_side_effect(Domain(Vertex(*vertex_id))))
-			}
-			[Argument(other), Separator, Argument(_), Argument(_)] => {
-				Err(TypeError(other.get_type()))
-			}
-			_ => Err(BadArgumentCount),
-		}
+		let VertexId(vertex_id) = args.read_as()?;
+		args.read_separator()?;
+		let x = args.read_as()?;
+		let y = args.read_as()?;
+		args.read_end()?;
+		self.place_vertex(vertex_id, Vec2::new(x, y))?;
+		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
 	}
 
 	fn call_link(
 		&mut self,
 		one_way: bool,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 		mut warnings: WarningSink<RuntimeWarning>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
-
-		let mut args = args.iter();
-		let mut direction = None;
-		let mut prev_cycle_id = None;
-		let mut cycles_linked = false;
-
-		while let Some(arg) = args.next() {
-			match arg {
-				Argument(String(flag)) => {
-					// Flags can appear as the first argument
-					if direction.is_some() || prev_cycle_id.is_some() {
-						return Err(TypeError(epilang::values::VariableType::String));
-					}
-					direction = Some(match *flag {
-						"coincident" => LinkedCycleDirection::Coincident,
-						"invert" => LinkedCycleDirection::Inverse,
-						_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
-					});
-					// A semicolon is expected next
-					match args.next() {
-						None | Some(Separator) => {}
-						Some(Argument(_)) => return Err(BadArgumentCount),
-					}
-				}
-				Separator => {
-					// Only a leading semicolon is allowed (indicates empty flag section)
-					if direction.is_some() || prev_cycle_id.is_some() {
-						return Err(BadArgumentCount);
-					}
-					// Mark the turnability flag as set to prevent setting it again
-					direction = Some(default());
-				}
-				Argument(Domain(Cycle(cycle_id))) => {
-					if let Some(prev_id) = prev_cycle_id {
-						if one_way {
-							self.one_way_link_cycles(
-								prev_id,
-								*cycle_id,
-								direction.unwrap_or_default(),
-							)?;
-						} else {
-							self.link_cycles(prev_id, *cycle_id, direction.unwrap_or_default())?;
-						}
-						cycles_linked = true;
-					}
-					prev_cycle_id = Some(*cycle_id);
-				}
-				Argument(other) => return Err(TypeError(other.get_type())),
-			}
+		let direction;
+		if let Some(flag) = args.optional_read_as() {
+			direction = match flag {
+				"coincident" => LinkedCycleDirection::Coincident,
+				"invert" => LinkedCycleDirection::Inverse,
+				_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
+			};
+			args.read_end_or_separator()?;
+		} else {
+			direction = LinkedCycleDirection::default();
+			args.optional_separator();
 		}
 
-		if !cycles_linked {
+		let mut cycles = Vec::new();
+		while let Some(CycleId(cycle_id)) = args.read_as_until_end_or_separator()? {
+			cycles.push(cycle_id);
+		}
+		if cycles.len() < 2 {
 			warnings.emit(RuntimeWarning::EmptyLink.into());
 		}
 
-		Ok(ReturnValue::with_side_effect(Blank))
+		for (a, b) in cycles.into_iter().tuple_windows() {
+			if one_way {
+				self.one_way_link_cycles(a, b, direction)?;
+			} else {
+				self.link_cycles(a, b, direction)?;
+			}
+		}
+
+		Ok(ReturnValue::void())
 	}
 
 	fn call_cycle_color_labels(
 		&mut self,
-		args: &[ArgumentValue<DomainValue>],
+		mut args: ArgumentStream<DomainValue>,
 	) -> Result<ReturnValue<'static, DomainValue>, FunctionCallError<RuntimeError, DomainType>> {
-		use DomainValue::*;
-		use VariableValue::*;
+		let CycleId(cycle_id) = args.read_as()?;
+		args.read_separator()?;
 
-		let mut args = args.iter();
-
-		let cycle_id = match args.next() {
-			Some(Argument(Domain(Cycle(id)))) => *id,
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
-			Some(Separator) | None => return Err(BadArgumentCount),
+		let positions = match args.read_as()? {
+			"lr" => CycleBoundColorLabelPositionSet::LeftRight,
+			"tb" => CycleBoundColorLabelPositionSet::AboveBelow,
+			"quad" => CycleBoundColorLabelPositionSet::CardinalDirections,
+			"any" => CycleBoundColorLabelPositionSet::AllDirections,
+			"rot" => CycleBoundColorLabelPositionSet::AllDirectionsRotated,
+			other => return Err(RuntimeError::InvalidFlag(other.to_string()).into()),
 		};
-		if !matches!(args.next(), Some(Separator)) {
-			return Err(BadArgumentCount);
-		}
-		let positions = match args.next() {
-			Some(Argument(String("lr"))) => CycleBoundColorLabelPositionSet::LeftRight,
-			Some(Argument(String("tb"))) => CycleBoundColorLabelPositionSet::AboveBelow,
-			Some(Argument(String("quad"))) => CycleBoundColorLabelPositionSet::CardinalDirections,
-			Some(Argument(String("any"))) => CycleBoundColorLabelPositionSet::AllDirections,
-			Some(Argument(String("rot"))) => CycleBoundColorLabelPositionSet::AllDirectionsRotated,
-			Some(Argument(String(other))) => {
-				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
-			}
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
-			Some(Separator) | None => return Err(BadArgumentCount),
+		let place_outside_cycle = match args.read_as_until_end_or_separator()? {
+			Some("out") | None => true,
+			Some("in") => false,
+			Some(other) => return Err(RuntimeError::InvalidFlag(other.to_string()).into()),
 		};
-		let place_outside_cycle = match args.next() {
-			Some(Argument(String("out"))) | None => true,
-			Some(Argument(String("in"))) => false,
-			Some(Argument(String(other))) => {
-				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
-			}
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
-			Some(Separator) => return Err(BadArgumentCount),
+		let has_arrow_tip = match args.read_as_until_end_or_separator()? {
+			Some("square") | None => false,
+			Some("arrow") => true,
+			Some(other) => return Err(RuntimeError::InvalidFlag(other.to_string()).into()),
 		};
-		let has_arrow_tip = match args.next() {
-			Some(Argument(String("square"))) | None => false,
-			Some(Argument(String("arrow"))) => true,
-			Some(Argument(String(other))) => {
-				return Err(RuntimeError::InvalidFlag(other.to_string()).into())
-			}
-			Some(Argument(other)) => return Err(TypeError(other.get_type())),
-			Some(Separator) => return Err(BadArgumentCount),
-		};
-		if args.next().is_some() {
-			return Err(BadArgumentCount);
-		}
+		args.read_end()?;
 
 		self.set_color_label_appearences_for_cycle(
 			cycle_id,
@@ -649,7 +521,7 @@ impl LevelBuilder {
 			place_outside_cycle,
 			has_arrow_tip,
 		)?;
-		Ok(ReturnValue::with_side_effect(Blank))
+		Ok(ReturnValue::void())
 	}
 }
 
@@ -713,8 +585,6 @@ fn pictogram_name_to_id(name: &str) -> Result<usize, ()> {
 pub enum RuntimeError {
 	ArithmeticOverflow,
 	BuilderError(LevelBuilderError),
-	UnknownColorName(String),
-	InvalidColorIndex(i32),
 	InvalidFlag(String),
 }
 
@@ -743,8 +613,6 @@ impl std::fmt::Display for RuntimeError {
 		match self {
 			Self::ArithmeticOverflow => f.write_str("arithmetic overflow"),
 			Self::BuilderError(e) => e.fmt(f),
-			Self::UnknownColorName(name) => write!(f, "'{name}' is not a valid color name"),
-			Self::InvalidColorIndex(i) => write!(f, "{i} is not a valid color index"),
 			Self::InvalidFlag(flag) => write!(f, "'{flag}' is not a valid flag for this function"),
 		}
 	}
