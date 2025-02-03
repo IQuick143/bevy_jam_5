@@ -1,7 +1,7 @@
 mod utils {
 	use crate::game::{
 		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, Vertex},
-		level::{parser, GlyphData, LevelData, ObjectData, ThingData},
+		level::{builder::backend as parser, GlyphData, LevelData, ObjectData, ThingData},
 		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};

@@ -1,11 +1,10 @@
 use bevy::prelude::*;
 
 pub mod asset;
-mod builder;
+pub mod builder;
 mod lex;
 pub mod list;
 pub mod list_asset;
-pub mod parser;
 
 /// Complete description of a level
 #[derive(Debug, Clone, Reflect, Asset)]
