@@ -181,6 +181,8 @@ pub struct InterpreterWarning<E: std::error::Error> {
 	pub loc: Range<SourceLocation>,
 }
 
+impl<E: std::error::Error> std::error::Error for InterpreterWarning<E> {}
+
 impl<E: std::error::Error> std::fmt::Display for InterpreterWarning<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_fmt(format_args!("{}: {}", self.loc.start, self.warning_code))
@@ -492,6 +494,18 @@ impl<'a, 's, T: DomainVariableValue + 'a> IntoIterator for &'s VariablePool<'a, 
 pub struct LoadedVariableTypeError<T: DomainVariableType> {
 	pub variable_name: String,
 	pub actual_type: VariableType<T>,
+}
+
+impl<T: DomainVariableType> std::error::Error for LoadedVariableTypeError<T> {}
+
+impl<T: DomainVariableType> std::fmt::Display for LoadedVariableTypeError<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"variable {} has incorrect type {}",
+			self.variable_name, self.actual_type
+		)
+	}
 }
 
 /// Describes the reason why the [`Interpreter::run`] has returned
