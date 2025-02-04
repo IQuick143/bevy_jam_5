@@ -1,7 +1,7 @@
 mod utils {
 	use crate::game::{
 		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, Vertex},
-		level::{builder::backend as parser, GlyphData, LevelData, ObjectData, ThingData},
+		level::{backend::builder as parser, GlyphData, LevelData, ObjectData, ThingData},
 		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
@@ -72,8 +72,8 @@ mod utils {
 		In(level_data): In<&str>,
 		mut asset_server: ResMut<Assets<LevelData>>,
 		mut spawn_trigger: EventWriter<EnterLevel>,
-	) -> Result<(), parser::LevelParsingError> {
-		let level = parser::parse(level_data, |_| {})?;
+	) -> Result<(), parser::Error> {
+		let level = parser::parse_and_run(level_data, |_| {})?;
 		let handle = asset_server.add(level);
 		spawn_trigger.send(EnterLevel(Some(handle)));
 		Ok(())

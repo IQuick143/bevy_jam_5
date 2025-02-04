@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 pub mod asset;
+pub mod backend;
 pub mod builder;
 mod lex;
 pub mod list;
