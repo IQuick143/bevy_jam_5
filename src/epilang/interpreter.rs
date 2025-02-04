@@ -1420,7 +1420,7 @@ enum Instruction<'ast, T: DomainVariableValue + 'ast> {
 	/// Fails if the popped value is not boolean.
 	///
 	/// Fails if there are not enough instructions on the stack.
-	/// ```
+	/// ```ignore
 	/// instruction_stack.push(action_if_true);
 	/// instruction_stack.push(action_if_false);
 	/// instruction_stack.push(Instruction::Switch);
