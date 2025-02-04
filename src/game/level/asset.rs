@@ -1,3 +1,5 @@
+use backend::builder::{parse_and_run, Error as LevelParsingError};
+
 use bevy::asset::AsyncReadExt;
 
 use super::*;
@@ -11,9 +13,9 @@ pub fn plugin(app: &mut App) {
 struct LevelLoader;
 
 #[derive(Debug)]
-pub enum LevelLoadingError {
+enum LevelLoadingError {
 	IO(std::io::Error),
-	Parsing(parser::LevelParsingError),
+	Parsing(LevelParsingError),
 }
 
 impl From<std::io::Error> for LevelLoadingError {
@@ -22,8 +24,8 @@ impl From<std::io::Error> for LevelLoadingError {
 	}
 }
 
-impl From<parser::LevelParsingError> for LevelLoadingError {
-	fn from(value: parser::LevelParsingError) -> Self {
+impl From<LevelParsingError> for LevelLoadingError {
+	fn from(value: LevelParsingError) -> Self {
 		Self::Parsing(value)
 	}
 }
@@ -54,12 +56,12 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		&self,
 		reader: &mut dyn bevy::asset::io::Reader,
 		_settings: &Self::Settings,
-		_load_context: &mut bevy::asset::LoadContext,
+		load_context: &mut bevy::asset::LoadContext,
 	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			let level_data = parser::parse(&s)?;
+			let level_data = parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path()))?;
 			Ok(level_data)
 		}
 	}

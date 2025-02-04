@@ -12,6 +12,7 @@ LEVEL teamwork tricycle olympic three_row_simple linked_sort
 
 SECTION hard
 Name=Hard
-LEVEL cargo cargo_single three_row car rubik
+LEVEL cargo cargo_single three_row car
+#LEVEL rubik
 
 #REQUIRES 1_intro 2_transfer 3_boxes 4_manual 5_sync 6_sync2 7_colors easy medium hard

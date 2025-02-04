@@ -1,0 +1,545 @@
+use super::{
+	super::super::{builder::error::*, *},
+	finalize::FinalizeError,
+	runtime::RuntimeError,
+	Error,
+};
+use crate::epilang::interpreter::{FunctionCallError, InterpreterError, LogicError};
+use std::f32::consts::PI;
+
+fn parse(level_file: &str) -> Result<LevelData, Error> {
+	super::parse_and_run(level_file, |_| {})
+}
+
+macro_rules! assert_err_eq {
+	($left:expr, $right:expr) => {
+		let left = $left;
+		let right = $right;
+		let err = left.expect_err("Negative test sample parrsed without error!");
+		let builder_error = match err {
+			Error::Runtime(InterpreterError::LogicError(err, _)) => match *err {
+				LogicError::FunctionCall(
+					FunctionCallError::Domain(RuntimeError::BuilderError(err)),
+					_,
+				) => err,
+				_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+			},
+			Error::Finalize(FinalizeError::BuilderError(err)) => err,
+			_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+		};
+		assert_eq!(builder_error, right);
+	};
+}
+
+#[test]
+fn basic_test() {
+	let data = r"
+name = '?!#_AAA 648';
+hint = 'This should parse correctly!';
+
+# Here we declare all the vertex names
+# The vertex function returns a value of type vertex
+# Vertices have reference semantics (a copy of the variable will represent the same vertex)
+x = vertex(box());
+
+# Here we declare cycles
+# First one declares a cycle, with a modifier specifying whether it needs a player
+# Leaving the modifier out defaults to an automatic playerless cycle
+# Next comes a list of vertices which lie on the circle in a clockwise order.
+# They can be actual vertices, objects, glyphs, or blank values (underscores).
+# For all types except a pre-existing vertex, the cycle function creates a new vertex at call time.
+# Cycles also have reference semantics
+cycle_a = cycle('manual'; box() vertex(player(), button()) _ x);
+cycle_b = cycle('auto'; x _ flag() _);
+
+# Oops, we forgot a cycle, let's add one
+# This defaults to an automatic cycle
+cycle_extra = cycle(q = vertex(), r = vertex(), s = vertex());
+
+# Objects and glaphs can also be added subsequently
+set_thing(q r; box());
+
+# Cycles can be linked together
+link(cycle_a cycle_extra);
+
+# We have to position the cycles with x y radius data
+circle(cycle_a; -100, 0.0, 100);
+circle(cycle_b; +100, 0, 100);
+circle(cycle_extra; -100, 100, sqrt(41));
+";
+	let level = parse(data).expect("Test sample did not parse correctly!");
+	assert_eq!(level.name, "?!#_AAA 648");
+}
+
+#[test]
+fn test_structural_validation() {
+	let test_cases = r"
+# Linking a cycle to itself is already weird, but legal.
+# The link, however, cannot be inverted.
+a = cycle(_ _);
+link('invert'; a a);
+
+# Intersecting cycles cannot be linked.
+a = cycle(x = vertex(), _);
+b = cycle(x _);
+link(a b);
+
+# Two (declared) links between the same two cycles may exist as well,
+# but they cannot be conflicting like this.
+a = cycle(_ _);
+b = cycle(_ _);
+link(a b);
+link('invert'; b a);
+
+# Three cycles linked in a triangle.
+# Again, this is legal, but the links must be compatible.
+a = cycle(_ _);
+b = cycle(_ _);
+c = cycle(_ _);
+link(a b c);
+link('invert'; a c);
+
+# Same with four cycles
+a = cycle(_ _);
+b = cycle(_ _);
+c = cycle(_ _);
+d = cycle(_ _);
+link(a b c d);
+link('invert'; a d);
+
+# Cycles 1 and 3 share a vertex.
+# They are not linked directly, but the links connect them transitively.
+a = cycle(x = vertex(), _);
+b = cycle(_ _);
+c = cycle(_ x);
+link(a b c);
+";
+
+	let expected_results = [
+		LevelBuilderError::CycleLinkageConflict(0, 0),
+		LevelBuilderError::OverlappedLinkedCycles(OverlappedLinkedCyclesError {
+			source_cycle: 1,
+			dest_cycle: 0,
+			shared_vertex: 0,
+		}),
+		LevelBuilderError::CycleLinkageConflict(1, 0),
+		LevelBuilderError::CycleLinkageConflict(0, 2),
+		LevelBuilderError::CycleLinkageConflict(0, 3),
+		LevelBuilderError::OverlappedLinkedCycles(OverlappedLinkedCyclesError {
+			source_cycle: 2,
+			dest_cycle: 0,
+			shared_vertex: 0,
+		}),
+	];
+
+	for (data, expected) in test_cases.split("\n\n").zip(expected_results) {
+		assert_err_eq!(parse(data), expected);
+	}
+}
+
+#[test]
+fn logical_colors_test() {
+	let data = r"
+# Default, with no call_color
+vertex(box());
+
+# Numeric colors are specified with numbers
+vertex(box(42));
+
+# Pictogram colors are specified by name
+vertex(box('star'));
+
+# Pictogram colors may also be specified by their id
+vertex(box(pict(16)));
+
+# Colorless object can be forced by explicit blank color value
+vertex(box(_));
+";
+
+	let expected_colors = [
+		None,
+		Some(LogicalColor::new(42)),
+		Some(LogicalColor::pictogram(36)),
+		Some(LogicalColor::pictogram(16)),
+		None,
+	];
+
+	let level = parse(data).expect("Test sample did not parse correctly!");
+	for (vertex, expected_color) in level.vertices.iter().zip(expected_colors) {
+		let Some(ObjectData::Box(call_color)) = vertex.object else {
+			panic!("Vertex does not contain a box.");
+		};
+		assert_eq!(call_color, expected_color);
+	}
+}
+
+#[test]
+fn color_labels_test() {
+	let data = r"
+col = color(0);
+
+# Color labels can be placed to a set of
+# predefined positions
+a = vertex(button(col; 'left'));
+b = vertex(button(col; 'right'));
+c = vertex(button(col; 'above'));
+d = vertex(button(col; 'below'));
+
+# The default position is inside the button.
+# This can also be forced manually
+g = vertex(button(col; _));
+h = vertex(button(col));
+
+# Position can be specified manually as rotation
+# (as clock angle in degrees)
+i = vertex(button(col; 30));
+
+# Adding the 'rot' flag means the label itself will be
+# rotated, not just positioned
+j = vertex(button(col; 'rot' 60));
+
+# Finally, any option can be combined with a shape specifier
+# to choose between square label (default) or an arrow-tipped one
+k = vertex(button(col; 'above' 'square'));
+l = vertex(button(col; _ 'arrow'));
+
+m = vertex(button(col));
+n = vertex(button(col));
+o = vertex(button(col));
+p = vertex(button(col));
+q = vertex(button(col));
+r = vertex(button(col));
+s = vertex(button(col));
+t = vertex(button(col));
+
+x = cycle(m, n, o, p);
+y = cycle(q, r, s, t);
+circle(x; 0, 0, 100);
+circle(y; 0, 0, 100);
+
+set_vertex_angle(m; 0.5);
+set_vertex_angle(q; 0.5);
+
+# Labels can be positioned symmetrically around a cycle,
+# with respect to where they are relative to the cycle center
+cycle_color_labels(x; 'quad');
+
+# Cycle-wide label placement may also be done inside the cycle
+# and with arrow labels if desired
+cycle_color_labels(y; 'lr' 'in' 'arrow');
+";
+	let expected_appearences = [
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(-PI / 2.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(0.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::Inside,
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::Inside,
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI / 6.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AngleRotated(PI / 3.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(0.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::Inside,
+			has_arrow_tip: true,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(0.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+			has_arrow_tip: false,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+			has_arrow_tip: true,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
+			has_arrow_tip: true,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+			has_arrow_tip: true,
+		},
+		ButtonColorLabelAppearence {
+			position: ButtonColorLabelPosition::AnglePlaced(PI / 2.0),
+			has_arrow_tip: true,
+		},
+	];
+
+	let level = parse(data).expect("Test sample did not parse correctly!");
+	for (vertex, expected_appearence) in level.vertices.iter().zip(expected_appearences) {
+		let Some(GlyphData::Button(Some((_, appearence)))) = vertex.glyph else {
+			panic!("Vertex does not contain a colored button.");
+		};
+		assert_eq!(appearence, expected_appearence);
+	}
+}
+
+#[test]
+fn one_way_parse_test() {
+	let level_header = r"
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+vx = vertex();
+vy = vertex();
+y = cycle(vy);
+c1 = cycle(v1);
+c2 = cycle(v2);
+c3 = cycle(v3);
+c4 = cycle(v4);
+c5 = cycle(v5);
+c6 = cycle(v6);
+x = cycle(vx);
+
+link(c6 x);
+link('invert'; c1 y);
+
+circle(c1; 0 0 100);
+circle(c2; 0 0 100);
+circle(c3; 0 0 100);
+circle(c4; 0 0 100);
+circle(c5; 0 0 100);
+circle(c6; 0 0 100);
+circle(x; 0 0 100);
+circle(y; 0 0 100);
+";
+	let linkages = r"
+# CHAIN
+oneway(c1 c2);
+oneway(c2 c3);
+oneway(c3 c4);
+oneway(c4 c5);
+oneway(c5 c6);
+
+# CHAIN, inversely written
+oneway(c5 c6);
+oneway(c4 c5);
+oneway(c3 c4);
+oneway(c2 c3);
+oneway(c1 c2);
+
+# CHAIN, weird order
+oneway(c3 c4);
+oneway(c2 c3);
+oneway(c4 c5);
+oneway(c1 c2);
+oneway(c5 c6);
+
+# CHAIN, reverse
+oneway(c2 c1);
+oneway(c3 c2);
+oneway(c4 c3);
+oneway(c5 c4);
+oneway(c6 c5);
+
+# TREE
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c3 c6);
+
+# TREE, different order
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c3 c6);
+
+# DIAMOND
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c2 c4);
+oneway(c3 c4);
+
+# DIAMOND, different order
+oneway(c2 c4);
+oneway(c3 c4);
+oneway(c1 c2);
+oneway(c1 c3);
+
+# COMPLETE GRAPH
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c1 c4);
+oneway(c1 c5);
+oneway(c1 c6);
+oneway(c2 c3);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c2 c6);
+oneway(c3 c4);
+oneway(c3 c5);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c4 c6);
+oneway(c5 c6);
+
+# COMPLETE GRAPH, different order
+oneway(c1 c2);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c1 c6);
+oneway(c2 c6);
+oneway(c4 c6);
+oneway(c1 c3);
+oneway(c3 c5);
+oneway(c3 c4);
+oneway(c5 c6);
+oneway(c2 c3);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c1 c4);
+oneway(c1 c5);
+
+# COMPLETE GRAPH, DOUBLED LINKS
+oneway(c1 c2);
+oneway(c1 c3);
+oneway(c1 c4);
+oneway(c1 c5);
+oneway(c1 c6);
+oneway(c2 c3);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c2 c6);
+oneway(c3 c4);
+oneway(c3 c5);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c4 c6);
+oneway(c5 c6);
+oneway(c1 c2);
+oneway(c2 c4);
+oneway(c2 c5);
+oneway(c1 c6);
+oneway(c2 c6);
+oneway(c4 c6);
+oneway(c1 c3);
+oneway(c3 c5);
+oneway(c3 c4);
+oneway(c5 c6);
+oneway(c2 c3);
+oneway(c3 c6);
+oneway(c4 c5);
+oneway(c1 c4);
+oneway(c1 c5);
+"
+	.split("\n\n");
+
+	for data in linkages {
+		let level = format!("{}\n{}", level_header, data);
+		let output = parse(&level);
+		assert!(output.is_ok(), "{:?}", output);
+	}
+}
+
+#[test]
+fn one_way_validation_test() {
+	let level_header = r"
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+vx = vertex();
+vy = vertex();
+y = cycle(vy);
+c1 = cycle(v1);
+c2 = cycle(v2);
+c3 = cycle(v3);
+c4 = cycle(v4);
+c5 = cycle(v5);
+c6 = cycle(v6);
+x = cycle(vx);
+
+link(c6, x);
+link('invert'; c1 y);
+
+circle(c1; 0 0 100);
+circle(c2; 0 0 100);
+circle(c3; 0 0 100);
+circle(c4; 0 0 100);
+circle(c5; 0 0 100);
+circle(c6; 0 0 100);
+circle(x; 0 0 100);
+circle(y; 0 0 100);
+";
+	let linkages = r"
+# CHAIN with LOOP
+oneway(c1 c2);
+oneway(c2 c3);
+oneway(c3 c4);
+oneway(c4 c5);
+oneway(c5 c6);
+oneway(c6 c1);
+
+# CHAIN with LINK LOOP
+oneway(c1 c2);
+oneway(c2 c3);
+oneway(c3 c4);
+oneway(c4 c5);
+oneway(c5 c6);
+link('invert'; c2 c5);
+
+# OVERLAPPING LINK AND ONEWAY
+oneway(c1 c2);
+link(c1 c2);
+
+# OVERLAPPING ONEWAYS
+oneway(c1 c2);
+oneway(c2 c1);
+
+# TRIANGLE
+oneway(c1 c2);
+oneway(c3 c1);
+oneway(c2 c3);
+"
+	.split("\n\n");
+
+	for data in linkages {
+		let level = format!("{}\n{}", level_header, data);
+		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+	}
+}

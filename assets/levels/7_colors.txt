@@ -1,28 +1,21 @@
-Name=Colors
+name = 'Colors';
 
-PALETTE heart club spade diamond
+c0 = 'heart';
+c1 = 'club';
+c2 = 'spade';
+c3 = 'diamond';
 
-VERTEX a b c w1 w2 w3 w4 x1 x2 x3 x4 y1 y2 y3 y4 y5 z1 z2 z3 z4 z5
+a = vertex();
+b = vertex(player());
+c = vertex();
+w = cycle(a b button(c1) button(c0) box(c0) box(c1));
+x = cycle('manual'; b a _ _ flag() _);
+y = cycle('still'; c _ button(c2) box(c2) box(c3) _);
+z = cycle(c _ button(c3) _ _ _);
 
-CYCLE w a b w1 w2 w3 w4
-CYCLE[MANUAL] x b a x1 x2 x3 x4
-CYCLE[STILL] y c y1 y2 y3 y4 y5
-CYCLE z c z1 z2 z3 z4 z5
+link(x y);
 
-OBJECT[BUTTON:0] w2
-OBJECT[BUTTON:1] w1
-OBJECT[BUTTON:2] y2
-OBJECT[BUTTON:3] z2
-OBJECT[BOX:0] w3
-OBJECT[BOX:1] w4
-OBJECT[BOX:2] y3
-OBJECT[BOX:3] y4
-OBJECT[PLAYER] b
-OBJECT[FLAG] x3
-
-LINK x y
-
-PLACE w -140 50 50
-PLACE x -80 0 50
-PLACE y 100 30 50
-PLACE z 40 -50 50
+circle(w; -140, 50 50);
+circle(x; -80, 0 50);
+circle(y; 100 30 50);
+circle(z; 40, -50, 50);

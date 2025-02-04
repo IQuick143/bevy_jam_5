@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 
 pub mod asset;
-mod builder;
+pub mod backend;
+pub mod builder;
 mod lex;
 pub mod list;
 pub mod list_asset;
-pub mod parser;
 
 /// Complete description of a level
 #[derive(Debug, Clone, Reflect, Asset)]
@@ -45,8 +45,10 @@ pub struct VertexData {
 /// Description of a single cycle
 #[derive(Debug, Clone, Reflect)]
 pub struct CycleData {
-	///  Placement of the cycle
+	/// Placement of the cycle
 	pub placement: CyclePlacement,
+	/// Settings of the cycle center sprite
+	pub center_sprite_appearence: CycleCenterSpriteAppearence,
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
@@ -154,10 +156,17 @@ impl OneWayLinkData {
 /// Computed placement of a cycle
 #[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub struct CyclePlacement {
-	/// Position of the center point of the cycle
+	/// Position of the cycle center. This is the position of the cycle entity
 	pub position: Vec2,
-	/// Radius of the cycle
-	pub radius: f32,
+	/// Shape of the cycle's perimeter
+	pub shape: CycleShape,
+}
+
+/// Description of the shape of a cycle's perimeter
+#[derive(Clone, Copy, PartialEq, Debug, Reflect)]
+pub enum CycleShape {
+	/// Circle defined by a radius, centered in the cycle's position
+	Circle(f32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
@@ -198,9 +207,10 @@ pub enum ThingData {
 }
 
 /// Defines conditions under which a cycle may be turned
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Reflect)]
 pub enum CycleTurnability {
 	/// Cycle may be turned anytime
+	#[default]
 	Always,
 	/// Cycle may be turned when an [`ObjectType::Player`] object lies on one of its vertices
 	WithPlayer,
@@ -209,9 +219,10 @@ pub enum CycleTurnability {
 }
 
 /// Relative direction of two cycles that are to turn together
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum LinkedCycleDirection {
 	/// The cycles will turn in the same direction
+	#[default]
 	Coincident,
 	/// The cycles will turn in opposite directions
 	Inverse,
@@ -284,6 +295,13 @@ pub enum ButtonColorLabelPosition {
 	AngleRotated(f32),
 }
 
+/// The rendering of a cycle's center sprite
+///
+/// Indicates the center sprite position relative to the cycle position,
+/// or [`None`] if the center sprite is not to be drawn
+#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
+pub struct CycleCenterSpriteAppearence(pub Option<Vec2>);
+
 impl LogicalColor {
 	pub fn new(color_index: usize) -> Self {
 		Self {
@@ -302,11 +320,11 @@ impl LogicalColor {
 
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"[x={} y={} r={}]",
-			self.position.x, self.position.y, self.radius
-		)
+		match self.shape {
+			CycleShape::Circle(r) => {
+				write!(f, "[x={} y={} r={r}]", self.position.x, self.position.y)
+			}
+		}
 	}
 }
 

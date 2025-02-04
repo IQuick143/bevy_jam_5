@@ -1,23 +1,23 @@
-Name=Olympic
-Hint=Tip: In levels with a single player and manual cycles, it's helpful to think about the player's routes through the crossings.
+name = 'Olympic';
+hint = 'Tip: In levels with a single player and manual cycles, it''s helpful to think about the player''s routes through the crossings.';
 
-PALETTE[DEFAULT_BOX] desc_neg
+box = box('desc_neg');
 
-VERTEX a b c d e f g h i j k l m n o p q r s t u v
+dx = 4;
+dy = 3;
+r = 3;
 
-CYCLE[MANUAL] blue a b h n m g
-CYCLE[MANUAL] yellow t s n h i o
-CYCLE[MANUAL] black c d j p o i
-CYCLE[MANUAL] green v u p j k q
-CYCLE[MANUAL] red e f l r q k
-
-OBJECT[BOX] b m
-OBJECT[BUTTON] f l
-OBJECT[PLAYER] a
-OBJECT[FLAG] a
-
-PLACE blue -400 300 300
-PLACE yellow 0 0 300
-PLACE black 400 300 300
-PLACE green 800 0 300
-PLACE red 1200 300 300
+a = vertex(player() flag());
+b = vertex();
+c = vertex();
+d = vertex();
+e = vertex();
+f = vertex();
+g = vertex();
+h = vertex();
+i = vertex();
+circle(cycle('manual'; a box b c box _);          -2 * dx, dy, r);
+circle(cycle('manual'; _ _ c b d e);                  -dx,  0, r);
+circle(cycle('manual'; _ _ f g e d);                    0, dy, r);
+circle(cycle('manual'; _ _ g f h i);                   dx,  0, r);
+circle(cycle('manual'; _ button() button() _ i h); 2 * dx, dy, r);

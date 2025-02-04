@@ -166,6 +166,7 @@ fn spawn_primary_level_entities(
 					.spawn((
 						*session_id,
 						cycle.placement,
+						cycle.center_sprite_appearence,
 						cycle.turnability,
 						Cycle {
 							id,
@@ -366,27 +367,39 @@ fn create_vertex_visuals(
 
 fn create_cycle_visuals(
 	mut commands: Commands,
-	query: Query<(Entity, &CyclePlacement, &CycleTurnability), Added<CyclePlacement>>,
+	query: Query<
+		(
+			Entity,
+			&CyclePlacement,
+			&CycleTurnability,
+			&CycleCenterSpriteAppearence,
+		),
+		Added<CyclePlacement>,
+	>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 	images: Res<HandleMap<ImageKey>>,
 	mut meshes: ResMut<Assets<Mesh>>,
 ) {
-	for (id, placement, turnability) in &query {
-		let mesh = Annulus::new(
-			placement.radius - RING_HALF_WIDTH,
-			placement.radius + RING_HALF_WIDTH,
-		)
-		.mesh()
-		.resolution(cycle_ring_mesh_resolution(placement.radius))
-		.build();
-		let outline_mesh = Annulus::new(
-			placement.radius - RING_HALF_WIDTH - RING_OUTLINE_WIDTH,
-			placement.radius + RING_HALF_WIDTH + RING_OUTLINE_WIDTH,
-		)
-		.mesh()
-		.resolution(cycle_ring_mesh_resolution(placement.radius))
-		.build();
+	for (id, placement, turnability, center_sprite) in &query {
+		let mesh;
+		let outline_mesh;
+
+		match placement.shape {
+			CycleShape::Circle(radius) => {
+				mesh = Annulus::new(radius - RING_HALF_WIDTH, radius + RING_HALF_WIDTH)
+					.mesh()
+					.resolution(cycle_ring_mesh_resolution(radius))
+					.build();
+				outline_mesh = Annulus::new(
+					radius - RING_HALF_WIDTH - RING_OUTLINE_WIDTH,
+					radius + RING_HALF_WIDTH + RING_OUTLINE_WIDTH,
+				)
+				.mesh()
+				.resolution(cycle_ring_mesh_resolution(radius))
+				.build();
+			}
+		}
 
 		let ring = commands
 			.spawn((
@@ -402,37 +415,39 @@ fn create_cycle_visuals(
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
-		let center = commands
-			.spawn((
-				Sprite {
-					custom_size: Some(SPRITE_SIZE),
-					image: images[&ImageKey::CycleCenter(*turnability)].clone_weak(),
-					color: palette.cycle_ready,
-					..default()
-				},
-				Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_SPRITES),
-			))
-			.id();
-		let arrow = commands
-			.spawn((
-				Sprite {
-					custom_size: Some(SPRITE_SIZE * 2.0),
-					image: images[&ImageKey::CycleRotationArrow].clone_weak(),
-					color: palette.cycle_ready,
-					..default()
-				},
-				Transform::from_translation(Vec3::Z * layers::CYCLE_CENTER_ARROWS),
-			))
-			.id();
 		commands
 			.entity(id)
-			.insert(CycleVisualEntities {
-				ring,
-				outline,
-				center,
-				arrow,
-			})
-			.add_children(&[ring, outline, center, arrow]);
+			.insert(CycleRingVisualEntities { ring, outline })
+			.add_children(&[ring, outline]);
+
+		if let Some(offset) = center_sprite.0 {
+			let sprite = commands
+				.spawn((
+					Sprite {
+						custom_size: Some(SPRITE_SIZE),
+						image: images[&ImageKey::CycleCenter(*turnability)].clone_weak(),
+						color: palette.cycle_ready,
+						..default()
+					},
+					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_SPRITES)),
+				))
+				.id();
+			let arrow = commands
+				.spawn((
+					Sprite {
+						custom_size: Some(SPRITE_SIZE * 2.0),
+						image: images[&ImageKey::CycleRotationArrow].clone_weak(),
+						color: palette.cycle_ready,
+						..default()
+					},
+					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_ARROWS)),
+				))
+				.id();
+			commands
+				.entity(id)
+				.insert(CycleCenterVisualEntities { sprite, arrow })
+				.add_children(&[sprite, arrow]);
+		}
 	}
 }
 

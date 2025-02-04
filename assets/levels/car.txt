@@ -1,23 +1,26 @@
-Name=Car
-Hint=Fun fact: Originally this level was thought to be impossible!
+name = 'Car';
+hint = 'Fun fact: Originally this level was thought to be impossible!';
 
-PALETTE[DEFAULT_BOX] lr
+box = box('lr');
 
-VERTEX a b c d e f g h i j k l m n o p
+a = vertex(box);
+b = vertex(box);
+c = vertex(box);
+d = vertex(box);
+e = vertex(box);
+f = vertex(button() player());
+g = vertex();
+h = vertex(box button());
+i = vertex();
+j = vertex(box flag());
+k = vertex();
+l = vertex(button());
+m = vertex(button());
+n = vertex(button());
+o = vertex(button());
+p = vertex(button());
 
-CYCLE[MANUAL] left a b h m l f
-CYCLE[MANUAL] middle_left i n m g b c
-CYCLE[MANUAL] middle_right j o n h c d
-CYCLE[MANUAL] right k p o i d e
-
-OBJECT[BOX] a b c d e
-OBJECT[BOX] h j
-OBJECT[BUTTON] l m n o p
-OBJECT[BUTTON] f h
-OBJECT[PLAYER] f
-OBJECT[FLAG] j
-
-PLACE left -300 0 300
-PLACE middle_left 0 0 300
-PLACE middle_right 300 0 300
-PLACE right 600 0 300
+circle(cycle('manual'; a b h m l f); 0 0 1);
+circle(cycle('manual'; i n m g b c); 1 0 1);
+circle(cycle('manual'; j o n h c d); 2 0 1);
+circle(cycle('manual'; k p o i d e); 3 0 1);

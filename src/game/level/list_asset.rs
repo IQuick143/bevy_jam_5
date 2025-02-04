@@ -14,6 +14,8 @@ pub struct LevelListAsset {
 	pub list: LevelList,
 	/// IDs/slugs of levels. Correspond to level asset file names.
 	pub slugs: Vec<String>,
+	/// Level assets:
+	pub levels: Vec<Handle<LevelData>>,
 }
 
 #[derive(Default)]
@@ -69,7 +71,7 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 		&self,
 		reader: &mut dyn bevy::asset::io::Reader,
 		_settings: &Self::Settings,
-		_load_context: &mut bevy::asset::LoadContext,
+		load_context: &mut bevy::asset::LoadContext,
 	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
 		async {
 			let mut s = String::new();
@@ -104,6 +106,10 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 			let level_list = builder.build()?;
 			Ok(LevelListAsset {
 				list: level_list,
+				levels: level_slugs
+					.iter()
+					.map(|slug| load_context.load(format!("levels/{slug}.txt")))
+					.collect(),
 				slugs: level_slugs,
 			})
 		}

@@ -2,9 +2,8 @@ use bevy::{prelude::*, utils::HashMap};
 
 use crate::game::level::{
 	asset::plugin as level_asset_plugin,
-	list::LevelList,
 	list_asset::{plugin as level_list_asset_plugin, LevelListAsset},
-	CycleTurnability, GlyphType, LevelData, ObjectType, ThingType,
+	CycleTurnability, GlyphType, ObjectType, ThingType,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -19,11 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 
 	app.add_plugins(level_asset_plugin);
 	app.add_plugins(level_list_asset_plugin);
-	app.init_resource::<LoadingLevelList>();
-	app.add_systems(
-		Update,
-		proceed_with_level_list_loading.run_if(primary_level_list_loaded),
-	);
+	app.init_resource::<LoadedLevelList>();
 
 	app.init_resource::<BoxColorSpriteAtlasLayout>();
 	app.init_resource::<GlobalFont>();
@@ -197,59 +192,19 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 /// Intermediate handle to a loading level list asset
 /// The resource will be removed when the asset is loaded
 #[derive(Resource, Debug)]
-struct LoadingLevelList(pub Handle<LevelListAsset>);
+pub struct LoadedLevelList(pub Handle<LevelListAsset>);
 
-impl FromWorld for LoadingLevelList {
+impl FromWorld for LoadedLevelList {
 	fn from_world(world: &mut World) -> Self {
 		let asset_server = world.resource::<AssetServer>();
 		Self(asset_server.load("levels/levels.txt"))
 	}
 }
 
-#[derive(Resource, Reflect)]
-#[reflect(Resource)]
-pub struct LoadedLevelList {
-	pub list: LevelList,
-	pub levels: Vec<Handle<LevelData>>,
-}
-
-impl FromWorld for LoadedLevelList {
-	fn from_world(world: &mut World) -> Self {
-		let asset_server = world.resource::<AssetServer>();
-		let level_lists = world.resource::<Assets<LevelListAsset>>();
-		let loading_level_list = world.resource::<LoadingLevelList>();
-		let level_list = level_lists
-			.get(&loading_level_list.0)
-			.expect("Got invalid handle to loading level list asset");
-		Self {
-			list: level_list.list.clone(),
-			levels: level_list
-				.slugs
-				.iter()
-				.map(|slug| asset_server.load(format!("levels/{slug}.txt")))
-				.collect(),
-		}
-	}
-}
-
 impl LoadedLevelList {
 	pub fn all_loaded(&self, asset_server: &AssetServer) -> bool {
-		self.levels
-			.iter()
-			.all(|h| asset_server.is_loaded_with_dependencies(h))
+		asset_server.is_loaded_with_dependencies(&self.0)
 	}
-}
-
-fn primary_level_list_loaded(
-	asset_server: Res<AssetServer>,
-	loading_list: Option<Res<LoadingLevelList>>,
-) -> bool {
-	loading_list.is_some_and(|list| asset_server.is_loaded_with_dependencies(&list.0))
-}
-
-fn proceed_with_level_list_loading(mut commands: Commands) {
-	commands.init_resource::<LoadedLevelList>();
-	commands.remove_resource::<LoadingLevelList>();
 }
 
 /// The font to be used for rendering all text

@@ -1,35 +1,20 @@
-Name=Sort
+name = 'Sort';
 
-VERTEX 1 2 3 4 5 6 7 8 9 v w
+main = cycle(
+    a = vertex(box(6) button(1)),
+    b = vertex(box(4) button(2)),
+    c = vertex(box(9) button(3)),
+    d = vertex(box(7) button(4)),
+    e = vertex(box(2) button(5)),
+    f = vertex(box(8) button(6)),
+    g = vertex(box(1) button(7)),
+    h = vertex(box(3) button(8)),
+    i = vertex(box(5) button(9)),
+);
 
-CYCLE main 1 2 3 4 5 6 7 8 9
-CYCLE side 3 2
-CYCLE player v w
+circle(main; 0 0 100);
+circle(cycle(c b); 120 0 40);
+circle(cycle(v = vertex(player()), flag()); 220 30 35);
+set_vertex_angle(v; 40);
 
-OBJECT[BOX:1] 6
-OBJECT[BOX:2] 4
-OBJECT[BOX:3] 9
-OBJECT[BOX:4] 7
-OBJECT[BOX:5] 2
-OBJECT[BOX:6] 8
-OBJECT[BOX:7] 1
-OBJECT[BOX:8] 3
-OBJECT[BOX:9] 5
-OBJECT[BUTTON:1] 1
-OBJECT[BUTTON:2] 2
-OBJECT[BUTTON:3] 3
-OBJECT[BUTTON:4] 4
-OBJECT[BUTTON:5] 5
-OBJECT[BUTTON:6] 6
-OBJECT[BUTTON:7] 7
-OBJECT[BUTTON:8] 8
-OBJECT[BUTTON:9] 9
-OBJECT[PLAYER] v
-OBJECT[FLAG] w
-
-PLACE main 0 0 100
-PLACE side 120 0 40
-PLACE player 220 30 35
-PLACE_VERT v 0.5
-
-COLORLABEL[CYCLE:rot:in:arrow] main
+cycle_color_labels(main; 'rot' 'in' 'arrow');

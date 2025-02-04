@@ -1,24 +1,15 @@
-Name=Disrupt
-Hint=So close, yet so far... Tip: Least common multiple.
+name = 'Disrupt';
+hint = 'So close, yet so far... Tip: Least common multiple.';
 
-PALETTE[DEFAULT_BOX] bot_neg
+box = box('bot_neg');
 
-VERTEX a1 a2 a3 ab1 ab2 b1 b2 b3 b4 c1 c2 c3 c4 c5 d1 d2 d3 d4 d5 d6
-
-CYCLE[MANUAL] a a1 a2 a3 ab1 ab2
-CYCLE[MANUAL] b b1 b2 b3 b4 ab2 ab1
-CYCLE[STILL] c c1 c2 c3 c4 c5
-CYCLE[STILL] d d1 d2 d3 d4 d5 d6
-
-OBJECT[BOX] c1 d1
-OBJECT[BUTTON] c1 d1
-OBJECT[PLAYER] a1
-OBJECT[FLAG] a3
-
-LINK a c
-LINK b d
-
-PLACE a -80 0 80
-PLACE b 80 0 100
-PLACE c -280 0 80
-PLACE d 300 0 100
+a = vertex();
+b = vertex();
+link(
+    circle(cycle('manual'; player() _ flag() a b); -4, 0, 4)
+    circle(cycle('still'; vertex(box button()) _ _ _ _); -14, 0 4)
+);
+link(
+    circle(cycle('manual'; _ _ _ _ b a); 4 0 5)
+    circle(cycle('still'; vertex(box button()) _ _ _ _ _); 15 0 5)
+);

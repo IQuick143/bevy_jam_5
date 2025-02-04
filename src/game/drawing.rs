@@ -31,15 +31,20 @@ pub(super) fn plugin(app: &mut App) {
 		);
 }
 
-/// References to entities that make up the visualization of a cycle
+/// References to entities that make up the visualization of a cycle's ring
 #[derive(Component, Clone, Debug, Reflect)]
-pub struct CycleVisualEntities {
+pub struct CycleRingVisualEntities {
 	/// The cycle ring
 	pub ring: Entity,
 	/// The cycle ring outline
 	pub outline: Entity,
+}
+
+/// References to entities that make up the visualization of a cycle's center
+#[derive(Component, Clone, Debug, Reflect)]
+pub struct CycleCenterVisualEntities {
 	/// The sprite at the center of the cycle
-	pub center: Entity,
+	pub sprite: Entity,
 	/// The arrow that shows up at the center of the cycle
 	pub arrow: Entity,
 }
@@ -244,7 +249,7 @@ fn button_trigger_animation_system(
 }
 
 fn cycle_center_turnability_visuals_update_system(
-	cycles_q: Query<(&ComputedCycleTurnability, &CycleVisualEntities)>,
+	cycles_q: Query<(&ComputedCycleTurnability, &CycleCenterVisualEntities)>,
 	mut arrows_q: Query<&mut Visibility>,
 ) {
 	for (is_turnable, visuals) in &cycles_q {
@@ -271,7 +276,8 @@ fn cycle_center_interaction_visuals_update_system(
 	all_cycles_q: Query<(
 		&ComputedCycleTurnability,
 		&CycleVertices,
-		&CycleVisualEntities,
+		Option<&CycleCenterVisualEntities>,
+		Option<&CycleRingVisualEntities>,
 	)>,
 	cycle_index: Res<CycleEntities>,
 	level_asset: Res<Assets<LevelData>>,
@@ -298,13 +304,14 @@ fn cycle_center_interaction_visuals_update_system(
 			.iter()
 			.map(|(cycle_id, _)| cycle_index.0[*cycle_id])
 		{
-			let (is_turnable, vertices, visuals) = match all_cycles_q.get(cycle_id) {
-				Ok(x) => x,
-				Err(e) => {
-					log::warn!("LinkedCycles refers to a non-cycle entity: {e}");
-					continue;
-				}
-			};
+			let (is_turnable, vertices, center_visuals, ring_visuals) =
+				match all_cycles_q.get(cycle_id) {
+					Ok(x) => x,
+					Err(e) => {
+						log::warn!("LinkedCycles refers to a non-cycle entity: {e}");
+						continue;
+					}
+				};
 
 			let cycle_status = if is_selected {
 				CycleStatus::Selected
@@ -314,9 +321,11 @@ fn cycle_center_interaction_visuals_update_system(
 				CycleStatus::Disabled
 			};
 
-			let sprite_status = sprites_to_repaint.entry(visuals.center).or_default();
-			if *sprite_status < cycle_status {
-				*sprite_status = cycle_status
+			if let Some(visuals) = center_visuals {
+				let sprite_status = sprites_to_repaint.entry(visuals.sprite).or_default();
+				if *sprite_status < cycle_status {
+					*sprite_status = cycle_status
+				}
 			}
 
 			vertices
@@ -331,7 +340,11 @@ fn cycle_center_interaction_visuals_update_system(
 						.ok()
 						.map(|visuals| (visuals.node, visuals.outline))
 				})
-				.chain(std::iter::once((visuals.ring, visuals.outline)))
+				.chain(
+					ring_visuals
+						.into_iter()
+						.map(|visuals| (visuals.ring, visuals.outline)),
+				)
 				.for_each(|(body, outline)| {
 					let mesh_status = meshes_to_repaint.entry(body).or_default();
 					if *mesh_status < cycle_status {

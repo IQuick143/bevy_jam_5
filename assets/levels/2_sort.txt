@@ -1,23 +1,24 @@
-Name=Partition
+name = 'Partition';
 
-PALETTE up minus
+c0 = 'up';
+c1 = 'minus';
 
-VERTEX a b c d e f g h x y v w
+main = cycle(
+    vertex(box(c0) button(c1))
+    vertex(box(c1) button(c1))
+    vertex(box(c0) button(c1))
+    vertex(box(c0) button(c1))
+    vertex(box(c1) button(c0))
+    vertex(box(c1) button(c0))
+    vertex(box(c0) button(c0))
+    vertex(box(c1) button(c0)),
+    x = vertex(box(c0) button(c0)),
+    y = vertex(box(c1) button(c1))
+);
 
-CYCLE main a b c d e f g h x y
-CYCLE side y x
-CYCLE player v w
+circle(main; 0 0 100);
+circle(cycle(y x); 120 0 40);
+circle(cycle(v = vertex(player()), flag()); 220 30 35);
+set_vertex_angle(v; 40);
 
-OBJECT[BOX:0] a   c d     g   x  
-OBJECT[BOX:1]   b     e f   h   y
-OBJECT[BUTTON:0] e f g h x
-OBJECT[BUTTON:1] a b c d y
-OBJECT[PLAYER] v
-OBJECT[FLAG] w
-
-PLACE main 0 0 100
-PLACE side 120 0 40
-PLACE player 220 30 35
-PLACE_VERT v 0.5
-
-COLORLABEL[CYCLE:tb:in:arrow] main
+cycle_color_labels(main; 'tb' 'in' 'arrow');
