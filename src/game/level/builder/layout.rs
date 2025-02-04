@@ -691,3 +691,39 @@ impl LevelBuilder {
 		}
 	}
 }
+
+fn intersect_circles(c1: Vec2, c2: Vec2, r1: f32, r2: f32) -> Option<OneTwo<Vec2>> {
+	let d_sq = c1.distance_squared(c2);
+	// Do not even try if the circles share a center point
+	const CENTER_OVERLAP_THRESHOLD: f32 = 0.001;
+	if d_sq < CENTER_OVERLAP_THRESHOLD {
+		return None;
+	}
+	// First we find the projection of the intersections onto the line that connects center points
+	// This is the distance of that point along that line, as a multiple of distance between the centers
+	let rel_midpoint = (r1.powi(2) - r2.powi(2)) / 2.0 / d_sq + 0.5;
+	let midpoint = c1.lerp(c2, rel_midpoint);
+	// Now we try to construct the actual intersection points, they will lie at the intersections
+	// of the normal at rel_midpoint with one of the circles
+	let normal_offset_sq = r1.powi(2) - rel_midpoint.powi(2) * d_sq;
+	// Round here, we want to cacth a single intersection with a margin of error
+	const TANGENTIAL_INTERSECTION_THRESHOLD: f32 = 0.001;
+	if normal_offset_sq.abs() < TANGENTIAL_INTERSECTION_THRESHOLD {
+		Some(One(midpoint))
+	} else if normal_offset_sq > 0.0 {
+		let normal_offset = normal_offset_sq.sqrt();
+		let normal_unit = (c2 - c1).normalize().perp();
+		let offset = normal_offset * normal_unit;
+		Some(Two(midpoint + offset, midpoint - offset))
+	} else {
+		None
+	}
+}
+
+fn approx_eq(a: f32, b: f32) -> bool {
+	// Threshold is intentionally chosen to be fairly large
+	// so as to make up for rounding errors in arithmetics
+	// and/or human inputs
+	const THRESHOLD: f32 = 0.001;
+	(a - b).abs() < THRESHOLD * a.max(b)
+}

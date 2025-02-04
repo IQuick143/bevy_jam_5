@@ -1,7 +1,11 @@
+//! Contains declarations and general helper structs for the [`LevelBuilder`]
+//! Implementations of [`LevelBuilder`] are in layout and builder submodules.
+
+/// Contains Error structs and variants for level construction logic.
 pub mod error;
-/// Contains declarations and general helper structs for the [`LevelBuilder`]
-/// Implementations of [`LevelBuilder`] are in layout and builder submodules.
+/// Contains the logic for laying out the geometry of a level inside a [`LevelBuilder`] impl.
 mod layout;
+/// Contains the logic for assembling and verifying level datastructures inside a [`LevelBuilder`] impl.
 mod logic;
 
 use super::*;
@@ -80,8 +84,11 @@ struct IntermediateCycleData {
 
 #[derive(Clone, Copy, Debug)]
 enum IntermediateLinkStatus {
+	/// No link has been declared
 	None,
+	/// A link to another cycle is known, but it is yet unknown what group these cycles are in.
 	Cycle(usize, LinkedCycleDirection),
+	/// The cycle is linked to a parent group.
 	Group(usize, LinkedCycleDirection),
 }
 
@@ -103,6 +110,15 @@ enum IntermediateVertexPosition {
 	/// Exactly one cycle that owns the vertex has been placed
 	/// and the vertex may still be moved along it
 	Partial(PartiallyBoundVertexPosition),
+}
+
+impl IntermediateVertexPosition {
+	fn get_fixed(&self) -> Option<Vec2> {
+		match self {
+			Self::Fixed(pos) => Some(*pos),
+			_ => None,
+		}
+	}
 }
 
 /// Placement of a vertex that belongs to a placed cycle,
@@ -137,15 +153,6 @@ enum OneTwo<T> {
 }
 use OneTwo::*;
 
-impl IntermediateVertexPosition {
-	fn get_fixed(&self) -> Option<Vec2> {
-		match self {
-			Self::Fixed(pos) => Some(*pos),
-			_ => None,
-		}
-	}
-}
-
 impl<T> OneTwo<T> {
 	fn add_to_one(self, x: T) -> Result<Self, (T, T, T)> {
 		match self {
@@ -170,40 +177,4 @@ impl<T> IntoIterator for OneTwo<T> {
 			Two(a, b) => vec![a, b].into_iter(),
 		}
 	}
-}
-
-fn intersect_circles(c1: Vec2, c2: Vec2, r1: f32, r2: f32) -> Option<OneTwo<Vec2>> {
-	let d_sq = c1.distance_squared(c2);
-	// Do not even try if the circles share a center point
-	const CENTER_OVERLAP_THRESHOLD: f32 = 0.001;
-	if d_sq < CENTER_OVERLAP_THRESHOLD {
-		return None;
-	}
-	// First we find the projection of the intersections onto the line that connects center points
-	// This is the distance of that point along that line, as a multiple of distance between the centers
-	let rel_midpoint = (r1.powi(2) - r2.powi(2)) / 2.0 / d_sq + 0.5;
-	let midpoint = c1.lerp(c2, rel_midpoint);
-	// Now we try to construct the actual intersection points, they will lie at the intersections
-	// of the normal at rel_midpoint with one of the circles
-	let normal_offset_sq = r1.powi(2) - rel_midpoint.powi(2) * d_sq;
-	// Round here, we want to cacth a single intersection with a margin of error
-	const TANGENTIAL_INTERSECTION_THRESHOLD: f32 = 0.001;
-	if normal_offset_sq.abs() < TANGENTIAL_INTERSECTION_THRESHOLD {
-		Some(One(midpoint))
-	} else if normal_offset_sq > 0.0 {
-		let normal_offset = normal_offset_sq.sqrt();
-		let normal_unit = (c2 - c1).normalize().perp();
-		let offset = normal_offset * normal_unit;
-		Some(Two(midpoint + offset, midpoint - offset))
-	} else {
-		None
-	}
-}
-
-fn approx_eq(a: f32, b: f32) -> bool {
-	// Threshold is intentionally chosen to be fairly large
-	// so as to make up for rounding errors in arithmetics
-	// and/or human inputs
-	const THRESHOLD: f32 = 0.001;
-	(a - b).abs() < THRESHOLD * a.max(b)
 }
