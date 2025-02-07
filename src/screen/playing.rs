@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::{level::list_asset::LevelListAsset, prelude::*},
+	game::{level::list::LevelList, prelude::*},
 	send_event,
 	ui::prelude::*,
 	AppSet,
@@ -201,7 +201,7 @@ fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
 	playing_level: Res<State<PlayingLevel>>,
 	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelListAsset>>,
+	level_list_asset: Res<Assets<LevelList>>,
 	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
 	let level_index = playing_level
@@ -253,7 +253,7 @@ fn update_level_name_display(
 
 fn load_level(
 	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelListAsset>>,
+	level_list_asset: Res<Assets<LevelList>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut events: EventWriter<EnterLevel>,
 ) {
@@ -266,6 +266,8 @@ fn load_level(
 		.expect("The LevelList asset should be valid")
 		.levels
 		.get(level_index)
-		.expect("PlayingLevel is out of range");
-	events.send(EnterLevel(Some(level_handle.clone_weak())));
+		.expect("PlayingLevel is out of range")
+		.data_handle
+		.clone_weak();
+	events.send(EnterLevel(Some(level_handle)));
 }

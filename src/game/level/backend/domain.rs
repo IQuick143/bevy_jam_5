@@ -9,6 +9,12 @@ pub struct VertexId(pub usize);
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct CycleId(pub usize);
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LevelId(pub usize);
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct HubId(pub usize);
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum DomainValue {
 	Vertex(VertexId),
@@ -16,6 +22,8 @@ pub enum DomainValue {
 	Object(ObjectData),
 	Glyph(GlyphData),
 	Color(LogicalColor),
+	Level(LevelId),
+	Hub(HubId),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -25,17 +33,22 @@ pub enum DomainType {
 	Object,
 	Glyph,
 	Color,
+	Level,
+	Hub,
 }
 
 impl std::fmt::Display for DomainType {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Vertex => f.write_str("vertex"),
-			Self::Cycle => f.write_str("cycle"),
-			Self::Object => f.write_str("object"),
-			Self::Glyph => f.write_str("glyph"),
-			Self::Color => f.write_str("color"),
-		}
+		let display_name = match self {
+			Self::Vertex => "vertex",
+			Self::Cycle => "cycle",
+			Self::Object => "object",
+			Self::Glyph => "glyph",
+			Self::Color => "color",
+			Self::Level => "level",
+			Self::Hub => "hub",
+		};
+		f.write_str(display_name)
 	}
 }
 
@@ -49,6 +62,8 @@ impl DomainVariableValue for DomainValue {
 			Self::Object(_) => Self::Type::Object,
 			Self::Glyph(_) => Self::Type::Glyph,
 			Self::Color(_) => Self::Type::Color,
+			Self::Level(_) => Self::Type::Level,
+			Self::Hub(_) => Self::Type::Hub,
 		}
 	}
 }
@@ -97,7 +112,9 @@ impl_try_into_for_domain_value! {
 		String(s) => pictogram_color_name_to_id(s)
 			.map(LogicalColor::pictogram)
 			.map_err(|_| ArgumentError::InvalidValue),
-	}
+	},
+	Level(LevelId),
+	Hub(HubId),
 }
 
 pub fn pictogram_color_name_to_id(name: &str) -> Result<usize, ()> {
