@@ -1,9 +1,9 @@
 use bevy::{prelude::*, utils::HashMap};
 
 use crate::game::level::{
-	asset::plugin as level_asset_plugin,
-	list_asset::{plugin as level_list_asset_plugin, LevelListAsset},
-	CycleTurnability, GlyphType, ObjectType, ThingType,
+	asset::plugin as level_asset_plugin, list::LevelList,
+	list_asset::plugin as level_list_asset_plugin, CycleTurnability, GlyphType, ObjectType,
+	ThingType,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -192,7 +192,7 @@ impl FromWorld for HandleMap<SoundtrackKey> {
 /// Intermediate handle to a loading level list asset
 /// The resource will be removed when the asset is loaded
 #[derive(Resource, Debug)]
-pub struct LoadedLevelList(pub Handle<LevelListAsset>);
+pub struct LoadedLevelList(pub Handle<LevelList>);
 
 impl FromWorld for LoadedLevelList {
 	fn from_world(world: &mut World) -> Self {

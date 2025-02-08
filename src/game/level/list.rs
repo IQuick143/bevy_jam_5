@@ -1,98 +1,205 @@
 //! The level list and construction thereof
 
-use bevy::reflect::Reflect;
+use super::LevelData;
+use bevy::{asset::*, reflect::Reflect, utils::default};
+use itertools::Itertools as _;
 
 /// A list of levels split into sections
-#[derive(Clone, Debug, Reflect)]
+#[derive(Clone, Debug, Reflect, Asset)]
 pub struct LevelList {
+	/// Levels in the list
+	pub levels: Vec<LevelInfo>,
 	/// Sections of the level list
-	pub sections: Vec<LevelListSection>,
+	pub hubs: Vec<HubLevelInfo>,
+	/// Index of the root/main hub
+	pub root_hub: usize,
 }
 
-/// A user-facing categorization of levels
+/// Information about a single level
 #[derive(Clone, Debug, Reflect)]
-pub struct LevelListSection {
-	/// Display name of the section, if any
-	pub name: Option<String>,
-	/// Indices of levels that belong to this section.
-	/// Intentionally a range as level sections must be presented as such.
-	pub level_indices: std::ops::Range<usize>,
+pub struct LevelInfo {
+	/// Path to the level asset
+	pub path: AssetPath<'static>,
+	/// Handle to the level data asset in the level file
+	pub data_handle: Handle<LevelData>,
+	/// Index of the hub that this level logically belongs to
+	pub parent_hub: usize,
+	/// Index of the level that comes after this
+	/// in the standard playing order
+	pub next_level: Option<usize>,
+}
+
+/// Information about a hub and a group of levels it contains
+#[derive(Clone, Debug, Reflect)]
+pub struct HubLevelInfo {
+	/// Index of the hub that this hub logically subdivides
+	pub parent_hub: Option<usize>,
 }
 
 /// Helper object for construction of a level list
 pub struct LevelListBuilder {
+	/// The level list that is being built
 	list: LevelList,
-	level_count: usize,
-}
-
-#[derive(Debug)]
-pub enum LevelListBuildError {
-	/// [`declare_level`](LevelListBuilder::declare_level) was called
-	/// before [`begin_section`](LevelListBuilder::begin_section)
-	LevelDeclaredBeforeSection,
-	/// [`set_current_section_name`](LevelListBuilder::declare_level) was called
-	/// before [`begin_section`](LevelListBuilder::begin_section)
-	NameDeclaredBeforeSection,
-	/// [`set_current_section_name`](LevelListBuilder::declare_level) was called
-	/// more than once on the same section
-	SectionDisplayNameRedefined,
+	/// Whether a parent hub has been specified for each level
+	/// (the level data structures alone do not reflect that)
+	has_parent_hub: Vec<bool>,
 }
 
 impl LevelListBuilder {
 	pub fn new() -> Self {
 		Self {
 			list: LevelList {
-				sections: Vec::new(),
+				levels: Vec::new(),
+				hubs: Vec::new(),
+				root_hub: 0,
 			},
-			level_count: 0,
+			has_parent_hub: Vec::new(),
 		}
 	}
 
-	pub fn begin_section(&mut self, _section_id: Option<&str>) -> Result<(), LevelListBuildError> {
-		self.end_section_if_any();
-		self.list.sections.push(LevelListSection {
-			name: None,
-			level_indices: self.level_count..self.level_count,
+	pub fn add_level(&mut self, path: &str) -> Result<usize, LevelListBuildError> {
+		self.list.levels.push(LevelInfo {
+			parent_hub: 0,
+			next_level: None,
+			data_handle: default(),
+			path: AssetPath::try_parse(path)
+				.map_err(|err| LevelListBuildError::BadAssetPath(path.to_owned(), err))?
+				.into_owned(),
 		});
-		Ok(())
+		self.has_parent_hub.push(false);
+		Ok(self.list.levels.len() - 1)
 	}
 
-	pub fn declare_level(&mut self, _level_id: &str) -> Result<(), LevelListBuildError> {
-		let Some(section) = self.list.sections.last_mut() else {
-			return Err(LevelListBuildError::LevelDeclaredBeforeSection);
-		};
-		section.level_indices.end += 1;
-		self.level_count += 1;
-		Ok(())
+	pub fn add_hub(&mut self) -> Result<usize, LevelListBuildError> {
+		self.list.hubs.push(HubLevelInfo { parent_hub: None });
+		Ok(self.list.hubs.len() - 1)
 	}
 
-	pub fn set_current_section_name(
+	pub fn set_parent_for_level(
 		&mut self,
-		display_name: &str,
+		level_index: usize,
+		parent_index: usize,
 	) -> Result<(), LevelListBuildError> {
-		let Some(section) = self.list.sections.last_mut() else {
-			return Err(LevelListBuildError::NameDeclaredBeforeSection);
-		};
-		if section.name.is_some() {
-			return Err(LevelListBuildError::SectionDisplayNameRedefined);
+		if level_index >= self.list.levels.len() {
+			return Err(LevelListBuildError::LevelIndexOutOfRange(level_index));
 		}
-		section.name = Some(display_name.to_owned());
+		if parent_index >= self.list.hubs.len() {
+			return Err(LevelListBuildError::HubIndexOutOfRange(parent_index));
+		}
+		self.list.levels[level_index].parent_hub = parent_index;
+		self.has_parent_hub[level_index] = true;
 		Ok(())
 	}
 
-	pub fn build(self) -> Result<LevelList, LevelListBuildError> {
-		self.end_section_if_any();
+	pub fn set_parent_for_hub(
+		&mut self,
+		hub_index: usize,
+		parent_index: usize,
+	) -> Result<(), LevelListBuildError> {
+		if hub_index >= self.list.hubs.len() {
+			return Err(LevelListBuildError::HubIndexOutOfRange(hub_index));
+		}
+		if parent_index >= self.list.hubs.len() {
+			return Err(LevelListBuildError::HubIndexOutOfRange(parent_index));
+		}
+		if self.is_hub_ancestor_of(hub_index, parent_index) {
+			return Err(LevelListBuildError::CycleInHubHierarchy(
+				hub_index,
+				parent_index,
+			));
+		}
+		self.list.hubs[hub_index].parent_hub = Some(parent_index);
+		Ok(())
+	}
+
+	pub fn set_next_level(
+		&mut self,
+		level_index: usize,
+		next_index: usize,
+	) -> Result<(), LevelListBuildError> {
+		if level_index >= self.list.levels.len() {
+			return Err(LevelListBuildError::LevelIndexOutOfRange(level_index));
+		}
+		if next_index >= self.list.levels.len() {
+			return Err(LevelListBuildError::LevelIndexOutOfRange(next_index));
+		}
+		self.list.levels[level_index].next_level = Some(next_index);
+		Ok(())
+	}
+
+	pub fn build(
+		mut self,
+		asset_load_context: &mut LoadContext,
+	) -> Result<LevelList, LevelListBuildError> {
+		if let Some((i, _)) = self.has_parent_hub.iter().find_position(|x| !**x) {
+			return Err(LevelListBuildError::OrphanedLevel(i));
+		}
+		self.find_and_set_root_hub()?;
+		self.load_level_assets(asset_load_context);
 		Ok(self.list)
 	}
 
-	/// Helper method that is called when the latest level list section is considered completed
-	fn end_section_if_any(&self) {
-		if let Some(current_section) = self.list.sections.last() {
-			if current_section.level_indices.is_empty() {
-				bevy::log::warn!("A level list section was declared without any levels");
+	/// Checks if `ancestor` is the same as or an ancestor of `successor`
+	/// in the hub tree hierarchy
+	fn is_hub_ancestor_of(&self, ancestor: usize, successor: usize) -> bool {
+		let mut current = successor;
+		if current == ancestor {
+			return true;
+		}
+		while let Some(parent) = self.list.hubs[current].parent_hub {
+			current = parent;
+			if current == ancestor {
+				return true;
 			}
 		}
+		false
 	}
+
+	/// Finds the root hub and sets its index as the [`LevelList::root_hub`].
+	/// Fails if there are no hubs or if there is more than one root.
+	fn find_and_set_root_hub(&mut self) -> Result<(), LevelListBuildError> {
+		let mut root_hubs = self
+			.list
+			.hubs
+			.iter()
+			.positions(|hub| hub.parent_hub.is_none());
+		let Some(first_root) = root_hubs.next() else {
+			return Err(LevelListBuildError::NoHub);
+		};
+		if let Some(second_root) = root_hubs.next() {
+			return Err(LevelListBuildError::MultipleRootHubs([
+				first_root,
+				second_root,
+			]));
+		}
+		self.list.root_hub = first_root;
+		Ok(())
+	}
+
+	fn load_level_assets(&mut self, load_context: &mut LoadContext) {
+		for level in &mut self.list.levels {
+			level.data_handle = load_context.load(&level.path);
+		}
+	}
+}
+
+#[derive(Debug)]
+pub enum LevelListBuildError {
+	/// Asset path has an invalid format
+	BadAssetPath(String, ParseAssetPathError),
+	/// Level index is too large
+	LevelIndexOutOfRange(usize),
+	/// Hub index is too large
+	HubIndexOutOfRange(usize),
+	/// Adding a parent-child relation would create a cycle
+	/// in hub hierarchy
+	CycleInHubHierarchy(usize, usize),
+	/// No hub has been declared by build time
+	NoHub,
+	/// More than one hub in root position at build time
+	MultipleRootHubs([usize; 2]),
+	/// A level does not have a parent set by build time
+	OrphanedLevel(usize),
 }
 
 impl std::error::Error for LevelListBuildError {}
@@ -100,18 +207,13 @@ impl std::error::Error for LevelListBuildError {}
 impl std::fmt::Display for LevelListBuildError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::LevelDeclaredBeforeSection => write!(
-				f,
-				"A level was declared before starting a level list section."
-			),
-			Self::NameDeclaredBeforeSection => write!(
-				f,
-				"A level list section name was assigned before starting a section."
-			),
-			Self::SectionDisplayNameRedefined => write!(
-				f,
-				"A level list section was assigned more than one display name."
-			),
+			Self::BadAssetPath(path, reason) => write!(f, "'{path}' is not a valid path to an asset: {reason}"),
+			Self::HubIndexOutOfRange(i) => write!(f, "trying to reference hub {i}, but there are not that many hubs"),
+			Self::LevelIndexOutOfRange(i) => write!(f, "trying to reference level {i}, but there are not that many levels"),
+			Self::CycleInHubHierarchy(child, parent) => write!(f, "adding hub {child} as child of hub {parent} would create a loop in hierarchy"),
+			Self::NoHub => f.write_str("level list is missing a hub"),
+			Self::MultipleRootHubs([first, second]) => write!(f, "only one root hub can exist, but hubs {first} and {second} are both in root position"),
+			Self::OrphanedLevel(i) => write!(f, "level {i} does not have a parent set"),
 		}
 	}
 }

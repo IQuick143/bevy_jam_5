@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::{level::list_asset::LevelListAsset, prelude::*},
+	game::{level::list::LevelList, prelude::*},
 	send_event,
 	ui::prelude::*,
 	AppSet,
@@ -166,6 +166,8 @@ fn game_ui_input_recording_system(
 fn game_ui_input_processing_system(
 	mut events: EventReader<GameUiAction>,
 	playing_level: Res<State<PlayingLevel>>,
+	level_list: Res<LoadedLevelList>,
+	level_list_asset: Res<Assets<LevelList>>,
 	mut commands: Commands,
 	mut next_level: ResMut<NextState<PlayingLevel>>,
 	mut undo_commands: EventWriter<UndoMove>,
@@ -186,9 +188,19 @@ fn game_ui_input_processing_system(
 					.get()
 					.0
 					.expect("When in Screen::Playing state, PlayingLevel must also be set");
-
-				next_level.set(PlayingLevel(Some(playing_level + 1)));
-				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
+				let next_level_id = level_list_asset
+					.get(&level_list.0)
+					.expect("The LevelList asset should be valid")
+					.levels
+					.get(playing_level)
+					.expect("PlayingLevel is out of range")
+					.next_level;
+				if next_level_id.is_none() {
+					log::warn!("Received a Next level action on a level without a successor");
+				} else {
+					next_level.set(PlayingLevel(next_level_id));
+					commands.spawn((FadeAnimationBundle::default(), LoadLevel));
+				}
 			}
 			GameUiAction::Undo => {
 				undo_commands.send(UndoMove);
@@ -201,20 +213,21 @@ fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
 	playing_level: Res<State<PlayingLevel>>,
 	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelListAsset>>,
+	level_list_asset: Res<Assets<LevelList>>,
 	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
 	let level_index = playing_level
 		.get()
 		.0
 		.expect("When in Screen::Playing state, PlayingLevel must also be set");
-	let is_last_level = level_index + 1
-		== level_list_asset
-			.get(&level_list.0)
-			.expect("The LevelList asset should be valid")
-			.levels
-			.len();
-	let display = if is_level_completed.0 && !is_last_level {
+	let next_level = level_list_asset
+		.get(&level_list.0)
+		.expect("The LevelList asset should be valid")
+		.levels
+		.get(level_index)
+		.expect("PlayingLevel is out of range")
+		.next_level;
+	let display = if is_level_completed.0 && next_level.is_some() {
 		Display::DEFAULT
 	} else {
 		Display::None
@@ -253,7 +266,7 @@ fn update_level_name_display(
 
 fn load_level(
 	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelListAsset>>,
+	level_list_asset: Res<Assets<LevelList>>,
 	playing_level: Res<State<PlayingLevel>>,
 	mut events: EventWriter<EnterLevel>,
 ) {
@@ -266,6 +279,8 @@ fn load_level(
 		.expect("The LevelList asset should be valid")
 		.levels
 		.get(level_index)
-		.expect("PlayingLevel is out of range");
-	events.send(EnterLevel(Some(level_handle.clone_weak())));
+		.expect("PlayingLevel is out of range")
+		.data_handle
+		.clone_weak();
+	events.send(EnterLevel(Some(level_handle)));
 }

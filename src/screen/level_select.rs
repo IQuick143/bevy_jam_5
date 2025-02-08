@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::level::{list_asset::LevelListAsset, LevelData},
+	game::level::{list::LevelList, LevelData},
 	ui::prelude::*,
 };
 
@@ -27,7 +27,7 @@ fn spawn_screen(
 	levels: Res<LoadedLevelList>,
 	font: Res<GlobalFont>,
 	level_assets: Res<Assets<LevelData>>,
-	level_list_asset: Res<Assets<LevelListAsset>>,
+	level_list_asset: Res<Assets<LevelList>>,
 ) {
 	let levels = level_list_asset
 		.get(&levels.0)
@@ -37,44 +37,27 @@ fn spawn_screen(
 		.insert(StateScoped(Screen::LevelSelect))
 		.with_children(|parent| {
 			parent.header("Level Select", font.0.clone_weak());
-			for section in &levels.list.sections {
-				let mut section_levels = levels.levels[section.level_indices.clone()]
-					.iter()
-					.enumerate()
-					// Offset indices to account for section start
-					.map(|(i, x)| (i + section.level_indices.start, x))
-					.peekable();
-				if section_levels.peek().is_none() {
-					// Exclude any sections that have no displayable levels
-					continue;
-				}
-				parent.label(
-					section
-						.name
-						.clone()
-						.unwrap_or_else(|| "NAME_MISSING".to_owned()),
-					font.0.clone_weak(),
-				);
-				parent
-					.spawn(Node {
-						display: Display::Grid,
-						column_gap: Val::Px(10.0),
-						row_gap: Val::Px(10.0),
-						justify_content: JustifyContent::Center,
-						align_content: AlignContent::Center,
-						grid_template_columns: vec![RepeatedGridTrack::auto(3)],
-						..default()
-					})
-					.with_children(|parent| {
-						for (level_id, level_handle) in section_levels {
-							if let Some(level) = level_assets.get(level_handle) {
-								parent
-									.small_button(level.name.clone(), font.0.clone_weak())
-									.insert(LevelSelectAction::PlayLevel(level_id));
-							}
+			parent
+				.spawn(Node {
+					display: Display::Grid,
+					column_gap: Val::Px(10.0),
+					row_gap: Val::Px(10.0),
+					justify_content: JustifyContent::Center,
+					align_content: AlignContent::Center,
+					grid_template_columns: vec![RepeatedGridTrack::auto(3)],
+					..default()
+				})
+				.with_children(|parent| {
+					for (level_id, level) in levels.levels.iter().enumerate() {
+						if let Some(level) = level_assets.get(&level.data_handle) {
+							parent
+								.small_button(level.name.clone(), font.0.clone_weak())
+								.insert(LevelSelectAction::PlayLevel(level_id));
+						} else {
+							log::warn!("Invalid level asset handle");
 						}
-					});
-			}
+					}
+				});
 			parent
 				.button("Back", font.0.clone_weak())
 				.insert(LevelSelectAction::Back);
