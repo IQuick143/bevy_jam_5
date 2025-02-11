@@ -179,11 +179,19 @@ impl LevelBuilder {
 	#[expect(dead_code)]
 	pub fn one_way_link_detector(
 		&mut self,
-		_detector: usize,
-		_dest_cycle: usize,
-		_direction: LinkedCycleDirection,
+		detector: usize,
+		dest_cycle: usize,
+		direction: LinkedCycleDirection,
 	) -> Result<(), LevelBuilderError> {
-		todo!();
+		if let Some(detector) = self.detectors.get_mut(detector) {
+			detector.links.push(OneWayIntermediateData {
+				target_cycle: dest_cycle,
+				direction,
+			});
+			Ok(())
+		} else {
+			Err(LevelBuilderError::DetectorIndexOutOfRange(detector))
+		}
 	}
 
 	/// Checks that the level data is complete and assembles it
