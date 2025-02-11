@@ -17,8 +17,12 @@ pub struct LevelData {
 	pub vertices: Vec<VertexData>,
 	/// Data for all cycles in the level
 	pub cycles: Vec<CycleData>,
-	/// Data for all groups of cycles in the level, sorted in topological order (lower indices need to be evaluated before higher ones)
+	/// Data for all groups of cycles in the level
 	pub groups: Vec<GroupData>,
+	/// Data for all abstract detector objects in the level (the ones doing the rotation propagation instead of the ones being rendered)
+	pub detectors: Vec<DetectorData>,
+	/// An order in which groups and detectors should be evaluated, sorted in topological order (previous elements need to be evaluated before later ones)
+	pub execution_order: Vec<DetectorOrGroup>,
 	/// List of group pairs, which cannot be turned at once
 	/// Sorted in increasing lexicographic order
 	pub forbidden_group_pairs: Vec<(usize, usize)>,
@@ -28,6 +32,13 @@ pub struct LevelData {
 	/// Data for all one way links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_one_way_links: Vec<DeclaredLinkData>,
+}
+
+/// Either the index of a detector or a group
+#[derive(Debug, Reflect, Clone, Copy)]
+pub enum DetectorOrGroup {
+	Group(usize),
+	Detector(usize),
 }
 
 /// Description of a single vertex
@@ -59,6 +70,12 @@ pub struct CycleData {
 	pub orientation_within_group: LinkedCycleDirection,
 }
 
+#[derive(Debug, Clone, Reflect)]
+pub struct DetectorData {
+	/// List of groups this detector points to.
+	pub linked_groups: Vec<OneWayLinkData>,
+}
+
 /// Description of a group of cycles
 #[derive(Debug, Clone, Reflect)]
 pub struct GroupData {
@@ -68,6 +85,8 @@ pub struct GroupData {
 	pub cycles: Vec<(usize, LinkedCycleDirection)>,
 	/// One Way Links to other groups that should get triggered by this one.
 	pub linked_groups: Vec<OneWayLinkData>,
+	/// List of cycle indices this group contains that have detectors on them.
+	pub outgoing_detector_cycles: Vec<(usize, usize)>,
 }
 
 /// Description of a declared (and visualized) cycle link

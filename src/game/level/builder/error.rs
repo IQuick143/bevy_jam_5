@@ -88,6 +88,8 @@ pub enum LevelBuilderError {
 	CycleIndexOutOfRange(usize),
 	/// An out-of-range index was used to reference a vertex
 	VertexIndexOutOfRange(usize),
+	/// An out-of-range index was used to reference a detector
+	DetectorIndexOutOfRange(usize),
 	/// A vertex shows up multiple times in the same cycle
 	RepeatingVertexInCycle(usize),
 	/// A cycle has been explicitly assigned negative radius
@@ -153,6 +155,7 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::LevelNameAlreadySet => write!(f, "Level name has been set multiple times."),
 			Self::LevelHintAlreadySet => write!(f, "Level hint has been set multiple times."),
 			Self::VertexIndexOutOfRange(i) => write!(f, "Vertex {i} has been referenced, but there are not that many vertices."),
+			Self::DetectorIndexOutOfRange(i) => write!(f, "Detector {i} has been referenced, but there are not that many detectors."),
 			Self::CycleIndexOutOfRange(i) => write!(f, "Cycle {i} has been referenced, but there are not that many cycles."),
 			Self::RepeatingVertexInCycle(i) => write!(f, "Cannot create cycle that contains vertex {i} multiple times."),
 			Self::CycleRadiusNotPositive(i, r) => write!(f, "Radius of cycle {i} is not positive ({r})"),

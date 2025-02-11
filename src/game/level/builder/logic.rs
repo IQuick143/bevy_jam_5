@@ -12,8 +12,10 @@ impl LevelBuilder {
 			hint: None,
 			vertices: Vec::new(),
 			cycles: Vec::new(),
+			detectors: Vec::new(),
 			declared_links: Vec::new(),
-			declared_one_way_links: Vec::new(),
+			declared_one_way_cycle_links: Vec::new(),
+			declared_one_way_detector_links: Vec::new(),
 		}
 	}
 
@@ -47,6 +49,7 @@ impl LevelBuilder {
 		&mut self,
 		turnability: CycleTurnability,
 		vertex_indices: impl IntoIterator<Item = usize>,
+		detectors: impl IntoIterator<Item = (usize, i32)>,
 	) -> Result<usize, LevelBuilderError> {
 		let vertex_indices = vertex_indices.into_iter().collect::<Vec<_>>();
 		if let Some(i) = vertex_indices.iter().duplicates().next() {
@@ -59,6 +62,13 @@ impl LevelBuilder {
 		{
 			return Err(LevelBuilderError::VertexIndexOutOfRange(i));
 		}
+		let detectors = detectors.into_iter().collect::<Vec<_>>();
+		if let Some((index, _)) = detectors
+			.iter()
+			.find(|&(index, _)| *index >= self.detectors.len())
+		{
+			return Err(LevelBuilderError::DetectorIndexOutOfRange(*index));
+		}
 		// Add the cycle entry
 		self.cycles.push(IntermediateCycleData {
 			placement: None,
@@ -67,8 +77,16 @@ impl LevelBuilder {
 			turnability,
 			linked_cycle: IntermediateLinkStatus::None,
 			outgoing_one_way_links: Vec::new(),
+			placed_detectors: detectors,
 		});
 		Ok(self.cycles.len() - 1)
+	}
+
+	#[expect(dead_code)]
+	pub fn add_detector(&mut self) -> Result<usize, LevelBuilderError> {
+		self.detectors
+			.push(IntermediateDetectorData { links: Vec::new() });
+		Ok(self.detectors.len() - 1)
 	}
 
 	pub fn set_object(
@@ -149,7 +167,7 @@ impl LevelBuilder {
 				target_cycle: dest_cycle,
 				direction,
 			});
-		self.declared_one_way_links.push(DeclaredLinkData {
+		self.declared_one_way_cycle_links.push(DeclaredLinkData {
 			source_cycle,
 			dest_cycle,
 			direction,
@@ -157,9 +175,20 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	/// Links a detector to a cycle by a one-way.
+	#[expect(dead_code)]
+	pub fn one_way_link_detector(
+		&mut self,
+		_detector: usize,
+		_dest_cycle: usize,
+		_direction: LinkedCycleDirection,
+	) -> Result<(), LevelBuilderError> {
+		todo!();
+	}
+
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
-		let groups = self.compute_groups()?;
+		let (groups, detectors, execution_order) = self.compute_groups_and_detectors()?;
 		let forbidden_group_pairs = self.compute_forbidden_groups()?;
 		self.validate_before_build()?;
 		self.build_layout();
@@ -180,22 +209,28 @@ impl LevelBuilder {
 			hint: self.hint,
 			vertices,
 			cycles,
-			declared_links: self.declared_links,
-			declared_one_way_links: self.declared_one_way_links,
 			groups,
+			detectors,
+			declared_links: self.declared_links,
+			declared_one_way_links: self.declared_one_way_cycle_links,
 			forbidden_group_pairs,
+			execution_order,
 		})
 	}
 
 	/// Computes and creates the GroupData objects
-	/// Also assigns all cycles into their groups
-	fn compute_groups(&mut self) -> Result<Vec<GroupData>, LevelBuilderError> {
+	/// Computes the execution order of groups and detectors
+	/// Also assigns all cycles and detectors into their groups
+	fn compute_groups_and_detectors(
+		&mut self,
+	) -> Result<(Vec<GroupData>, Vec<DetectorData>, Vec<DetectorOrGroup>), LevelBuilderError> {
 		let mut groups = Vec::new();
 		for cycle in self.cycles.iter_mut() {
 			if let IntermediateLinkStatus::None = cycle.linked_cycle {
 				groups.push(GroupData {
 					cycles: Vec::new(),
 					linked_groups: Vec::new(),
+					outgoing_detector_cycles: Vec::new(),
 				});
 				cycle.linked_cycle = IntermediateLinkStatus::Group(
 					groups.len() - 1,
@@ -213,7 +248,7 @@ impl LevelBuilder {
 			let IntermediateLinkStatus::Group(group, direction_2) =
 				self.cycles[root_cycle].linked_cycle
 			else {
-				panic!("Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)");
+				unreachable!("Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)");
 			};
 			let direction = direction_1 * direction_2;
 			groups[group]
@@ -226,13 +261,13 @@ impl LevelBuilder {
 			let IntermediateLinkStatus::Group(source_group, direction_1) =
 				self.cycles[source_cycle].linked_cycle
 			else {
-				panic!("Some doofus done doofed up the for loop above this one.");
+				unreachable!("Some doofus done doofed up the for loop above this one.");
 			};
 			for link in self.cycles[source_cycle].outgoing_one_way_links.iter() {
 				let IntermediateLinkStatus::Group(target_group, direction_2) =
 					self.cycles[link.target_cycle].linked_cycle
 				else {
-					panic!("Some doofus done doofed up the for loop above this one.");
+					unreachable!("Some doofus done doofed up the for loop above this one.");
 				};
 				groups[source_group].linked_groups.push(OneWayLinkData {
 					source_cycle_data: Some(source_cycle),
@@ -243,124 +278,191 @@ impl LevelBuilder {
 				});
 			}
 		}
+		// Finalise detector objects
+		let detectors = {
+			// Remove unused detectors
+			let mut used = vec![false; self.detectors.len()];
+			for cycle in self.cycles.iter() {
+				for (detector, _) in cycle.placed_detectors.iter() {
+					used[*detector] = true;
+				}
+			}
+			let mut new_ids = vec![0; self.detectors.len()];
+			let mut detectors = Vec::new();
+			for detector in 0..self.detectors.len() {
+				if used[detector] {
+					new_ids[detector] = detectors.len();
+					detectors.push(DetectorData {
+						linked_groups: self.detectors[detector]
+							.links
+							.iter()
+							.map(|link| {
+								let IntermediateLinkStatus::Group(
+									target_group,
+									target_direction_in_group,
+								) = self.cycles[link.target_cycle].linked_cycle
+								else {
+									unreachable!("Cycles should have groups by now");
+								};
+								OneWayLinkData {
+									target_group,
+									direction: link.direction * target_direction_in_group,
+									multiplicity: 1,         // TODO
+									source_cycle_data: None, // TODO
+									target_cycle_data: None, // TODO
+								}
+							})
+							.collect(),
+					});
+				}
+			}
+			// Fix indices in cycles
+			for cycle in self.cycles.iter_mut() {
+				for (detector, _) in cycle.placed_detectors.iter_mut() {
+					*detector = new_ids[*detector];
+				}
+			}
+			detectors
+		};
 		// TOPOLOGICAL SORT
-		// THIS BLOCK INVALIDATES OR CHANGES ALL GROUP INDICES BY RESHUFFLING THE `groups` VECTOR.
 		// TODO: use a better structure for the links between cycles, to deduplicate mutliple equivalent dependencies
-		{
-			let group_target_indices = {
-				let mut sorted_order = vec![0usize; groups.len()];
-				let mut next_order_index = 0;
-				let mut sorted_mark = vec![false; groups.len()];
-				let mut currently_visited_mark = vec![false; groups.len()];
-				let mut stack = Vec::new();
+		let execution_order = {
+			let n_groups = groups.len();
+			let n_detectors = self.detectors.len();
 
-				for i in 0..groups.len() {
+			let get_merged_index = |id| match id {
+				DetectorOrGroup::Group(i) => i,
+				DetectorOrGroup::Detector(i) => i + n_groups,
+			};
+
+			let mut sorted_order = Vec::new();
+			let mut sorted_mark = vec![false; n_groups + n_detectors];
+			let mut currently_visited_mark = vec![false; n_groups + n_detectors];
+			let mut stack = Vec::new();
+
+			// This for-loop inserts all the groups, we don't really care about the detectors
+			// They'll either be brought in as a dependency of some group, or can be ignored.
+			// (Though that should raise eyebrows if it happens.)
+			for new_group in 0..n_groups {
+				// Node is already in the ordering, skip it
+				if sorted_mark[new_group] {
+					continue;
+				}
+				stack.push(DetectorOrGroup::Group(new_group));
+				while !stack.is_empty() {
+					let node = *stack.last().unwrap();
+					let index = get_merged_index(node);
 					// Node is already in the ordering, skip it
-					if sorted_mark[i] {
+					// This removes duplicates from the stack
+					if sorted_mark[index] {
+						stack.pop();
 						continue;
 					}
-					stack.push(i);
-					while !stack.is_empty() {
-						let node = *stack.last().unwrap();
-						// Node is already in the ordering, skip it
-						// This removes duplicates from the stack
-						if sorted_mark[node] {
-							stack.pop();
-							continue;
+					currently_visited_mark[index] = true;
+					let mut blocked = false;
+					// Process group dependencies of this node
+					let mut dependency_group_callback = |dependency_group: usize| {
+						// TODO let dependency_group = dependency.target_group;
+						if currently_visited_mark[dependency_group] {
+							// TODO: Better errors, but I really could not be bothered.
+							return Err(LevelBuilderError::OneWayLinkLoop);
 						}
-						currently_visited_mark[node] = true;
-						let mut blocked = false;
-						for dependency in groups[node].linked_groups.iter() {
-							let dependency_node = dependency.target_group;
-							if currently_visited_mark[dependency_node] {
-								// TODO: Better errors, but I really could not be bothered.
-								return Err(LevelBuilderError::OneWayLinkLoop);
-							}
-							// If this node depends on nodes that have not yet been put into the topological ordering
-							// We need to first handle those and block this node
-							if !sorted_mark[dependency_node] {
-								blocked = true;
-								stack.push(dependency_node);
-							}
+						// If this node depends on nodes that have not yet been put into the topological ordering
+						// We need to first handle those and block this node
+						if !sorted_mark[dependency_group] {
+							blocked = true;
+							stack.push(DetectorOrGroup::Group(dependency_group));
 						}
-						if !blocked {
-							// Remove our node (it has to be at the top because node is the last element)
-							// And we have not pushed to the stack
-							stack.pop();
-							// Place the node into the ordering giving it the next available index
-							sorted_mark[node] = true;
-							currently_visited_mark[node] = false;
-							sorted_order[node] = next_order_index;
-							next_order_index += 1;
-						}
-					}
-				}
-				// Reverse the ordering, so sources come before targets
-				for index in sorted_order.iter_mut() {
-					*index = groups.len() - 1 - *index;
-				}
-				sorted_order
-			};
-			#[cfg(debug_assertions)]
-			{
-				// Check that every group index occurs exactly once
-				let mut counter = vec![0; groups.len()];
-				for index in group_target_indices.iter() {
-					counter[*index] += 1;
-				}
-				assert_eq!(
-					counter,
-					vec![1; groups.len()],
-					"Index map is not a bijection"
-				);
-			}
-			// Update ***EVERY*** group index.
-
-			// Update cycle -> group links
-			for source_cycle in 0..self.cycles.len() {
-				let IntermediateLinkStatus::Group(source_group, direction) =
-					self.cycles[source_cycle].linked_cycle
-				else {
-					panic!("Some doofus done doofed up the for loop above this one.");
-				};
-				self.cycles[source_cycle].linked_cycle =
-					IntermediateLinkStatus::Group(group_target_indices[source_group], direction);
-			}
-
-			// Update group -> group links
-			for group in groups.iter_mut() {
-				for link in group.linked_groups.iter_mut() {
-					link.target_group = group_target_indices[link.target_group];
-				}
-			}
-
-			// Shuffle groups
-			let n_groups = groups.len();
-			let old_groups = std::mem::replace(
-				&mut groups,
-				vec![
-					GroupData {
-						cycles: Vec::new(),
-						linked_groups: Vec::new()
+						Ok(())
 					};
-					n_groups
-				],
-			);
-			for (old_index, group) in old_groups.into_iter().enumerate() {
-				let _ = std::mem::replace(&mut groups[group_target_indices[old_index]], group);
-			}
-			#[cfg(debug_assertions)]
-			{
-				// Check that every group is linked only to groups of higher index
-				for (source_group_id, group) in groups.iter().enumerate() {
-					for link in group.linked_groups.iter() {
-						assert!(
-							link.target_group > source_group_id,
-							"Group {} links to a lower (or equal) index group {}",
-							source_group_id,
-							link.target_group
-						);
+					match node {
+						DetectorOrGroup::Group(group) => {
+							// TODO: Group -> Detector dependencies
+							for link in groups[group].linked_groups.iter() {
+								dependency_group_callback(link.target_group)?
+							}
+						}
+						DetectorOrGroup::Detector(detector) => {
+							for link in detectors[detector].linked_groups.iter() {
+								dependency_group_callback(link.target_group)?
+							}
+						}
 					}
+					// If the node is not blocked, we can safely put it as the next in the topological ordering.
+					if !blocked {
+						// Remove our node (it has to be at the top because `node` is the last element)
+						// And we have not pushed to the stack
+						stack.pop();
+						// Place the node into the ordering giving it the next available index
+						sorted_mark[index] = true;
+						currently_visited_mark[index] = false;
+						sorted_order.push(node);
+					}
+				}
+			}
+			// Reverse the ordering, so sources come before targets
+			sorted_order.reverse();
+			sorted_order
+		};
+		#[cfg(debug_assertions)]
+		{
+			// Check that every group and (used) detector index occurs exactly once
+			let mut group_counter = vec![0; groups.len()];
+			let mut detector_counter = vec![0; detectors.len()];
+			for step in execution_order.iter() {
+				match step {
+					DetectorOrGroup::Group(group) => group_counter[*group] += 1,
+					DetectorOrGroup::Detector(detector) => detector_counter[*detector] += 1,
+				}
+			}
+			assert_eq!(
+				group_counter,
+				vec![1; groups.len()],
+				"Groups are not placed uniquely in execution order"
+			);
+			assert_eq!(
+				detector_counter,
+				vec![1; detectors.len()],
+				"Detectors are not placed uniquely in execution order"
+			);
+		}
+		#[cfg(debug_assertions)]
+		{
+			// Check that all links come from earlier to later objects in the execution order
+			let mut group_appearances = vec![0; groups.len()];
+			let mut detector_appearances = vec![0; detectors.len()];
+			for (number, step) in execution_order.iter().enumerate() {
+				match step {
+					DetectorOrGroup::Group(group) => group_appearances[*group] = number,
+					DetectorOrGroup::Detector(detector) => detector_appearances[*detector] = number,
+				}
+			}
+			for (source_group_id, group) in groups.iter().enumerate() {
+				for link in group.linked_groups.iter() {
+					assert!(
+						group_appearances[link.target_group] > group_appearances[source_group_id],
+						"Group {} links to an earlier group {}",
+						source_group_id,
+						link.target_group
+					);
+				}
+				for (_, detector) in group.outgoing_detector_cycles.iter().copied() {
+					assert!(
+						detector_appearances[detector] > group_appearances[source_group_id],
+						"Group {} contains an earlier detector {}",
+						source_group_id,
+						detector
+					);
+				}
+			}
+			for (detector_id, detector) in detectors.iter().enumerate() {
+				for link in detector.linked_groups.iter().copied() {
+					assert!(
+						detector_appearances[detector_id] > group_appearances[link.target_group],
+						"Detector {} triggers an earlier group {}",
+						detector_id,
+						link.target_group,
+					);
 				}
 			}
 		}
@@ -390,7 +492,7 @@ impl LevelBuilder {
 				}
 			}
 		}
-		Ok(groups)
+		Ok((groups, detectors, execution_order))
 	}
 
 	/// Computes which pairs of groups can not be rotated in sync

@@ -247,7 +247,8 @@ impl LevelBuilder {
 		}
 
 		args.read_end()?;
-		let cycle_id = self.add_cycle(turnability, vertices)?;
+		// TODO: Detectors
+		let cycle_id = self.add_cycle(turnability, vertices, Vec::new())?;
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
