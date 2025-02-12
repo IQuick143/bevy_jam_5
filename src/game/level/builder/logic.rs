@@ -458,9 +458,11 @@ impl LevelBuilder {
 				for link in group.linked_groups.iter() {
 					assert!(
 						group_appearances[link.target_group] > group_appearances[source_group_id],
-						"Group {} links to an earlier group {}",
+						"Group {} (with order {}) links to an earlier group {} (with order {})",
 						source_group_id,
-						link.target_group
+						group_appearances[source_group_id],
+						link.target_group,
+						group_appearances[link.target_group],
 					);
 				}
 				for detector_cycle_id in group.outgoing_detector_cycles.iter().copied() {
@@ -468,9 +470,11 @@ impl LevelBuilder {
 					{
 						assert!(
 							detector_appearances[detector_id] > group_appearances[source_group_id],
-							"Group {} contains an earlier detector {}",
+							"Group {} (with order {}) contains an earlier detector {} (with order {})",
 							source_group_id,
-							detector_id
+							group_appearances[source_group_id],
+							detector_id,
+							detector_appearances[detector_id],
 						);
 					}
 				}
@@ -478,10 +482,12 @@ impl LevelBuilder {
 			for (detector_id, detector) in detectors.iter().enumerate() {
 				for link in detector.linked_groups.iter().copied() {
 					assert!(
-						detector_appearances[detector_id] > group_appearances[link.target_group],
-						"Detector {} triggers an earlier group {}",
+						detector_appearances[detector_id] < group_appearances[link.target_group],
+						"Detector {} (with order {}) triggers an earlier group {} (with order {})",
 						detector_id,
+						detector_appearances[detector_id],
 						link.target_group,
+						group_appearances[link.target_group],
 					);
 				}
 			}
