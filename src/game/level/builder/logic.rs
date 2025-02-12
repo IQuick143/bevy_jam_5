@@ -181,6 +181,9 @@ impl LevelBuilder {
 		dest_cycle: usize,
 		direction: LinkedCycleDirection,
 	) -> Result<(), LevelBuilderError> {
+		if dest_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(dest_cycle));
+		}
 		if let Some(detector) = self.detectors.get_mut(detector) {
 			detector.links.push(OneWayIntermediateData {
 				target_cycle: dest_cycle,
