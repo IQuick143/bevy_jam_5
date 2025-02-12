@@ -165,7 +165,9 @@ fn cycle_group_rotation_relay_system(
 						}
 					}
 				}
-				// TODO: Update detectors
+				// for detector_cycle in level.groups[group_id].outgoing_detector_cycles.iter() {
+				// 	// TODO: Update detectors
+				// }
 			}
 			DetectorOrGroup::Detector(detector_id) => {
 				if detector_rotations[detector_id] == 0 {

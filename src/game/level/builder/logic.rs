@@ -326,6 +326,15 @@ impl LevelBuilder {
 			}
 			detectors
 		};
+		// Place detectors into groups
+		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
+			if !cycle.placed_detectors.is_empty() {
+				let IntermediateLinkStatus::Group(group, _) = cycle.linked_cycle else {
+					unreachable!("Cycles should have groups by now");
+				};
+				groups[group].outgoing_detector_cycles.push(cycle_id);
+			}
+		}
 		// TOPOLOGICAL SORT
 		// TODO: use a better structure for the links between cycles, to deduplicate mutliple equivalent dependencies
 		let execution_order = {
@@ -363,30 +372,36 @@ impl LevelBuilder {
 					currently_visited_mark[index] = true;
 					let mut blocked = false;
 					// Process group dependencies of this node
-					let mut dependency_group_callback = |dependency_group: usize| {
-						// TODO let dependency_group = dependency.target_group;
-						if currently_visited_mark[dependency_group] {
+					let mut dependency_callback = |dependency: DetectorOrGroup| {
+						let index = get_merged_index(dependency);
+						if currently_visited_mark[index] {
 							// TODO: Better errors, but I really could not be bothered.
 							return Err(LevelBuilderError::OneWayLinkLoop);
 						}
 						// If this node depends on nodes that have not yet been put into the topological ordering
 						// We need to first handle those and block this node
-						if !sorted_mark[dependency_group] {
+						if !sorted_mark[index] {
 							blocked = true;
-							stack.push(DetectorOrGroup::Group(dependency_group));
+							stack.push(dependency);
 						}
 						Ok(())
 					};
 					match node {
 						DetectorOrGroup::Group(group) => {
-							// TODO: Group -> Detector dependencies
 							for link in groups[group].linked_groups.iter() {
-								dependency_group_callback(link.target_group)?
+								dependency_callback(DetectorOrGroup::Group(link.target_group))?
+							}
+							for detector_cycle in groups[group].outgoing_detector_cycles.iter() {
+								for (detector, _) in
+									self.cycles[*detector_cycle].placed_detectors.iter()
+								{
+									dependency_callback(DetectorOrGroup::Detector(*detector))?
+								}
 							}
 						}
 						DetectorOrGroup::Detector(detector) => {
 							for link in detectors[detector].linked_groups.iter() {
-								dependency_group_callback(link.target_group)?
+								dependency_callback(DetectorOrGroup::Group(link.target_group))?
 							}
 						}
 					}
@@ -448,13 +463,16 @@ impl LevelBuilder {
 						link.target_group
 					);
 				}
-				for (_, detector) in group.outgoing_detector_cycles.iter().copied() {
-					assert!(
-						detector_appearances[detector] > group_appearances[source_group_id],
-						"Group {} contains an earlier detector {}",
-						source_group_id,
-						detector
-					);
+				for detector_cycle_id in group.outgoing_detector_cycles.iter().copied() {
+					for &(detector_id, _) in self.cycles[detector_cycle_id].placed_detectors.iter()
+					{
+						assert!(
+							detector_appearances[detector_id] > group_appearances[source_group_id],
+							"Group {} contains an earlier detector {}",
+							source_group_id,
+							detector_id
+						);
+					}
 				}
 			}
 			for (detector_id, detector) in detectors.iter().enumerate() {

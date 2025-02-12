@@ -341,7 +341,7 @@ impl LevelBuilder {
 		while let Some(CycleId(cycle_id)) = args.read_as_until_end_or_separator()? {
 			cycles.push(cycle_id);
 		}
-		if cycles.len() < 2 && (cycles.len() < 1 || detector.is_none()) {
+		if cycles.len() < 2 && (cycles.is_empty() || detector.is_none()) {
 			warnings.emit(RuntimeWarning::EmptyLink.into());
 		}
 

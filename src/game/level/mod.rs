@@ -86,7 +86,7 @@ pub struct GroupData {
 	/// One Way Links to other groups that should get triggered by this one.
 	pub linked_groups: Vec<OneWayLinkData>,
 	/// List of cycle indices this group contains that have detectors on them.
-	pub outgoing_detector_cycles: Vec<(usize, usize)>,
+	pub outgoing_detector_cycles: Vec<usize>,
 }
 
 /// Description of a declared (and visualized) cycle link
