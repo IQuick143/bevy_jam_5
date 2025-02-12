@@ -50,6 +50,7 @@ impl InterpreterBackend for LevelBuilder {
 			"box" => Self::call_box(args),
 			"button" => Self::call_button(args),
 			"vertex" => self.call_vertex(args),
+			"detector" => self.call_detector(args),
 			"set_thing" => self.call_set_thing(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
@@ -184,6 +185,11 @@ impl LevelBuilder {
 		Ok(ReturnValue::pure(VertexId(vertex_id).into()))
 	}
 
+	fn call_detector(&mut self, args: ArgumentStream<DomainValue>) -> CallResult {
+		args.read_end()?;
+		Ok(ReturnValue::pure(DetectorId(self.add_detector()?).into()))
+	}
+
 	fn call_set_thing(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
 		let mut target_vertices = Vec::new();
 		while let Some(VertexId(vertex_id)) = args.read_as_until_end_or_separator()? {
@@ -316,11 +322,34 @@ impl LevelBuilder {
 		}
 
 		let mut cycles = Vec::new();
+		let mut detector = None;
+		// TODO: Better handling of wrong type inputs
+		if one_way {
+			// Handle the first input potentially being a detector
+			if let Some(value) = args.read_until_end_or_separator() {
+				match value {
+					VariableValue::Domain(DomainValue::Cycle(CycleId(cycle_id))) => {
+						cycles.push(*cycle_id)
+					}
+					VariableValue::Domain(DomainValue::Detector(DetectorId(detector_id))) => {
+						detector = Some(*detector_id)
+					}
+					_ => {}
+				}
+			}
+		}
 		while let Some(CycleId(cycle_id)) = args.read_as_until_end_or_separator()? {
 			cycles.push(cycle_id);
 		}
-		if cycles.len() < 2 {
+		if cycles.len() < 2 && (cycles.len() < 1 || detector.is_none()) {
 			warnings.emit(RuntimeWarning::EmptyLink.into());
+		}
+
+		// Handle the first input potentially being a detector
+		if let Some(detector) = detector {
+			if let Some(cycle) = cycles.first() {
+				self.one_way_link_detector(detector, *cycle, direction)?;
+			}
 		}
 
 		for (a, b) in cycles.into_iter().tuple_windows() {

@@ -82,7 +82,6 @@ impl LevelBuilder {
 		Ok(self.cycles.len() - 1)
 	}
 
-	#[expect(dead_code)]
 	pub fn add_detector(&mut self) -> Result<usize, LevelBuilderError> {
 		self.detectors
 			.push(IntermediateDetectorData { links: Vec::new() });
@@ -176,7 +175,6 @@ impl LevelBuilder {
 	}
 
 	/// Links a detector to a cycle by a one-way.
-	#[expect(dead_code)]
 	pub fn one_way_link_detector(
 		&mut self,
 		detector: usize,
@@ -278,8 +276,6 @@ impl LevelBuilder {
 					unreachable!("Some doofus done doofed up the for loop above this one.");
 				};
 				groups[source_group].linked_groups.push(OneWayLinkData {
-					source_cycle_data: Some(source_cycle),
-					target_cycle_data: Some(link.target_cycle),
 					target_group,
 					direction: link.direction * direction_1 * direction_2,
 					multiplicity: 1,
@@ -315,9 +311,7 @@ impl LevelBuilder {
 								OneWayLinkData {
 									target_group,
 									direction: link.direction * target_direction_in_group,
-									multiplicity: 1,         // TODO
-									source_cycle_data: None, // TODO
-									target_cycle_data: None, // TODO
+									multiplicity: 1, // TODO
 								}
 							})
 							.collect(),
@@ -472,15 +466,6 @@ impl LevelBuilder {
 						link.target_group,
 					);
 				}
-			}
-		}
-
-		// Throw away cycle data on links that don't need it
-		for group in groups.iter_mut() {
-			for link in group.linked_groups.iter_mut() {
-				// TODO: take into account detectors
-				link.source_cycle_data = None;
-				link.target_cycle_data = None;
 			}
 		}
 

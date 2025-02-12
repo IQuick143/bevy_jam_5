@@ -104,24 +104,14 @@ pub struct DeclaredLinkData {
 pub struct OneWayLinkData {
 	/// The group this link goes to
 	pub target_group: usize,
-	/// Relative turning direction between the linked groups
+	/// Relative turning direction between the source (either a group or a detector) and target group
 	pub direction: LinkedCycleDirection,
 	/// How many copies of this link are present
 	pub multiplicity: u64,
-	/// An Option of (source_cycle, target_cycle) indices, present only if relevant (TODO: Detectors!!)
-	pub source_cycle_data: Option<usize>,
-	/// An Option of (source_cycle, target_cycle) indices, present only if relevant
-	pub target_cycle_data: Option<usize>,
 }
 
 impl OneWayLinkData {
 	pub fn try_merge(a: &OneWayLinkData, b: &OneWayLinkData) -> Option<OneWayLinkData> {
-		if a.target_group != b.target_group
-			|| a.source_cycle_data != b.source_cycle_data
-			|| a.target_cycle_data != b.target_cycle_data
-		{
-			return None;
-		}
 		let (direction, multiplicity) = if a.direction == b.direction {
 			(a.direction, a.multiplicity + b.multiplicity)
 		} else {
@@ -135,8 +125,6 @@ impl OneWayLinkData {
 			target_group: a.target_group,
 			direction,
 			multiplicity,
-			source_cycle_data: a.source_cycle_data,
-			target_cycle_data: a.target_cycle_data,
 		})
 	}
 
@@ -144,14 +132,6 @@ impl OneWayLinkData {
 	pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
 		// First we compare unmergeable attributes
 		match self.target_group.cmp(&other.target_group) {
-			core::cmp::Ordering::Equal => {}
-			ord => return ord,
-		}
-		match self.source_cycle_data.cmp(&other.source_cycle_data) {
-			core::cmp::Ordering::Equal => {}
-			ord => return ord,
-		}
-		match self.target_cycle_data.cmp(&other.target_cycle_data) {
 			core::cmp::Ordering::Equal => {}
 			ord => return ord,
 		}
