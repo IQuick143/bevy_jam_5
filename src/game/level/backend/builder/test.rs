@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use super::{
 	super::super::{builder::error::*, *},
 	finalize::FinalizeError,
@@ -540,6 +542,166 @@ oneway(c2 c3);
 
 	for data in linkages {
 		let level = format!("{}\n{}", level_header, data);
+		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+	}
+}
+
+#[test]
+fn detector_basic_test() {
+	let level = r"
+name = 'detector test';
+
+d = detector();
+
+c1 = cycle(d _);
+c2 = cycle(_ d);
+
+target = cycle();
+
+oneway(d, target);
+
+circle(c1; 0,0,1);
+circle(c2; 0,0,1);
+circle(target; 0,0,1);
+";
+	let output = parse(&level);
+	assert!(output.is_ok(), "{:?}", output);
+}
+
+#[test]
+fn detector_oneway_integration_test() {
+	let level = r"
+name = 'detector+oneway test';
+
+d = detector();
+d2 = detector();
+
+source = cycle(_);
+
+c1 = cycle(d _);
+c2 = cycle(_ d);
+
+target1 = cycle();
+target2 = cycle(_ d2);
+target3 = cycle();
+
+oneway(source, c1);
+oneway(source, c2);
+oneway(d, target1);
+oneway(target1, target2, target3);
+oneway(d2, target3);
+
+circle(c1; 0,0,1);
+circle(c2; 0,0,1);
+circle(source; 0,0,1);
+circle(target1; 0,0,1);
+circle(target2; 0,0,1);
+circle(target3; 0,0,1);
+";
+	let output = parse(&level);
+	assert!(output.is_ok(), "{:?}", output);
+}
+
+#[test]
+fn detector_link_integration_test() {
+	let level = r"
+name = 'detector+oneway+link test';
+
+d0 = detector();
+d = detector();
+
+source1 = cycle(_ d0);
+source2 = cycle(_ d0);
+
+c1 = cycle(d _);
+c2 = cycle(_ d);
+
+target = cycle();
+
+link(source1, source2);
+
+oneway(source1, c1);
+oneway(source1, c2);
+oneway(d0, c1);
+oneway(d, target);
+
+link(c1, c2);
+
+circle(c1; 0,0,1);
+circle(c2; 0,0,1);
+circle(source1; 0,0,1);
+circle(source2; 0,0,1);
+circle(target; 0,0,1);
+";
+	let output = parse(&level);
+	assert!(output.is_ok(), "{:?}", output);
+}
+
+#[test]
+fn detector_loop_test() {
+	let level = r"
+name = 'detector loop test';
+
+d1 = detector();
+d2 = detector();
+d3 = detector();
+
+c1 = cycle(_ d1);
+c2 = cycle(_ d2);
+c3 = cycle(_ d3);
+
+oneway(d1, c2);
+oneway(d2, c3);
+oneway(d3, c1);
+
+circle(c1; 0,0,1);
+circle(c2; 0,0,1);
+circle(c3; 0,0,1);
+";
+	assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+}
+
+#[test]
+fn detector_loop_complex_test() {
+	let level_header = r"
+name = 'detector loop stress test';
+
+d1 = detector();
+d2 = detector();
+d7 = detector();
+
+c1 = cycle(_ d1);
+c2 = cycle(_ d2);
+c3 = cycle(_);
+c4 = cycle(_);
+c5 = cycle(_);
+c6 = cycle(_);
+c7 = cycle(_ d7);
+
+circle(c1; 0,0,1);
+circle(c2; 0,0,1);
+circle(c3; 0,0,1);
+circle(c4; 0,0,1);
+circle(c5; 0,0,1);
+circle(c6; 0,0,1);
+circle(c7; 0,0,1);
+";
+	let loop_statements = r"oneway(d1, c2);
+oneway(d2, c3);
+link(c3, c4);
+link(c4, c5);
+oneway(c5, c6);
+link(c6, c7);
+oneway(d7, c1);"
+		.split("\n")
+		.collect::<Vec<_>>();
+
+	// Sanity check so we don't go through a bagintillion permtuations on accident
+	assert!(loop_statements.len() <= 7);
+
+	// Test every ordering
+	for statements in loop_statements.iter().permutations(loop_statements.len()) {
+		let level = format!("{}\n{}", level_header, statements.into_iter().join("\n"));
 		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
 	}
 }
