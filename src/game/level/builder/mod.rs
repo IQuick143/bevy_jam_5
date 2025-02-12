@@ -21,7 +21,7 @@ pub struct LevelBuilder {
 	vertices: Vec<IntermediateVertexData>,
 	/// Placements of cycles, if they have been placed yet
 	cycles: Vec<IntermediateCycleData>,
-	/// Detectors and their outgoinglinks
+	/// Detectors and their outgoing links
 	detectors: Vec<IntermediateDetectorData>,
 	/// Cycle links that have been explicitly added (no symmetry or transitivity)
 	declared_links: Vec<DeclaredLinkData>,
