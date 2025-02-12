@@ -360,8 +360,7 @@ impl LevelBuilder {
 					continue;
 				}
 				stack.push(DetectorOrGroup::Group(new_group));
-				while !stack.is_empty() {
-					let node = *stack.last().unwrap();
+				while let Some(&node) = stack.last() {
 					let index = get_merged_index(node);
 					// Node is already in the ordering, skip it
 					// This removes duplicates from the stack
