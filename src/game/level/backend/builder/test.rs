@@ -705,3 +705,22 @@ oneway(d7, c1);"
 		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
 	}
 }
+
+#[test]
+fn detector_unused_test() {
+	let level = r"
+name = 'unused detector test';
+
+unused = detector();
+unplaced = detector();
+unlinked = detector();
+
+c1 = cycle(_ unlinked);
+
+oneway(unplaced, c1);
+
+circle(c1; 0,0,1);
+";
+	let output = parse(level);
+	assert!(output.is_ok(), "{:?}", output);
+}
