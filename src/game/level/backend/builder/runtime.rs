@@ -234,6 +234,8 @@ impl LevelBuilder {
 		}
 
 		let mut vertices = Vec::new();
+		let mut detectors = Vec::new();
+		// TODO: Better handling of overlapping detectors.
 		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {
 				Blank => vertices.push(self.add_vertex()?),
@@ -248,13 +250,15 @@ impl LevelBuilder {
 					vertices.push(vertex_id);
 				}
 				Domain(Vertex(VertexId(id))) => vertices.push(*id),
+				Domain(Detector(DetectorId(id))) => {
+					detectors.push((*id, (vertices.len() as i32) - 1))
+				}
 				other => return Err(TypeError(other.get_type()).into()),
 			}
 		}
 
 		args.read_end()?;
-		// TODO: Detectors
-		let cycle_id = self.add_cycle(turnability, vertices, Vec::new())?;
+		let cycle_id = self.add_cycle(turnability, vertices, detectors)?;
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
@@ -323,7 +327,7 @@ impl LevelBuilder {
 
 		let mut cycles = Vec::new();
 		let mut detector = None;
-		// TODO: Better handling of wrong type inputs
+
 		if one_way {
 			// Handle the first input potentially being a detector
 			if let Some(value) = args.read_until_end_or_separator() {
@@ -334,7 +338,7 @@ impl LevelBuilder {
 					VariableValue::Domain(DomainValue::Detector(DetectorId(detector_id))) => {
 						detector = Some(*detector_id)
 					}
-					_ => {}
+					other => return Err(TypeError(other.get_type()).into()),
 				}
 			}
 		}
