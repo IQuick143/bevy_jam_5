@@ -564,7 +564,7 @@ circle(c1; 0,0,1);
 circle(c2; 0,0,1);
 circle(target; 0,0,1);
 ";
-	let output = parse(&level);
+	let output = parse(level);
 	assert!(output.is_ok(), "{:?}", output);
 }
 
@@ -598,7 +598,7 @@ circle(target1; 0,0,1);
 circle(target2; 0,0,1);
 circle(target3; 0,0,1);
 ";
-	let output = parse(&level);
+	let output = parse(level);
 	assert!(output.is_ok(), "{:?}", output);
 }
 
@@ -633,7 +633,7 @@ circle(source1; 0,0,1);
 circle(source2; 0,0,1);
 circle(target; 0,0,1);
 ";
-	let output = parse(&level);
+	let output = parse(level);
 	assert!(output.is_ok(), "{:?}", output);
 }
 
@@ -658,7 +658,7 @@ circle(c1; 0,0,1);
 circle(c2; 0,0,1);
 circle(c3; 0,0,1);
 ";
-	assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+	assert_err_eq!(parse(level), LevelBuilderError::OneWayLinkLoop);
 }
 
 #[test]
