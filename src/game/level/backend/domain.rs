@@ -7,6 +7,9 @@ use crate::epilang::{interpreter::*, values::*};
 pub struct VertexId(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct DetectorId(pub usize);
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct CycleId(pub usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -18,6 +21,7 @@ pub struct HubId(pub usize);
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum DomainValue {
 	Vertex(VertexId),
+	Detector(DetectorId),
 	Cycle(CycleId),
 	Object(ObjectData),
 	Glyph(GlyphData),
@@ -29,6 +33,7 @@ pub enum DomainValue {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DomainType {
 	Vertex,
+	Detector,
 	Cycle,
 	Object,
 	Glyph,
@@ -41,6 +46,7 @@ impl std::fmt::Display for DomainType {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let display_name = match self {
 			Self::Vertex => "vertex",
+			Self::Detector => "detector",
 			Self::Cycle => "cycle",
 			Self::Object => "object",
 			Self::Glyph => "glyph",
@@ -58,6 +64,7 @@ impl DomainVariableValue for DomainValue {
 	fn get_type(&self) -> Self::Type {
 		match self {
 			Self::Vertex(_) => Self::Type::Vertex,
+			Self::Detector(_) => Self::Type::Detector,
 			Self::Cycle(_) => Self::Type::Cycle,
 			Self::Object(_) => Self::Type::Object,
 			Self::Glyph(_) => Self::Type::Glyph,
@@ -101,6 +108,7 @@ macro_rules! impl_try_into_for_domain_value {
 
 impl_try_into_for_domain_value! {
 	Vertex(VertexId),
+	Detector(DetectorId),
 	Cycle(CycleId),
 	Object(ObjectData),
 	Glyph(GlyphData),

@@ -17,8 +17,12 @@ pub struct LevelData {
 	pub vertices: Vec<VertexData>,
 	/// Data for all cycles in the level
 	pub cycles: Vec<CycleData>,
-	/// Data for all groups of cycles in the level, sorted in topological order (lower indices need to be evaluated before higher ones)
+	/// Data for all groups of cycles in the level
 	pub groups: Vec<GroupData>,
+	/// Data for all abstract detector objects in the level (the ones doing the rotation propagation instead of the ones being rendered)
+	pub detectors: Vec<DetectorData>,
+	/// An order in which groups and detectors should be evaluated, sorted in topological order (previous elements need to be evaluated before later ones)
+	pub execution_order: Vec<DetectorOrGroup>,
 	/// List of group pairs, which cannot be turned at once
 	/// Sorted in increasing lexicographic order
 	pub forbidden_group_pairs: Vec<(usize, usize)>,
@@ -28,6 +32,13 @@ pub struct LevelData {
 	/// Data for all one way links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_one_way_links: Vec<DeclaredLinkData>,
+}
+
+/// Either the index of a detector or a group
+#[derive(Debug, Reflect, Clone, Copy)]
+pub enum DetectorOrGroup {
+	Group(usize),
+	Detector(usize),
 }
 
 /// Description of a single vertex
@@ -51,12 +62,22 @@ pub struct CycleData {
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
+	/// Indices into [`LevelData::detectors`]
+	/// that identify the detectors that lie on the cycle, and numerical offsets,
+	/// that identify which vertex this detector comes after
+	pub detector_indices: Vec<(usize, usize)>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
 	/// Group this cycle belongs to
 	pub group: usize,
 	/// The relative orientation of the cycle in regards to the group
 	pub orientation_within_group: LinkedCycleDirection,
+}
+
+#[derive(Debug, Clone, Reflect)]
+pub struct DetectorData {
+	/// List of groups this detector points to.
+	pub linked_groups: Vec<OneWayLinkData>,
 }
 
 /// Description of a group of cycles
@@ -68,6 +89,8 @@ pub struct GroupData {
 	pub cycles: Vec<(usize, LinkedCycleDirection)>,
 	/// One Way Links to other groups that should get triggered by this one.
 	pub linked_groups: Vec<OneWayLinkData>,
+	/// List of cycle indices this group contains that have detectors on them.
+	pub outgoing_detector_cycles: Vec<usize>,
 }
 
 /// Description of a declared (and visualized) cycle link
@@ -85,24 +108,14 @@ pub struct DeclaredLinkData {
 pub struct OneWayLinkData {
 	/// The group this link goes to
 	pub target_group: usize,
-	/// Relative turning direction between the linked groups
+	/// Relative turning direction between the source (either a group or a detector) and target group
 	pub direction: LinkedCycleDirection,
 	/// How many copies of this link are present
 	pub multiplicity: u64,
-	/// An Option of (source_cycle, target_cycle) indices, present only if relevant (TODO: Detectors!!)
-	pub source_cycle_data: Option<usize>,
-	/// An Option of (source_cycle, target_cycle) indices, present only if relevant
-	pub target_cycle_data: Option<usize>,
 }
 
 impl OneWayLinkData {
 	pub fn try_merge(a: &OneWayLinkData, b: &OneWayLinkData) -> Option<OneWayLinkData> {
-		if a.target_group != b.target_group
-			|| a.source_cycle_data != b.source_cycle_data
-			|| a.target_cycle_data != b.target_cycle_data
-		{
-			return None;
-		}
 		let (direction, multiplicity) = if a.direction == b.direction {
 			(a.direction, a.multiplicity + b.multiplicity)
 		} else {
@@ -116,8 +129,6 @@ impl OneWayLinkData {
 			target_group: a.target_group,
 			direction,
 			multiplicity,
-			source_cycle_data: a.source_cycle_data,
-			target_cycle_data: a.target_cycle_data,
 		})
 	}
 
@@ -125,14 +136,6 @@ impl OneWayLinkData {
 	pub fn compare(&self, other: &Self) -> std::cmp::Ordering {
 		// First we compare unmergeable attributes
 		match self.target_group.cmp(&other.target_group) {
-			core::cmp::Ordering::Equal => {}
-			ord => return ord,
-		}
-		match self.source_cycle_data.cmp(&other.source_cycle_data) {
-			core::cmp::Ordering::Equal => {}
-			ord => return ord,
-		}
-		match self.target_cycle_data.cmp(&other.target_cycle_data) {
 			core::cmp::Ordering::Equal => {}
 			ord => return ord,
 		}

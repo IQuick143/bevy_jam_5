@@ -127,6 +127,8 @@ fn cycle_group_rotation_relay_system(
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
+	#[expect(unused_mut)]
+	let mut detector_rotations = vec![0i64; level.detectors.len()];
 	let mut group_rotations = vec![0i64; level.groups.len()];
 	for group_rotation in group_events.read() {
 		let Ok(source_cycle) = cycles_q.get(group_rotation.0.target_cycle) else {
@@ -145,19 +147,43 @@ fn cycle_group_rotation_relay_system(
 	}
 
 	// Propagate one-way links
-	for group_id in 0..level.groups.len() {
-		if group_rotations[group_id] == 0 {
-			continue;
-		}
-		for link in level.groups[group_id].linked_groups.iter() {
-			match link.direction {
-				LinkedCycleDirection::Coincident => {
-					group_rotations[link.target_group] +=
-						group_rotations[group_id] * link.multiplicity as i64
+	for step in level.execution_order.iter().copied() {
+		match step {
+			DetectorOrGroup::Group(group_id) => {
+				if group_rotations[group_id] == 0 {
+					continue;
 				}
-				LinkedCycleDirection::Inverse => {
-					group_rotations[link.target_group] -=
-						group_rotations[group_id] * link.multiplicity as i64
+				for link in level.groups[group_id].linked_groups.iter() {
+					match link.direction {
+						LinkedCycleDirection::Coincident => {
+							group_rotations[link.target_group] +=
+								group_rotations[group_id] * link.multiplicity as i64
+						}
+						LinkedCycleDirection::Inverse => {
+							group_rotations[link.target_group] -=
+								group_rotations[group_id] * link.multiplicity as i64
+						}
+					}
+				}
+				// for detector_cycle in level.groups[group_id].outgoing_detector_cycles.iter() {
+				// 	// TODO: Update detectors
+				// }
+			}
+			DetectorOrGroup::Detector(detector_id) => {
+				if detector_rotations[detector_id] == 0 {
+					continue;
+				}
+				for link in level.detectors[detector_id].linked_groups.iter() {
+					match link.direction {
+						LinkedCycleDirection::Coincident => {
+							group_rotations[link.target_group] +=
+								detector_rotations[detector_id] * link.multiplicity as i64
+						}
+						LinkedCycleDirection::Inverse => {
+							group_rotations[link.target_group] -=
+								detector_rotations[detector_id] * link.multiplicity as i64
+						}
+					}
 				}
 			}
 		}
@@ -165,6 +191,7 @@ fn cycle_group_rotation_relay_system(
 
 	// Decide if the turns is valid
 	let forbidden = {
+		// TODO: Change this code, so that it takes into account the modulo rotations to enable certain mechanisms, Unless this is decided against.
 		let mut forbidden = false;
 		let mut pair_index = 0;
 		'outer: for group_a_id in 0..level.groups.len() {

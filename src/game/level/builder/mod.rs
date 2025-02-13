@@ -21,10 +21,16 @@ pub struct LevelBuilder {
 	vertices: Vec<IntermediateVertexData>,
 	/// Placements of cycles, if they have been placed yet
 	cycles: Vec<IntermediateCycleData>,
+	/// Detectors and their outgoing links
+	detectors: Vec<IntermediateDetectorData>,
 	/// Cycle links that have been explicitly added (no symmetry or transitivity)
 	declared_links: Vec<DeclaredLinkData>,
-	/// One way links that have been explicitly added (no transitivity)
-	declared_one_way_links: Vec<DeclaredLinkData>,
+	/// One way links between cycles that have been explicitly added (no transitivity)
+	declared_one_way_cycle_links: Vec<DeclaredLinkData>,
+	/// One way links from detectors that have been explicitly added (no transitivity)
+	// TODO: Populate and use this
+	#[expect(dead_code)]
+	declared_one_way_detector_links: Vec<DeclaredLinkData>,
 }
 
 /// Enumerates the possible sets of positions
@@ -80,8 +86,17 @@ struct IntermediateCycleData {
 	pub linked_cycle: IntermediateLinkStatus,
 	/// Outgoing oneways
 	pub outgoing_one_way_links: Vec<OneWayIntermediateData>,
+	/// Detectors, pairs of detector ID's and their offsets on this cycle. (The second, positional, index is the index of the vertex this detector comes *after*)
+	pub placed_detectors: Vec<(usize, usize)>,
 }
 
+#[derive(Clone, Debug)]
+struct IntermediateDetectorData {
+	/// Outgoing links
+	links: Vec<OneWayIntermediateData>,
+}
+
+/// Data about cycle linkages (bothway), used secondarily to compute the union of groups of linked cycles.
 #[derive(Clone, Copy, Debug)]
 enum IntermediateLinkStatus {
 	/// No link has been declared
@@ -96,8 +111,6 @@ enum IntermediateLinkStatus {
 struct OneWayIntermediateData {
 	target_cycle: usize,
 	direction: LinkedCycleDirection,
-	// /// Information on whether this link interacts with detectors, if that information is known already
-	// has_detectors: Option<bool>
 }
 
 /// Placement of a vertex while the layout is being built
