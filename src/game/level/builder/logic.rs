@@ -534,12 +534,12 @@ impl LevelBuilder {
 							let IntermediateLinkStatus::Group(group_a, _) =
 								self.cycles[cycle_a].linked_cycle
 							else {
-								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
+								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups_and_detectors`]");
 							};
 							let IntermediateLinkStatus::Group(group_b, _) =
 								self.cycles[cycle_b].linked_cycle
 							else {
-								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
+								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups_and_detectors`]");
 							};
 							if group_a == group_b {
 								return Err(LevelBuilderError::OverlappedLinkedCycles(
