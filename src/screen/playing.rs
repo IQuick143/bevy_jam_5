@@ -75,7 +75,7 @@ enum GameUiAction {
 
 /// Event that is sent to signal that the currently selected level should be (re)loaded
 #[derive(Event, Clone, Copy, Debug, Default)]
-struct LoadLevel;
+pub struct LoadLevel;
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 	commands

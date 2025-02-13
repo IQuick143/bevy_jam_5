@@ -4,7 +4,7 @@ use crate::{
 	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
-	ui::hover::Hoverable,
+	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
 };
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions,
@@ -21,20 +21,37 @@ pub(super) fn plugin(app: &mut App) {
 		(
 			log_transitions::<Screen>,
 			log_transitions::<PlayingLevel>,
+			automatic_reloading
+				.run_if(resource_equals(AutoReload(true)).and(in_state(Screen::Playing))),
+			toggle_automatic_reloading.run_if(input_just_pressed(KeyCode::KeyX)),
+			debug_oneways.run_if(resource_equals(RenderOutlines(true))),
 			draw_layout.run_if(resource_equals(RenderOutlines(true))),
 			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 		),
 	);
 	app.init_resource::<RenderOutlines>();
+	app.init_resource::<AutoReload>();
 }
 
 /// Whether hover and layout boxes should be drawn
 #[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
 struct RenderOutlines(pub bool);
 
+/// Whether the autoreloading system should run
+#[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
+struct AutoReload(pub bool);
+
 fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
 	render.0 = !render.0;
+}
+
+fn toggle_automatic_reloading(mut reload: ResMut<AutoReload>) {
+	reload.0 = !reload.0;
+	info!(
+		"Automatic reloading is: {}",
+		if reload.0 { "ENABLED" } else { "DISABLED" }
+	);
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
@@ -63,6 +80,44 @@ fn draw_layout(mut gizmos: Gizmos) {
 		LEVEL_AREA_WIDTH,
 		palettes::basic::NAVY,
 	);
+}
+
+fn automatic_reloading(
+	level_handle: Res<LevelHandle>,
+	mut changed_events: EventReader<AssetEvent<LevelData>>,
+	mut commands: Commands,
+) {
+	let mut reload = false;
+	for event in changed_events.read() {
+		reload |= event.is_modified(&level_handle.0);
+	}
+	if reload {
+		commands.spawn((
+			FadeAnimationBundle::from_time(0.05),
+			crate::screen::LoadLevel,
+		));
+	}
+}
+
+fn debug_oneways(
+	mut gizmos: Gizmos,
+	cycles_q: Query<&Transform>,
+	cycle_index: Res<CycleEntities>,
+	level_asset: Res<Assets<LevelData>>,
+	level_handle: Res<LevelHandle>,
+) {
+	let level = level_asset.get(&level_handle.0).unwrap();
+	for link in level.declared_one_way_links.iter() {
+		let start = cycles_q
+			.get(cycle_index.0[link.source_cycle])
+			.unwrap()
+			.translation;
+		let end = cycles_q
+			.get(cycle_index.0[link.dest_cycle])
+			.unwrap()
+			.translation;
+		gizmos.arrow(start, end, bevy::color::palettes::basic::RED);
+	}
 }
 
 pub fn _debug_inputs(
