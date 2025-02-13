@@ -724,3 +724,17 @@ circle(c1; 0,0,1);
 	let output = parse(level);
 	assert!(output.is_ok(), "{:?}", output);
 }
+
+#[test]
+fn empty_cycle_detector_test() {
+	let level = r"
+name = 'empty cycle detector test';
+
+d = detector();
+
+cycle = cycle(d);
+
+circle(cycle; 0,0,1);
+";
+	assert_err_eq!(parse(level), LevelBuilderError::DetectorOnEmptyCycle);
+}
