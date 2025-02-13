@@ -62,7 +62,16 @@ impl LevelBuilder {
 		{
 			return Err(LevelBuilderError::VertexIndexOutOfRange(i));
 		}
-		let detectors = detectors.into_iter().collect::<Vec<_>>();
+		// Max with 1 to avoid a possible panic in rem_euclid.
+		let n_vertices = vertex_indices.len().max(1) as i32;
+		let detectors = detectors
+			.into_iter()
+			.map(|(detector, position)| (detector, i32::rem_euclid(position, n_vertices) as usize))
+			.collect::<Vec<_>>();
+		// If there are detecotrs but no vertices, this cycle is invalid.
+		if vertex_indices.is_empty() && !detectors.is_empty() {
+			return Err(LevelBuilderError::DetectorOnEmptyCycle);
+		}
 		if let Some((index, _)) = detectors
 			.iter()
 			.find(|&(index, _)| *index >= self.detectors.len())
@@ -152,7 +161,6 @@ impl LevelBuilder {
 		if dest_cycle >= self.cycles.len() {
 			return Err(LevelBuilderError::CycleIndexOutOfRange(dest_cycle));
 		}
-		// Add the link symmetrically, in both directions
 		if source_cycle == dest_cycle {
 			// TODO: consider a better error.
 			return Err(LevelBuilderError::CycleLinkageConflict(
@@ -594,12 +602,13 @@ impl LevelBuilder {
 			CycleCenterSpriteAppearence(center_sprite_position.map(|p| p - placement.position));
 		let IntermediateLinkStatus::Group(group, relative_direction) = intermediate.linked_cycle
 		else {
-			panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups`]");
+			panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups_and_detectors`]");
 		};
 		CycleData {
 			placement,
 			center_sprite_appearence,
 			vertex_indices: intermediate.vertex_indices,
+			detector_indices: intermediate.placed_detectors,
 			turnability: intermediate.turnability,
 			group,
 			orientation_within_group: relative_direction,

@@ -62,6 +62,10 @@ pub struct CycleData {
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
+	/// Indices into [`LevelData::detectors`]
+	/// that identify the detectors that lie on the cycle, and numerical offsets,
+	/// that identify which vertex this detector comes after
+	pub detector_indices: Vec<(usize, usize)>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
 	/// Group this cycle belongs to
