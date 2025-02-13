@@ -503,22 +503,6 @@ impl LevelBuilder {
 			}
 		}
 
-		// Deduplicate link data whenever possible
-		for group in groups.iter_mut() {
-			if group.linked_groups.is_empty() {
-				continue;
-			}
-			group.linked_groups.sort_by(OneWayLinkData::compare);
-			let old_links = std::mem::take(&mut group.linked_groups);
-			// At least one link must exist because we checked for the vector being empty earlier
-			group.linked_groups.push(old_links[0]);
-			for link in old_links.into_iter().skip(1) {
-				match OneWayLinkData::try_merge(&link, group.linked_groups.last().unwrap()) {
-					Some(new_link) => *group.linked_groups.last_mut().unwrap() = new_link,
-					None => group.linked_groups.push(link),
-				}
-			}
-		}
 		Ok((groups, detectors, execution_order))
 	}
 

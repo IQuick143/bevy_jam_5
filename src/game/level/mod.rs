@@ -114,6 +114,8 @@ pub struct OneWayLinkData {
 	pub multiplicity: u64,
 }
 
+// This segment is unused because the relevant optimisation is not currently being done.
+#[expect(dead_code)]
 impl OneWayLinkData {
 	pub fn try_merge(a: &OneWayLinkData, b: &OneWayLinkData) -> Option<OneWayLinkData> {
 		let (direction, multiplicity) = if a.direction == b.direction {
