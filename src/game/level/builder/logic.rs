@@ -431,7 +431,7 @@ impl LevelBuilder {
 			sorted_order.reverse();
 			sorted_order
 		};
-		#[cfg(debug_assertions)]
+		#[cfg(any(debug_assertions, test))]
 		{
 			// Check that every group and (used) detector index occurs exactly once
 			let mut group_counter = vec![0; groups.len()];
@@ -453,7 +453,7 @@ impl LevelBuilder {
 				"Detectors are not placed uniquely in execution order"
 			);
 		}
-		#[cfg(debug_assertions)]
+		#[cfg(any(debug_assertions, test))]
 		{
 			// Check that all links come from earlier to later objects in the execution order
 			let mut group_appearances = vec![0; groups.len()];
