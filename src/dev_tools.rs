@@ -24,6 +24,7 @@ pub(super) fn plugin(app: &mut App) {
 			automatic_reloading
 				.run_if(resource_equals(AutoReload(true)).and(in_state(Screen::Playing))),
 			toggle_automatic_reloading.run_if(input_just_pressed(KeyCode::KeyX)),
+			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
 			debug_oneways.run_if(resource_equals(RenderOutlines(true))),
 			draw_layout.run_if(resource_equals(RenderOutlines(true))),
 			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
@@ -106,18 +107,27 @@ fn debug_oneways(
 	level_asset: Res<Assets<LevelData>>,
 	level_handle: Res<LevelHandle>,
 ) {
-	let level = level_asset.get(&level_handle.0).unwrap();
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		return;
+	};
 	for link in level.declared_one_way_links.iter() {
-		let start = cycles_q
-			.get(cycle_index.0[link.source_cycle])
-			.unwrap()
-			.translation;
-		let end = cycles_q
-			.get(cycle_index.0[link.dest_cycle])
-			.unwrap()
-			.translation;
+		let Ok(start) = cycles_q.get(cycle_index.0[link.source_cycle]) else {
+			return;
+		};
+		let start = start.translation;
+		let Ok(end) = cycles_q.get(cycle_index.0[link.dest_cycle]) else {
+			return;
+		};
+		let end = end.translation;
 		gizmos.arrow(start, end, bevy::color::palettes::basic::RED);
 	}
+}
+
+fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<LevelHandle>) {
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		return;
+	};
+	info!("{:?}", level);
 }
 
 pub fn _debug_inputs(
