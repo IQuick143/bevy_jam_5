@@ -43,6 +43,7 @@ pub enum Token {
 		lex.extras.line_start_offset = lex.span().end;
 		logos::Filter::Skip
 	})]
+	#[regex(r"#[^\n]*", |_| logos::Filter::Skip)]
 	Eol(NeverTag),
 
 	#[regex(r"[a-zA-Z][a-zA-Z0-9_]*", |lex| lex.slice().to_owned())]

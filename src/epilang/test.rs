@@ -722,3 +722,10 @@ fn overwritte_builtin_warning() {
 		.collect::<Vec<_>>();
 	assert_eq!(warnings, [WarningCode::OverwrittenBuiltin("a".to_owned())]);
 }
+
+#[test]
+fn comment_on_last_line() {
+	let program = "# test comment";
+	let module = compile(program).unwrap();
+	assert!(module.0 .0.is_empty());
+}

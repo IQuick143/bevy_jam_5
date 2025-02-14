@@ -597,6 +597,49 @@ oneway(A, C);";
 }
 
 #[test]
+fn one_way_output_test_variadic() {
+	let level = "
+name = 'test one way line';
+
+A = cycle(player() _);
+B = cycle(box() _);
+C = cycle(box() _);
+
+circle(A; 0, 0, 1);
+circle(B; 0, 0, 1);
+circle(C; 0, 0, 1);
+
+oneway(A, B, C);";
+	let output = parse(level);
+	assert!(output.is_ok(), "{:?}", output);
+	let output = output.unwrap();
+	let ordering: Vec<usize> = output
+		.execution_order
+		.iter()
+		.map(|step| match step {
+			DetectorOrGroup::Group(id) => *id,
+			DetectorOrGroup::Detector(_) => panic!("There are no detectors"),
+		})
+		.collect();
+	let link_1 = OneWayLinkData {
+		target_group: ordering[1],
+		direction: LinkedCycleDirection::Coincident,
+		multiplicity: 1,
+	};
+	let link_2 = OneWayLinkData {
+		target_group: ordering[2],
+		direction: LinkedCycleDirection::Coincident,
+		multiplicity: 1,
+	};
+	// First cycle is linked to second cycle
+	assert_eq!(output.groups[ordering[0]].linked_groups, vec![link_1]);
+	// Second cycle is linked to last cycle
+	assert_eq!(output.groups[ordering[1]].linked_groups, vec![link_2]);
+	// Last cycle isn't linked
+	assert_eq!(output.groups[ordering[2]].linked_groups, vec![]);
+}
+
+#[test]
 fn detector_basic_test() {
 	let level = r"
 name = 'detector test';
