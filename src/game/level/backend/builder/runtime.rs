@@ -322,6 +322,7 @@ impl LevelBuilder {
 			args.read_end_or_separator()?;
 		} else if let Some(count) = args.optional_read_as() {
 			multiplicity = count;
+			args.read_end_or_separator()?;
 		} else {
 			multiplicity = 1;
 			args.optional_separator();
@@ -464,7 +465,7 @@ impl std::error::Error for RuntimeWarning {}
 impl std::fmt::Display for RuntimeWarning {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::EmptyLink => f.write_str("Too few vertices to actually create a link"),
+			Self::EmptyLink => f.write_str("Too few arguments to actually create a link"),
 			Self::ZeroLink => f.write_str("Link with multiplicity of zero is no-op"),
 		}
 	}
