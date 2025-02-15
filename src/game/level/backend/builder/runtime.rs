@@ -354,6 +354,8 @@ impl LevelBuilder {
 		while let Some(CycleId(cycle_id)) = args.read_as_until_end_or_separator()? {
 			cycles.push(cycle_id);
 		}
+		// Check that we have processed all arguments.
+		args.read_end()?;
 		if cycles.len() < 2 && (cycles.is_empty() || detector.is_none()) {
 			warnings.emit(RuntimeWarning::EmptyLink.into());
 		}
