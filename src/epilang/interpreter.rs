@@ -256,8 +256,8 @@ impl<'a, 's, T: DomainVariableValue + 'a> ArgumentStream<'a, 's, T> {
 		}
 	}
 
-	pub fn optional_separator(&mut self) {
-		let _ = self.read_separator();
+	pub fn optional_separator(&mut self) -> bool {
+		self.read_separator().is_ok()
 	}
 
 	/// Fails if there are any remaining arguments, including separators

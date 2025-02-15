@@ -103,6 +103,18 @@ impl LevelBuilder {
 		})
 	}
 
+	fn read_optional_vec2(
+		args: &mut ArgumentStream<DomainValue>,
+	) -> Result<Option<Vec2>, FunctionCallError<RuntimeError, DomainType>> {
+		if args.read_blank().is_ok() {
+			Ok(None)
+		} else {
+			let x = args.read_as()?;
+			let y = args.read_as()?;
+			Ok(Some(Vec2::new(x, y)))
+		}
+	}
+
 	fn call_color(mut args: ArgumentStream<DomainValue>) -> CallResult {
 		Ok(ReturnValue::pure(
 			args.read_single_as::<LogicalColor>()?.into(),
@@ -268,23 +280,25 @@ impl LevelBuilder {
 		let x = args.read_as()?;
 		let y = args.read_as()?;
 		let r = args.read_as()?;
+		let center_position = if args.optional_separator() {
+			Some(Self::read_optional_vec2(&mut args)?)
+		} else {
+			None
+		};
 		args.read_end()?;
 		self.place_cycle(cycle_id, Vec2::new(x, y), r, &[])?;
+		if let Some(position) = center_position {
+			self.place_cycle_center(cycle_id, position)?;
+		}
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
 	fn call_put_center(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
 		let CycleId(cycle_id) = args.read_as()?;
 		args.read_separator()?;
-		if args.read_blank().is_ok() {
-			args.read_end()?;
-			self.place_cycle_center(cycle_id, None)?
-		} else {
-			let x = args.read_as()?;
-			let y = args.read_as()?;
-			args.read_end()?;
-			self.place_cycle_center(cycle_id, Some(Vec2::new(x, y)))?
-		}
+		let position = Self::read_optional_vec2(&mut args)?;
+		args.read_end()?;
+		self.place_cycle_center(cycle_id, position)?;
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
