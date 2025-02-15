@@ -26,11 +26,11 @@ pub struct LevelBuilder {
 	/// Cycle links that have been explicitly added (no symmetry or transitivity)
 	declared_links: Vec<DeclaredLinkData>,
 	/// One way links between cycles that have been explicitly added (no transitivity)
-	declared_one_way_cycle_links: Vec<DeclaredLinkData>,
+	declared_one_way_cycle_links: Vec<DeclaredOneWayLinkData>,
 	/// One way links from detectors that have been explicitly added (no transitivity)
 	// TODO: Populate and use this
 	#[expect(dead_code)]
-	declared_one_way_detector_links: Vec<DeclaredLinkData>,
+	declared_one_way_detector_links: Vec<DeclaredOneWayLinkData>,
 }
 
 /// Enumerates the possible sets of positions
@@ -111,6 +111,7 @@ enum IntermediateLinkStatus {
 struct OneWayIntermediateData {
 	target_cycle: usize,
 	direction: LinkedCycleDirection,
+	multiplicity: u64,
 }
 
 /// Placement of a vertex while the layout is being built

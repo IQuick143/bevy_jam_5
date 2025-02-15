@@ -313,14 +313,17 @@ impl LevelBuilder {
 		mut warnings: WarningSink<RuntimeWarning>,
 	) -> CallResult {
 		let direction;
+		let multiplicity;
 		if let Some(flag) = args.optional_read_as() {
 			direction = match flag {
 				"coincident" => LinkedCycleDirection::Coincident,
 				"invert" => LinkedCycleDirection::Inverse,
 				_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
 			};
+			multiplicity = 1;
 			args.read_end_or_separator()?;
 		} else {
+			multiplicity = 1;
 			direction = LinkedCycleDirection::default();
 			args.optional_separator();
 		}
@@ -352,13 +355,13 @@ impl LevelBuilder {
 		// Handle the first input potentially being a detector
 		if let Some(detector) = detector {
 			if let Some(cycle) = cycles.first() {
-				self.one_way_link_detector(detector, *cycle, direction)?;
+				self.one_way_link_detector(detector, *cycle, direction, multiplicity)?;
 			}
 		}
 
 		for (a, b) in cycles.into_iter().tuple_windows() {
 			if one_way {
-				self.one_way_link_cycles(a, b, direction)?;
+				self.one_way_link_cycles(a, b, direction, multiplicity)?;
 			} else {
 				self.link_cycles(a, b, direction)?;
 			}

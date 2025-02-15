@@ -111,7 +111,7 @@ fn debug_oneways(
 		return;
 	};
 	for link in level.declared_one_way_links.iter() {
-		let Ok(start) = cycles_q.get(cycle_index.0[link.source_cycle]) else {
+		let Ok(start) = cycles_q.get(cycle_index.0[link.source]) else {
 			return;
 		};
 		let start = start.translation;

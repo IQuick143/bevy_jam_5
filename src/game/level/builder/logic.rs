@@ -154,6 +154,7 @@ impl LevelBuilder {
 		source_cycle: usize,
 		dest_cycle: usize,
 		direction: LinkedCycleDirection,
+		multiplicity: u64,
 	) -> Result<(), LevelBuilderError> {
 		if source_cycle >= self.cycles.len() {
 			return Err(LevelBuilderError::CycleIndexOutOfRange(source_cycle));
@@ -173,12 +174,15 @@ impl LevelBuilder {
 			.push(OneWayIntermediateData {
 				target_cycle: dest_cycle,
 				direction,
+				multiplicity,
 			});
-		self.declared_one_way_cycle_links.push(DeclaredLinkData {
-			source_cycle,
-			dest_cycle,
-			direction,
-		});
+		self.declared_one_way_cycle_links
+			.push(DeclaredOneWayLinkData {
+				source: source_cycle,
+				dest_cycle,
+				direction,
+				multiplicity,
+			});
 		Ok(())
 	}
 
@@ -188,6 +192,7 @@ impl LevelBuilder {
 		detector: usize,
 		dest_cycle: usize,
 		direction: LinkedCycleDirection,
+		multiplicity: u64,
 	) -> Result<(), LevelBuilderError> {
 		if dest_cycle >= self.cycles.len() {
 			return Err(LevelBuilderError::CycleIndexOutOfRange(dest_cycle));
@@ -196,6 +201,7 @@ impl LevelBuilder {
 			detector.links.push(OneWayIntermediateData {
 				target_cycle: dest_cycle,
 				direction,
+				multiplicity,
 			});
 			Ok(())
 		} else {
@@ -289,7 +295,7 @@ impl LevelBuilder {
 				groups[source_group].linked_groups.push(OneWayLinkData {
 					target_group,
 					direction: link.direction * direction_1 * direction_2,
-					multiplicity: 1,
+					multiplicity: link.multiplicity,
 				});
 			}
 		}
@@ -322,7 +328,7 @@ impl LevelBuilder {
 								OneWayLinkData {
 									target_group,
 									direction: link.direction * target_direction_in_group,
-									multiplicity: 1, // TODO
+									multiplicity: link.multiplicity,
 								}
 							})
 							.collect(),

@@ -31,7 +31,7 @@ pub struct LevelData {
 	pub declared_links: Vec<DeclaredLinkData>,
 	/// Data for all one way links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
-	pub declared_one_way_links: Vec<DeclaredLinkData>,
+	pub declared_one_way_links: Vec<DeclaredOneWayLinkData>,
 }
 
 /// Either the index of a detector or a group
@@ -102,6 +102,19 @@ pub struct DeclaredLinkData {
 	pub dest_cycle: usize,
 	/// Relative turning direction between the linked cycles
 	pub direction: LinkedCycleDirection,
+}
+
+/// Description of a declared (and visualized) cycle link
+#[derive(Debug, Clone, Copy, Reflect)]
+pub struct DeclaredOneWayLinkData {
+	/// Cycle/Detector id from which the link goes
+	pub source: usize,
+	/// Cycle to which the link goes
+	pub dest_cycle: usize,
+	/// Relative turning direction between the linked cycles
+	pub direction: LinkedCycleDirection,
+	/// How many copies of this link are present
+	pub multiplicity: u64,
 }
 
 #[derive(Debug, Clone, Copy, Reflect, PartialEq, Eq)]
