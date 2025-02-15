@@ -232,7 +232,7 @@ fn cycle_group_rotation_relay_system(
 					}
 					if partial_turns != 0 {
 						// How long of a strip of vertices needs to be scanned for objects
-						let interval_length = partial_turns.abs() as usize;
+						let interval_length = partial_turns.unsigned_abs();
 						// Counts how many objects are in a interval <i - interval_length, i) (accounting for looping)
 						let mut objects_in_interval = vec![0; n_vertices];
 						let mut running_total: i32 = 0;
