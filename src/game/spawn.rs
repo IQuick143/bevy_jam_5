@@ -459,17 +459,31 @@ fn create_link_visuals(
 		(Entity, &Parent, &LinkTargetCycle, &LinkedCycleDirection),
 		Added<LinkTargetCycle>,
 	>,
-	cycles_q: Query<&CyclePlacement>,
+	cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
 ) {
 	for (id, source, dest, direction) in &links_q {
-		let a = cycles_q
-			.get(source.get())
-			.expect("Parent of cycle link does not have CyclePlacement component")
-			.position;
-		let b = cycles_q
-			.get(dest.0)
-			.expect("TargetCycle of cycle link does not have CyclePlacement component")
-			.position;
+		let (cycle_a_placement, CycleCenterSpriteAppearence(Some(cycle_a_center_offset))) =
+			cycles_q
+				.get(source.get())
+				.expect("Parent of cycle link does not have CyclePlacement component")
+		else {
+			// Links cannot be drawn if a cycle does not have center sprite
+			log::warn!("Visible link to a cycle with invisible center sprite");
+			continue;
+		};
+		let (cycle_b_placement, CycleCenterSpriteAppearence(Some(cycle_b_center_offset))) =
+			cycles_q
+				.get(dest.0)
+				.expect("TargetCycle of cycle link does not have CyclePlacement component")
+		else {
+			// Links cannot be drawn if a cycle does not have center sprite
+			log::warn!("Visible link to a cycle with invisible center sprite");
+			continue;
+		};
+		// Links are anchored at cycle center sprites
+		let a = cycle_a_placement.position + cycle_a_center_offset;
+		let b = cycle_b_placement.position + cycle_b_center_offset;
+
 		let d_sq = a.distance_squared(b);
 		if d_sq <= CYCLE_LINK_SPACING.powi(2) {
 			// The link cannot be rendered if the cycles are too close
