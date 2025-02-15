@@ -312,20 +312,33 @@ impl LevelBuilder {
 		mut args: ArgumentStream<DomainValue>,
 		mut warnings: WarningSink<RuntimeWarning>,
 	) -> CallResult {
-		let direction;
 		let multiplicity;
 		if let Some(flag) = args.optional_read_as() {
-			direction = match flag {
-				"coincident" => LinkedCycleDirection::Coincident,
-				"invert" => LinkedCycleDirection::Inverse,
+			multiplicity = match flag {
+				"coincident" => 1,
+				"invert" => -1,
 				_ => return Err(RuntimeError::InvalidFlag(flag.to_string()).into()),
 			};
-			multiplicity = 1;
 			args.read_end_or_separator()?;
+		} else if let Some(count) = args.optional_read_as() {
+			multiplicity = count;
 		} else {
 			multiplicity = 1;
-			direction = LinkedCycleDirection::default();
 			args.optional_separator();
+		}
+
+		let direction = match multiplicity {
+			1.. => LinkedCycleDirection::Coincident,
+			..0 => LinkedCycleDirection::Inverse,
+			0 => {
+				warnings.emit(RuntimeWarning::ZeroLink.into());
+				return Ok(ReturnValue::void());
+			}
+		};
+		let abs_multiplicity = multiplicity.unsigned_abs() as u64;
+
+		if !one_way && abs_multiplicity != 1 {
+			return Err(RuntimeError::InvalidHardLinkMultiplicity(multiplicity).into());
 		}
 
 		let mut cycles = Vec::new();
@@ -333,16 +346,8 @@ impl LevelBuilder {
 
 		if one_way {
 			// Handle the first input potentially being a detector
-			if let Some(value) = args.read_until_end_or_separator() {
-				match value {
-					VariableValue::Domain(DomainValue::Cycle(CycleId(cycle_id))) => {
-						cycles.push(*cycle_id)
-					}
-					VariableValue::Domain(DomainValue::Detector(DetectorId(detector_id))) => {
-						detector = Some(*detector_id)
-					}
-					other => return Err(TypeError(other.get_type()).into()),
-				}
+			if let Some(DetectorId(detector_id)) = args.optional_read_as() {
+				detector = Some(detector_id);
 			}
 		}
 		while let Some(CycleId(cycle_id)) = args.read_as_until_end_or_separator()? {
@@ -355,13 +360,13 @@ impl LevelBuilder {
 		// Handle the first input potentially being a detector
 		if let Some(detector) = detector {
 			if let Some(cycle) = cycles.first() {
-				self.one_way_link_detector(detector, *cycle, direction, multiplicity)?;
+				self.one_way_link_detector(detector, *cycle, direction, abs_multiplicity)?;
 			}
 		}
 
 		for (a, b) in cycles.into_iter().tuple_windows() {
 			if one_way {
-				self.one_way_link_cycles(a, b, direction, multiplicity)?;
+				self.one_way_link_cycles(a, b, direction, abs_multiplicity)?;
 			} else {
 				self.link_cycles(a, b, direction)?;
 			}
@@ -409,6 +414,7 @@ pub enum RuntimeError {
 	ArithmeticOverflow,
 	BuilderError(LevelBuilderError),
 	InvalidFlag(String),
+	InvalidHardLinkMultiplicity(i32),
 }
 
 impl From<builtins::ArithmeticOverflowError> for RuntimeError {
@@ -437,6 +443,9 @@ impl std::fmt::Display for RuntimeError {
 			Self::ArithmeticOverflow => f.write_str("arithmetic overflow"),
 			Self::BuilderError(e) => e.fmt(f),
 			Self::InvalidFlag(flag) => write!(f, "'{flag}' is not a valid flag for this function"),
+			Self::InvalidHardLinkMultiplicity(count) => {
+				write!(f, "hard link does not allow multiplicity of {count}")
+			}
 		}
 	}
 }
@@ -446,6 +455,8 @@ pub enum RuntimeWarning {
 	/// A link function was called with less than two cycles,
 	/// creating no links
 	EmptyLink,
+	/// A link function was called with multiplicity set to zero
+	ZeroLink,
 }
 
 impl std::error::Error for RuntimeWarning {}
@@ -454,6 +465,7 @@ impl std::fmt::Display for RuntimeWarning {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::EmptyLink => f.write_str("Too few vertices to actually create a link"),
+			Self::ZeroLink => f.write_str("Link with multiplicity of zero is no-op"),
 		}
 	}
 }
