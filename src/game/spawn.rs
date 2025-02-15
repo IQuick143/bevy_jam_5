@@ -202,6 +202,24 @@ fn spawn_primary_level_entities(
 					));
 				});
 		}
+		for link in &level.declared_one_way_links {
+			let target_cycle = commands
+				.get_entity(cycles[link.dest_cycle])
+				.expect("The entity has just been spawned")
+				.id();
+			commands
+				.get_entity(cycles[link.source])
+				.expect("The entity has just been spawned")
+				.with_children(|children| {
+					children.spawn((
+						LinkTargetCycle(target_cycle),
+						link.direction,
+						LinkMultiplicity(link.multiplicity),
+						Transform::default(),
+						Visibility::default(),
+					));
+				});
+		}
 
 		// Spawn cycle list
 		commands.insert_resource(CycleEntities(cycles));
@@ -456,79 +474,177 @@ fn create_link_visuals(
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
 	links_q: Query<
-		(Entity, &Parent, &LinkTargetCycle, &LinkedCycleDirection),
+		(
+			Entity,
+			&Parent,
+			&LinkTargetCycle,
+			&LinkedCycleDirection,
+			Option<&LinkMultiplicity>,
+		),
 		Added<LinkTargetCycle>,
 	>,
-	cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
+	mut cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
 ) {
-	for (id, source, dest, direction) in &links_q {
-		let (cycle_a_placement, CycleCenterSpriteAppearence(Some(cycle_a_center_offset))) =
-			cycles_q
-				.get(source.get())
-				.expect("Parent of cycle link does not have CyclePlacement component")
-		else {
-			// Links cannot be drawn if a cycle does not have center sprite
-			log::warn!("Visible link to a cycle with invisible center sprite");
+	for (id, source, dest, direction, multiplicity) in &links_q {
+		// Fetch endpoints
+		let a = get_link_endpoint(source.get(), cycles_q.reborrow());
+		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
+		let (Some(a), Some(b)) = (a, b) else {
 			continue;
 		};
-		let (cycle_b_placement, CycleCenterSpriteAppearence(Some(cycle_b_center_offset))) =
-			cycles_q
-				.get(dest.0)
-				.expect("TargetCycle of cycle link does not have CyclePlacement component")
-		else {
-			// Links cannot be drawn if a cycle does not have center sprite
-			log::warn!("Visible link to a cycle with invisible center sprite");
-			continue;
-		};
-		// Links are anchored at cycle center sprites
-		let a = cycle_a_placement.position + cycle_a_center_offset;
-		let b = cycle_b_placement.position + cycle_b_center_offset;
 
-		let d_sq = a.distance_squared(b);
-		if d_sq <= CYCLE_LINK_SPACING.powi(2) {
-			// The link cannot be rendered if the cycles are too close
-			log::warn!("Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}", d_sq.sqrt());
-			continue;
-		}
-		let connector_length = match direction {
-			LinkedCycleDirection::Coincident => a.distance(b),
-			LinkedCycleDirection::Inverse => (d_sq - CYCLE_LINK_SPACING.powi(2)).sqrt(),
-		};
-		let mesh = Rectangle::from_size(Vec2::new(
-			connector_length - CYCLE_LINK_END_CUT,
-			CYCLE_LINK_WIDTH,
-		))
-		.mesh();
-		let mesh = meshes.add(mesh);
-		let dir_from_a_to_b = (a - b).normalize();
-		let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_from_a_to_b);
-		let position = (b - a) / 2.0;
-		let offset = match direction {
-			LinkedCycleDirection::Coincident => dir_from_a_to_b.perp() * CYCLE_LINK_SPACING / 2.0,
-			LinkedCycleDirection::Inverse => Vec2::ZERO,
-		};
-		let extra_rotation = match direction {
-			LinkedCycleDirection::Coincident => Quat::IDENTITY,
-			LinkedCycleDirection::Inverse => Quat::from_rotation_arc_2d(
-				Vec2::X,
-				Vec2::new(d_sq.sqrt(), CYCLE_LINK_SPACING).normalize(),
-			),
-		};
+		// Spawn the visuals under the link entity
 		commands.entity(id).with_children(|children| {
-			children.spawn((
-				Mesh2d(mesh.clone_weak()),
-				Transform::from_rotation(rotation.mul_quat(extra_rotation))
-					.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
-				MeshMaterial2d(materials.link_lines.clone_weak()),
-			));
-			children.spawn((
-				Mesh2d(mesh),
-				Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
-					.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
-				MeshMaterial2d(materials.link_lines.clone_weak()),
-			));
+			if let Some(multiplicity) = multiplicity {
+				create_one_way_link_visual(
+					children,
+					a,
+					b,
+					*direction,
+					**multiplicity,
+					&mut meshes,
+					materials.link_lines.clone_weak(),
+				);
+			} else {
+				create_hard_link_visual(
+					children,
+					a,
+					b,
+					*direction,
+					&mut meshes,
+					materials.link_lines.clone_weak(),
+				);
+			}
 		});
 	}
+}
+
+fn get_link_endpoint(
+	cycle_id: Entity,
+	query: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
+) -> Option<Vec2> {
+	let Ok((placement, center_sprite)) = query.get(cycle_id) else {
+		// Skip drawing link if its endpoints are not cycles
+		log::warn!("Link endpoint entity does not have CyclePlacement or CycleCenterSpriteAppearence component");
+		return None;
+	};
+
+	if let Some(center_offset) = center_sprite.0 {
+		// Links are anchored at cycle center sprites
+		Some(placement.position + center_offset)
+	} else {
+		// Links cannot be drawn if a cycle does not have center sprite
+		log::warn!("Visible link to a cycle with invisible center sprite");
+		None
+	}
+}
+
+fn create_hard_link_visual(
+	children: &mut ChildBuilder,
+	a: Vec2,
+	b: Vec2,
+	direction: LinkedCycleDirection,
+	meshes: &mut Assets<Mesh>,
+	material: Handle<ColorMaterial>,
+) {
+	let d_sq = a.distance_squared(b);
+	if d_sq <= CYCLE_LINK_SPACING.powi(2) {
+		// The link cannot be rendered if the cycles are too close
+		log::warn!("Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}", d_sq.sqrt());
+		return;
+	}
+	let connector_length = match direction {
+		LinkedCycleDirection::Coincident => a.distance(b),
+		LinkedCycleDirection::Inverse => (d_sq - CYCLE_LINK_SPACING.powi(2)).sqrt(),
+	};
+	let mesh = Rectangle::from_size(Vec2::new(
+		connector_length - CYCLE_LINK_END_CUT,
+		CYCLE_LINK_WIDTH,
+	))
+	.mesh();
+	let mesh = meshes.add(mesh);
+	let dir_from_a_to_b = (a - b).normalize();
+	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_from_a_to_b);
+	let position = (b - a) / 2.0;
+	let offset = match direction {
+		LinkedCycleDirection::Coincident => dir_from_a_to_b.perp() * CYCLE_LINK_SPACING / 2.0,
+		LinkedCycleDirection::Inverse => Vec2::ZERO,
+	};
+	let extra_rotation = match direction {
+		LinkedCycleDirection::Coincident => Quat::IDENTITY,
+		LinkedCycleDirection::Inverse => Quat::from_rotation_arc_2d(
+			Vec2::X,
+			Vec2::new(d_sq.sqrt(), CYCLE_LINK_SPACING).normalize(),
+		),
+	};
+	children.spawn((
+		Mesh2d(mesh.clone_weak()),
+		Transform::from_rotation(rotation.mul_quat(extra_rotation))
+			.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
+		MeshMaterial2d(material.clone_weak()),
+	));
+	children.spawn((
+		Mesh2d(mesh),
+		Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
+			.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
+		MeshMaterial2d(material.clone_weak()),
+	));
+}
+
+fn create_one_way_link_visual(
+	children: &mut ChildBuilder,
+	a: Vec2,
+	b: Vec2,
+	_direction: LinkedCycleDirection,
+	_multiplicity: u64,
+	meshes: &mut Assets<Mesh>,
+	material: Handle<ColorMaterial>,
+) {
+	let d = a.distance(b);
+	let line_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
+	if line_length < 0.0 {
+		// The link cannot be rendered if the cycles are too close
+		log::warn!(
+			"Skipped drawing a cycle link because the cycles are {d} units apart, need at least {}",
+			CYCLE_LINK_END_CUT / 2.0 + ONEWAY_LINK_TARGET_OFFSET
+		);
+		return;
+	}
+	let line_mesh = Rectangle::from_size(Vec2::new(line_length, CYCLE_LINK_WIDTH)).mesh();
+	let line_mesh = meshes.add(line_mesh);
+	let tip_mesh = Capsule2d::new(CYCLE_LINK_WIDTH / 2.0, ONEWAY_LINK_TIP_LENGTH)
+		.mesh()
+		.resolution(8);
+	let tip_mesh = meshes.add(tip_mesh);
+	let dir_a_to_b = (b - a).normalize();
+	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_a_to_b);
+	let main_tip_rotation = rotation * Quat::from_rotation_z(PI / 2.0);
+	let relative_tip_rotation = Quat::from_rotation_z(ONEWAY_LINK_TIP_ANGLE);
+	let line_center_distance_from_a = line_length / 2.0 + CYCLE_LINK_END_CUT;
+	let line_center_position = dir_a_to_b * line_center_distance_from_a;
+	let tip_distance_from_a = d - ONEWAY_LINK_TARGET_OFFSET;
+	let tip_position = dir_a_to_b * tip_distance_from_a;
+	let tip_inner_transform = Transform::from_translation(Vec3::Y * ONEWAY_LINK_TIP_LENGTH / 2.0);
+	children.spawn((
+		Mesh2d(line_mesh),
+		Transform::from_rotation(rotation)
+			.with_translation(line_center_position.extend(layers::CYCLE_LINKS)),
+		MeshMaterial2d(material.clone_weak()),
+	));
+	children.spawn((
+		Mesh2d(tip_mesh.clone()),
+		Transform::from_rotation(main_tip_rotation * relative_tip_rotation)
+			.with_translation(tip_position.extend(layers::CYCLE_LINKS))
+			.mul_transform(tip_inner_transform),
+		MeshMaterial2d(material.clone_weak()),
+	));
+	children.spawn((
+		Mesh2d(tip_mesh),
+		Transform::from_rotation(main_tip_rotation * relative_tip_rotation.inverse())
+			.with_translation(tip_position.extend(layers::CYCLE_LINKS))
+			.mul_transform(tip_inner_transform),
+		MeshMaterial2d(material.clone_weak()),
+	));
 }
 
 fn create_thing_sprites(

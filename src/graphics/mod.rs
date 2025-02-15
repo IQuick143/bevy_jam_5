@@ -53,6 +53,14 @@ pub const CYCLE_LINK_SPACING: f32 = SPRITE_LENGTH * 0.7;
 /// between the centers of the cycles, in world units
 pub const CYCLE_LINK_END_CUT: f32 = SPRITE_LENGTH / 2.0;
 
+/// How much space should be left between the end of a one-way link visual
+/// and its target cycle's center
+pub const ONEWAY_LINK_TARGET_OFFSET: f32 = SPRITE_LENGTH * 0.65;
+/// Length of each arm of the tip of a one-way link visual
+pub const ONEWAY_LINK_TIP_LENGTH: f32 = SPRITE_LENGTH / 2.0;
+/// Angle between a one-way link and the arms of its tip
+pub const ONEWAY_LINK_TIP_ANGLE: f32 = f32::consts::PI / 5.0;
+
 /// How big should a sprite be in world units.
 /// See [`SPRITE_LENGTH`]
 pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);

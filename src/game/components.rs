@@ -76,3 +76,7 @@ pub struct CycleEntities(pub Vec<Entity>);
 /// The source cycle is its [`Parent`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct LinkTargetCycle(pub Entity);
+
+/// Multiplicity of a one-way link
+#[derive(Component, Clone, Copy, Deref, DerefMut, Debug, Reflect)]
+pub struct LinkMultiplicity(pub u64);
