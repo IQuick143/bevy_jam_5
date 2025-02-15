@@ -528,6 +528,65 @@ circle(b; 200 0 100);
 	);
 }
 
+/// Test one-way links with higher multiplicity
+#[test]
+fn test_link_multiplicity() {
+	use crate::game::level::ObjectData;
+
+	let mut app = app_with_level(
+		r"
+name = 'DebugLinkMultiplicity';
+hint = 'A player should not be reading this message!';
+
+a = circle(cycle(box() _ _ _ _); 0 0 1);
+b = circle(cycle(box() _ _ _ _); 0 0 1);
+c = circle(cycle(box() _ _ _ _); 0 0 1);
+d = circle(cycle(box() _ _ _ _); 0 0 1);
+e = circle(cycle(box() _ _ _ _); 0 0 1);
+f = circle(cycle(box() _ _ _ _); 0 0 1);
+g = circle(cycle(box() _ _ _ _); 0 0 1);
+h = circle(cycle(box() _ _ _ _); 0 0 1);
+
+link(   1; a b);
+link(  -1; c a); # This link should be symmetrical
+oneway( 1; a d);
+oneway(-1; a e);
+oneway( 2; a f);
+oneway(-2; a g);
+oneway( 3; a h);
+",
+	);
+
+	const CYCLE_COUNT: usize = 8;
+
+	// Shorthand for box object for assertions
+	const BOX: Option<ObjectData> = Some(ObjectData::Box(None));
+
+	// Sanity check: objects should be where we placed them
+	let initial_state = [[BOX, None, None, None, None]; CYCLE_COUNT]
+		.into_iter()
+		.flatten()
+		.collect::<Vec<_>>();
+	assert_eq!(app.read_vertices().objects, initial_state);
+
+	// Turn the center cycle once
+	app.turn_cycle(0, 1);
+	app.update();
+
+	// Other cycles should follow
+	let expected_state = [
+		None, BOX, None, None, None, // Cycle a was turned manually
+		None, BOX, None, None, None, // Cycle b should turn forward once
+		None, None, None, None, BOX, // Cycle c should turn backwards once
+		None, BOX, None, None, None, // Cycle d should turn forward once
+		None, None, None, None, BOX, // Cycle e should turn backwards once
+		None, None, BOX, None, None, // Cycle f should turn forward twice
+		None, None, None, BOX, None, // Cycle g should turn backwards twice
+		None, None, None, BOX, None, // Cycle h should turn forward thrice
+	];
+	assert_eq!(app.read_vertices().objects, expected_state);
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk(
 	n_cycles: usize,
