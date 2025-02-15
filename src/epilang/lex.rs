@@ -34,16 +34,15 @@ pub struct LexerSourceLocation {
 pub enum NeverTag {}
 
 #[derive(Logos, Clone, PartialEq, Debug)]
-#[logos(skip r"[ \t\r]")]
+#[logos(skip r"[ \t\r]|#[^\n]*")]
 #[logos(extras = LexerSourceLocation)]
 #[logos(error = LexerErrorCode)]
 pub enum Token {
-	#[regex(r"(#[^\n]*)?\n", |lex| {
+	#[regex(r"\n", |lex| {
 		lex.extras.line_index += 1;
 		lex.extras.line_start_offset = lex.span().end;
 		logos::Filter::Skip
 	})]
-	#[regex(r"#[^\n]*", |_| logos::Filter::Skip)]
 	Eol(NeverTag),
 
 	#[regex(r"[a-zA-Z][a-zA-Z0-9_]*", |lex| lex.slice().to_owned())]
