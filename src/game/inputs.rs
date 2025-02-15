@@ -39,6 +39,12 @@ fn cycle_inputs_system(
 		&mut CycleInteraction,
 	)>,
 ) {
+	// This system may get called when exiting the app, after these entities
+	// have been despawned, we do not want to crash in that case
+	if window_q.is_empty() || camera_q.is_empty() {
+		return;
+	}
+
 	let lmb = input_mouse.just_pressed(MouseButton::Left) || input_key.just_pressed(KeyCode::KeyD);
 	let rmb = input_mouse.just_pressed(MouseButton::Right) || input_key.just_pressed(KeyCode::KeyA);
 	let new_interaction = match (lmb, rmb) {

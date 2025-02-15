@@ -90,6 +90,12 @@ fn update_hover(
 	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut hint_text: ResMut<HintText>,
 ) {
+	// This system may get called when exiting the app, after these entities
+	// have been despawned, we do not want to crash in that case
+	if window_q.is_empty() || camera_q.is_empty() {
+		return;
+	}
+
 	let window = window_q.single();
 	let (camera, camera_transform) = camera_q.single();
 	let cursor_pos = window
