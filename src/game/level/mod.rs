@@ -362,6 +362,17 @@ impl std::ops::MulAssign for LinkedCycleDirection {
 	}
 }
 
+impl std::ops::Mul<i64> for LinkedCycleDirection {
+	type Output = i64;
+
+	fn mul(self, rhs: i64) -> Self::Output {
+		match self {
+			LinkedCycleDirection::Coincident => rhs,
+			LinkedCycleDirection::Inverse => -rhs,
+		}
+	}
+}
+
 impl From<ObjectData> for ObjectType {
 	fn from(value: ObjectData) -> Self {
 		match value {

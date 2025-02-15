@@ -69,18 +69,20 @@ mod utils {
 	}
 
 	fn load_level(
-		In(level_data): In<&str>,
+		In(level): In<LevelData>,
 		mut asset_server: ResMut<Assets<LevelData>>,
 		mut spawn_trigger: EventWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
-		let level = parser::parse_and_run(level_data, |_| {})?;
 		let handle = asset_server.add(level);
 		spawn_trigger.send(EnterLevel(Some(handle)));
 		Ok(())
 	}
 
-	pub fn app_with_level(level: &'static str) -> App {
+	pub fn app_with_level(level: &str) -> App {
 		let mut app = setup_app();
+		let level =
+			parser::parse_and_run(level, |_| {}).expect("Level data should compile correctly!");
+
 		app.world_mut()
 			.run_system_once_with(level, load_level)
 			.expect("System should've ran.")
@@ -193,10 +195,13 @@ mod utils {
 
 #[allow(unused_imports)]
 use bevy::prelude::*;
+use itertools::Itertools;
 #[allow(unused_imports)]
 use rand::{Rng, SeedableRng};
 #[allow(unused_imports)]
 use utils::*;
+
+use crate::game::level::ObjectData;
 
 /// Metatest for asserting that running the headless game works.
 #[test]
@@ -587,6 +592,173 @@ oneway( 3; a h);
 	assert_eq!(app.read_vertices().objects, expected_state);
 }
 
+/// Test that detectors activate when expected.
+#[test]
+fn test_detector_activations() {
+	let level_header = "
+name = 'TestDetectorActivations';
+hint = 'A player should not be reading this message!';
+
+test_cycle = cycle(box() _ _ _ _ _ _ _ _);
+circle(test_cycle; 0 0 1);
+d = detector();
+oneway(d test_cycle);
+circle(";
+
+	let level_footer = "; 0, 0, 1);";
+	let should_activate_instantly_forward = [
+		"cycle(d box())",
+		"cycle(box() d)",
+		"cycle(_ box() d)",
+		"cycle(_ box() d _)",
+		"cycle(_ _ box() box() d _ _)",
+		"cycle(_ box() box() d box() _ _)",
+		"cycle(d _ _ box())",
+		"cycle(_ _ box() d)",
+		"cycle(_ d _ d box() d)",
+	];
+	let should_activate_instantly_backward = [
+		"cycle(d box())",
+		"cycle(box() d)",
+		"cycle(_ d box())",
+		"cycle(_ d box() _)",
+		"cycle(_ _ d box() box() _ _)",
+		"cycle(_ box() d box() box() _ _)",
+		"cycle(d box() _ _ )",
+		"cycle(box() _ _ d)",
+		"cycle(_ d _ d box() d)",
+	];
+	const N_VERTICES_ON_TEST_CYCLE: usize = 9;
+	fn check_test_cycle_in_position(app: &mut App, position: usize) {
+		let vertices = app.read_vertices();
+		assert!(
+			position < N_VERTICES_ON_TEST_CYCLE,
+			"Some doofus done doofed up the testcase"
+		);
+		assert_eq!(
+			vertices.objects[position],
+			Some(ObjectData::Box(None)),
+			"Test cycle is in a wrong position"
+		);
+	}
+	for circle in should_activate_instantly_forward.iter() {
+		let level = format!("{}{}{}", level_header, circle, level_footer);
+		let mut app = app_with_level(&level);
+		// Test cycle should be unrotated
+		check_test_cycle_in_position(&mut app, 0);
+		app.turn_cycle(1, 1);
+		app.update();
+		check_test_cycle_in_position(&mut app, 1);
+		app.turn_cycle(1, -1);
+		app.update();
+		check_test_cycle_in_position(&mut app, 0);
+	}
+	for circle in should_activate_instantly_backward.iter() {
+		let level = format!("{}{}{}", level_header, circle, level_footer);
+		let mut app = app_with_level(&level);
+		// Test cycle should be unrotated
+		check_test_cycle_in_position(&mut app, 0);
+		app.turn_cycle(1, -1);
+		app.update();
+		check_test_cycle_in_position(&mut app, N_VERTICES_ON_TEST_CYCLE - 1);
+		app.turn_cycle(1, 1);
+		app.update();
+		check_test_cycle_in_position(&mut app, 0);
+	}
+}
+
+/// Test that detectors activate when expected when turned a lot.
+#[test]
+fn test_detector_multi_activations() {
+	let level = "
+name = 'TestDetectorActivations';
+hint = 'A player should not be reading this message!';
+
+test_cycle = cycle(box() _ _ _ _ _ _ _ _);
+circle(test_cycle; 0 0 1);
+d = detector();
+oneway(d test_cycle);
+circle(cycle(d box() _ _ _); 0 0 1);";
+	const N_VERTICES_ON_TEST_CYCLE: usize = 9;
+	const N_VERTICES_ON_DETECTOR_CYCLE: usize = 4;
+	fn check_test_cycle_in_position(app: &mut App, position: usize) {
+		let vertices = app.read_vertices();
+		assert!(
+			position < N_VERTICES_ON_TEST_CYCLE,
+			"Some doofus done doofed up the testcase"
+		);
+		assert_eq!(
+			vertices.objects[position],
+			Some(ObjectData::Box(None)),
+			"Test cycle is in a wrong position"
+		);
+	}
+	for i in 0..200 {
+		let mut app = app_with_level(level);
+		// Test cycle should be unrotated
+		check_test_cycle_in_position(&mut app, 0);
+		app.turn_cycle(1, i);
+		app.update();
+		check_test_cycle_in_position(
+			&mut app,
+			(i32::div_euclid(i, N_VERTICES_ON_DETECTOR_CYCLE as i32)) as usize
+				% N_VERTICES_ON_TEST_CYCLE,
+		);
+		app.turn_cycle(1, -i);
+		app.update();
+		check_test_cycle_in_position(&mut app, 0);
+	}
+}
+
+// Tests that a contraption for divisibility works
+#[test]
+fn test_divisibilitor() {
+	for divisor in 2..10 {
+		for divisee in 1..50 {
+			let level = format!(
+				"name = 'Divisibility Contraption';
+
+			d = detector();
+			blocker_vertex = vertex();
+
+			source = cycle(box() _);
+			gear = cycle(blocker_vertex);
+			blocker = cycle(blocker_vertex);
+			divider = cycle(d box() {});
+			
+			oneway({divisee}; source gear);
+			oneway(-1; gear blocker);
+			oneway(1; gear divider);
+			oneway({divisor}; d blocker);
+
+			circle(source; 0, -10, 1);
+			circle(divider; -1, 0, 1);
+			circle(gear; -1, 0, 1);
+			circle(blocker; +1, 0, 1);",
+				(1..divisor).map(|_| { "_" }).join(" ")
+			);
+			let mut app = app_with_level(&level);
+			let initial_vertex_state = app.read_vertices();
+			assert_eq!(initial_vertex_state.n_vertices, divisor + 3);
+			// println!("Divisor: {divisor}, Divisee: {divisee}");
+			app.turn_cycle(0, 1);
+			app.update();
+			let new_state = app.read_vertices();
+			if divisee % divisor == 0 {
+				// Turn should've went through and changed stuff
+				assert_ne!(new_state, initial_vertex_state);
+			} else {
+				// Turn shouldn't've went through and nothing should've changed
+				assert_eq!(new_state, initial_vertex_state);
+			}
+			app.turn_cycle(0, -1);
+			app.update();
+			let final_state = app.read_vertices();
+			assert_eq!(final_state, initial_vertex_state);
+		}
+	}
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk(
 	n_cycles: usize,
@@ -734,6 +906,49 @@ circle(b; 100 0 100);
 
 	// Perform many moves
 	move_fuzz(&mut app, 1024, 1234123412341234);
+}
+
+#[test]
+fn stress_test_detector_invertibility() {
+	let level = "
+name = 'DetectorStressTest';
+hint = 'A player should not be reading this message!';
+
+d1 = detector();
+d2 = detector();
+d3 = detector();
+d4 = detector();
+
+a1 = cycle(d1 box() player() _ _);
+a2 = cycle(d2 player() _ d1 _);
+
+link(-1; a1 a2);
+
+b1 = cycle(box() _ player() _ d4 _);
+b2 = cycle(player() _ d3 box() d4);
+
+link(b1 b2);
+
+oneway(2; d1 b1);
+oneway(-3; d2 b2);
+
+c1 = cycle(box() _ _ _);
+c2 = cycle(box() _ _ _);
+
+link(c1, c2);
+
+oneway(d3, c1);
+oneway(d4, c2);
+
+circle(a1; 0 0 1);
+circle(a2; 0 0 1);
+circle(b1; 0 0 1);
+circle(b2; 0 0 1);
+circle(c1; 0 0 1);
+circle(c2; 0 0 1);
+";
+	let mut app = app_with_level(level);
+	move_fuzz(&mut app, 4096, 1337133713371337);
 }
 
 /// Tries fuzzing a random selection of levels
