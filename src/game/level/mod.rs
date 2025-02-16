@@ -24,8 +24,9 @@ pub struct LevelData {
 	/// An order in which groups and detectors should be evaluated, sorted in topological order (previous elements need to be evaluated before later ones)
 	pub execution_order: Vec<DetectorOrGroup>,
 	/// List of group pairs, which cannot be turned at once
-	/// Sorted in increasing lexicographic order
-	pub forbidden_group_pairs: Vec<(usize, usize)>,
+	/// Sorted in increasing lexicographic order of their index tuples
+	/// The vector contains a list of offending pairs of cycles
+	pub forbidden_group_pairs: Vec<(usize, usize, Vec<(usize, usize)>)>,
 	/// Data for all cycle links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_links: Vec<DeclaredLinkData>,

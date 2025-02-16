@@ -293,7 +293,7 @@ fn cycle_group_rotation_relay_system(
 		'outer: for group_a_id in 0..level.groups.len() {
 			if group_rotations[group_a_id] != 0 {
 				while pair_index < level.forbidden_group_pairs.len() {
-					let (a, b) = level.forbidden_group_pairs[pair_index];
+					let (a, b, _) = level.forbidden_group_pairs[pair_index];
 					if a > group_a_id {
 						break;
 					}
