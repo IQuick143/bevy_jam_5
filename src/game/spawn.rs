@@ -482,6 +482,9 @@ fn create_link_visuals(
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
 	standard_meshes: Res<GameObjectMeshes>,
+	sprites: Res<HandleMap<ImageKey>>,
+	atlas_layout: Res<BoxColorSpriteAtlasLayout>,
+	palette: Res<ThingPalette>,
 	links_q: Query<
 		(
 			Entity,
@@ -514,6 +517,10 @@ fn create_link_visuals(
 					&mut meshes,
 					materials.link_lines.clone_weak(),
 					standard_meshes.one_way_link_tips.clone_weak(),
+					standard_meshes.one_way_link_backheads.clone_weak(),
+					sprites[&ImageKey::BoxSpriteAtlas].clone_weak(),
+					atlas_layout.0.clone_weak(),
+					palette.link_multiplicity_label,
 				);
 			} else {
 				create_hard_link_visual(
@@ -610,20 +617,42 @@ fn create_one_way_link_visual(
 	meshes: &mut Assets<Mesh>,
 	material: Handle<ColorMaterial>,
 	tip_mesh: Handle<Mesh>,
+	backhead_mesh: Handle<Mesh>,
+	digit_atlas: Handle<Image>,
+	digit_atlas_layout: Handle<TextureAtlasLayout>,
+	label_color: Color,
 ) {
 	if multiplicity == 0 {
 		log::warn!("Skipped drawing a cycle link with zero multiplicity");
 		return;
 	}
-	// How many tips the arrow should have (`--->>>`)
-	let tip_count = multiplicity;
 	// Distance between cycle centers
 	let d = a.distance(b);
 	// Length of the whole arrow, from base to tip
 	let arrow_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
+
+	// Whether multiplicity should be indicated with a number
+	let use_numeric = multiplicity > ONEWAY_MULTILINK_MAX_COUNT;
+	let digits;
+	// How many tips the arrow should have (`--->>>`)
+	let tip_count;
 	// Length of the line that makes up the main body of the arrow
 	// Only goes up to the first tip in a multilink arrow
-	let line_length = arrow_length - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
+	let line_length;
+
+	if use_numeric {
+		digits = multiplicity.to_string();
+		let text_width = get_number_typeset_width(&digits) * ONEWAY_MULTILINK_DIGIT_SIZE.x;
+		tip_count = 1;
+		line_length =
+			arrow_length - text_width - ONEWAY_MULTILINK_TEXT_BEFORE - ONEWAY_MULTILINK_TEXT_AFTER;
+	} else {
+		tip_count = multiplicity;
+		line_length = arrow_length - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
+		// Assign to this so we can use it later
+		digits = String::new();
+	};
+
 	if line_length <= 0.0 {
 		// The link cannot be rendered if the cycles are too close
 		log::warn!(
@@ -673,6 +702,42 @@ fn create_one_way_link_visual(
 				.mul_transform(tip_inner_transform),
 			MeshMaterial2d(material.clone_weak()),
 		));
+	}
+
+	if use_numeric {
+		// Backhead
+		let backhead_distance_from_a = CYCLE_LINK_END_CUT + line_length;
+		let backhead_position = backhead_distance_from_a * dir_a_to_b;
+		children.spawn((
+			Mesh2d(backhead_mesh),
+			Transform::from_rotation(rotation)
+				.with_translation(backhead_position.extend(layers::CYCLE_LINKS)),
+			MeshMaterial2d(material.clone_weak()),
+		));
+
+		// Distance to the caret, i.e. where the most signuficant digit starts
+		let caret_distance_from_a;
+		let label_rotation;
+		// Flip the label if it would be upside down
+		if Vec2::X.dot(b - a) > 0.0 {
+			caret_distance_from_a = backhead_distance_from_a + ONEWAY_MULTILINK_TEXT_BEFORE;
+			label_rotation = rotation;
+		} else {
+			caret_distance_from_a = tip_distance_from_a - ONEWAY_MULTILINK_TEXT_AFTER;
+			label_rotation = rotation * Quat::from_rotation_z(PI);
+		}
+		let caret_position = caret_distance_from_a * dir_a_to_b;
+		let caret_transform = Transform::from_rotation(label_rotation)
+			.with_translation(caret_position.extend(layers::CYCLE_LINKS));
+		typeset_number(
+			&digits,
+			children,
+			caret_transform,
+			digit_atlas,
+			digit_atlas_layout,
+			label_color,
+			ONEWAY_MULTILINK_DIGIT_SIZE,
+		);
 	}
 }
 

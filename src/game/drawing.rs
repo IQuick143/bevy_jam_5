@@ -135,6 +135,9 @@ pub struct GameObjectMeshes {
 	pub arrow_labels: Handle<Mesh>,
 	/// Mesh for tips of arrows that represent one-way links
 	pub one_way_link_tips: Handle<Mesh>,
+	/// Mesh for back side of tips of arrows for one-way links
+	/// with numeric multiplicity labels
+	pub one_way_link_backheads: Handle<Mesh>,
 }
 
 impl FromWorld for GameObjectMeshes {
@@ -161,6 +164,11 @@ impl FromWorld for GameObjectMeshes {
 				.mesh()
 				.resolution(ONEWAY_LINK_TIP_RESOLUTION),
 		);
+		let one_way_link_backheads = meshes.add(
+			Capsule2d::new(CYCLE_LINK_WIDTH / 2.0, ONEWAY_MULTILINK_BACKHEAD_LENGTH)
+				.mesh()
+				.resolution(ONEWAY_LINK_TIP_RESOLUTION),
+		);
 
 		Self {
 			vertices,
@@ -168,6 +176,7 @@ impl FromWorld for GameObjectMeshes {
 			square_labels,
 			arrow_labels,
 			one_way_link_tips,
+			one_way_link_backheads,
 		}
 	}
 }
@@ -184,6 +193,7 @@ pub struct ThingPalette {
 	pub cycle_disabled: Color,
 	pub cycle_ready: Color,
 	pub cycle_trigger: Color,
+	pub link_multiplicity_label: Color,
 }
 
 impl Default for ThingPalette {
@@ -199,6 +209,7 @@ impl Default for ThingPalette {
 			cycle_disabled: p::SLATE_300.into(),
 			cycle_ready: p::SLATE_300.into(),
 			cycle_trigger: p::SLATE_400.into(),
+			link_multiplicity_label: p::SLATE_300.into(),
 		}
 	}
 }
