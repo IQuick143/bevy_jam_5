@@ -62,6 +62,9 @@ pub const ONEWAY_LINK_TIP_LENGTH: f32 = SPRITE_LENGTH / 2.0;
 pub const ONEWAY_LINK_TIP_ANGLE: f32 = f32::consts::PI / 5.0;
 /// Number of vertices to use for each end of the tip
 pub const ONEWAY_LINK_TIP_RESOLUTION: u32 = 8;
+/// For low-multiplicity multi-links, how much space
+/// should be between the repeated tips
+pub const ONEWAY_MULTILINK_TIP_SPACING: f32 = ONEWAY_LINK_TIP_LENGTH * 0.75;
 
 /// How big should a sprite be in world units.
 /// See [`SPRITE_LENGTH`]

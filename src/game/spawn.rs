@@ -598,52 +598,74 @@ fn create_one_way_link_visual(
 	a: Vec2,
 	b: Vec2,
 	_direction: LinkedCycleDirection,
-	_multiplicity: u64,
+	multiplicity: u64,
 	meshes: &mut Assets<Mesh>,
 	material: Handle<ColorMaterial>,
 	tip_mesh: Handle<Mesh>,
 ) {
+	if multiplicity == 0 {
+		log::warn!("Skipped drawing a cycle link with zero multiplicity");
+		return;
+	}
+	// How many tips the arrow should have (`--->>>`)
+	let tip_count = multiplicity;
+	// Distance between cycle centers
 	let d = a.distance(b);
-	let line_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
-	if line_length < 0.0 {
+	// Length of the whole arrow, from base to tip
+	let arrow_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
+	// Length of the line that makes up the main body of the arrow
+	// Only goes up to the first tip in a multilink arrow
+	let line_length = arrow_length - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
+	if line_length <= 0.0 {
 		// The link cannot be rendered if the cycles are too close
 		log::warn!(
 			"Skipped drawing a cycle link because the cycles are {d} units apart, need at least {}",
-			CYCLE_LINK_END_CUT / 2.0 + ONEWAY_LINK_TARGET_OFFSET
+			d - line_length
 		);
 		return;
 	}
+
 	let line_mesh = Rectangle::from_size(Vec2::new(line_length, CYCLE_LINK_WIDTH)).mesh();
 	let line_mesh = meshes.add(line_mesh);
 	let dir_a_to_b = (b - a).normalize();
 	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_a_to_b);
-	let main_tip_rotation = rotation * Quat::from_rotation_z(PI / 2.0);
-	let relative_tip_rotation = Quat::from_rotation_z(ONEWAY_LINK_TIP_ANGLE);
 	let line_center_distance_from_a = line_length / 2.0 + CYCLE_LINK_END_CUT;
 	let line_center_position = dir_a_to_b * line_center_distance_from_a;
-	let tip_distance_from_a = d - ONEWAY_LINK_TARGET_OFFSET;
-	let tip_position = dir_a_to_b * tip_distance_from_a;
-	let tip_inner_transform = Transform::from_translation(Vec3::Y * ONEWAY_LINK_TIP_LENGTH / 2.0);
 	children.spawn((
 		Mesh2d(line_mesh),
 		Transform::from_rotation(rotation)
 			.with_translation(line_center_position.extend(layers::CYCLE_LINKS)),
 		MeshMaterial2d(material.clone_weak()),
 	));
-	children.spawn((
-		Mesh2d(tip_mesh.clone_weak()),
-		Transform::from_rotation(main_tip_rotation * relative_tip_rotation)
-			.with_translation(tip_position.extend(layers::CYCLE_LINKS))
-			.mul_transform(tip_inner_transform),
-		MeshMaterial2d(material.clone_weak()),
-	));
-	children.spawn((
-		Mesh2d(tip_mesh.clone_weak()),
-		Transform::from_rotation(main_tip_rotation * relative_tip_rotation.inverse())
-			.with_translation(tip_position.extend(layers::CYCLE_LINKS))
-			.mul_transform(tip_inner_transform),
-		MeshMaterial2d(material.clone_weak()),
-	));
+
+	// Rotates a tip arm to be parallel to arrow body
+	// (arrow body rotation plus 90 degrees)
+	let main_tip_rotation = rotation * Quat::from_rotation_z(PI / 2.0);
+	// Rotation of the arrow tip to either side of the arrow body
+	let relative_tip_rotation = Quat::from_rotation_z(ONEWAY_LINK_TIP_ANGLE);
+	// Distance to the farthest tip in case of multiarrow
+	let tip_distance_from_a = d - ONEWAY_LINK_TARGET_OFFSET;
+	// Displace the tip's rotation center to its end so we can use it easier
+	let tip_inner_transform = Transform::from_translation(Vec3::Y * ONEWAY_LINK_TIP_LENGTH / 2.0);
+	for i in 0..tip_count {
+		let this_tip_distance_from_a =
+			tip_distance_from_a - ONEWAY_MULTILINK_TIP_SPACING * i as f32;
+		let tip_position = dir_a_to_b * this_tip_distance_from_a;
+		children.spawn((
+			Mesh2d(tip_mesh.clone_weak()),
+			Transform::from_rotation(main_tip_rotation * relative_tip_rotation)
+				.with_translation(tip_position.extend(layers::CYCLE_LINKS))
+				.mul_transform(tip_inner_transform),
+			MeshMaterial2d(material.clone_weak()),
+		));
+		children.spawn((
+			Mesh2d(tip_mesh.clone_weak()),
+			Transform::from_rotation(main_tip_rotation * relative_tip_rotation.inverse())
+				.with_translation(tip_position.extend(layers::CYCLE_LINKS))
+				.mul_transform(tip_inner_transform),
+			MeshMaterial2d(material.clone_weak()),
+		));
+	}
 }
 
 fn create_thing_sprites(
