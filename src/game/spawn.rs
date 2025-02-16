@@ -883,7 +883,7 @@ fn create_logical_color_sprite(
 		typeset_number(
 			&index_str,
 			children,
-			Transform::from_translation(Vec3::X * start_offset),
+			transform * Transform::from_translation(Vec3::X * start_offset),
 			atlas,
 			atlas_layout,
 			sprite_color,
