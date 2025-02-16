@@ -892,9 +892,9 @@ fn get_number_typeset_width(digits: &str) -> f32 {
 		.map(|c| {
 			if c == '1' {
 				// Digit 1 needs less space than the others
-				DIGIT_ONE_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
+				DigitAtlas::ONE_WIDTH + DIGIT_SPRITE_SPACING
 			} else {
-				DIGIT_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
+				DigitAtlas::DIGIT_WIDTH + DIGIT_SPRITE_SPACING
 			}
 		})
 		.sum::<f32>()
@@ -929,9 +929,9 @@ fn typeset_number(
 			.expect("String representation of a number should only be digits");
 		let current_digit_width = if digit == 1 {
 			// Digit 1 needs less space than the others
-			DIGIT_ONE_SPRITE_WIDTH
+			DigitAtlas::ONE_WIDTH
 		} else {
-			DIGIT_SPRITE_WIDTH
+			DigitAtlas::DIGIT_WIDTH
 		};
 		// Offset of the current digit from `start_transform`, measured
 		// to the center of the digit, in multiples of sprite size

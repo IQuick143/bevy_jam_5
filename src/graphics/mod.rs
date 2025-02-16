@@ -88,12 +88,6 @@ pub const PLAYER_FLAG_SPRITE_ANCHOR: Vec2 = Vec2::new(0.0, -0.25);
 pub const COLOR_SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH * 0.265625);
 /// How logical color sprites on boxes should be offset vertically from the parent sprite in world units
 pub const COLOR_SPRITE_OFFSET: f32 = 0.0;
-/// How much of the width of a sprite is actually taken up by digits other than 1,
-/// relative to width of a full sprite slot
-pub const DIGIT_SPRITE_WIDTH: f32 = 0.8;
-/// How much of the width of a sprite is taken up by the digit 1
-/// relative to width of a full sprite slot
-pub const DIGIT_ONE_SPRITE_WIDTH: f32 = 0.4;
 /// Spacing of digit sprites, relative to full width of a sprite slot
 pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
 

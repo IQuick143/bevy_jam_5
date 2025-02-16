@@ -144,6 +144,13 @@ pub struct DigitAtlas {
 }
 
 impl DigitAtlas {
+	/// How much of the width of a sprite is actually taken up by digits other than 1,
+	/// relative to width of the sprite
+	pub const DIGIT_WIDTH: f32 = 0.8;
+	/// How much of the width of a sprite is taken up by the digit 1
+	/// relative to width of the sprite
+	pub const ONE_WIDTH: f32 = 0.4;
+
 	/// Path to the sprite sheet image
 	const IMAGE_ASSET_PATH: &'static str = "images/digits.png";
 
