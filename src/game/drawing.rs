@@ -1,9 +1,8 @@
 use super::{components::*, inputs::CycleInteraction, logic::*, prelude::*};
 use crate::{
 	graphics::{
-		color_labels, layers,
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
-		NODE_RADIUS, RING_OUTLINE_WIDTH,
+		*,
 	},
 	AppSet,
 };
@@ -134,6 +133,8 @@ pub struct GameObjectMeshes {
 	pub square_labels: Handle<Mesh>,
 	/// Mesh for arrow-like labels that show logical colors of buttons
 	pub arrow_labels: Handle<Mesh>,
+	/// Mesh for tips of arrows that represent one-way links
+	pub one_way_link_tips: Handle<Mesh>,
 }
 
 impl FromWorld for GameObjectMeshes {
@@ -155,12 +156,18 @@ impl FromWorld for GameObjectMeshes {
 				.mesh()
 				.resolution(color_labels::MESH_RESOLUTION),
 		);
+		let one_way_link_tips = meshes.add(
+			Capsule2d::new(CYCLE_LINK_WIDTH / 2.0, ONEWAY_LINK_TIP_LENGTH)
+				.mesh()
+				.resolution(ONEWAY_LINK_TIP_RESOLUTION),
+		);
 
 		Self {
 			vertices,
 			vertex_outlines,
 			square_labels,
 			arrow_labels,
+			one_way_link_tips,
 		}
 	}
 }

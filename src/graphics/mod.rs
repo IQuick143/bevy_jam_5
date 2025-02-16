@@ -60,6 +60,8 @@ pub const ONEWAY_LINK_TARGET_OFFSET: f32 = SPRITE_LENGTH * 0.65;
 pub const ONEWAY_LINK_TIP_LENGTH: f32 = SPRITE_LENGTH / 2.0;
 /// Angle between a one-way link and the arms of its tip
 pub const ONEWAY_LINK_TIP_ANGLE: f32 = f32::consts::PI / 5.0;
+/// Number of vertices to use for each end of the tip
+pub const ONEWAY_LINK_TIP_RESOLUTION: u32 = 8;
 
 /// How big should a sprite be in world units.
 /// See [`SPRITE_LENGTH`]

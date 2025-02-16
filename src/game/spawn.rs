@@ -473,6 +473,7 @@ fn create_link_visuals(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
+	standard_meshes: Res<GameObjectMeshes>,
 	links_q: Query<
 		(
 			Entity,
@@ -504,6 +505,7 @@ fn create_link_visuals(
 					**multiplicity,
 					&mut meshes,
 					materials.link_lines.clone_weak(),
+					standard_meshes.one_way_link_tips.clone_weak(),
 				);
 			} else {
 				create_hard_link_visual(
@@ -599,6 +601,7 @@ fn create_one_way_link_visual(
 	_multiplicity: u64,
 	meshes: &mut Assets<Mesh>,
 	material: Handle<ColorMaterial>,
+	tip_mesh: Handle<Mesh>,
 ) {
 	let d = a.distance(b);
 	let line_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
@@ -612,10 +615,6 @@ fn create_one_way_link_visual(
 	}
 	let line_mesh = Rectangle::from_size(Vec2::new(line_length, CYCLE_LINK_WIDTH)).mesh();
 	let line_mesh = meshes.add(line_mesh);
-	let tip_mesh = Capsule2d::new(CYCLE_LINK_WIDTH / 2.0, ONEWAY_LINK_TIP_LENGTH)
-		.mesh()
-		.resolution(8);
-	let tip_mesh = meshes.add(tip_mesh);
 	let dir_a_to_b = (b - a).normalize();
 	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_a_to_b);
 	let main_tip_rotation = rotation * Quat::from_rotation_z(PI / 2.0);
@@ -632,14 +631,14 @@ fn create_one_way_link_visual(
 		MeshMaterial2d(material.clone_weak()),
 	));
 	children.spawn((
-		Mesh2d(tip_mesh.clone()),
+		Mesh2d(tip_mesh.clone_weak()),
 		Transform::from_rotation(main_tip_rotation * relative_tip_rotation)
 			.with_translation(tip_position.extend(layers::CYCLE_LINKS))
 			.mul_transform(tip_inner_transform),
 		MeshMaterial2d(material.clone_weak()),
 	));
 	children.spawn((
-		Mesh2d(tip_mesh),
+		Mesh2d(tip_mesh.clone_weak()),
 		Transform::from_rotation(main_tip_rotation * relative_tip_rotation.inverse())
 			.with_translation(tip_position.extend(layers::CYCLE_LINKS))
 			.mul_transform(tip_inner_transform),
