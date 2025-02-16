@@ -482,8 +482,7 @@ fn create_link_visuals(
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
 	standard_meshes: Res<GameObjectMeshes>,
-	sprites: Res<HandleMap<ImageKey>>,
-	atlas_layout: Res<BoxColorSpriteAtlasLayout>,
+	digit_atlas: Res<DigitAtlas>,
 	palette: Res<ThingPalette>,
 	links_q: Query<
 		(
@@ -518,8 +517,7 @@ fn create_link_visuals(
 					materials.link_lines.clone_weak(),
 					standard_meshes.one_way_link_tips.clone_weak(),
 					standard_meshes.one_way_link_backheads.clone_weak(),
-					sprites[&ImageKey::BoxSpriteAtlas].clone_weak(),
-					atlas_layout.0.clone_weak(),
+					&digit_atlas,
 					palette.link_multiplicity_label,
 				);
 			} else {
@@ -618,8 +616,7 @@ fn create_one_way_link_visual(
 	material: Handle<ColorMaterial>,
 	tip_mesh: Handle<Mesh>,
 	backhead_mesh: Handle<Mesh>,
-	digit_atlas: Handle<Image>,
-	digit_atlas_layout: Handle<TextureAtlasLayout>,
+	digit_atlas: &DigitAtlas,
 	label_color: Color,
 ) {
 	if multiplicity == 0 {
@@ -734,7 +731,6 @@ fn create_one_way_link_visual(
 			children,
 			caret_transform,
 			digit_atlas,
-			digit_atlas_layout,
 			label_color,
 			ONEWAY_MULTILINK_DIGIT_SIZE,
 		);
@@ -783,20 +779,19 @@ fn create_thing_sprites(
 
 fn create_box_color_markers(
 	mut commands: Commands,
-	sprites: Res<HandleMap<ImageKey>>,
-	atlas_layout: Res<BoxColorSpriteAtlasLayout>,
+	sprite_atlas: Res<BoxColorSpriteAtlas>,
+	digit_atlas: Res<DigitAtlas>,
 	palette: Res<ThingPalette>,
 	query: Query<(Entity, &LogicalColor), (With<Box>, Added<LogicalColor>)>,
 ) {
-	let atlas = &sprites[&ImageKey::BoxSpriteAtlas];
 	for (id, color) in &query {
 		commands.entity(id).with_children(|children| {
 			create_logical_color_sprite(
 				children,
 				*color,
 				palette.box_base,
-				atlas.clone_weak(),
-				atlas_layout.0.clone_weak(),
+				&sprite_atlas,
+				&digit_atlas,
 				Transform::from_translation(Vec3::Z * layers::BOX_COLOR_SPRITES),
 			);
 		});
@@ -805,8 +800,8 @@ fn create_box_color_markers(
 
 fn create_button_color_markers(
 	mut commands: Commands,
-	sprites: Res<HandleMap<ImageKey>>,
-	atlas_layout: Res<BoxColorSpriteAtlasLayout>,
+	sprite_atlas: Res<BoxColorSpriteAtlas>,
+	digit_atlas: Res<DigitAtlas>,
 	meshes: Res<GameObjectMeshes>,
 	materials: Res<GameObjectMaterials>,
 	palette: Res<ThingPalette>,
@@ -815,7 +810,6 @@ fn create_button_color_markers(
 		(With<BoxSlot>, Added<LogicalColor>),
 	>,
 ) {
-	let atlas = &sprites[&ImageKey::BoxSpriteAtlas];
 	for (id, color, label_appearence) in &query {
 		commands.entity(id).with_children(|children| {
 			let label_mesh = if label_appearence.has_arrow_tip {
@@ -837,8 +831,8 @@ fn create_button_color_markers(
 				children,
 				*color,
 				palette.button_base,
-				atlas.clone_weak(),
-				atlas_layout.0.clone_weak(),
+				&sprite_atlas,
+				&digit_atlas,
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_SPRITES))
 					.with_rotation(Quat::from_rotation_z(sprite_rotation)),
 			);
@@ -850,21 +844,20 @@ fn create_logical_color_sprite(
 	children: &mut ChildBuilder,
 	logical_color: LogicalColor,
 	sprite_color: Color,
-	atlas: Handle<Image>,
-	atlas_layout: Handle<TextureAtlasLayout>,
+	sprite_atlas: &BoxColorSpriteAtlas,
+	digit_atlas: &DigitAtlas,
 	transform: Transform,
 ) {
 	if logical_color.is_pictogram {
-		let sprite_index = logical_color.color_index + BOX_COLOR_SPRITE_PICTOGRAM_OFFSET;
 		children.spawn((
 			transform,
 			Sprite {
 				custom_size: Some(COLOR_SPRITE_SIZE),
-				image: atlas.clone_weak(),
+				image: sprite_atlas.image.clone_weak(),
 				color: sprite_color,
 				texture_atlas: Some(TextureAtlas {
-					layout: atlas_layout.clone_weak(),
-					index: sprite_index,
+					layout: sprite_atlas.layout.clone_weak(),
+					index: logical_color.color_index,
 				}),
 				..default()
 			},
@@ -884,8 +877,7 @@ fn create_logical_color_sprite(
 			&index_str,
 			children,
 			transform * Transform::from_translation(Vec3::X * start_offset),
-			atlas,
-			atlas_layout,
+			digit_atlas,
 			sprite_color,
 			base_sprite_size,
 		);
@@ -923,8 +915,7 @@ fn typeset_number(
 	digits: &str,
 	children: &mut ChildBuilder,
 	start_transform: Transform,
-	atlas: Handle<Image>,
-	atlas_layout: Handle<TextureAtlasLayout>,
+	digit_atlas: &DigitAtlas,
 	color: Color,
 	digit_sprite_size: Vec2,
 ) {
@@ -954,10 +945,10 @@ fn typeset_number(
 			start_transform.mul_transform(digit_transform),
 			Sprite {
 				custom_size: Some(digit_sprite_size),
-				image: atlas.clone_weak(),
+				image: digit_atlas.image.clone_weak(),
 				color,
 				texture_atlas: Some(TextureAtlas {
-					layout: atlas_layout.clone_weak(),
+					layout: digit_atlas.layout.clone_weak(),
 					index: digit as usize,
 				}),
 				..default()
