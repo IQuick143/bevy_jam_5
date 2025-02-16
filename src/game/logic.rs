@@ -8,6 +8,7 @@ pub fn plugin(app: &mut App) {
 		.add_event::<RotateCycleGroup>()
 		.add_event::<RotateSingleCycle>()
 		.add_event::<RecordCycleGroupRotation>()
+		.add_event::<TurnBlockedByGroupConflict>()
 		.add_systems(
 			LevelInitialization,
 			(
@@ -86,6 +87,13 @@ pub struct RecordCycleGroupRotation(pub RotateCycle);
 #[derive(Event, Clone, Copy, Default, Debug)]
 pub struct GameLayoutChanged;
 
+/// Event indicating that a pair of groups that cannot be turned together
+/// blocked the execution of a turn.
+/// Emitted for each pair of conflicting groups.
+/// The value indexes into [`LevelData::forbidden_group_pairs`]
+#[derive(Event, Clone, Copy, Default, Debug)]
+pub struct TurnBlockedByGroupConflict(pub usize);
+
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
 pub struct LevelCompletionConditions {
@@ -118,6 +126,7 @@ fn cycle_group_rotation_relay_system(
 	mut group_events: EventReader<RotateCycleGroup>,
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
+	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
 	cycles_q: Query<(&Cycle, &CycleVertices)>,
 	vertex_q: Query<(&Vertex, &PlacedObject)>,
 	cycle_index: Res<CycleEntities>,
@@ -290,7 +299,7 @@ fn cycle_group_rotation_relay_system(
 		// TODO: Change this code, so that it takes into account the modulo rotations to enable certain mechanisms, Unless this is decided against.
 		let mut forbidden = false;
 		let mut pair_index = 0;
-		'outer: for group_a_id in 0..level.groups.len() {
+		for group_a_id in 0..level.groups.len() {
 			if group_rotations[group_a_id] != 0 {
 				while pair_index < level.forbidden_group_pairs.len() {
 					let (a, b, _) = level.forbidden_group_pairs[pair_index];
@@ -299,7 +308,7 @@ fn cycle_group_rotation_relay_system(
 					}
 					if a == group_a_id && group_rotations[b] != 0 {
 						forbidden = true;
-						break 'outer;
+						blocked_event.send(TurnBlockedByGroupConflict(pair_index));
 					}
 					pair_index += 1;
 				}

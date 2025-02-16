@@ -11,6 +11,9 @@ pub const CYCLE_MANUAL: &str = "This cycle can only be turned while you stand on
 pub const CYCLE_AUTOMATIC: &str = "This cycle can be turned by left/right clicking its center.";
 pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 
+pub const BLOCKADE_WARNING: &str =
+	"The last turn did not execute because of a conflict this cycle was involved in.";
+
 pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if you hover on it!";
 
 use crate::{

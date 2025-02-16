@@ -76,3 +76,8 @@ pub struct CycleEntities(pub Vec<Entity>);
 /// The source cycle is its [`Parent`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct LinkTargetCycle(pub Entity);
+
+/// A temporary marker object used for showing something to the player
+/// Gets invalidated (all these entities despawn)
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+pub struct TemporaryMarker;

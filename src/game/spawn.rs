@@ -94,7 +94,13 @@ pub struct LevelSessionId(usize);
 
 /// The last [`LevelSessionId`] used by a level spawn
 #[derive(Resource, Clone, Copy, Default, Debug, Reflect)]
-struct LastLevelSessionId(LevelSessionId);
+pub struct LastLevelSessionId(LevelSessionId);
+
+impl LastLevelSessionId {
+	pub fn get_session(&self) -> LevelSessionId {
+		self.0
+	}
+}
 
 /// The last [`LevelSessionId`] whose entities should be despawned
 #[derive(Resource, Clone, Copy, Default, Debug, Reflect)]
