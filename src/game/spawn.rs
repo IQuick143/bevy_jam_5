@@ -781,11 +781,8 @@ fn create_logical_color_sprite(
 	atlas_layout: Handle<TextureAtlasLayout>,
 	transform: Transform,
 ) {
-	// Shorthand for spawning a color sprite (more than one may be needed for numeric colors)
-	let mut spawn_sprite = |index, x_offset, x_scale| {
-		let transform = transform.mul_transform(
-			Transform::from_translation(Vec3::X * x_offset).with_scale(Vec3::ONE.with_x(x_scale)),
-		);
+	if logical_color.is_pictogram {
+		let sprite_index = logical_color.color_index + BOX_COLOR_SPRITE_PICTOGRAM_OFFSET;
 		children.spawn((
 			transform,
 			Sprite {
@@ -794,53 +791,105 @@ fn create_logical_color_sprite(
 				color: sprite_color,
 				texture_atlas: Some(TextureAtlas {
 					layout: atlas_layout.clone_weak(),
-					index,
+					index: sprite_index,
 				}),
 				..default()
 			},
 		));
-	};
-
-	if logical_color.is_pictogram {
-		let sprite_index = logical_color.color_index + BOX_COLOR_SPRITE_PICTOGRAM_OFFSET;
-		spawn_sprite(sprite_index, 0.0, 1.0);
 	} else {
 		let index_str = logical_color.color_index.to_string();
-		// Calculate the width of the written number. Digit 1 needs less space than the others.
-		let number_width = index_str
-			.chars()
-			.map(|c| {
-				if c == '1' {
-					DIGIT_ONE_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
-				} else {
-					DIGIT_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
-				}
-			})
-			.sum::<f32>()
-			- DIGIT_SPRITE_SPACING;
-		let (mut width_progress, number_width) = if number_width < 1.0 {
+		let number_width = get_number_typeset_width(&index_str);
+		let (starting_caret_pos, number_width) = if number_width < 1.0 {
 			// Sprites should never grow in width, so cap the width at one
 			((1.0 - number_width) / 2.0, 1.0)
 		} else {
 			(0.0, number_width)
 		};
-		for digit in index_str.chars() {
-			let digit = digit
-				.to_digit(10)
-				.expect("String representation of a number should only be digits");
-			let current_width = if digit == 1 {
-				DIGIT_ONE_SPRITE_WIDTH
+		let base_sprite_size = Vec2::new(COLOR_SPRITE_SIZE.x / number_width, COLOR_SPRITE_SIZE.y);
+		let start_offset = (starting_caret_pos - 0.5) * COLOR_SPRITE_SIZE.x;
+		typeset_number(
+			&index_str,
+			children,
+			Transform::from_translation(Vec3::X * start_offset),
+			atlas,
+			atlas_layout,
+			sprite_color,
+			base_sprite_size,
+		);
+	}
+}
+
+/// Calculates the width of a number typeset using digit sprites.
+/// Width is relative to the size of a single sprite.
+fn get_number_typeset_width(digits: &str) -> f32 {
+	digits
+		.chars()
+		.map(|c| {
+			if c == '1' {
+				// Digit 1 needs less space than the others
+				DIGIT_ONE_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
 			} else {
-				DIGIT_SPRITE_WIDTH
-			};
-			let relative_offset = (width_progress + current_width / 2.0) / number_width - 0.5;
-			width_progress += current_width + DIGIT_SPRITE_SPACING;
-			spawn_sprite(
-				digit as usize,
-				relative_offset * COLOR_SPRITE_SIZE.x,
-				1.0 / number_width,
-			);
-		}
+				DIGIT_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
+			}
+		})
+		.sum::<f32>()
+		- DIGIT_SPRITE_SPACING
+}
+
+/// Constructs a number from digit sprites
+/// ## Parameters
+/// - `digits` - Digits of the number
+/// - `children` - Child builder that receives the digit sprites
+/// - `start_transform` - Transformation of the number,
+///   anchored in the center-start of the number
+/// - `atlas` - The sprite sheet
+/// - `atlas_layout` - Layout for the sprite sheet
+/// - `color` - Color of the sprites
+/// - `digit_sprite_size` - Size of the sprite for each digit
+fn typeset_number(
+	digits: &str,
+	children: &mut ChildBuilder,
+	start_transform: Transform,
+	atlas: Handle<Image>,
+	atlas_layout: Handle<TextureAtlasLayout>,
+	color: Color,
+	digit_sprite_size: Vec2,
+) {
+	// How far from `start_transform` the next digit should start,
+	// in multiples of sprite size
+	let mut caret_offset = 0.0;
+
+	for digit in digits.chars() {
+		let digit = digit
+			.to_digit(10)
+			.expect("String representation of a number should only be digits");
+		let current_digit_width = if digit == 1 {
+			// Digit 1 needs less space than the others
+			DIGIT_ONE_SPRITE_WIDTH
+		} else {
+			DIGIT_SPRITE_WIDTH
+		};
+		// Offset of the current digit from `start_transform`, measured
+		// to the center of the digit, in multiples of sprite size
+		let relative_offset = caret_offset + current_digit_width / 2.0;
+		// Move the caret to the next digit
+		caret_offset += current_digit_width + DIGIT_SPRITE_SPACING;
+		// Transformation of the digit relative to `start_transform`
+		let digit_transform =
+			Transform::from_translation(Vec3::X * relative_offset * digit_sprite_size.x);
+		children.spawn((
+			start_transform.mul_transform(digit_transform),
+			Sprite {
+				custom_size: Some(digit_sprite_size),
+				image: atlas.clone_weak(),
+				color,
+				texture_atlas: Some(TextureAtlas {
+					layout: atlas_layout.clone_weak(),
+					index: digit as usize,
+				}),
+				..default()
+			},
+		));
 	}
 }
 
