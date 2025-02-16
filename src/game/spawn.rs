@@ -190,6 +190,10 @@ fn spawn_primary_level_entities(
 				.get_entity(cycles[link.dest_cycle])
 				.expect("The entity has just been spawned")
 				.id();
+			let source_center_pos = level.cycles[link.source_cycle]
+				.center_sprite_appearence
+				.0
+				.unwrap_or_default();
 			commands
 				.get_entity(cycles[link.source_cycle])
 				.expect("The entity has just been spawned")
@@ -197,7 +201,7 @@ fn spawn_primary_level_entities(
 					children.spawn((
 						LinkTargetCycle(target_cycle),
 						link.direction,
-						Transform::default(),
+						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
 				});
@@ -207,6 +211,10 @@ fn spawn_primary_level_entities(
 				.get_entity(cycles[link.dest_cycle])
 				.expect("The entity has just been spawned")
 				.id();
+			let source_center_pos = level.cycles[link.source]
+				.center_sprite_appearence
+				.0
+				.unwrap_or_default();
 			commands
 				.get_entity(cycles[link.source])
 				.expect("The entity has just been spawned")
@@ -215,7 +223,7 @@ fn spawn_primary_level_entities(
 						LinkTargetCycle(target_cycle),
 						link.direction,
 						LinkMultiplicity(link.multiplicity),
-						Transform::default(),
+						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
 				});
