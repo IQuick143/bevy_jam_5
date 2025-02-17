@@ -118,7 +118,8 @@ fn cycle_group_rotation_relay_system(
 	mut group_events: EventReader<RotateCycleGroup>,
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
-	cycles_q: Query<&Cycle>,
+	cycles_q: Query<(&Cycle, &CycleVertices)>,
+	vertex_q: Query<(&Vertex, &PlacedObject)>,
 	cycle_index: Res<CycleEntities>,
 	level_asset: Res<Assets<LevelData>>,
 	level_handle: Res<LevelHandle>,
@@ -127,11 +128,10 @@ fn cycle_group_rotation_relay_system(
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
-	#[expect(unused_mut)]
 	let mut detector_rotations = vec![0i64; level.detectors.len()];
 	let mut group_rotations = vec![0i64; level.groups.len()];
 	for group_rotation in group_events.read() {
-		let Ok(source_cycle) = cycles_q.get(group_rotation.0.target_cycle) else {
+		let Ok((source_cycle, _)) = cycles_q.get(group_rotation.0.target_cycle) else {
 			continue;
 		};
 		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
@@ -154,20 +154,113 @@ fn cycle_group_rotation_relay_system(
 					continue;
 				}
 				for link in level.groups[group_id].linked_groups.iter() {
-					match link.direction {
-						LinkedCycleDirection::Coincident => {
-							group_rotations[link.target_group] +=
-								group_rotations[group_id] * link.multiplicity as i64
+					group_rotations[link.target_group] +=
+						link.direction * group_rotations[group_id] * link.multiplicity as i64
+				}
+				for &detector_cycle_id in level.groups[group_id].outgoing_detector_cycles.iter() {
+					// Gather data
+					let detector_cycle = level.cycles.get(detector_cycle_id).unwrap();
+					let n_vertices = detector_cycle.vertex_indices.len();
+					let n_detectors = detector_cycle.detector_indices.len();
+					if n_vertices == 0 || n_detectors == 0 {
+						#[cfg(any(debug_assertions, test))]
+						unreachable!("Cycle with no vertices or no detectors is somehow in the `outgoing_detector_cycles` list.");
+						#[cfg(not(any(debug_assertions, test)))]
+						{
+							warn!("Cycle with no vertices or no detectors is somehow in the `outgoing_detector_cycles` list.");
+							continue;
 						}
-						LinkedCycleDirection::Inverse => {
-							group_rotations[link.target_group] -=
-								group_rotations[group_id] * link.multiplicity as i64
+					}
+					// Grab vertex occupancy data from ECS
+					let Some((_, cycle_vertices)) = cycle_index
+						.0
+						.get(detector_cycle_id)
+						.and_then(|entity| cycles_q.get(*entity).ok())
+					else {
+						#[cfg(any(debug_assertions, test))]
+						unreachable!("Nonexistent cycle!!");
+						#[cfg(not(any(debug_assertions, test)))]
+						{
+							error!(
+								"Cycle {} missing in ECS but referenced in logic!",
+								detector_cycle_id
+							);
+							return;
+						}
+					};
+					if n_vertices != cycle_vertices.0.len() {
+						#[cfg(any(debug_assertions, test))]
+						panic!("Incorrect amount of vertices on a cycle.");
+						#[cfg(not(any(debug_assertions, test)))]
+						{
+							error!("Incorrect amount of vertices on a cycle.");
+							return;
+						}
+					}
+					let vertex_occupation: Vec<bool> = (0..n_vertices)
+						.map(|index| {
+							let Ok((_, occupancy)) = vertex_q.get(cycle_vertices.0[index]) else {
+								#[cfg(any(debug_assertions, test))]
+								unreachable!("Nonexistent vertex!!");
+								#[cfg(not(any(debug_assertions, test)))]
+								{
+									error!("Nonexistent vertex!!");
+									return;
+								}
+							};
+							occupancy.0.is_some()
+						})
+						.collect();
+					let n_objects = vertex_occupation.iter().filter(|x| **x).count();
+					// Nothing to detect
+					if n_objects == 0 {
+						continue;
+					}
+					// Compute rotation characteristics
+					let n_rotations =
+						detector_cycle.orientation_within_group * group_rotations[group_id];
+					let full_turns = n_rotations.signum()
+						* i64::div_euclid(n_rotations.abs(), n_vertices as i64);
+					let partial_turns = (n_rotations.signum()
+						* i64::rem_euclid(n_rotations.abs(), n_vertices as i64))
+						as isize;
+					for (detector_id, _) in detector_cycle.detector_indices.iter() {
+						detector_rotations[*detector_id] += (n_objects as i64) * full_turns;
+					}
+					if partial_turns != 0 {
+						// How long of a strip of vertices needs to be scanned for objects
+						let interval_length = partial_turns.unsigned_abs();
+						// Counts how many objects are in a interval <i - interval_length, i) (accounting for looping)
+						let mut objects_in_interval = vec![0; n_vertices];
+						let mut running_total: i32 = 0;
+						#[allow(clippy::needless_range_loop)]
+						for i in (n_vertices - interval_length)..n_vertices {
+							if vertex_occupation[i] {
+								running_total += 1;
+							}
+						}
+						for i in 0..n_vertices {
+							// Write the value
+							objects_in_interval[i] = running_total;
+							// Move the interval
+							let back_index = (n_vertices - interval_length + i) % n_vertices;
+							if vertex_occupation[back_index] {
+								running_total -= 1;
+							}
+							if vertex_occupation[i] {
+								running_total += 1;
+							}
+						}
+						for &(detector_id, offset) in detector_cycle.detector_indices.iter() {
+							let detections = if partial_turns > 0 {
+								objects_in_interval[(offset + 1) % n_vertices]
+							} else {
+								-objects_in_interval[(offset + 1 + interval_length) % n_vertices]
+							} as i64;
+							detector_rotations[detector_id] += detections;
 						}
 					}
 				}
-				// for detector_cycle in level.groups[group_id].outgoing_detector_cycles.iter() {
-				// 	// TODO: Update detectors
-				// }
 			}
 			DetectorOrGroup::Detector(detector_id) => {
 				if detector_rotations[detector_id] == 0 {
