@@ -1,13 +1,21 @@
-use super::{components::*, inputs::CycleInteraction, logic::*, prelude::*};
+use super::{
+	components::*, inputs::CycleInteraction, logic::*, prelude::*, spawn::LastLevelSessionId,
+};
 use crate::{
+	assets::{HandleMap, ImageKey},
 	graphics::{
 		color_labels, layers,
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
-		NODE_RADIUS, RING_OUTLINE_WIDTH,
+		NODE_RADIUS, RING_OUTLINE_WIDTH, SPRITE_LENGTH,
 	},
+	ui::hover::{self, Hoverable},
 	AppSet,
 };
-use bevy::{color::palettes, utils::hashbrown::HashMap};
+use bevy::{
+	color::palettes,
+	math::bounding::Aabb2d,
+	utils::hashbrown::{HashMap, HashSet},
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<GameObjectMaterials>()
@@ -24,6 +32,11 @@ pub(super) fn plugin(app: &mut App) {
 						.before(cycle_center_interaction_visuals_update_system),
 				)
 					.run_if(on_event::<GameLayoutChanged>),
+				(
+					marker_despawn_system.run_if(on_event::<RotateCycleGroup>),
+					cycle_blocked_marker_system.run_if(on_event::<TurnBlockedByGroupConflict>),
+				)
+					.chain(),
 				cycle_center_interaction_visuals_update_system
 					.run_if(cycle_interaction_visuals_changed),
 			)
@@ -177,6 +190,7 @@ pub struct ThingPalette {
 	pub cycle_disabled: Color,
 	pub cycle_ready: Color,
 	pub cycle_trigger: Color,
+	pub warning_sign: Color,
 }
 
 impl Default for ThingPalette {
@@ -192,6 +206,7 @@ impl Default for ThingPalette {
 			cycle_disabled: p::SLATE_300.into(),
 			cycle_ready: p::SLATE_300.into(),
 			cycle_trigger: p::SLATE_400.into(),
+			warning_sign: p::RED_400.into(),
 		}
 	}
 }
@@ -414,5 +429,77 @@ fn cycle_center_interaction_visuals_update_system(
 				material.0 = materials.cycle_ring_outlines.clone_weak();
 			}
 		}
+	}
+}
+
+/// Despawns entities with [`TemporaryMarker`] during the start of a turn.
+fn marker_despawn_system(
+	mut commands: Commands,
+	marker_entities: Query<Entity, With<TemporaryMarker>>,
+) {
+	for entity in marker_entities.iter() {
+		commands.entity(entity).despawn();
+	}
+}
+
+fn cycle_blocked_marker_system(
+	mut commands: Commands,
+	mut events: EventReader<TurnBlockedByGroupConflict>,
+	vertices_q: Query<&Transform, With<Vertex>>,
+	vertex_index: Res<VertexEntities>,
+	level_asset: Res<Assets<LevelData>>,
+	level_handle: Res<LevelHandle>,
+	images: Res<HandleMap<ImageKey>>,
+	session: Res<LastLevelSessionId>,
+	palette: Res<ThingPalette>,
+) {
+	let Some(level) = level_asset.get(&level_handle.0) else {
+		log::error!("Non-existent level asset being referenced.");
+		return;
+	};
+
+	let mut marked_vertices = HashSet::new();
+	for event in events.read() {
+		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
+			error!("Incorrect level data!?");
+			return;
+		};
+		for &vert in conflicting_vertices.iter() {
+			marked_vertices.insert(vert);
+		}
+	}
+
+	for &vertex in marked_vertices.iter() {
+		let Some(vertex_transform) = vertex_index
+			.0
+			.get(vertex)
+			.and_then(|entity| vertices_q.get(*entity).ok())
+		else {
+			warn!("Nonexistent vertex!");
+			continue;
+		};
+		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
+		commands.spawn((
+			Sprite {
+				anchor: bevy::sprite::Anchor::BottomCenter,
+				image: images[&ImageKey::InGameWarning].clone_weak(),
+				custom_size: Some(size),
+				color: palette.warning_sign,
+				..default()
+			},
+			Transform::from_translation(
+				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+			),
+			TemporaryMarker,
+			Hoverable {
+				hover_text: hover::BLOCKADE_WARNING,
+				hover_bounding_circle: None,
+				hover_bounding_box: Some(Aabb2d::new(
+					Vec2::new(0.0, SPRITE_LENGTH / 2.0),
+					size / 2.0,
+				)),
+			},
+			session.get_session(),
+		));
 	}
 }

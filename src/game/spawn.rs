@@ -94,7 +94,13 @@ pub struct LevelSessionId(usize);
 
 /// The last [`LevelSessionId`] used by a level spawn
 #[derive(Resource, Clone, Copy, Default, Debug, Reflect)]
-struct LastLevelSessionId(LevelSessionId);
+pub struct LastLevelSessionId(LevelSessionId);
+
+impl LastLevelSessionId {
+	pub fn get_session(&self) -> LevelSessionId {
+		self.0
+	}
+}
 
 /// The last [`LevelSessionId`] whose entities should be despawned
 #[derive(Resource, Clone, Copy, Default, Debug, Reflect)]
@@ -205,6 +211,7 @@ fn spawn_primary_level_entities(
 
 		// Spawn cycle list
 		commands.insert_resource(CycleEntities(cycles));
+		commands.insert_resource(VertexEntities(vertices));
 		commands.insert_resource(LevelHandle(
 			levels
 				.get_strong_handle(level_handle.id())
