@@ -196,6 +196,10 @@ fn spawn_primary_level_entities(
 				.get_entity(cycles[link.dest_cycle])
 				.expect("The entity has just been spawned")
 				.id();
+			let source_center_pos = level.cycles[link.source_cycle]
+				.center_sprite_appearence
+				.0
+				.unwrap_or_default();
 			commands
 				.get_entity(cycles[link.source_cycle])
 				.expect("The entity has just been spawned")
@@ -203,7 +207,29 @@ fn spawn_primary_level_entities(
 					children.spawn((
 						LinkTargetCycle(target_cycle),
 						link.direction,
-						Transform::default(),
+						Transform::from_translation(source_center_pos.extend(0.0)),
+						Visibility::default(),
+					));
+				});
+		}
+		for link in &level.declared_one_way_links {
+			let target_cycle = commands
+				.get_entity(cycles[link.dest_cycle])
+				.expect("The entity has just been spawned")
+				.id();
+			let source_center_pos = level.cycles[link.source]
+				.center_sprite_appearence
+				.0
+				.unwrap_or_default();
+			commands
+				.get_entity(cycles[link.source])
+				.expect("The entity has just been spawned")
+				.with_children(|children| {
+					children.spawn((
+						LinkTargetCycle(target_cycle),
+						link.direction,
+						LinkMultiplicity(link.multiplicity),
+						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
 				});
@@ -462,79 +488,294 @@ fn create_link_visuals(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
+	standard_meshes: Res<GameObjectMeshes>,
+	digit_atlas: Res<DigitAtlas>,
+	palette: Res<ThingPalette>,
 	links_q: Query<
-		(Entity, &Parent, &LinkTargetCycle, &LinkedCycleDirection),
+		(
+			Entity,
+			&Parent,
+			&LinkTargetCycle,
+			&LinkedCycleDirection,
+			Option<&LinkMultiplicity>,
+		),
 		Added<LinkTargetCycle>,
 	>,
-	cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
+	mut cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
 ) {
-	for (id, source, dest, direction) in &links_q {
-		let (cycle_a_placement, CycleCenterSpriteAppearence(Some(cycle_a_center_offset))) =
-			cycles_q
-				.get(source.get())
-				.expect("Parent of cycle link does not have CyclePlacement component")
-		else {
-			// Links cannot be drawn if a cycle does not have center sprite
-			log::warn!("Visible link to a cycle with invisible center sprite");
+	for (id, source, dest, direction, multiplicity) in &links_q {
+		// Fetch endpoints
+		let a = get_link_endpoint(source.get(), cycles_q.reborrow());
+		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
+		let (Some(a), Some(b)) = (a, b) else {
 			continue;
 		};
-		let (cycle_b_placement, CycleCenterSpriteAppearence(Some(cycle_b_center_offset))) =
-			cycles_q
-				.get(dest.0)
-				.expect("TargetCycle of cycle link does not have CyclePlacement component")
-		else {
-			// Links cannot be drawn if a cycle does not have center sprite
-			log::warn!("Visible link to a cycle with invisible center sprite");
-			continue;
-		};
-		// Links are anchored at cycle center sprites
-		let a = cycle_a_placement.position + cycle_a_center_offset;
-		let b = cycle_b_placement.position + cycle_b_center_offset;
 
-		let d_sq = a.distance_squared(b);
-		if d_sq <= CYCLE_LINK_SPACING.powi(2) {
-			// The link cannot be rendered if the cycles are too close
-			log::warn!("Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}", d_sq.sqrt());
-			continue;
-		}
-		let connector_length = match direction {
-			LinkedCycleDirection::Coincident => a.distance(b),
-			LinkedCycleDirection::Inverse => (d_sq - CYCLE_LINK_SPACING.powi(2)).sqrt(),
-		};
-		let mesh = Rectangle::from_size(Vec2::new(
-			connector_length - CYCLE_LINK_END_CUT,
-			CYCLE_LINK_WIDTH,
-		))
-		.mesh();
-		let mesh = meshes.add(mesh);
-		let dir_from_a_to_b = (a - b).normalize();
-		let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_from_a_to_b);
-		let position = (b - a) / 2.0;
-		let offset = match direction {
-			LinkedCycleDirection::Coincident => dir_from_a_to_b.perp() * CYCLE_LINK_SPACING / 2.0,
-			LinkedCycleDirection::Inverse => Vec2::ZERO,
-		};
-		let extra_rotation = match direction {
-			LinkedCycleDirection::Coincident => Quat::IDENTITY,
-			LinkedCycleDirection::Inverse => Quat::from_rotation_arc_2d(
-				Vec2::X,
-				Vec2::new(d_sq.sqrt(), CYCLE_LINK_SPACING).normalize(),
-			),
-		};
+		// Spawn the visuals under the link entity
 		commands.entity(id).with_children(|children| {
-			children.spawn((
-				Mesh2d(mesh.clone_weak()),
-				Transform::from_rotation(rotation.mul_quat(extra_rotation))
-					.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
-				MeshMaterial2d(materials.link_lines.clone_weak()),
-			));
-			children.spawn((
-				Mesh2d(mesh),
-				Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
-					.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
-				MeshMaterial2d(materials.link_lines.clone_weak()),
-			));
+			if let Some(multiplicity) = multiplicity {
+				create_one_way_link_visual(
+					children,
+					a,
+					b,
+					*direction,
+					**multiplicity,
+					&mut meshes,
+					materials.link_lines.clone_weak(),
+					standard_meshes.one_way_link_tips.clone_weak(),
+					standard_meshes.one_way_link_backheads.clone_weak(),
+					&digit_atlas,
+					palette.link_multiplicity_label,
+					palette.inverted_link_multiplicity_label,
+				);
+			} else {
+				create_hard_link_visual(
+					children,
+					a,
+					b,
+					*direction,
+					&mut meshes,
+					materials.link_lines.clone_weak(),
+				);
+			}
 		});
+	}
+}
+
+fn get_link_endpoint(
+	cycle_id: Entity,
+	query: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
+) -> Option<Vec2> {
+	let Ok((placement, center_sprite)) = query.get(cycle_id) else {
+		// Skip drawing link if its endpoints are not cycles
+		log::warn!("Link endpoint entity does not have CyclePlacement or CycleCenterSpriteAppearence component");
+		return None;
+	};
+
+	if let Some(center_offset) = center_sprite.0 {
+		// Links are anchored at cycle center sprites
+		Some(placement.position + center_offset)
+	} else {
+		// Links cannot be drawn if a cycle does not have center sprite
+		log::warn!("Visible link to a cycle with invisible center sprite");
+		None
+	}
+}
+
+fn create_hard_link_visual(
+	children: &mut ChildBuilder,
+	a: Vec2,
+	b: Vec2,
+	direction: LinkedCycleDirection,
+	meshes: &mut Assets<Mesh>,
+	material: Handle<ColorMaterial>,
+) {
+	let d_sq = a.distance_squared(b);
+	if d_sq <= CYCLE_LINK_SPACING.powi(2) {
+		// The link cannot be rendered if the cycles are too close
+		log::warn!("Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}", d_sq.sqrt());
+		return;
+	}
+	let connector_length = match direction {
+		LinkedCycleDirection::Coincident => a.distance(b),
+		LinkedCycleDirection::Inverse => (d_sq - CYCLE_LINK_SPACING.powi(2)).sqrt(),
+	};
+	let mesh = Rectangle::from_size(Vec2::new(
+		connector_length - CYCLE_LINK_END_CUT,
+		CYCLE_LINK_WIDTH,
+	))
+	.mesh();
+	let mesh = meshes.add(mesh);
+	let dir_from_a_to_b = (a - b).normalize();
+	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_from_a_to_b);
+	let position = (b - a) / 2.0;
+	let offset = match direction {
+		LinkedCycleDirection::Coincident => dir_from_a_to_b.perp() * CYCLE_LINK_SPACING / 2.0,
+		LinkedCycleDirection::Inverse => Vec2::ZERO,
+	};
+	let extra_rotation = match direction {
+		LinkedCycleDirection::Coincident => Quat::IDENTITY,
+		LinkedCycleDirection::Inverse => Quat::from_rotation_arc_2d(
+			Vec2::X,
+			Vec2::new(d_sq.sqrt(), CYCLE_LINK_SPACING).normalize(),
+		),
+	};
+	children.spawn((
+		Mesh2d(mesh.clone_weak()),
+		Transform::from_rotation(rotation.mul_quat(extra_rotation))
+			.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
+		MeshMaterial2d(material.clone_weak()),
+	));
+	children.spawn((
+		Mesh2d(mesh),
+		Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
+			.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
+		MeshMaterial2d(material.clone_weak()),
+	));
+}
+
+fn create_one_way_link_visual(
+	children: &mut ChildBuilder,
+	a: Vec2,
+	b: Vec2,
+	direction: LinkedCycleDirection,
+	multiplicity: u64,
+	meshes: &mut Assets<Mesh>,
+	material: Handle<ColorMaterial>,
+	tip_mesh: Handle<Mesh>,
+	backhead_mesh: Handle<Mesh>,
+	digit_atlas: &DigitAtlas,
+	label_color: Color,
+	invert_label_color: Color,
+) {
+	if multiplicity == 0 {
+		log::warn!("Skipped drawing a cycle link with zero multiplicity");
+		return;
+	}
+	// Distance between cycle centers
+	let d = a.distance(b);
+	// Length of the whole arrow, from base to tip
+	let arrow_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
+
+	// Whether multiplicity should be indicated with a number
+	let use_numeric =
+		multiplicity > ONEWAY_MULTILINK_MAX_COUNT || direction == LinkedCycleDirection::Inverse;
+	let digits;
+	// Whether the multiplicity label will be flipped
+	// so as to not end up upside down
+	let flip_multiplicity_label = Vec2::X.dot(b - a) < 0.0;
+	// [`ONEWAY_MULTILINK_TEXT_AFTER`], corrected for kerning
+	let padding_after;
+	// How many tips the arrow should have (`--->>>`)
+	let tip_count;
+	// Length of the line that makes up the main body of the arrow
+	// Only goes up to the first tip in a multilink arrow
+	let line_length;
+
+	if use_numeric {
+		let mut digits_string = String::new();
+		// Add a minus sign for inverted links
+		if direction == LinkedCycleDirection::Inverse {
+			digits_string.push('-');
+		}
+		// Add the actual number
+		digits_string.push_str(&multiplicity.to_string());
+		// Append a dot so we can tell if it's a 6 or a 9
+		if is_number_non_orientable(&digits_string) {
+			digits_string.push('.');
+		}
+		// Save the string
+		digits = digits_string;
+
+		// Add kerning to the arrow tip
+		padding_after = if !flip_multiplicity_label && digits.ends_with('.') {
+			ONEWAY_MULTILINK_TEXT_AFTER - ONEWAY_MULTILINK_DOT_KERNING
+		} else if flip_multiplicity_label && digits.starts_with('-') {
+			ONEWAY_MULTILINK_TEXT_AFTER - ONEWAY_MULTILINK_MINUS_KERNING
+		} else {
+			ONEWAY_MULTILINK_TEXT_AFTER
+		};
+
+		let text_width = get_number_typeset_width(&digits) * ONEWAY_MULTILINK_DIGIT_SIZE.x;
+		tip_count = 1;
+		line_length = arrow_length - text_width - ONEWAY_MULTILINK_TEXT_BEFORE - padding_after;
+	} else {
+		tip_count = multiplicity;
+		line_length = arrow_length - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
+		// Assign to this so we can use it later
+		digits = String::new();
+		padding_after = 0.0;
+	};
+
+	if line_length <= 0.0 {
+		// The link cannot be rendered if the cycles are too close
+		log::warn!(
+			"Skipped drawing a cycle link because the cycles are {d} units apart, need at least {}",
+			d - line_length
+		);
+		return;
+	}
+
+	let line_mesh = Rectangle::from_size(Vec2::new(line_length, CYCLE_LINK_WIDTH)).mesh();
+	let line_mesh = meshes.add(line_mesh);
+	let dir_a_to_b = (b - a).normalize();
+	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_a_to_b);
+	let line_center_distance_from_a = line_length / 2.0 + CYCLE_LINK_END_CUT;
+	let line_center_position = dir_a_to_b * line_center_distance_from_a;
+	children.spawn((
+		Mesh2d(line_mesh),
+		Transform::from_rotation(rotation)
+			.with_translation(line_center_position.extend(layers::CYCLE_LINKS)),
+		MeshMaterial2d(material.clone_weak()),
+	));
+
+	// Rotates a tip arm to be parallel to arrow body
+	// (arrow body rotation plus 90 degrees)
+	let main_tip_rotation = rotation * Quat::from_rotation_z(PI / 2.0);
+	// Rotation of the arrow tip to either side of the arrow body
+	let relative_tip_rotation = Quat::from_rotation_z(ONEWAY_LINK_TIP_ANGLE);
+	// Distance to the farthest tip in case of multiarrow
+	let tip_distance_from_a = d - ONEWAY_LINK_TARGET_OFFSET;
+	// Displace the tip's rotation center to its end so we can use it easier
+	let tip_inner_transform = Transform::from_translation(Vec3::Y * ONEWAY_LINK_TIP_LENGTH / 2.0);
+	for i in 0..tip_count {
+		let this_tip_distance_from_a =
+			tip_distance_from_a - ONEWAY_MULTILINK_TIP_SPACING * i as f32;
+		let tip_position = dir_a_to_b * this_tip_distance_from_a;
+		children.spawn((
+			Mesh2d(tip_mesh.clone_weak()),
+			Transform::from_rotation(main_tip_rotation * relative_tip_rotation)
+				.with_translation(tip_position.extend(layers::CYCLE_LINKS))
+				.mul_transform(tip_inner_transform),
+			MeshMaterial2d(material.clone_weak()),
+		));
+		children.spawn((
+			Mesh2d(tip_mesh.clone_weak()),
+			Transform::from_rotation(main_tip_rotation * relative_tip_rotation.inverse())
+				.with_translation(tip_position.extend(layers::CYCLE_LINKS))
+				.mul_transform(tip_inner_transform),
+			MeshMaterial2d(material.clone_weak()),
+		));
+	}
+
+	if use_numeric {
+		// Backhead
+		let backhead_distance_from_a = CYCLE_LINK_END_CUT + line_length;
+		let backhead_position = backhead_distance_from_a * dir_a_to_b;
+		children.spawn((
+			Mesh2d(backhead_mesh),
+			Transform::from_rotation(rotation)
+				.with_translation(backhead_position.extend(layers::CYCLE_LINKS)),
+			MeshMaterial2d(material.clone_weak()),
+		));
+
+		// Use the color corresponding to the direction
+		let color = match direction {
+			LinkedCycleDirection::Coincident => label_color,
+			LinkedCycleDirection::Inverse => invert_label_color,
+		};
+		// Distance to the caret, i.e. where the most signuficant digit starts
+		let caret_distance_from_a;
+		let label_rotation;
+		// Flip the label if it would be upside down
+		if !flip_multiplicity_label {
+			caret_distance_from_a = backhead_distance_from_a + ONEWAY_MULTILINK_TEXT_BEFORE;
+			label_rotation = rotation;
+		} else {
+			caret_distance_from_a = tip_distance_from_a - padding_after;
+			label_rotation = rotation * Quat::from_rotation_z(PI);
+		}
+		let caret_position = caret_distance_from_a * dir_a_to_b;
+		let caret_transform = Transform::from_rotation(label_rotation)
+			.with_translation(caret_position.extend(layers::CYCLE_LINKS));
+		typeset_number(
+			&digits,
+			children,
+			caret_transform,
+			digit_atlas,
+			color,
+			ONEWAY_MULTILINK_DIGIT_SIZE,
+		);
 	}
 }
 
@@ -580,20 +821,19 @@ fn create_thing_sprites(
 
 fn create_box_color_markers(
 	mut commands: Commands,
-	sprites: Res<HandleMap<ImageKey>>,
-	atlas_layout: Res<BoxColorSpriteAtlasLayout>,
+	sprite_atlas: Res<BoxColorSpriteAtlas>,
+	digit_atlas: Res<DigitAtlas>,
 	palette: Res<ThingPalette>,
 	query: Query<(Entity, &LogicalColor), (With<Box>, Added<LogicalColor>)>,
 ) {
-	let atlas = &sprites[&ImageKey::BoxSpriteAtlas];
 	for (id, color) in &query {
 		commands.entity(id).with_children(|children| {
 			create_logical_color_sprite(
 				children,
 				*color,
 				palette.box_base,
-				atlas.clone_weak(),
-				atlas_layout.0.clone_weak(),
+				&sprite_atlas,
+				&digit_atlas,
 				Transform::from_translation(Vec3::Z * layers::BOX_COLOR_SPRITES),
 			);
 		});
@@ -602,8 +842,8 @@ fn create_box_color_markers(
 
 fn create_button_color_markers(
 	mut commands: Commands,
-	sprites: Res<HandleMap<ImageKey>>,
-	atlas_layout: Res<BoxColorSpriteAtlasLayout>,
+	sprite_atlas: Res<BoxColorSpriteAtlas>,
+	digit_atlas: Res<DigitAtlas>,
 	meshes: Res<GameObjectMeshes>,
 	materials: Res<GameObjectMaterials>,
 	palette: Res<ThingPalette>,
@@ -612,7 +852,6 @@ fn create_button_color_markers(
 		(With<BoxSlot>, Added<LogicalColor>),
 	>,
 ) {
-	let atlas = &sprites[&ImageKey::BoxSpriteAtlas];
 	for (id, color, label_appearence) in &query {
 		commands.entity(id).with_children(|children| {
 			let label_mesh = if label_appearence.has_arrow_tip {
@@ -634,8 +873,8 @@ fn create_button_color_markers(
 				children,
 				*color,
 				palette.button_base,
-				atlas.clone_weak(),
-				atlas_layout.0.clone_weak(),
+				&sprite_atlas,
+				&digit_atlas,
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_SPRITES))
 					.with_rotation(Quat::from_rotation_z(sprite_rotation)),
 			);
@@ -647,70 +886,133 @@ fn create_logical_color_sprite(
 	children: &mut ChildBuilder,
 	logical_color: LogicalColor,
 	sprite_color: Color,
-	atlas: Handle<Image>,
-	atlas_layout: Handle<TextureAtlasLayout>,
+	sprite_atlas: &BoxColorSpriteAtlas,
+	digit_atlas: &DigitAtlas,
 	transform: Transform,
 ) {
-	// Shorthand for spawning a color sprite (more than one may be needed for numeric colors)
-	let mut spawn_sprite = |index, x_offset, x_scale| {
-		let transform = transform.mul_transform(
-			Transform::from_translation(Vec3::X * x_offset).with_scale(Vec3::ONE.with_x(x_scale)),
-		);
+	if logical_color.is_pictogram {
 		children.spawn((
 			transform,
 			Sprite {
 				custom_size: Some(COLOR_SPRITE_SIZE),
-				image: atlas.clone_weak(),
+				image: sprite_atlas.image.clone_weak(),
 				color: sprite_color,
 				texture_atlas: Some(TextureAtlas {
-					layout: atlas_layout.clone_weak(),
-					index,
+					layout: sprite_atlas.layout.clone_weak(),
+					index: logical_color.color_index,
 				}),
 				..default()
 			},
 		));
-	};
-
-	if logical_color.is_pictogram {
-		let sprite_index = logical_color.color_index + BOX_COLOR_SPRITE_PICTOGRAM_OFFSET;
-		spawn_sprite(sprite_index, 0.0, 1.0);
 	} else {
 		let index_str = logical_color.color_index.to_string();
-		// Calculate the width of the written number. Digit 1 needs less space than the others.
-		let number_width = index_str
-			.chars()
-			.map(|c| {
-				if c == '1' {
-					DIGIT_ONE_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
-				} else {
-					DIGIT_SPRITE_WIDTH + DIGIT_SPRITE_SPACING
-				}
-			})
-			.sum::<f32>()
-			- DIGIT_SPRITE_SPACING;
-		let (mut width_progress, number_width) = if number_width < 1.0 {
+		let number_width = get_number_typeset_width(&index_str);
+		let (starting_caret_pos, number_width) = if number_width < 1.0 {
 			// Sprites should never grow in width, so cap the width at one
 			((1.0 - number_width) / 2.0, 1.0)
 		} else {
 			(0.0, number_width)
 		};
-		for digit in index_str.chars() {
-			let digit = digit
-				.to_digit(10)
-				.expect("String representation of a number should only be digits");
-			let current_width = if digit == 1 {
-				DIGIT_ONE_SPRITE_WIDTH
-			} else {
-				DIGIT_SPRITE_WIDTH
-			};
-			let relative_offset = (width_progress + current_width / 2.0) / number_width - 0.5;
-			width_progress += current_width + DIGIT_SPRITE_SPACING;
-			spawn_sprite(
-				digit as usize,
-				relative_offset * COLOR_SPRITE_SIZE.x,
-				1.0 / number_width,
-			);
+		let base_sprite_size = Vec2::new(COLOR_SPRITE_SIZE.x / number_width, COLOR_SPRITE_SIZE.y);
+		let start_offset = (starting_caret_pos - 0.5) * COLOR_SPRITE_SIZE.x;
+		typeset_number(
+			&index_str,
+			children,
+			transform * Transform::from_translation(Vec3::X * start_offset),
+			digit_atlas,
+			sprite_color,
+			base_sprite_size,
+		);
+	}
+}
+
+/// Whether a digit string may require additional
+/// indication of what way it should be read
+fn is_number_non_orientable(digits: &str) -> bool {
+	let mirrorred_chars = digits
+		.chars()
+		.rev()
+		// Map pairs of characters at mirrorred positions
+		.zip(digits.chars())
+		// Only the first half of the string is relevant,
+		// the second is guaranteed to be the same
+		// Assume only ascii characters
+		.take(digits.len().div_ceil(2));
+	let mut looks_the_same_upside_down = true;
+	for (a, b) in mirrorred_chars {
+		match (a, b) {
+			// If all characters match their mirror images,
+			// the string is not necessarily non-orientable
+			('6', '9') | ('9', '6') | ('8', '8') | ('0', '0') => {}
+			// If non-orientable characters appear in some other
+			// combination, the number may be non-orientable
+			('0' | '6' | '8' | '9', '0' | '6' | '8' | '9') => looks_the_same_upside_down = false,
+			// If any other character appears, the number
+			// is automatically orientable
+			_ => return false,
 		}
+	}
+	!looks_the_same_upside_down
+}
+
+/// Calculates the width of a number typeset using digit sprites.
+/// Width is relative to the size of a single sprite.
+fn get_number_typeset_width(digits: &str) -> f32 {
+	digits
+		.chars()
+		.map(|c| DigitAtlas::width_of(c).unwrap_or_default() + DIGIT_SPRITE_SPACING)
+		.sum::<f32>()
+		- DIGIT_SPRITE_SPACING
+}
+
+/// Constructs a number from digit sprites
+/// ## Parameters
+/// - `digits` - Digits of the number
+/// - `children` - Child builder that receives the digit sprites
+/// - `start_transform` - Transformation of the number,
+///   anchored in the center-start of the number
+/// - `atlas` - The sprite sheet
+/// - `atlas_layout` - Layout for the sprite sheet
+/// - `color` - Color of the sprites
+/// - `digit_sprite_size` - Size of the sprite for each digit
+fn typeset_number(
+	digits: &str,
+	children: &mut ChildBuilder,
+	start_transform: Transform,
+	digit_atlas: &DigitAtlas,
+	color: Color,
+	digit_sprite_size: Vec2,
+) {
+	// How far from `start_transform` the next digit should start,
+	// in multiples of sprite size
+	let mut caret_offset = 0.0;
+
+	for digit in digits.chars() {
+		let current_digit_width = DigitAtlas::width_of(digit)
+			.expect("String representation of a number should only be valid characters");
+		let sprite_index = DigitAtlas::sprite_index_of(digit)
+			.expect("String representation of a number should only be valid characters");
+		// Offset of the current digit from `start_transform`, measured
+		// to the center of the digit, in multiples of sprite size
+		let relative_offset = caret_offset + current_digit_width / 2.0;
+		// Move the caret to the next digit
+		caret_offset += current_digit_width + DIGIT_SPRITE_SPACING;
+		// Transformation of the digit relative to `start_transform`
+		let digit_transform =
+			Transform::from_translation(Vec3::X * relative_offset * digit_sprite_size.x);
+		children.spawn((
+			start_transform.mul_transform(digit_transform),
+			Sprite {
+				custom_size: Some(digit_sprite_size),
+				image: digit_atlas.image.clone_weak(),
+				color,
+				texture_atlas: Some(TextureAtlas {
+					layout: digit_atlas.layout.clone_weak(),
+					index: sprite_index,
+				}),
+				..default()
+			},
+		));
 	}
 }
 

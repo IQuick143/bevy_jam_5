@@ -20,7 +20,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_plugins(level_list_asset_plugin);
 	app.init_resource::<LoadedLevelList>();
 
-	app.init_resource::<BoxColorSpriteAtlasLayout>();
+	app.init_resource::<BoxColorSpriteAtlas>();
+	app.init_resource::<DigitAtlas>();
 	app.init_resource::<GlobalFont>();
 }
 
@@ -29,7 +30,6 @@ pub enum ImageKey {
 	Object(ThingType),
 	CycleCenter(CycleTurnability),
 	CycleRotationArrow,
-	BoxSpriteAtlas,
 	Background,
 	Title,
 	TitleBack,
@@ -80,10 +80,6 @@ impl FromWorld for HandleMap<ImageKey> {
 				ImageKey::Background,
 				asset_server.load("images/background.png"),
 			),
-			(
-				ImageKey::BoxSpriteAtlas,
-				asset_server.load("images/box-sprites.png"),
-			),
 			(ImageKey::Title, asset_server.load("images/title.png")),
 			(
 				ImageKey::TitleBack,
@@ -98,26 +94,127 @@ impl FromWorld for HandleMap<ImageKey> {
 	}
 }
 
-/// Texture atlas layout for the box sprites.
+/// Texture atlas for the box sprites
 #[derive(Resource, Reflect)]
 #[reflect(Resource)]
-pub struct BoxColorSpriteAtlasLayout(pub Handle<TextureAtlasLayout>);
+pub struct BoxColorSpriteAtlas {
+	/// The image with the full sprite sheet
+	pub image: Handle<Image>,
+	/// Atlas layout for the sprite sheet
+	pub layout: Handle<TextureAtlasLayout>,
+}
 
-/// Index into the box color sprite sheet where pictograms start
-pub const BOX_COLOR_SPRITE_PICTOGRAM_OFFSET: usize = 10;
+impl BoxColorSpriteAtlas {
+	/// Path to the sprite sheet image
+	const IMAGE_ASSET_PATH: &'static str = "images/box-sprites.png";
 
-impl FromWorld for BoxColorSpriteAtlasLayout {
+	/// Size of each digit's tile in pixels
+	const TILE_SIZE: u32 = 136;
+	/// Width of the gap between tiles and at the edges
+	/// of the sheet, in pixels
+	const PADDING_WIDTH: u32 = 15;
+	/// How many sprites there are (rows and columns)
+	const SPRITE_COUNTS: UVec2 = UVec2::splat(10);
+
+	/// Constructs a [`TextureAtlasLayout`] for the sprite sheet
+	fn construct_atlas_layout() -> TextureAtlasLayout {
+		TextureAtlasLayout::from_grid(
+			UVec2::splat(Self::TILE_SIZE),
+			Self::SPRITE_COUNTS.x,
+			Self::SPRITE_COUNTS.y,
+			Some(UVec2::splat(Self::PADDING_WIDTH)),
+			Some(UVec2::splat(Self::PADDING_WIDTH)),
+		)
+	}
+}
+
+impl FromWorld for BoxColorSpriteAtlas {
 	fn from_world(world: &mut World) -> Self {
 		let mut layouts = world.resource_mut::<Assets<TextureAtlasLayout>>();
-		let layout = TextureAtlasLayout::from_grid(
-			UVec2::splat(136),
-			10,
-			10,
-			Some(UVec2::splat(15)),
-			Some(UVec2::splat(15)),
-		);
-		let handle = layouts.add(layout);
-		Self(handle)
+		let layout = layouts.add(Self::construct_atlas_layout());
+		let asset_server = world.resource::<AssetServer>();
+		let image = asset_server.load(Self::IMAGE_ASSET_PATH);
+		Self { image, layout }
+	}
+}
+
+/// Sprite sheet for typesetting digits
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
+pub struct DigitAtlas {
+	/// The image with the full sprite sheet
+	pub image: Handle<Image>,
+	/// Atlas layout for the sprite sheet
+	pub layout: Handle<TextureAtlasLayout>,
+}
+
+impl DigitAtlas {
+	/// How much of the width of a sprite is actually taken up by digits other than 1,
+	/// relative to width of the sprite
+	pub const DIGIT_WIDTH: f32 = 0.8;
+	/// How much of the width of a sprite is taken up by the digit 1
+	/// relative to width of the sprite
+	pub const ONE_WIDTH: f32 = 0.4;
+	/// How much of the width of a sprite is taken up by the dot
+	pub const DOT_WIDTH: f32 = 0.2;
+	/// How much of the width of a sprite is taken up by the minus sign
+	pub const MINUS_WIDTH: f32 = 0.5;
+
+	/// Index of the dot sprite
+	pub const DOT: usize = 10;
+	/// Index of the minus sprite
+	pub const MINUS: usize = 11;
+
+	/// Gets the width of a character
+	pub fn width_of(c: char) -> Option<f32> {
+		match c {
+			'1' => Some(Self::ONE_WIDTH),
+			'0' | '2'..='9' => Some(Self::DIGIT_WIDTH),
+			'.' => Some(Self::DOT_WIDTH),
+			'-' => Some(Self::MINUS_WIDTH),
+			_ => None,
+		}
+	}
+
+	/// Gets the index of the sprite that corresponds to a given character
+	pub fn sprite_index_of(c: char) -> Option<usize> {
+		match c {
+			'.' => Some(Self::DOT),
+			'-' => Some(Self::MINUS),
+			_ => c.to_digit(10).map(|i| i as usize),
+		}
+	}
+
+	/// Path to the sprite sheet image
+	const IMAGE_ASSET_PATH: &'static str = "images/digits.png";
+
+	/// Size of each digit's tile in pixels
+	const TILE_SIZE: u32 = 136;
+	/// Width of the gap between tiles and at the edges
+	/// of the sheet, in pixels
+	const PADDING_WIDTH: u32 = 15;
+	/// How many sprites there are
+	const SPRITE_COUNT: u32 = 12;
+
+	/// Constructs a [`TextureAtlasLayout`] for the sprite sheet
+	fn construct_atlas_layout() -> TextureAtlasLayout {
+		TextureAtlasLayout::from_grid(
+			UVec2::splat(Self::TILE_SIZE),
+			Self::SPRITE_COUNT,
+			1,
+			Some(UVec2::splat(Self::PADDING_WIDTH)),
+			Some(UVec2::splat(Self::PADDING_WIDTH)),
+		)
+	}
+}
+
+impl FromWorld for DigitAtlas {
+	fn from_world(world: &mut World) -> Self {
+		let mut layouts = world.resource_mut::<Assets<TextureAtlasLayout>>();
+		let layout = layouts.add(Self::construct_atlas_layout());
+		let asset_server = world.resource::<AssetServer>();
+		let image = asset_server.load(Self::IMAGE_ASSET_PATH);
+		Self { image, layout }
 	}
 }
 

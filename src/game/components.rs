@@ -81,6 +81,10 @@ pub struct VertexEntities(pub Vec<Entity>);
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct LinkTargetCycle(pub Entity);
 
+/// Multiplicity of a one-way link
+#[derive(Component, Clone, Copy, Deref, DerefMut, Debug, Reflect)]
+pub struct LinkMultiplicity(pub u64);
+
 /// A temporary marker object used for showing something to the player
 /// Gets invalidated (all these entities despawn)
 #[derive(Component, Debug, Clone, Copy, Reflect)]

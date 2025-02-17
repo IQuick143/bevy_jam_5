@@ -53,6 +53,36 @@ pub const CYCLE_LINK_SPACING: f32 = SPRITE_LENGTH * 0.7;
 /// between the centers of the cycles, in world units
 pub const CYCLE_LINK_END_CUT: f32 = SPRITE_LENGTH / 2.0;
 
+/// How much space should be left between the end of a one-way link visual
+/// and its target cycle's center
+pub const ONEWAY_LINK_TARGET_OFFSET: f32 = SPRITE_LENGTH * 0.65;
+/// Length of each arm of the tip of a one-way link visual
+pub const ONEWAY_LINK_TIP_LENGTH: f32 = SPRITE_LENGTH / 2.0;
+/// Angle between a one-way link and the arms of its tip
+pub const ONEWAY_LINK_TIP_ANGLE: f32 = f32::consts::PI / 5.0;
+/// Number of vertices to use for each end of the tip
+pub const ONEWAY_LINK_TIP_RESOLUTION: u32 = 8;
+/// For low-multiplicity multi-links, how much space
+/// should be between the repeated tips
+pub const ONEWAY_MULTILINK_TIP_SPACING: f32 = ONEWAY_LINK_TIP_LENGTH * 0.75;
+/// How many arrow tips can be used on a multi-link
+/// (anything more will be indicated with text)
+pub const ONEWAY_MULTILINK_MAX_COUNT: u64 = 4;
+/// Size of each digit for a link multiplicity indicator
+pub const ONEWAY_MULTILINK_DIGIT_SIZE: Vec2 = Vec2::splat(CYCLE_LINK_WIDTH * 2.5);
+/// Padding before the text in a link multiplicity indicator
+pub const ONEWAY_MULTILINK_TEXT_BEFORE: f32 = CYCLE_LINK_WIDTH * 1.25;
+/// Padding after the text in a link multiplicity indicator
+pub const ONEWAY_MULTILINK_TEXT_AFTER: f32 = ONEWAY_MULTILINK_TIP_SPACING + CYCLE_LINK_WIDTH * 0.25;
+/// Length of the backhead line of a link with numeric multiplicity label
+pub const ONEWAY_MULTILINK_BACKHEAD_LENGTH: f32 = ONEWAY_LINK_TIP_LENGTH * 0.65;
+/// How much space should be cut from [`ONEWAY_MULTILINK_TEXT_AFTER`]
+/// if there is a minus sign at that end
+pub const ONEWAY_MULTILINK_MINUS_KERNING: f32 = CYCLE_LINK_WIDTH * 0.75;
+/// How much space should be cut from [`ONEWAY_MULTILINK_TEXT_AFTER`]
+/// if there is a dot at that end
+pub const ONEWAY_MULTILINK_DOT_KERNING: f32 = CYCLE_LINK_WIDTH / 4.0;
+
 /// How big should a sprite be in world units.
 /// See [`SPRITE_LENGTH`]
 pub const SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH);
@@ -64,12 +94,6 @@ pub const PLAYER_FLAG_SPRITE_ANCHOR: Vec2 = Vec2::new(0.0, -0.25);
 pub const COLOR_SPRITE_SIZE: Vec2 = Vec2::splat(SPRITE_LENGTH * 0.265625);
 /// How logical color sprites on boxes should be offset vertically from the parent sprite in world units
 pub const COLOR_SPRITE_OFFSET: f32 = 0.0;
-/// How much of the width of a sprite is actually taken up by digits other than 1,
-/// relative to width of a full sprite slot
-pub const DIGIT_SPRITE_WIDTH: f32 = 0.8;
-/// How much of the width of a sprite is taken up by the digit 1
-/// relative to width of a full sprite slot
-pub const DIGIT_ONE_SPRITE_WIDTH: f32 = 0.4;
 /// Spacing of digit sprites, relative to full width of a sprite slot
 pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
 

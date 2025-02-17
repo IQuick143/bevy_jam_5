@@ -4,9 +4,8 @@ use super::{
 use crate::{
 	assets::{HandleMap, ImageKey},
 	graphics::{
-		color_labels, layers,
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
-		NODE_RADIUS, RING_OUTLINE_WIDTH, SPRITE_LENGTH,
+		*,
 	},
 	ui::hover::{self, Hoverable},
 	AppSet,
@@ -147,6 +146,11 @@ pub struct GameObjectMeshes {
 	pub square_labels: Handle<Mesh>,
 	/// Mesh for arrow-like labels that show logical colors of buttons
 	pub arrow_labels: Handle<Mesh>,
+	/// Mesh for tips of arrows that represent one-way links
+	pub one_way_link_tips: Handle<Mesh>,
+	/// Mesh for back side of tips of arrows for one-way links
+	/// with numeric multiplicity labels
+	pub one_way_link_backheads: Handle<Mesh>,
 }
 
 impl FromWorld for GameObjectMeshes {
@@ -168,12 +172,24 @@ impl FromWorld for GameObjectMeshes {
 				.mesh()
 				.resolution(color_labels::MESH_RESOLUTION),
 		);
+		let one_way_link_tips = meshes.add(
+			Capsule2d::new(CYCLE_LINK_WIDTH / 2.0, ONEWAY_LINK_TIP_LENGTH)
+				.mesh()
+				.resolution(ONEWAY_LINK_TIP_RESOLUTION),
+		);
+		let one_way_link_backheads = meshes.add(
+			Capsule2d::new(CYCLE_LINK_WIDTH / 2.0, ONEWAY_MULTILINK_BACKHEAD_LENGTH)
+				.mesh()
+				.resolution(ONEWAY_LINK_TIP_RESOLUTION),
+		);
 
 		Self {
 			vertices,
 			vertex_outlines,
 			square_labels,
 			arrow_labels,
+			one_way_link_tips,
+			one_way_link_backheads,
 		}
 	}
 }
@@ -190,6 +206,8 @@ pub struct ThingPalette {
 	pub cycle_disabled: Color,
 	pub cycle_ready: Color,
 	pub cycle_trigger: Color,
+	pub link_multiplicity_label: Color,
+	pub inverted_link_multiplicity_label: Color,
 	pub warning_sign: Color,
 }
 
@@ -206,6 +224,8 @@ impl Default for ThingPalette {
 			cycle_disabled: p::SLATE_300.into(),
 			cycle_ready: p::SLATE_300.into(),
 			cycle_trigger: p::SLATE_400.into(),
+			link_multiplicity_label: p::SLATE_300.into(),
+			inverted_link_multiplicity_label: Srgba::hex("F29FA7").unwrap().into(),
 			warning_sign: p::RED_400.into(),
 		}
 	}
