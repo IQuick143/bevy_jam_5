@@ -33,6 +33,7 @@ pub enum ImageKey {
 	Background,
 	Title,
 	TitleBack,
+	InGameWarning,
 }
 
 impl AssetKey for ImageKey {
@@ -83,6 +84,10 @@ impl FromWorld for HandleMap<ImageKey> {
 			(
 				ImageKey::TitleBack,
 				asset_server.load("images/title-back.png"),
+			),
+			(
+				ImageKey::InGameWarning,
+				asset_server.load("images/warning.png"),
 			),
 		]
 		.into()

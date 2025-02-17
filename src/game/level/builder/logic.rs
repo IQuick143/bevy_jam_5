@@ -1,6 +1,7 @@
 use super::error::*;
 use super::*;
 
+use bevy::utils::hashbrown::HashSet;
 use itertools::Itertools as _;
 
 impl LevelBuilder {
@@ -212,7 +213,7 @@ impl LevelBuilder {
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
 		let (groups, detectors, execution_order) = self.compute_groups_and_detectors()?;
-		let forbidden_group_pairs = self.compute_forbidden_groups()?;
+		let forbidden_group_pairs = self.compute_forbidden_groups(&groups)?;
 		self.validate_before_build()?;
 		self.build_layout();
 		let cycles = self
@@ -513,48 +514,50 @@ impl LevelBuilder {
 	}
 
 	/// Computes which pairs of groups can not be rotated in sync
-	fn compute_forbidden_groups(&self) -> Result<Vec<(usize, usize)>, LevelBuilderError> {
+	fn compute_forbidden_groups(
+		&self,
+		groups: &[GroupData],
+	) -> Result<Vec<(usize, usize, HashSet<usize>)>, LevelBuilderError> {
 		let mut forbid = Vec::new();
-		// TODO: Use a better algorithm, like come on O(n^4) ???
-		for cycle_a in 0..self.cycles.len() {
-			for cycle_b in (cycle_a + 1)..self.cycles.len() {
-				'inner: for &vertex_a in self.cycles[cycle_a].vertex_indices.iter() {
-					for &vertex_b in self.cycles[cycle_b].vertex_indices.iter() {
-						if vertex_a == vertex_b {
-							let IntermediateLinkStatus::Group(group_a, _) =
-								self.cycles[cycle_a].linked_cycle
-							else {
-								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups_and_detectors`]");
-							};
-							let IntermediateLinkStatus::Group(group_b, _) =
-								self.cycles[cycle_b].linked_cycle
-							else {
-								panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups_and_detectors`]");
-							};
+		// TODO: Use a better algorithm, like come on O(n^6) ???
+		for group_a in 0..groups.len() {
+			for group_b in group_a..groups.len() {
+				let mut problems = HashSet::new();
+				for &(cycle_a, _) in groups[group_a].cycles.iter() {
+					for &(cycle_b, _) in groups[group_b].cycles.iter() {
+						if cycle_a == cycle_b {
 							if group_a == group_b {
-								return Err(LevelBuilderError::OverlappedLinkedCycles(
-									OverlappedLinkedCyclesError {
-										dest_cycle: cycle_a,
-										source_cycle: cycle_b,
-										shared_vertex: vertex_a,
-									},
-								));
+								continue;
 							}
-							if group_a < group_b {
-								forbid.push((group_a, group_b));
-							} else {
-								forbid.push((group_b, group_a));
+							// TODO: Return something like `Internal Error` instead of panic in release builds
+							unreachable!(
+								"Union-find should've partitioned cycles into disjoint groups"
+							);
+						}
+						'inner: for &vertex_a in self.cycles[cycle_a].vertex_indices.iter() {
+							for &vertex_b in self.cycles[cycle_b].vertex_indices.iter() {
+								if vertex_a == vertex_b {
+									if group_a == group_b {
+										return Err(LevelBuilderError::OverlappedLinkedCycles(
+											OverlappedLinkedCyclesError {
+												dest_cycle: cycle_a,
+												source_cycle: cycle_b,
+												shared_vertex: vertex_a,
+											},
+										));
+									}
+									problems.insert(vertex_a);
+									break 'inner;
+								}
 							}
-							break 'inner;
 						}
 					}
 				}
+				if !problems.is_empty() {
+					forbid.push((group_a, group_b, problems));
+				}
 			}
 		}
-		forbid.sort_by(|a, b| match a.0.cmp(&b.0) {
-			std::cmp::Ordering::Equal => a.1.cmp(&b.1),
-			ord => ord,
-		});
 		Ok(forbid)
 	}
 

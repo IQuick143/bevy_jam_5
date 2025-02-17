@@ -72,6 +72,10 @@ pub struct LevelHandle(pub Handle<LevelData>);
 #[derive(Resource, Clone, Debug, Default, Reflect)]
 pub struct CycleEntities(pub Vec<Entity>);
 
+/// Component carrying the data mapping level indices to vertex entities.
+#[derive(Resource, Clone, Debug, Default, Reflect)]
+pub struct VertexEntities(pub Vec<Entity>);
+
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`Parent`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]
@@ -80,3 +84,8 @@ pub struct LinkTargetCycle(pub Entity);
 /// Multiplicity of a one-way link
 #[derive(Component, Clone, Copy, Deref, DerefMut, Debug, Reflect)]
 pub struct LinkMultiplicity(pub u64);
+
+/// A temporary marker object used for showing something to the player
+/// Gets invalidated (all these entities despawn)
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+pub struct TemporaryMarker;
