@@ -519,6 +519,7 @@ fn create_link_visuals(
 					standard_meshes.one_way_link_backheads.clone_weak(),
 					&digit_atlas,
 					palette.link_multiplicity_label,
+					palette.inverted_link_multiplicity_label,
 				);
 			} else {
 				create_hard_link_visual(
@@ -618,6 +619,7 @@ fn create_one_way_link_visual(
 	backhead_mesh: Handle<Mesh>,
 	digit_atlas: &DigitAtlas,
 	label_color: Color,
+	invert_label_color: Color,
 ) {
 	if multiplicity == 0 {
 		log::warn!("Skipped drawing a cycle link with zero multiplicity");
@@ -726,6 +728,11 @@ fn create_one_way_link_visual(
 			MeshMaterial2d(material.clone_weak()),
 		));
 
+		// Use the color corresponding to the direction
+		let color = match direction {
+			LinkedCycleDirection::Coincident => label_color,
+			LinkedCycleDirection::Inverse => invert_label_color,
+		};
 		// Distance to the caret, i.e. where the most signuficant digit starts
 		let caret_distance_from_a;
 		let label_rotation;
@@ -745,7 +752,7 @@ fn create_one_way_link_visual(
 			children,
 			caret_transform,
 			digit_atlas,
-			label_color,
+			color,
 			ONEWAY_MULTILINK_DIGIT_SIZE,
 		);
 	}

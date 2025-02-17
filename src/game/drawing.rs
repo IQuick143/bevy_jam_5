@@ -194,6 +194,7 @@ pub struct ThingPalette {
 	pub cycle_ready: Color,
 	pub cycle_trigger: Color,
 	pub link_multiplicity_label: Color,
+	pub inverted_link_multiplicity_label: Color,
 }
 
 impl Default for ThingPalette {
@@ -210,6 +211,7 @@ impl Default for ThingPalette {
 			cycle_ready: p::SLATE_300.into(),
 			cycle_trigger: p::SLATE_400.into(),
 			link_multiplicity_label: p::SLATE_300.into(),
+			inverted_link_multiplicity_label: Srgba::hex("F29FA7").unwrap().into(),
 		}
 	}
 }
