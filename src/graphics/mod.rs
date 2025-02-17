@@ -76,6 +76,12 @@ pub const ONEWAY_MULTILINK_TEXT_BEFORE: f32 = CYCLE_LINK_WIDTH * 1.25;
 pub const ONEWAY_MULTILINK_TEXT_AFTER: f32 = ONEWAY_MULTILINK_TIP_SPACING + CYCLE_LINK_WIDTH * 0.25;
 /// Length of the backhead line of a link with numeric multiplicity label
 pub const ONEWAY_MULTILINK_BACKHEAD_LENGTH: f32 = ONEWAY_LINK_TIP_LENGTH * 0.65;
+/// How much space should be cut from [`ONEWAY_MULTILINK_TEXT_AFTER`]
+/// if there is a minus sign at that end
+pub const ONEWAY_MULTILINK_MINUS_KERNING: f32 = CYCLE_LINK_WIDTH * 0.75;
+/// How much space should be cut from [`ONEWAY_MULTILINK_TEXT_AFTER`]
+/// if there is a dot at that end
+pub const ONEWAY_MULTILINK_DOT_KERNING: f32 = CYCLE_LINK_WIDTH / 4.0;
 
 /// How big should a sprite be in world units.
 /// See [`SPRITE_LENGTH`]

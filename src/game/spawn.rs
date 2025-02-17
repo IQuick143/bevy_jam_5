@@ -634,6 +634,11 @@ fn create_one_way_link_visual(
 	let use_numeric =
 		multiplicity > ONEWAY_MULTILINK_MAX_COUNT || direction == LinkedCycleDirection::Inverse;
 	let digits;
+	// Whether the multiplicity label will be flipped
+	// so as to not end up upside down
+	let flip_multiplicity_label = Vec2::X.dot(b - a) < 0.0;
+	// [`ONEWAY_MULTILINK_TEXT_AFTER`], corrected for kerning
+	let padding_after;
 	// How many tips the arrow should have (`--->>>`)
 	let tip_count;
 	// Length of the line that makes up the main body of the arrow
@@ -655,15 +660,24 @@ fn create_one_way_link_visual(
 		// Save the string
 		digits = digits_string;
 
+		// Add kerning to the arrow tip
+		padding_after = if !flip_multiplicity_label && digits.ends_with('.') {
+			ONEWAY_MULTILINK_TEXT_AFTER - ONEWAY_MULTILINK_DOT_KERNING
+		} else if flip_multiplicity_label && digits.starts_with('-') {
+			ONEWAY_MULTILINK_TEXT_AFTER - ONEWAY_MULTILINK_MINUS_KERNING
+		} else {
+			ONEWAY_MULTILINK_TEXT_AFTER
+		};
+
 		let text_width = get_number_typeset_width(&digits) * ONEWAY_MULTILINK_DIGIT_SIZE.x;
 		tip_count = 1;
-		line_length =
-			arrow_length - text_width - ONEWAY_MULTILINK_TEXT_BEFORE - ONEWAY_MULTILINK_TEXT_AFTER;
+		line_length = arrow_length - text_width - ONEWAY_MULTILINK_TEXT_BEFORE - padding_after;
 	} else {
 		tip_count = multiplicity;
 		line_length = arrow_length - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
 		// Assign to this so we can use it later
 		digits = String::new();
+		padding_after = 0.0;
 	};
 
 	if line_length <= 0.0 {
@@ -737,11 +751,11 @@ fn create_one_way_link_visual(
 		let caret_distance_from_a;
 		let label_rotation;
 		// Flip the label if it would be upside down
-		if Vec2::X.dot(b - a) > 0.0 {
+		if !flip_multiplicity_label {
 			caret_distance_from_a = backhead_distance_from_a + ONEWAY_MULTILINK_TEXT_BEFORE;
 			label_rotation = rotation;
 		} else {
-			caret_distance_from_a = tip_distance_from_a - ONEWAY_MULTILINK_TEXT_AFTER;
+			caret_distance_from_a = tip_distance_from_a - padding_after;
 			label_rotation = rotation * Quat::from_rotation_z(PI);
 		}
 		let caret_position = caret_distance_from_a * dir_a_to_b;
