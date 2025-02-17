@@ -629,7 +629,8 @@ fn create_one_way_link_visual(
 	let arrow_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
 
 	// Whether multiplicity should be indicated with a number
-	let use_numeric = multiplicity > ONEWAY_MULTILINK_MAX_COUNT;
+	let use_numeric =
+		multiplicity > ONEWAY_MULTILINK_MAX_COUNT || direction == LinkedCycleDirection::Inverse;
 	let digits;
 	// How many tips the arrow should have (`--->>>`)
 	let tip_count;
