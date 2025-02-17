@@ -610,7 +610,7 @@ fn create_one_way_link_visual(
 	children: &mut ChildBuilder,
 	a: Vec2,
 	b: Vec2,
-	_direction: LinkedCycleDirection,
+	direction: LinkedCycleDirection,
 	multiplicity: u64,
 	meshes: &mut Assets<Mesh>,
 	material: Handle<ColorMaterial>,
@@ -638,7 +638,20 @@ fn create_one_way_link_visual(
 	let line_length;
 
 	if use_numeric {
-		digits = multiplicity.to_string();
+		let mut digits_string = String::new();
+		// Add a minus sign for inverted links
+		if direction == LinkedCycleDirection::Inverse {
+			digits_string.push('-');
+		}
+		// Add the actual number
+		digits_string.push_str(&multiplicity.to_string());
+		// Append a dot so we can tell if it's a 6 or a 9
+		if is_number_non_orientable(&digits_string) {
+			digits_string.push('.');
+		}
+		// Save the string
+		digits = digits_string;
+
 		let text_width = get_number_typeset_width(&digits) * ONEWAY_MULTILINK_DIGIT_SIZE.x;
 		tip_count = 1;
 		line_length =
@@ -882,6 +895,35 @@ fn create_logical_color_sprite(
 			base_sprite_size,
 		);
 	}
+}
+
+/// Whether a digit string may require additional
+/// indication of what way it should be read
+fn is_number_non_orientable(digits: &str) -> bool {
+	let mirrorred_chars = digits
+		.chars()
+		.rev()
+		// Map pairs of characters at mirrorred positions
+		.zip(digits.chars())
+		// Only the first half of the string is relevant,
+		// the second is guaranteed to be the same
+		// Assume only ascii characters
+		.take(digits.len().div_ceil(2));
+	let mut looks_the_same_upside_down = true;
+	for (a, b) in mirrorred_chars {
+		match (a, b) {
+			// If all characters match their mirror images,
+			// the string is not necessarily non-orientable
+			('6', '9') | ('9', '6') | ('8', '8') | ('0', '0') => {}
+			// If non-orientable characters appear in some other
+			// combination, the number may be non-orientable
+			('0' | '6' | '8' | '9', '0' | '6' | '8' | '9') => looks_the_same_upside_down = false,
+			// If any other character appears, the number
+			// is automatically orientable
+			_ => return false,
+		}
+	}
+	!looks_the_same_upside_down
 }
 
 /// Calculates the width of a number typeset using digit sprites.
