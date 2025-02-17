@@ -157,9 +157,6 @@ fn cycle_group_rotation_relay_system(
 
 	// Propagate one-way links
 	for step in level.execution_order.iter().copied() {
-		// println!("{:?}", step);
-		// println!("G{:?}", group_rotations);
-		// println!("D{:?}", detector_rotations);
 		match step {
 			DetectorOrGroup::Group(group_id) => {
 				if group_rotations[group_id] == 0 {
