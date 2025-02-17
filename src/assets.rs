@@ -150,6 +150,35 @@ impl DigitAtlas {
 	/// How much of the width of a sprite is taken up by the digit 1
 	/// relative to width of the sprite
 	pub const ONE_WIDTH: f32 = 0.4;
+	/// How much of the width of a sprite is taken up by the dot
+	pub const DOT_WIDTH: f32 = 0.2;
+	/// How much of the width of a sprite is taken up by the minus sign
+	pub const MINUS_WIDTH: f32 = 0.5;
+
+	/// Index of the dot sprite
+	pub const DOT: usize = 10;
+	/// Index of the minus sprite
+	pub const MINUS: usize = 11;
+
+	/// Gets the width of a character
+	pub fn width_of(c: char) -> Option<f32> {
+		match c {
+			'1' => Some(Self::ONE_WIDTH),
+			'0' | '2'..='9' => Some(Self::DIGIT_WIDTH),
+			'.' => Some(Self::DOT_WIDTH),
+			'-' => Some(Self::MINUS_WIDTH),
+			_ => None,
+		}
+	}
+
+	/// Gets the index of the sprite that corresponds to a given character
+	pub fn sprite_index_of(c: char) -> Option<usize> {
+		match c {
+			'.' => Some(Self::DOT),
+			'-' => Some(Self::MINUS),
+			_ => c.to_digit(10).map(|i| i as usize),
+		}
+	}
 
 	/// Path to the sprite sheet image
 	const IMAGE_ASSET_PATH: &'static str = "images/digits.png";
@@ -160,7 +189,7 @@ impl DigitAtlas {
 	/// of the sheet, in pixels
 	const PADDING_WIDTH: u32 = 15;
 	/// How many sprites there are
-	const SPRITE_COUNT: u32 = 10;
+	const SPRITE_COUNT: u32 = 12;
 
 	/// Constructs a [`TextureAtlasLayout`] for the sprite sheet
 	fn construct_atlas_layout() -> TextureAtlasLayout {

@@ -889,14 +889,7 @@ fn create_logical_color_sprite(
 fn get_number_typeset_width(digits: &str) -> f32 {
 	digits
 		.chars()
-		.map(|c| {
-			if c == '1' {
-				// Digit 1 needs less space than the others
-				DigitAtlas::ONE_WIDTH + DIGIT_SPRITE_SPACING
-			} else {
-				DigitAtlas::DIGIT_WIDTH + DIGIT_SPRITE_SPACING
-			}
-		})
+		.map(|c| DigitAtlas::width_of(c).unwrap_or_default() + DIGIT_SPRITE_SPACING)
 		.sum::<f32>()
 		- DIGIT_SPRITE_SPACING
 }
@@ -924,15 +917,10 @@ fn typeset_number(
 	let mut caret_offset = 0.0;
 
 	for digit in digits.chars() {
-		let digit = digit
-			.to_digit(10)
-			.expect("String representation of a number should only be digits");
-		let current_digit_width = if digit == 1 {
-			// Digit 1 needs less space than the others
-			DigitAtlas::ONE_WIDTH
-		} else {
-			DigitAtlas::DIGIT_WIDTH
-		};
+		let current_digit_width = DigitAtlas::width_of(digit)
+			.expect("String representation of a number should only be valid characters");
+		let sprite_index = DigitAtlas::sprite_index_of(digit)
+			.expect("String representation of a number should only be valid characters");
 		// Offset of the current digit from `start_transform`, measured
 		// to the center of the digit, in multiples of sprite size
 		let relative_offset = caret_offset + current_digit_width / 2.0;
@@ -949,7 +937,7 @@ fn typeset_number(
 				color,
 				texture_atlas: Some(TextureAtlas {
 					layout: digit_atlas.layout.clone_weak(),
-					index: digit as usize,
+					index: sprite_index,
 				}),
 				..default()
 			},
