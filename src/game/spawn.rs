@@ -211,6 +211,7 @@ fn spawn_primary_level_entities(
 
 		// Spawn cycle list
 		commands.insert_resource(CycleEntities(cycles));
+		commands.insert_resource(VertexEntities(vertices));
 		commands.insert_resource(LevelHandle(
 			levels
 				.get_strong_handle(level_handle.id())

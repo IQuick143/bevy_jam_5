@@ -12,7 +12,7 @@ pub const CYCLE_AUTOMATIC: &str = "This cycle can be turned by left/right clicki
 pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 
 pub const BLOCKADE_WARNING: &str =
-	"The last turn did not execute because of a conflict this cycle was involved in.";
+	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
 
 pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if you hover on it!";
 

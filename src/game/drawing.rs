@@ -11,7 +11,11 @@ use crate::{
 	ui::hover::{self, Hoverable},
 	AppSet,
 };
-use bevy::{color::palettes, math::bounding::Aabb2d, utils::hashbrown::HashMap};
+use bevy::{
+	color::palettes,
+	math::bounding::Aabb2d,
+	utils::hashbrown::{HashMap, HashSet},
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<GameObjectMaterials>()
@@ -441,8 +445,8 @@ fn marker_despawn_system(
 fn cycle_blocked_marker_system(
 	mut commands: Commands,
 	mut events: EventReader<TurnBlockedByGroupConflict>,
-	cycles_q: Query<&Transform, With<Cycle>>,
-	cycle_index: Res<CycleEntities>,
+	vertices_q: Query<&Transform, With<Vertex>>,
+	vertex_index: Res<VertexEntities>,
 	level_asset: Res<Assets<LevelData>>,
 	level_handle: Res<LevelHandle>,
 	images: Res<HandleMap<ImageKey>>,
@@ -454,51 +458,48 @@ fn cycle_blocked_marker_system(
 		return;
 	};
 
-	let mut marked_cycles = vec![false; level.cycles.len()];
+	let mut marked_vertices = HashSet::new();
 	for event in events.read() {
-		let Some((_, _, cycles)) = level.forbidden_group_pairs.get(event.0) else {
+		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
 			error!("Incorrect level data!?");
 			return;
 		};
-		for &(cycle_a, cycle_b) in cycles.iter() {
-			if cycle_a >= level.cycles.len() || cycle_b >= level.cycles.len() {
-				error!("Incorrect level data!?");
-				return;
-			}
-			marked_cycles[cycle_a] = true;
-			marked_cycles[cycle_b] = true;
+		for &vert in conflicting_vertices.iter() {
+			marked_vertices.insert(vert);
 		}
 	}
 
-	for (i, mark) in marked_cycles.iter().enumerate() {
-		if *mark {
-			let Ok(cycle_transform) = cycles_q.get(cycle_index.0[i]) else {
-				warn!("Nonexistent cycle!");
-				continue;
-			};
-			let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
-			commands.spawn((
-				Sprite {
-					anchor: bevy::sprite::Anchor::BottomCenter,
-					image: images[&ImageKey::InGameWarning].clone_weak(),
-					custom_size: Some(size),
-					color: palette.warning_sign,
-					..default()
-				},
-				Transform::from_translation(
-					cycle_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.75,
-				),
-				TemporaryMarker,
-				Hoverable {
-					hover_text: hover::BLOCKADE_WARNING,
-					hover_bounding_circle: None,
-					hover_bounding_box: Some(Aabb2d::new(
-						Vec2::new(0.0, SPRITE_LENGTH / 2.0),
-						size / 2.0,
-					)),
-				},
-				session.get_session(),
-			));
-		}
+	for &vertex in marked_vertices.iter() {
+		let Some(vertex_transform) = vertex_index
+			.0
+			.get(vertex)
+			.and_then(|entity| vertices_q.get(*entity).ok())
+		else {
+			warn!("Nonexistent vertex!");
+			continue;
+		};
+		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
+		commands.spawn((
+			Sprite {
+				anchor: bevy::sprite::Anchor::BottomCenter,
+				image: images[&ImageKey::InGameWarning].clone_weak(),
+				custom_size: Some(size),
+				color: palette.warning_sign,
+				..default()
+			},
+			Transform::from_translation(
+				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+			),
+			TemporaryMarker,
+			Hoverable {
+				hover_text: hover::BLOCKADE_WARNING,
+				hover_bounding_circle: None,
+				hover_bounding_box: Some(Aabb2d::new(
+					Vec2::new(0.0, SPRITE_LENGTH / 2.0),
+					size / 2.0,
+				)),
+			},
+			session.get_session(),
+		));
 	}
 }

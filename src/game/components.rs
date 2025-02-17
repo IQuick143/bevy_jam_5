@@ -72,6 +72,10 @@ pub struct LevelHandle(pub Handle<LevelData>);
 #[derive(Resource, Clone, Debug, Default, Reflect)]
 pub struct CycleEntities(pub Vec<Entity>);
 
+/// Component carrying the data mapping level indices to vertex entities.
+#[derive(Resource, Clone, Debug, Default, Reflect)]
+pub struct VertexEntities(pub Vec<Entity>);
+
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`Parent`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]

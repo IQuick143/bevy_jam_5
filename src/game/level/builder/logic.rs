@@ -1,6 +1,7 @@
 use super::error::*;
 use super::*;
 
+use bevy::utils::hashbrown::HashSet;
 use itertools::Itertools as _;
 
 impl LevelBuilder {
@@ -516,12 +517,12 @@ impl LevelBuilder {
 	fn compute_forbidden_groups(
 		&self,
 		groups: &[GroupData],
-	) -> Result<Vec<(usize, usize, Vec<(usize, usize)>)>, LevelBuilderError> {
+	) -> Result<Vec<(usize, usize, HashSet<usize>)>, LevelBuilderError> {
 		let mut forbid = Vec::new();
 		// TODO: Use a better algorithm, like come on O(n^6) ???
 		for group_a in 0..groups.len() {
 			for group_b in group_a..groups.len() {
-				let mut problems = Vec::new();
+				let mut problems = HashSet::new();
 				for &(cycle_a, _) in groups[group_a].cycles.iter() {
 					for &(cycle_b, _) in groups[group_b].cycles.iter() {
 						if cycle_a == cycle_b {
@@ -545,7 +546,7 @@ impl LevelBuilder {
 											},
 										));
 									}
-									problems.push((cycle_a, cycle_b));
+									problems.insert(vertex_a);
 									break 'inner;
 								}
 							}

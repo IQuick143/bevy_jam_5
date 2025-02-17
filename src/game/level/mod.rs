@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::hashbrown::HashSet};
 
 pub mod asset;
 pub mod backend;
@@ -25,8 +25,8 @@ pub struct LevelData {
 	pub execution_order: Vec<DetectorOrGroup>,
 	/// List of group pairs, which cannot be turned at once
 	/// Sorted in increasing lexicographic order of their index tuples
-	/// The vector contains a list of offending pairs of cycles
-	pub forbidden_group_pairs: Vec<(usize, usize, Vec<(usize, usize)>)>,
+	/// The hashset contains offending vertices
+	pub forbidden_group_pairs: Vec<(usize, usize, HashSet<usize>)>,
 	/// Data for all cycle links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_links: Vec<DeclaredLinkData>,
