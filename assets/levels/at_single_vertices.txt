@@ -1,0 +1,13 @@
+name = 'AT: One-Vertex';
+hint = 'Manual animation testing: Cycle should turn by a full turn (two turns using the gear). Hit [T] to change animation speed.';
+
+a = cycle(vertex(player() flag()));
+gear = cycle();
+gear2 = cycle('still');
+
+circle(a; 0 0 100);
+circle(gear2; -200, 0 30);
+circle(gear; -300, 0 30);
+
+oneway(gear gear2 a);
+oneway(gear a);
