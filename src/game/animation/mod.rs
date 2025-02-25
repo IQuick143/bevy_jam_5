@@ -146,6 +146,10 @@ fn listen_for_moves(
 			log::warn!("Target of RotateSingleCycle is not a cycle entity");
 			continue;
 		};
+		if vertices.0.is_empty() {
+			// Cycle has no vertices, no need to observe it further
+			continue;
+		}
 		let center_point = transform.translation().xy();
 		let vertex_positions = vertices
 			.0
