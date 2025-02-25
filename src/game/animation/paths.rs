@@ -50,7 +50,6 @@ impl PathAnimation {
 		let mut delta_distance = distance_progress * self.total_length - self.traversed_length;
 
 		while let Some(first_segment) = self.segments.front() {
-			log::info!("{self:?}");
 			let first_segment_length = first_segment.length();
 			// Correct for rounding errors by explicitly overriding at 1
 			let first_segment_completed =
@@ -66,7 +65,6 @@ impl PathAnimation {
 				self.first_segment_progress = delta_distance / first_segment_length;
 				return;
 			}
-			log::info!("Dropping section");
 		}
 
 		// No segments are left to animate, so use static position
