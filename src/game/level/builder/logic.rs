@@ -215,23 +215,17 @@ impl LevelBuilder {
 		let mut is_valid = true;
 		let mut building_error = None;
 
-		fn set_if_none<T>(target: &mut Option<T>, value: T) {
-			if target.is_none() {
-				*target = Some(value);
-			}
-		}
-
 		let (groups, detectors, execution_order) =
 			self.compute_groups_and_detectors().unwrap_or_else(|err| {
 				is_valid = false;
-				set_if_none(&mut building_error, err);
+				building_error.get_or_insert(err);
 				(Vec::new(), Vec::new(), Vec::new())
 			});
 		let forbidden_group_pairs = if is_valid {
 			self.compute_forbidden_groups(&groups)
 				.unwrap_or_else(|err| {
 					is_valid = false;
-					set_if_none(&mut building_error, err);
+					building_error.get_or_insert(err);
 					Vec::new()
 				})
 		} else {
@@ -239,7 +233,7 @@ impl LevelBuilder {
 		};
 		self.validate_before_build().unwrap_or_else(|err| {
 			is_valid = false;
-			set_if_none(&mut building_error, err);
+			building_error.get_or_insert(err);
 		});
 		self.build_layout();
 		let cycles = self
