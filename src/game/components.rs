@@ -65,6 +65,7 @@ pub struct Cycle {
 pub struct CycleVertices(pub Vec<Entity>);
 
 /// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
+/// Is only present if the level is correct and logical systems can run on it.
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct LevelHandle(pub Handle<LevelData>);
 

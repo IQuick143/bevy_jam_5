@@ -17,26 +17,32 @@ pub type Error =
 pub type Warning =
 	super::Warning<InterpreterWarning<runtime::RuntimeWarning>, finalize::FinalizeWarning>;
 
-pub fn run(module: &Module, mut warning_handler: impl FnMut(Warning)) -> Result<LevelData, Error> {
+pub fn run(
+	module: &Module,
+	mut warning_handler: impl FnMut(Warning),
+) -> (Option<LevelData>, Option<Error>) {
 	let mut interpreter = Interpreter::new(module, LevelBuilder::new());
 	interpreter.variable_pool = builtins::default_builtin_variables();
 	match interpreter.run(MAX_INTERPRETER_ITERATIONS) {
-		InterpreterEndState::Timeout => return Err(Error::Timeout),
-		InterpreterEndState::Halted(result) => result.map_err(Error::Runtime)?,
+		InterpreterEndState::Timeout => return (None, Some(Error::Timeout)),
+		InterpreterEndState::Halted(Ok(())) => {}
+		InterpreterEndState::Halted(Err(err)) => return (None, Some(Error::Runtime(err))),
 	}
 	for warning in interpreter.get_warnings() {
 		warning_handler(Warning::Runtime(warning));
 	}
-	finalize::finalize(interpreter.backend, &interpreter.variable_pool, |w| {
+	let (level, err) = finalize::finalize(interpreter.backend, &interpreter.variable_pool, |w| {
 		warning_handler(Warning::Finalize(w))
-	})
-	.map_err(Error::Finalize)
+	});
+	(level, err.map(Error::Finalize))
 }
 
 pub fn parse_and_run(
 	level_file: &str,
 	warning_handler: impl FnMut(Warning),
-) -> Result<LevelData, Error> {
-	let module = compile(level_file)?;
-	run(&module, warning_handler)
+) -> (Option<LevelData>, Option<Error>) {
+	match compile(level_file) {
+		Ok(module) => run(&module, warning_handler),
+		Err(err) => (None, Some(Error::Compile(err))),
+	}
 }

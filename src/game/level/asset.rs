@@ -14,6 +14,7 @@ struct LevelLoader;
 
 #[derive(Debug)]
 enum LevelLoadingError {
+	Unknown,
 	IO(std::io::Error),
 	Parsing(LevelParsingError),
 }
@@ -33,6 +34,9 @@ impl From<LevelParsingError> for LevelLoadingError {
 impl std::fmt::Display for LevelLoadingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
+			LevelLoadingError::Unknown => f.write_fmt(format_args!(
+				"Level could not be loaded because of an eldritch entity interferring. This is most certainly a developer issue.",
+			)),
 			LevelLoadingError::IO(e) => f.write_fmt(format_args!(
 				"Level could not be loaded because of an IO error: {}",
 				e
@@ -61,8 +65,12 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			let level_data = parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path()))?;
-			Ok(level_data)
+			match parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path())) {
+				(None, None) => Err(LevelLoadingError::Unknown),
+				(None, Some(err)) => Err(err.into()),
+				(Some(level), None) => Ok(level),
+				(Some(level), Some(_)) => Ok(level), // TODO: Log the error.
+			}
 		}
 	}
 

@@ -80,8 +80,10 @@ mod utils {
 
 	pub fn app_with_level(level: &str) -> App {
 		let mut app = setup_app();
-		let level =
-			parser::parse_and_run(level, |_| {}).expect("Level data should compile correctly!");
+		let level = parser::parse_and_run(level, |_| {})
+			.0
+			.expect("Level data should compile correctly!");
+		assert!(level.is_valid);
 
 		app.world_mut()
 			.run_system_once_with(level, load_level)

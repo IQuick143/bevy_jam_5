@@ -344,11 +344,15 @@ impl LevelBuilder {
 		for vertex in &mut self.vertices {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
 				if let Some(p) = vertex.color_label_appearence {
-					let vertex_position = vertex.position.get_fixed()
-						.expect("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
-					let owner_cycle_position = self.cycles[p.owner_cycle].placement
-						.expect("Color label appearences cannot be applied before all cycles are placed")
-						.position;
+					let Some(vertex_position) = vertex.position.get_fixed() else {
+						warn!("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
+						continue;
+					};
+					let Some(placement) = self.cycles[p.owner_cycle].placement else {
+						warn!("Color label appearences cannot be applied before all cycles are placed");
+						continue;
+					};
+					let owner_cycle_position = placement.position;
 					let angle_from_owner =
 						-Vec2::Y.angle_to(vertex_position - owner_cycle_position);
 					// Flip target angle if we want the labels inside the cycle
@@ -359,26 +363,31 @@ impl LevelBuilder {
 					}
 					.rem_euclid(2.0 * PI);
 					let position = match p.positions {
-						CycleBoundColorLabelPositionSet::LeftRight => match target_angle / PI {
-							0.0..1.0 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
-							1.0..=2.0 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
-							_ => unreachable!(),
-						},
-						CycleBoundColorLabelPositionSet::AboveBelow => match target_angle / PI {
-							0.0..0.5 | 1.5..=2.0 => ButtonColorLabelPosition::AnglePlaced(0.0),
-							0.5..1.5 => ButtonColorLabelPosition::AnglePlaced(PI),
-							_ => unreachable!(),
-						},
+						CycleBoundColorLabelPositionSet::LeftRight => {
+							ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
+								0.0..1.0 => PI * 0.5,
+								1.0..=2.0 => PI * 1.5,
+								// Theoretically unreachable but just in case (because floats) we use a default value
+								_ => PI * 0.5,
+							})
+						}
+						CycleBoundColorLabelPositionSet::AboveBelow => {
+							ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
+								0.0..0.5 | 1.5..=2.0 => 0.0,
+								0.5..1.5 => PI,
+								// Theoretically unreachable but just in case (because floats) we use a default value
+								_ => 0.0,
+							})
+						}
 						CycleBoundColorLabelPositionSet::CardinalDirections => {
-							match target_angle / PI {
-								0.0..0.25 | 1.75..=2.0 => {
-									ButtonColorLabelPosition::AnglePlaced(0.0)
-								}
-								0.25..0.75 => ButtonColorLabelPosition::AnglePlaced(PI * 0.5),
-								0.75..1.25 => ButtonColorLabelPosition::AnglePlaced(PI),
-								1.25..1.75 => ButtonColorLabelPosition::AnglePlaced(PI * 1.5),
-								_ => unreachable!(),
-							}
+							ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
+								0.0..0.25 | 1.75..=2.0 => 0.0,
+								0.25..0.75 => PI * 0.5,
+								0.75..1.25 => PI,
+								1.25..1.75 => PI * 1.5,
+								// Theoretically unreachable but just in case (because floats) we use a default value
+								_ => 0.0,
+							})
 						}
 						CycleBoundColorLabelPositionSet::AllDirections => {
 							ButtonColorLabelPosition::AnglePlaced(target_angle)
@@ -531,7 +540,7 @@ impl LevelBuilder {
 
 	/// Sets a vertex to a fixed placement and checks that it belonged to a particular cycle
 	/// ## Panics
-	/// Panics if the vertex was not previously in [`Partial`](IntermediateVertexPosition::Partial)
+	/// May panic if the vertex was not previously in [`Partial`](IntermediateVertexPosition::Partial)
 	/// placement owned by the specified cycle
 	fn checked_materialize(
 		pos: &mut IntermediateVertexPosition,
@@ -539,6 +548,7 @@ impl LevelBuilder {
 		owner_cycle: usize,
 		index_in_owner: usize,
 	) {
+		#[cfg(any(test, debug_assertions))]
 		assert_eq!(
 			*pos,
 			IntermediateVertexPosition::Partial(PartiallyBoundVertexPosition {
@@ -553,7 +563,7 @@ impl LevelBuilder {
 	/// Checks whether a materialization can be done or if it breaks
 	/// cycle order of a particular cycle
 	/// ## Notes
-	/// - The cycle to test against must already be placed
+	/// - If the cycle is not placed, it will default to an invalid placement
 	/// - Materialized points are intentionally passed as an iterator.
 	///   The list is searched linearly for every vertex of the cycle,
 	///   as the list is expected to be very small.
@@ -564,9 +574,10 @@ impl LevelBuilder {
 		cycle_index: usize,
 		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
 	) -> bool {
-		let cycle_placement = self.cycles[cycle_index]
-			.placement
-			.expect("Partial materialization checks can only be run on placed cycles");
+		let Some(cycle_placement) = self.cycles[cycle_index].placement else {
+			warn!("Partial materialization checks can only be run on placed cycles");
+			return false;
+		};
 		// Positions of all checked vertices, in cyclic order
 		// Vertices that were already fixed-placed are included
 		// Vertices that are in points_to_materialize are also included

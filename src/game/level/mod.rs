@@ -9,6 +9,8 @@ pub mod list_asset;
 /// Complete description of a level
 #[derive(Debug, Clone, Reflect, Asset)]
 pub struct LevelData {
+	/// Whether this level is correctly built
+	pub is_valid: bool,
 	/// Name of the level
 	pub name: String,
 	/// Hint or comment that relates to the level, if any

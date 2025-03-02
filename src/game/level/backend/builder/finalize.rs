@@ -15,18 +15,35 @@ pub fn finalize(
 	mut builder: LevelBuilder,
 	variable_pool: &VariablePool<DomainValue>,
 	mut warning_handler: impl FnMut(FinalizeWarning),
-) -> Result<LevelData, FinalizeError> {
-	if let Some(level_name) = variable_pool.load_as::<&str>("name").transpose()? {
-		builder.set_level_name(level_name.to_owned())?;
-	} else {
-		warning_handler(FinalizeWarning::LevelNameNotSet);
+) -> (Option<LevelData>, Option<FinalizeError>) {
+	match variable_pool.load_as::<&str>("name").transpose() {
+		Ok(Some(level_name)) => {
+			if let Err(err) = builder.set_level_name(level_name.to_owned()) {
+				return (None, Some(FinalizeError::BuilderError(err)));
+			}
+		}
+		Ok(None) => {
+			warning_handler(FinalizeWarning::LevelNameNotSet);
+		}
+		Err(err) => {
+			return (None, Some(FinalizeError::InvalidVariableType(err)));
+		}
 	}
 
-	if let Some(level_hint) = variable_pool.load_as::<&str>("hint").transpose()? {
-		builder.set_level_hint(level_hint.to_owned())?;
+	match variable_pool.load_as::<&str>("hint").transpose() {
+		Ok(Some(level_hint)) => {
+			if let Err(err) = builder.set_level_hint(level_hint.to_owned()) {
+				return (None, Some(FinalizeError::BuilderError(err)));
+			}
+		}
+		Ok(None) => {}
+		Err(err) => {
+			return (None, Some(FinalizeError::InvalidVariableType(err)));
+		}
 	}
 
-	Ok(builder.build()?)
+	let (level, err) = builder.build();
+	(Some(level), err.map(FinalizeError::BuilderError))
 }
 
 #[derive(Clone, PartialEq, Debug)]

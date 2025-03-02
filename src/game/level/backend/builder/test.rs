@@ -10,7 +10,14 @@ use crate::epilang::interpreter::{FunctionCallError, InterpreterError, LogicErro
 use std::f32::consts::PI;
 
 fn parse(level_file: &str) -> Result<LevelData, Error> {
-	super::parse_and_run(level_file, |_| {})
+	match super::parse_and_run(level_file, |_| {}) {
+		(None, None) => panic!("AAAAAA"),
+		(_, Some(err)) => Err(err),
+		(Some(level), None) => {
+			assert!(level.is_valid);
+			Ok(level)
+		}
+	}
 }
 
 macro_rules! assert_err_eq {

@@ -21,9 +21,7 @@ pub(super) fn plugin(app: &mut App) {
 		(
 			log_transitions::<Screen>,
 			log_transitions::<PlayingLevel>,
-			automatic_reloading
-				.run_if(resource_equals(AutoReload(true)).and(in_state(Screen::Playing))),
-			toggle_automatic_reloading.run_if(input_just_pressed(KeyCode::KeyX)),
+			automatic_reloading.run_if(in_state(Screen::Playing)),
 			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
 			debug_oneways.run_if(resource_equals(RenderOutlines(true))),
 			draw_layout.run_if(resource_equals(RenderOutlines(true))),
@@ -32,27 +30,14 @@ pub(super) fn plugin(app: &mut App) {
 		),
 	);
 	app.init_resource::<RenderOutlines>();
-	app.init_resource::<AutoReload>();
 }
 
 /// Whether hover and layout boxes should be drawn
 #[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
 struct RenderOutlines(pub bool);
 
-/// Whether the autoreloading system should run
-#[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
-struct AutoReload(pub bool);
-
 fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
 	render.0 = !render.0;
-}
-
-fn toggle_automatic_reloading(mut reload: ResMut<AutoReload>) {
-	reload.0 = !reload.0;
-	info!(
-		"Automatic reloading is: {}",
-		if reload.0 { "ENABLED" } else { "DISABLED" }
-	);
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
@@ -84,13 +69,18 @@ fn draw_layout(mut gizmos: Gizmos) {
 }
 
 fn automatic_reloading(
-	level_handle: Res<LevelHandle>,
 	mut changed_events: EventReader<AssetEvent<LevelData>>,
+	asset_server: Res<AssetServer>,
 	mut commands: Commands,
 ) {
+	if !asset_server.watching_for_changes() {
+		return;
+	}
 	let mut reload = false;
 	for event in changed_events.read() {
-		reload |= event.is_modified(&level_handle.0);
+		if let AssetEvent::Modified { id: _ } = event {
+			reload = true
+		}
 	}
 	if reload {
 		commands.spawn((

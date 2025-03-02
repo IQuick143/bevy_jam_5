@@ -236,13 +236,21 @@ fn spawn_primary_level_entities(
 		}
 
 		// Spawn cycle list
-		commands.insert_resource(CycleEntities(cycles));
-		commands.insert_resource(VertexEntities(vertices));
-		commands.insert_resource(LevelHandle(
-			levels
-				.get_strong_handle(level_handle.id())
-				.expect("I expect you to work."),
-		));
+		if level.is_valid {
+			commands.insert_resource(CycleEntities(cycles));
+			commands.insert_resource(VertexEntities(vertices));
+			commands.insert_resource(LevelHandle(
+				levels
+					.get_strong_handle(level_handle.id())
+					.expect("I expect you to work."),
+			));
+		} else {
+			// Ensure the [`LevelHandle`] is not around for an invalid level.
+			commands.remove_resource::<LevelHandle>();
+			// Just to be sure, remove these resources as well.
+			commands.remove_resource::<CycleEntities>();
+			commands.remove_resource::<VertexEntities>();
+		}
 	}
 }
 
