@@ -7,7 +7,10 @@ use super::super::{
 	},
 	domain::*,
 };
-use crate::epilang::interpreter::{LoadedVariableTypeError, VariablePool};
+use crate::{
+	epilang::interpreter::{LoadedVariableTypeError, VariablePool},
+	game::level::builder::ResultNonExclusive,
+};
 
 /// Finalization procedure for the [`LevelBuilder`] backend.
 /// Call this when the Epilang program is done executing.
@@ -15,35 +18,34 @@ pub fn finalize(
 	mut builder: LevelBuilder,
 	variable_pool: &VariablePool<DomainValue>,
 	mut warning_handler: impl FnMut(FinalizeWarning),
-) -> (Option<LevelData>, Option<FinalizeError>) {
+) -> ResultNonExclusive<LevelData, FinalizeError> {
 	match variable_pool.load_as::<&str>("name").transpose() {
 		Ok(Some(level_name)) => {
 			if let Err(err) = builder.set_level_name(level_name.to_owned()) {
-				return (None, Some(FinalizeError::BuilderError(err)));
+				return FinalizeError::BuilderError(err).into();
 			}
 		}
 		Ok(None) => {
 			warning_handler(FinalizeWarning::LevelNameNotSet);
 		}
 		Err(err) => {
-			return (None, Some(FinalizeError::InvalidVariableType(err)));
+			return FinalizeError::InvalidVariableType(err).into();
 		}
 	}
 
 	match variable_pool.load_as::<&str>("hint").transpose() {
 		Ok(Some(level_hint)) => {
 			if let Err(err) = builder.set_level_hint(level_hint.to_owned()) {
-				return (None, Some(FinalizeError::BuilderError(err)));
+				return FinalizeError::BuilderError(err).into();
 			}
 		}
 		Ok(None) => {}
 		Err(err) => {
-			return (None, Some(FinalizeError::InvalidVariableType(err)));
+			return FinalizeError::InvalidVariableType(err).into();
 		}
 	}
 
-	let (level, err) = builder.build();
-	(Some(level), err.map(FinalizeError::BuilderError))
+	builder.build().map_err(FinalizeError::BuilderError)
 }
 
 #[derive(Clone, PartialEq, Debug)]

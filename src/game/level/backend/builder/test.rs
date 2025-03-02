@@ -11,12 +11,12 @@ use std::f32::consts::PI;
 
 fn parse(level_file: &str) -> Result<LevelData, Error> {
 	match super::parse_and_run(level_file, |_| {}) {
-		(None, None) => panic!("AAAAAA"),
-		(_, Some(err)) => Err(err),
-		(Some(level), None) => {
+		builder::ResultNonExclusive::Ok(level) => {
 			assert!(level.is_valid);
 			Ok(level)
 		}
+		builder::ResultNonExclusive::Partial(_, err) => Err(err),
+		builder::ResultNonExclusive::Err(err) => Err(err),
 	}
 }
 

@@ -211,7 +211,7 @@ impl LevelBuilder {
 	}
 
 	/// Checks that the level data is complete and assembles it
-	pub fn build(mut self) -> (LevelData, Option<LevelBuilderError>) {
+	pub fn build(mut self) -> ResultNonExclusive<LevelData, LevelBuilderError> {
 		let mut is_valid = true;
 		let mut building_error = None;
 
@@ -246,7 +246,7 @@ impl LevelBuilder {
 			.into_iter()
 			.map(Self::build_vertex_data)
 			.collect();
-		(
+		ResultNonExclusive::from((
 			LevelData {
 				is_valid,
 				name: self
@@ -263,7 +263,7 @@ impl LevelBuilder {
 				execution_order,
 			},
 			building_error,
-		)
+		))
 	}
 
 	/// Computes and creates the GroupData objects
