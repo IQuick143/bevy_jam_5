@@ -65,6 +65,7 @@ pub enum Screen {
 	Title,
 	Credits,
 	LevelSelect,
+	/// The actual playing screen of the game.
 	Playing,
 }
 

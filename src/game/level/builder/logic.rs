@@ -211,10 +211,30 @@ impl LevelBuilder {
 	}
 
 	/// Checks that the level data is complete and assembles it
-	pub fn build(mut self) -> Result<LevelData, LevelBuilderError> {
-		let (groups, detectors, execution_order) = self.compute_groups_and_detectors()?;
-		let forbidden_group_pairs = self.compute_forbidden_groups(&groups)?;
-		self.validate_before_build()?;
+	pub fn build(mut self) -> ResultNonExclusive<LevelData, LevelBuilderError> {
+		let mut is_valid = true;
+		let mut building_error = None;
+
+		let (groups, detectors, execution_order) =
+			self.compute_groups_and_detectors().unwrap_or_else(|err| {
+				is_valid = false;
+				building_error.get_or_insert(err);
+				(Vec::new(), Vec::new(), Vec::new())
+			});
+		let forbidden_group_pairs = if is_valid {
+			self.compute_forbidden_groups(&groups)
+				.unwrap_or_else(|err| {
+					is_valid = false;
+					building_error.get_or_insert(err);
+					Vec::new()
+				})
+		} else {
+			Vec::new()
+		};
+		self.validate_before_build().unwrap_or_else(|err| {
+			is_valid = false;
+			building_error.get_or_insert(err);
+		});
 		self.build_layout();
 		let cycles = self
 			.cycles
@@ -226,20 +246,24 @@ impl LevelBuilder {
 			.into_iter()
 			.map(Self::build_vertex_data)
 			.collect();
-		Ok(LevelData {
-			name: self
-				.name
-				.unwrap_or_else(|| Self::PLACEHOLDER_LEVEL_NAME.to_owned()),
-			hint: self.hint,
-			vertices,
-			cycles,
-			groups,
-			detectors,
-			declared_links: self.declared_links,
-			declared_one_way_links: self.declared_one_way_cycle_links,
-			forbidden_group_pairs,
-			execution_order,
-		})
+		ResultNonExclusive::from((
+			LevelData {
+				is_valid,
+				name: self
+					.name
+					.unwrap_or_else(|| Self::PLACEHOLDER_LEVEL_NAME.to_owned()),
+				hint: self.hint,
+				vertices,
+				cycles,
+				groups,
+				detectors,
+				declared_links: self.declared_links,
+				declared_one_way_links: self.declared_one_way_cycle_links,
+				forbidden_group_pairs,
+				execution_order,
+			},
+			building_error,
+		))
 	}
 
 	/// Computes and creates the GroupData objects
@@ -562,8 +586,6 @@ impl LevelBuilder {
 	}
 
 	/// Asserts that a vertex data object is complete and assembles it
-	/// ## Panics
-	/// Panics if the vertex is partially placed
 	fn build_vertex_data(intermediate: IntermediateVertexData) -> VertexData {
 		let position = match intermediate.position {
 			IntermediateVertexPosition::Fixed(pos) => pos,
@@ -571,7 +593,8 @@ impl LevelBuilder {
 			IntermediateVertexPosition::Free => Vec2::ZERO,
 			// Prevented by [`materialize_all_partial_vertex_placements`]
 			IntermediateVertexPosition::Partial(_) => {
-				panic!("Partially placed vertex in build phase, should have been materialized")
+				warn!("Partially placed vertex in build phase, should have been materialized");
+				Vec2::ONE
 			}
 		};
 		VertexData {
@@ -582,20 +605,26 @@ impl LevelBuilder {
 	}
 
 	/// Asserts that a cycle data object is complete and assembles it
-	/// ## Panics
-	/// Panics if the cycle has not been placed
 	fn build_cycle_data(intermediate: IntermediateCycleData) -> CycleData {
 		let placement = intermediate
-			.placement
-			.expect("Unplaced cycle in build phase, should have been detected earlier");
-		let center_sprite_position = intermediate.center_sprite_position.expect(
-			"Unplaced cycle center sprite in build phase, should have been materialized earlier",
-		);
+			.placement.unwrap_or_else(|| {
+				warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
+				CyclePlacement { position: Vec2::ZERO, shape: CycleShape::Circle(1.0) }
+			});
+		let center_sprite_position = intermediate.center_sprite_position.unwrap_or_else(|| {
+			warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
+			None
+		});
 		let center_sprite_appearence =
 			CycleCenterSpriteAppearence(center_sprite_position.map(|p| p - placement.position));
-		let IntermediateLinkStatus::Group(group, relative_direction) = intermediate.linked_cycle
-		else {
-			panic!("Cycle in build phase doesn't have a link pointer, should've been resolved in [`compute_groups_and_detectors`]");
+		let (group, relative_direction) = match intermediate.linked_cycle {
+			IntermediateLinkStatus::Group(group, relative_direction) => (group, relative_direction),
+			_ => {
+				warn!(
+					"Cycle built without a valid group assignment, defaulting to an invalid value"
+				);
+				(0, LinkedCycleDirection::Coincident)
+			}
 		};
 		CycleData {
 			placement,
@@ -625,7 +654,7 @@ impl LevelBuilder {
 		let mut relative_direction = LinkedCycleDirection::Coincident;
 		while let IntermediateLinkStatus::Cycle(lower, direction) = self.cycles[cycle].linked_cycle
 		{
-			// Todo: Optimise by shortening the path as we traverse it.
+			// TODO: Optimise by shortening the path as we traverse it.
 			cycle = lower;
 			relative_direction *= direction;
 		}
