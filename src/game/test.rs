@@ -297,6 +297,28 @@ circle(cycle(_ flag() _ _ _ player() _); 0 0 100);
 	assert_eq!(initial_vertex_data, app.read_vertices(), "2 * -3 = -6.");
 }
 
+/// Test for 0-sized cycles
+#[test]
+fn test_zero_cycle() {
+	let mut app = app_with_level(
+		r"
+name = 'Zero cycle';
+hint = 'A player should not be reading this message!';
+
+circle(cycle(); 0 0 100);
+",
+	);
+
+	app.turn_cycle(0, 1);
+	app.update();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	app.turn_cycle(0, 1684657993);
+	app.update();
+}
+
 /// Test that the cycle rotation direction is truly forwards
 #[test]
 fn test_rotation_direction() {
@@ -820,6 +842,52 @@ fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
 		app.read_vertices(),
 		"Moves should've been undone."
 	);
+}
+
+/// Test for 0-sized cycles with links
+#[test]
+fn test_gears() {
+	let mut app = app_with_level(
+		r"
+name = 'Zero cycle 2';
+hint = 'A player should not be reading this message!';
+
+circle(gear1 = cycle(); 0 0 100);
+circle(gear2 = cycle(); 0 0 100);
+circle(gear3 = cycle(); 0 0 100);
+
+circle(a = cycle(box() _ _); 0 0 100);
+circle(b = cycle(box() _ _ _); 0 0 100);
+circle(c = cycle(box() _ _ _ _); 0 0 100);
+
+oneway(a gear1 gear2 gear3 c);
+link(gear2 b);
+",
+	);
+
+	let state_1 = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+
+	let state_2 = app.read_vertices();
+
+	app.turn_cycle(1, -1);
+	app.update();
+
+	let state_1_2 = app.read_vertices();
+
+	app.turn_cycle(2, 1);
+	app.update();
+
+	let state_3 = app.read_vertices();
+
+	assert_ne!(state_1, state_2);
+	assert_ne!(state_2, state_3);
+	assert_ne!(state_3, state_1);
+	assert_eq!(state_1, state_1_2);
+
+	move_fuzz(&mut app, 128, 3);
 }
 
 /// Tests rotation with intersecting cycles

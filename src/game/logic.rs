@@ -364,6 +364,10 @@ fn cycle_rotation_system(
 			.inspect_err(|e| log::warn!("{e}"))
 		{
 			let n_vertices = cycle_vertices.0.len();
+			if n_vertices == 0 {
+				// Nothing to rotate
+				continue;
+			}
 			let amount = {
 				let step = event.0.amount % n_vertices;
 				if step == 0 {
