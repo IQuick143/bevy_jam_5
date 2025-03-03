@@ -6,7 +6,7 @@ pub mod level_pack;
 
 use crate::epilang::CompileError;
 
-pub const MAX_INTERPRETER_ITERATIONS: u32 = 2000;
+pub const MAX_INTERPRETER_ITERATIONS: u32 = 2 << 20;
 
 /// Error type returned by a full interpreter run
 #[derive(Clone, PartialEq, Debug)]
