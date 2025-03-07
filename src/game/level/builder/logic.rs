@@ -17,6 +17,7 @@ impl LevelBuilder {
 			declared_links: Vec::new(),
 			declared_one_way_cycle_links: Vec::new(),
 			declared_one_way_detector_links: Vec::new(),
+			bounding_box: None,
 		}
 	}
 
@@ -236,6 +237,7 @@ impl LevelBuilder {
 			building_error.get_or_insert(err);
 		});
 		self.build_layout();
+		let bounding_box = self.bounding_box.unwrap_or_else(|| self.get_bounding_box());
 		let cycles = self
 			.cycles
 			.into_iter()
@@ -261,6 +263,7 @@ impl LevelBuilder {
 				declared_one_way_links: self.declared_one_way_cycle_links,
 				forbidden_group_pairs,
 				execution_order,
+				bounding_box,
 			},
 			building_error,
 		))

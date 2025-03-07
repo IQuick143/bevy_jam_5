@@ -621,7 +621,7 @@ impl LevelBuilder {
 		}
 	}
 	/// Calculates the bounding box of all currently placed cycles and their center sprites
-	fn get_bounding_box(&self) -> Aabb2d {
+	pub(super) fn get_bounding_box(&self) -> Aabb2d {
 		let min = self
 			.cycles
 			.iter()
@@ -700,6 +700,7 @@ impl LevelBuilder {
 				*p = (*p - bounds_center) * scale + viewport_center;
 			}
 		}
+		self.bounding_box = Some(Aabb2d::new(Vec2::ZERO, bounds.half_size() * scale));
 	}
 }
 

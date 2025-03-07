@@ -12,9 +12,7 @@ use bevy::{
 	asset::AssetMetaCheck,
 	audio::{AudioPlugin, Volume},
 	prelude::*,
-	render::camera::ScalingMode,
 };
-use graphics::GAME_AREA;
 
 pub struct AppPlugin;
 
@@ -32,9 +30,6 @@ impl Plugin for AppPlugin {
 			)
 				.chain(),
 		);
-
-		// Spawn the main camera.
-		app.add_systems(Startup, spawn_camera);
 
 		// Add Bevy plugins.
 		app.add_plugins(
@@ -107,29 +102,4 @@ fn send_event<E: Event + Clone>(event: E) -> impl Fn(EventWriter<E>) {
 	move |mut events| {
 		events.send(event.clone());
 	}
-}
-
-fn spawn_camera(mut commands: Commands) {
-	commands.spawn((
-		Name::new("Camera"),
-		Camera2d,
-		Camera {
-			clear_color: ClearColorConfig::Custom(Color::WHITE),
-			..default()
-		},
-		OrthographicProjection {
-			scaling_mode: ScalingMode::AutoMin {
-				min_width: GAME_AREA.x,
-				min_height: GAME_AREA.y,
-			},
-			..OrthographicProjection::default_2d()
-		},
-		// Render all UI to this camera.
-		// Not strictly necessary since we only use one camera,
-		// but if we don't use this component, our UI will disappear as soon
-		// as we add another camera. This includes indirect ways of adding cameras like using
-		// [ui node outlines](https://bevyengine.org/news/bevy-0-14/#ui-node-outline-gizmos)
-		// for debugging. So it's good to have this here for future-proofing.
-		IsDefaultUiCamera,
-	));
 }

@@ -10,6 +10,10 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_plugins(scrolling_texture::plugin);
 }
 
+/// Fraction of vertical space that should be reserved for UI.
+/// Half of it is at the bottom and half of it is at the top.
+pub const VERTICAL_PADDING_FRACTION: f32 = 0.2;
+
 /// Rectangle centered on (0,0), into which everything should fit in order to guarantee it being rendered.
 pub const GAME_AREA: Vec2 = Vec2::new(1600.0, 900.0);
 
@@ -24,7 +28,7 @@ pub const LEVEL_AREA_CENTER: Vec2 = Vec2::ZERO;
 pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
 
 /// Size of a sprite in world-units.
-pub const SPRITE_LENGTH: f32 = 100.0;
+pub const SPRITE_LENGTH: f32 = 75.0;
 
 /// Half of the width of a cycle perimeter ring in world units
 pub const RING_HALF_WIDTH: f32 = 0.15 / 4.0 * SPRITE_LENGTH;
