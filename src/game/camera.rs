@@ -6,12 +6,16 @@ use bevy::{
 use crate::{
 	game::prelude::*,
 	graphics::{
-		GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, SPRITE_SIZE, VERTICAL_PADDING_FRACTION,
+		GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, SPRITE_LENGTH, SPRITE_SIZE,
+		VERTICAL_PADDING_FRACTION,
 	},
 	screen::{DoScreenTransition, Screen},
+	AppSet,
 };
 
 use crate::game::spawn::SpawnLevel;
+
+use super::inputs::{MoveCameraEvent, ZoomCameraEvent};
 
 #[derive(Component, Clone, Copy)]
 #[require(Camera, Camera2d)]
@@ -44,7 +48,7 @@ pub fn plugin(app: &mut App) {
 			(
 				set_camera_on_screen_transition.run_if(on_event::<DoScreenTransition>),
 				set_camera_level_view.run_if(on_event::<SpawnLevel>),
-				update_camera,
+				update_camera.after(AppSet::RecordInput),
 			)
 				.chain(),
 		);
@@ -114,17 +118,37 @@ fn update_camera(
 		&mut OrthographicProjection,
 		&mut Transform,
 	)>,
+	mut move_events: EventReader<MoveCameraEvent>,
+	mut zoom_events: EventReader<ZoomCameraEvent>,
+	time: Res<Time<Real>>,
 ) {
 	let (mut harness, mut projection, mut transform) = camera.into_inner();
-	transform.translation.x = harness.center.x;
-	transform.translation.y = harness.center.y;
 
-	harness.scale = harness.scale.max(1.0);
-	let bounds = 2.0 * harness.level_bounds.half_size() / harness.scale
-		* Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));
+	harness.scale *= zoom_events.read().map(|event| event.0).product::<f32>();
+
+	let level_size = 2.0 * harness.level_bounds.half_size();
+
+	let maximum_zoom = level_size.max_element() / SPRITE_LENGTH;
+	harness.scale = harness.scale.max(1.0).min(maximum_zoom);
+
+	let bounds =
+		level_size / harness.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));
 
 	projection.scaling_mode = ScalingMode::AutoMin {
 		min_width: bounds.x,
 		min_height: bounds.y,
 	};
+
+	let movement = move_events
+		.read()
+		.map(|event| event.0)
+		.reduce(<Vec2 as std::ops::Add>::add)
+		.unwrap_or_default();
+
+	harness.center += bounds * movement * time.delta_secs();
+
+	harness.center = harness.level_bounds.closest_point(harness.center);
+
+	transform.translation.x = harness.center.x;
+	transform.translation.y = harness.center.y;
 }

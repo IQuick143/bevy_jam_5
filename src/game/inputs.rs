@@ -6,15 +6,62 @@ use super::{
 	prelude::*,
 };
 
+/// An event sent to move the camera, units are screens per second.
+/// Sent during [`AppSet::RecordInput`]
+#[derive(Event)]
+pub struct MoveCameraEvent(pub Vec2);
+
+/// An event describing a multiplicative change to the camera zoom factor.
+/// Sent during [`AppSet::RecordInput`]
+#[derive(Event)]
+pub struct ZoomCameraEvent(pub f32);
+
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
-			cycle_inputs_system.in_set(AppSet::RecordInput),
-			cycle_rotation_with_inputs_system.in_set(AppSet::ExecuteInput),
-		)
-			.run_if(ui_not_frozen),
-	);
+	app.add_event::<MoveCameraEvent>()
+		.add_event::<ZoomCameraEvent>()
+		.add_systems(Update, send_input_events.in_set(AppSet::RecordInput))
+		.add_systems(
+			Update,
+			(
+				cycle_inputs_system.in_set(AppSet::RecordInput),
+				cycle_rotation_with_inputs_system.in_set(AppSet::ExecuteInput),
+			)
+				.run_if(ui_not_frozen),
+		);
+}
+
+fn send_input_events(
+	//	input_mouse: Res<ButtonInput<MouseButton>>,
+	input_key: Res<ButtonInput<KeyCode>>,
+	//	window: Single<&Window>,
+	mut camera_move: EventWriter<MoveCameraEvent>,
+	mut camera_zoom: EventWriter<ZoomCameraEvent>,
+) {
+	// Camera handling
+	{
+		let camera_velocity = 1.0;
+		let mut camera_direction = Vec2::ZERO;
+		if input_key.pressed(KeyCode::ArrowUp) {
+			camera_direction += Vec2::Y;
+		}
+		if input_key.pressed(KeyCode::ArrowDown) {
+			camera_direction -= Vec2::Y;
+		}
+		if input_key.pressed(KeyCode::ArrowLeft) {
+			camera_direction -= Vec2::X;
+		}
+		if input_key.pressed(KeyCode::ArrowRight) {
+			camera_direction += Vec2::X;
+		}
+		camera_move.send(MoveCameraEvent(camera_direction * camera_velocity));
+
+		if input_key.just_pressed(KeyCode::NumpadAdd) {
+			camera_zoom.send(ZoomCameraEvent(1.1));
+		}
+		if input_key.just_pressed(KeyCode::NumpadSubtract) {
+			camera_zoom.send(ZoomCameraEvent(1.0 / 1.1));
+		}
+	}
 }
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect, Default)]
