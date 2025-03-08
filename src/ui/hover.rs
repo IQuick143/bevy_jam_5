@@ -43,48 +43,7 @@ pub struct HintText {
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<HintText>()
-		.add_systems(Update, (update_hover, update_hover_text))
-		.add_systems(Startup, spawn_hover_text);
-}
-
-fn spawn_hover_text(mut commands: Commands, font: Res<GlobalFont>) {
-	let margin = 10.0;
-	//	let text = "Click to rotate the wheels clockwise! Right click rotates them anti-clockwise! Get the boxes on the buttons and the player to the flag!";
-	commands.spawn((
-		bevy::text::TextBounds {
-			width: Some(HINT_TEXT_SIZE.x - margin * 2.0),
-			height: Some(HINT_TEXT_SIZE.y - margin * 2.0),
-		},
-		Transform::from_xyz(
-			0.0,
-			-GAME_AREA.y / 2.0 + HINT_TEXT_SIZE.y / 2.0,
-			layers::HINT_TEXT_PANEL,
-		),
-		bevy::sprite::Anchor::Center,
-		Text2d::default(),
-		get_text_style(&font),
-		TextLayout {
-			justify: JustifyText::Left,
-			..default()
-		},
-		HoverText,
-		Hoverable {
-			hover_text: HINT_BOX,
-			hover_bounding_circle: None,
-			hover_bounding_box: Some(Aabb2d::new(Vec2::ZERO, HINT_TEXT_SIZE / 2.0)),
-		},
-	));
-}
-
-fn get_text_style(font: &GlobalFont) -> (TextFont, TextColor) {
-	(
-		TextFont {
-			font: font.0.clone_weak(),
-			font_size: 32.0,
-			..default()
-		},
-		TextColor(super::palette::LABEL_TEXT),
-	)
+		.add_systems(Update, (update_hover, update_hover_text));
 }
 
 fn update_hover(
@@ -149,7 +108,7 @@ fn update_hover(
 }
 
 fn update_hover_text(
-	mut text_query: Query<(&mut Text2d, &mut Visibility), With<HoverText>>,
+	mut text_query: Query<(&mut Text, &mut Visibility), With<HoverText>>,
 	hint_text: Res<HintText>,
 	state: Res<State<Screen>>,
 ) {

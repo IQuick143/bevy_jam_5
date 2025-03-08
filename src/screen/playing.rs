@@ -6,7 +6,7 @@ use crate::{
 	assets::{GlobalFont, LoadedLevelList},
 	game::{level::list::LevelList, prelude::*},
 	send_event,
-	ui::prelude::*,
+	ui::{hover::HoverText, prelude::*},
 	AppSet,
 };
 
@@ -84,7 +84,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		.with_children(|parent| {
 			parent
 				.spawn(Node {
-					width: Val::Percent(100.0),
+					width: Val::Vw(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: Val::Px(10.0),
 					padding: UiRect::all(Val::Px(10.0)),
@@ -105,7 +105,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 				});
 			parent
 				.spawn(Node {
-					width: Val::Percent(100.0),
+					width: Val::Vw(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: Val::Px(10.0),
 					padding: UiRect::all(Val::Px(10.0)),
@@ -129,8 +129,8 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 				});
 			parent
 				.spawn(Node {
-					width: Val::Percent(100.0),
-					height: Val::Px(50.0),
+					width: Val::Vw(100.0),
+					height: Val::Vh(10.0),
 					margin: UiRect::all(Val::Px(10.0)),
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
@@ -149,6 +149,32 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						TextColor(ui_palette::LABEL_TEXT),
 					));
 				});
+		});
+
+	commands
+		.ui_root_justified(JustifyContent::End)
+		.insert(StateScoped(Screen::Playing))
+		.with_children(|parent| {
+			parent
+				.spawn(Node {
+					width: Val::Vw(100.0),
+					flex_direction: FlexDirection::Row,
+					column_gap: Val::Px(10.0),
+					padding: UiRect::all(Val::Px(10.0)),
+					align_items: AlignItems::Center,
+					justify_content: JustifyContent::Center,
+					..default()
+				})
+				.with_child((
+					HoverText,
+					Text::default(),
+					TextFont {
+						font: font.0.clone_weak(),
+						font_size: 35.0,
+						..default()
+					},
+					TextColor(ui_palette::LABEL_TEXT),
+				));
 		});
 }
 

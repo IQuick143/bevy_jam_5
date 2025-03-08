@@ -183,8 +183,6 @@ pub mod layers {
 	pub const BUTTON_COLOR_LABELS: f32 = -49.0;
 	/// Z depth of sprites for flags and buttons
 	pub const GLYPH_SPRITES: f32 = -50.0;
-	/// Z depth of the bottom text box
-	pub const HINT_TEXT_PANEL: f32 = -100.0;
 	/// Z depth of meshes for perimeters of cycles that are currently selected
 	pub const ACTIVE_CYCLE_RINGS: f32 = -150.0;
 	/// Z depth of meshes for outlines of perimeters of cycles that are currently selected
