@@ -1,7 +1,7 @@
 //! Game mechanics and content.
 
 mod animation;
-mod camera;
+pub mod camera;
 pub mod components;
 mod drawing;
 mod game_sfx;

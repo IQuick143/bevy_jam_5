@@ -101,6 +101,9 @@ pub const COLOR_SPRITE_OFFSET: f32 = 0.0;
 /// Spacing of digit sprites, relative to full width of a sprite slot
 pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
 
+/// Parallax factor of background
+pub const BACKGROUND_PARALLAX: f32 = 0.5;
+
 /// Various dimensions of button color labels.
 /// In a separate module, because there are too many of them
 pub mod color_labels {

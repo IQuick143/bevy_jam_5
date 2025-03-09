@@ -3,6 +3,7 @@
 use super::*;
 use crate::{
 	assets::{self, GlobalFont, HandleMap, ImageKey},
+	game::camera::Parallax,
 	graphics,
 	ui::prelude::*,
 };
@@ -41,6 +42,9 @@ const ANIMATED_BACKGROUND_MESH_SIZE: Vec2 = Vec2::new(
 
 /// Speed of the background animation, in viewport widths per second
 const ANIMATED_BACKGROUND_SPEED: Vec2 = Vec2::new(-0.01, 0.0);
+
+/// Parallax factor of the background mesh
+const ANIMATED_BACKGROUND_PARALLAX: f32 = graphics::BACKGROUND_PARALLAX / 2.0;
 
 #[derive(Resource, Clone, Deref, DerefMut, Debug, Reflect)]
 struct AnimatedBackgroundMaterial(Handle<graphics::ScrollingTextureMaterial>);
@@ -100,6 +104,7 @@ fn enter_title(
 		Mesh2d(meshes.add(Rectangle::from_size(ANIMATED_BACKGROUND_MESH_SIZE))),
 		MeshMaterial2d(background_material.clone_weak()),
 		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_BACKDROP),
+		Parallax(ANIMATED_BACKGROUND_PARALLAX),
 	));
 }
 
