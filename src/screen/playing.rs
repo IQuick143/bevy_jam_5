@@ -157,11 +157,10 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		.with_children(|parent| {
 			parent
 				.spawn(Node {
-					width: Val::Vw(100.0),
-					flex_direction: FlexDirection::Row,
-					column_gap: Val::Px(10.0),
+					width: Val::Vh(100.0),
+					min_width: Val::Vw(50.0),
+					max_width: Val::Vw(100.0),
 					padding: UiRect::all(Val::Px(10.0)),
-					align_items: AlignItems::Center,
 					justify_content: JustifyContent::Center,
 					..default()
 				})
@@ -170,9 +169,10 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 					Text::default(),
 					TextFont {
 						font: font.0.clone_weak(),
-						font_size: 35.0,
+						font_size: 20.0,
 						..default()
 					},
+					TextLayout::new_with_justify(JustifyText::Center),
 					TextColor(ui_palette::LABEL_TEXT),
 				));
 		});
