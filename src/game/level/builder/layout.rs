@@ -695,6 +695,12 @@ impl LevelBuilder {
 				scale.x.min(scale.y)
 			}
 		};
+		let scale = if scale.is_finite() {
+			scale.abs()
+		} else {
+			warn!("Non-finite scale value in level bound computation, level likely has 0 size.");
+			1.0
+		};
 
 		let viewport_center = viewport.center();
 		let bounds_center = bounds.center();
@@ -715,7 +721,10 @@ impl LevelBuilder {
 				*p = (*p - bounds_center) * scale + viewport_center;
 			}
 		}
-		self.bounding_box = Some(Aabb2d::new(Vec2::ZERO, bounds.half_size() * scale));
+		self.bounding_box = Some(Aabb2d::new(
+			Vec2::ZERO,
+			(bounds.half_size() * scale).max(Vec2::ONE),
+		));
 	}
 }
 
