@@ -28,7 +28,7 @@ pub const LEVEL_AREA_CENTER: Vec2 = Vec2::ZERO;
 pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
 
 /// Size of a sprite in world-units.
-pub const SPRITE_LENGTH: f32 = 75.0;
+pub const SPRITE_LENGTH: f32 = 100.0;
 
 /// Half of the width of a cycle perimeter ring in world units
 pub const RING_HALF_WIDTH: f32 = 0.15 / 4.0 * SPRITE_LENGTH;

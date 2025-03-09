@@ -18,6 +18,7 @@ impl LevelBuilder {
 			declared_one_way_cycle_links: Vec::new(),
 			declared_one_way_detector_links: Vec::new(),
 			bounding_box: None,
+			scale_override: None,
 		}
 	}
 

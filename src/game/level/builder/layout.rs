@@ -336,6 +336,15 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	/// Sets the scale override to the level.
+	/// Argument is a float converting epilang units to world units
+	pub fn set_level_scale(&mut self, mut scale: f32) {
+		if !scale.is_finite() {
+			scale = 1.0;
+		}
+		self.scale_override = Some(scale.max(0.0));
+	}
+
 	/// Iterates through all vertices and applies their intermediate
 	/// color label position to button objects on them if present.
 	///
@@ -678,9 +687,15 @@ impl LevelBuilder {
 	/// Resizes all currently placed objects to fit a bounding box
 	fn fit_to_viewport(&mut self, viewport: Aabb2d) {
 		let bounds = self.get_bounding_box();
-		let scale = viewport.half_size() / bounds.half_size();
-		// Scaling must be equal in both directions
-		let scale = scale.x.min(scale.y);
+		let scale = match self.scale_override {
+			Some(scale) => scale,
+			None => {
+				let scale = viewport.half_size() / bounds.half_size();
+				// Scaling must be equal in both directions
+				scale.x.min(scale.y)
+			}
+		};
+
 		let viewport_center = viewport.center();
 		let bounds_center = bounds.center();
 
