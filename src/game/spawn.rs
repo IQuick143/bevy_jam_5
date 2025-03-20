@@ -502,7 +502,7 @@ fn create_link_visuals(
 	links_q: Query<
 		(
 			Entity,
-			&Parent,
+			&ChildOf,
 			&LinkTargetCycle,
 			&LinkedCycleDirection,
 			Option<&LinkMultiplicity>,
@@ -513,7 +513,7 @@ fn create_link_visuals(
 ) {
 	for (id, source, dest, direction, multiplicity) in &links_q {
 		// Fetch endpoints
-		let a = get_link_endpoint(source.get(), cycles_q.reborrow());
+		let a = get_link_endpoint(source.parent, cycles_q.reborrow());
 		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
 		let (Some(a), Some(b)) = (a, b) else {
 			continue;
@@ -571,7 +571,7 @@ fn get_link_endpoint(
 }
 
 fn create_hard_link_visual(
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	a: Vec2,
 	b: Vec2,
 	direction: LinkedCycleDirection,
@@ -623,7 +623,7 @@ fn create_hard_link_visual(
 }
 
 fn create_one_way_link_visual(
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	a: Vec2,
 	b: Vec2,
 	direction: LinkedCycleDirection,
@@ -891,7 +891,7 @@ fn create_button_color_markers(
 }
 
 fn create_logical_color_sprite(
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	logical_color: LogicalColor,
 	sprite_color: Color,
 	sprite_atlas: &BoxColorSpriteAtlas,
@@ -985,7 +985,7 @@ fn get_number_typeset_width(digits: &str) -> f32 {
 /// - `digit_sprite_size` - Size of the sprite for each digit
 fn typeset_number(
 	digits: &str,
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	start_transform: Transform,
 	digit_atlas: &DigitAtlas,
 	color: Color,
