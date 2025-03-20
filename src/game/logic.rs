@@ -520,7 +520,7 @@ fn button_trigger_check_system(
 
 fn level_completion_check_system(
 	flags_q: Query<&IsTriggered, With<Goal>>,
-	buttons_q: Query<&IsTriggered, With<BoxSlot>>,
+	buttons_q: Query<&IsTriggered, With<SokoButton>>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
 ) {

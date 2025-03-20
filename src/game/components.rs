@@ -15,7 +15,7 @@ pub struct Player;
 
 /// [`Object`] entity that represents a push box
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct Box;
+pub struct SokoBox;
 
 /// [`Glyph`] entity that represents the destination of a [`Player`] entity
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -23,7 +23,7 @@ pub struct Goal;
 
 /// [`Glyph`] entity that represents the destination of a [`Box`] entity
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct BoxSlot;
+pub struct SokoButton;
 
 /// Movable thing
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]

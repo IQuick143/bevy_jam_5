@@ -276,7 +276,7 @@ fn spawn_thing_entities(
 			ObjectData::Box(None) => commands
 				.spawn((
 					Object,
-					Box,
+					SokoBox,
 					object,
 					ThingData::Object(object),
 					*session,
@@ -289,7 +289,7 @@ fn spawn_thing_entities(
 			ObjectData::Box(Some(color)) => commands
 				.spawn((
 					Object,
-					Box,
+					SokoBox,
 					color,
 					object,
 					ThingData::Object(object),
@@ -318,7 +318,7 @@ fn spawn_thing_entities(
 			GlyphData::Button(None) => commands
 				.spawn((
 					Glyph,
-					BoxSlot,
+					SokoButton,
 					glyph,
 					ThingData::Glyph(glyph),
 					*session,
@@ -331,7 +331,7 @@ fn spawn_thing_entities(
 			GlyphData::Button(Some(color_data)) => commands
 				.spawn((
 					Glyph,
-					BoxSlot,
+					SokoButton,
 					glyph,
 					color_data,
 					ThingData::Glyph(glyph),
@@ -832,7 +832,7 @@ fn create_box_color_markers(
 	sprite_atlas: Res<BoxColorSpriteAtlas>,
 	digit_atlas: Res<DigitAtlas>,
 	palette: Res<ThingPalette>,
-	query: Query<(Entity, &LogicalColor), (With<Box>, Added<LogicalColor>)>,
+	query: Query<(Entity, &LogicalColor), (With<SokoBox>, Added<LogicalColor>)>,
 ) {
 	for (id, color) in &query {
 		commands.entity(id).with_children(|children| {
@@ -857,7 +857,7 @@ fn create_button_color_markers(
 	palette: Res<ThingPalette>,
 	query: Query<
 		(Entity, &LogicalColor, &ButtonColorLabelAppearence),
-		(With<BoxSlot>, Added<LogicalColor>),
+		(With<SokoButton>, Added<LogicalColor>),
 	>,
 ) {
 	for (id, color, label_appearence) in &query {

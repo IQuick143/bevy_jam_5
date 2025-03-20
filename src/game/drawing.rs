@@ -265,7 +265,7 @@ fn goal_unlock_animation_system(
 
 fn button_trigger_animation_system(
 	mut sprites_q: Query<&mut Sprite>,
-	buttons_q: Query<(&Children, &IsTriggered), (With<BoxSlot>, Changed<IsTriggered>)>,
+	buttons_q: Query<(&Children, &IsTriggered), (With<SokoButton>, Changed<IsTriggered>)>,
 	palette: Res<ThingPalette>,
 ) {
 	for (children, is_triggered) in &buttons_q {

@@ -165,8 +165,8 @@ pub fn _gizmo_draw(
 		&CycleTurnability,
 	)>,
 	players: Query<&Transform, With<Player>>,
-	boxes: Query<&Transform, With<Box>>,
-	buttons: Query<&Transform, With<BoxSlot>>,
+	boxes: Query<&Transform, With<SokoBox>>,
+	buttons: Query<&Transform, With<SokoButton>>,
 	flags: Query<&Transform, With<Goal>>,
 	mut gizmos: Gizmos,
 ) {
