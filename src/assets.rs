@@ -320,7 +320,7 @@ impl FromWorld for GlobalFont {
 	}
 }
 
-pub trait AssetKey: Sized {
+pub trait AssetKey: Eq + std::hash::Hash + Sized {
 	type Asset: Asset;
 }
 
@@ -328,12 +328,9 @@ pub trait AssetKey: Sized {
 #[reflect(Resource)]
 pub struct HandleMap<K: AssetKey>(HashMap<K, Handle<K::Asset>>);
 
-impl<K: AssetKey, T> From<T> for HandleMap<K>
-where
-	T: Into<HashMap<K, Handle<K::Asset>>>,
-{
-	fn from(value: T) -> Self {
-		Self(value.into())
+impl<K: AssetKey, const N: usize> From<[(K, Handle<K::Asset>); N]> for HandleMap<K> {
+	fn from(value: [(K, Handle<K::Asset>); N]) -> Self {
+		Self(value.into_iter().collect())
 	}
 }
 
