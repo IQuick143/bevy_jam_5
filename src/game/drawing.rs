@@ -13,7 +13,7 @@ use crate::{
 use bevy::{
 	color::palettes,
 	math::bounding::Aabb2d,
-	utils::hashbrown::{HashMap, HashSet},
+	platform_support::collections::{HashMap, HashSet},
 };
 
 pub(super) fn plugin(app: &mut App) {

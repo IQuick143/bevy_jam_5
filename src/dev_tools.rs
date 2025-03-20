@@ -9,7 +9,7 @@ use crate::{
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions,
 	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
-	utils::hashbrown::HashMap,
+	platform_support::collections::HashMap,
 };
 
 use crate::screen::Screen;

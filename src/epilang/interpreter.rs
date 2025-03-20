@@ -1,5 +1,5 @@
 use super::{ast::*, values::*, SourceLocation};
-use bevy::utils::HashMap;
+use bevy::platform_support::collections::HashMap;
 use std::ops::Range;
 
 #[derive(Clone, PartialEq, Eq, Debug)]

@@ -1,7 +1,7 @@
 use super::error::*;
 use super::*;
 
-use bevy::utils::hashbrown::HashSet;
+use bevy::platform_support::collections::HashSet;
 use itertools::Itertools as _;
 
 impl LevelBuilder {
