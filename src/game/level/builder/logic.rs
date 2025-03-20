@@ -597,7 +597,7 @@ impl LevelBuilder {
 			IntermediateVertexPosition::Free => Vec2::ZERO,
 			// Prevented by [`materialize_all_partial_vertex_placements`]
 			IntermediateVertexPosition::Partial(_) => {
-				warn!("Partially placed vertex in build phase, should have been materialized");
+				log::warn!("Partially placed vertex in build phase, should have been materialized");
 				Vec2::ONE
 			}
 		};
@@ -612,11 +612,11 @@ impl LevelBuilder {
 	fn build_cycle_data(intermediate: IntermediateCycleData) -> CycleData {
 		let placement = intermediate
 			.placement.unwrap_or_else(|| {
-				warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
+				log::warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
 				CyclePlacement { position: Vec2::ZERO, shape: CycleShape::Circle(1.0) }
 			});
 		let center_sprite_position = intermediate.center_sprite_position.unwrap_or_else(|| {
-			warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
+			log::warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
 			None
 		});
 		let center_sprite_appearence =
@@ -624,7 +624,7 @@ impl LevelBuilder {
 		let (group, relative_direction) = match intermediate.linked_cycle {
 			IntermediateLinkStatus::Group(group, relative_direction) => (group, relative_direction),
 			_ => {
-				warn!(
+				log::warn!(
 					"Cycle built without a valid group assignment, defaulting to an invalid value"
 				);
 				(0, LinkedCycleDirection::Coincident)

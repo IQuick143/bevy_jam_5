@@ -481,7 +481,7 @@ fn cycle_blocked_marker_system(
 	let mut marked_vertices = HashSet::new();
 	for event in events.read() {
 		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
-			error!("Incorrect level data!?");
+			log::error!("Incorrect level data!?");
 			return;
 		};
 		for &vert in conflicting_vertices.iter() {
@@ -495,7 +495,7 @@ fn cycle_blocked_marker_system(
 			.get(vertex)
 			.and_then(|entity| vertices_q.get(*entity).ok())
 		else {
-			warn!("Nonexistent vertex!");
+			log::warn!("Nonexistent vertex!");
 			continue;
 		};
 		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);

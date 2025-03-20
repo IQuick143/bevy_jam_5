@@ -354,11 +354,11 @@ impl LevelBuilder {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
 				if let Some(p) = vertex.color_label_appearence {
 					let Some(vertex_position) = vertex.position.get_fixed() else {
-						warn!("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
+						log::warn!("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
 						continue;
 					};
 					let Some(placement) = self.cycles[p.owner_cycle].placement else {
-						warn!("Color label appearences cannot be applied before all cycles are placed");
+						log::warn!("Color label appearences cannot be applied before all cycles are placed");
 						continue;
 					};
 					let owner_cycle_position = placement.position;
@@ -584,7 +584,7 @@ impl LevelBuilder {
 		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
 	) -> bool {
 		let Some(cycle_placement) = self.cycles[cycle_index].placement else {
-			warn!("Partial materialization checks can only be run on placed cycles");
+			log::warn!("Partial materialization checks can only be run on placed cycles");
 			return false;
 		};
 		// Positions of all checked vertices, in cyclic order
@@ -698,7 +698,9 @@ impl LevelBuilder {
 		let scale = if scale.is_finite() {
 			scale.abs()
 		} else {
-			warn!("Non-finite scale value in level bound computation, level likely has 0 size.");
+			log::warn!(
+				"Non-finite scale value in level bound computation, level likely has 0 size."
+			);
 			1.0
 		};
 

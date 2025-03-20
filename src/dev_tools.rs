@@ -117,7 +117,7 @@ fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<Level
 	let Some(level) = level_asset.get(&level_handle.0) else {
 		return;
 	};
-	info!("{:?}", level);
+	log::info!("{:?}", level);
 }
 
 pub fn _debug_inputs(
@@ -220,14 +220,14 @@ pub fn _gizmo_draw(
 			match (turnability, current_turnability.0) {
 				(CycleTurnability::Always, true) => palettes::tailwind::GREEN_600,
 				(CycleTurnability::Always, false) => {
-					warn!("Always cycle has no turning somehow");
+					log::warn!("Always cycle has no turning somehow");
 					palettes::tailwind::RED_600
 				}
 				(CycleTurnability::WithPlayer, true) => palettes::tailwind::AMBER_100,
 				(CycleTurnability::WithPlayer, false) => palettes::tailwind::AMBER_600,
 				(CycleTurnability::Never, false) => palettes::tailwind::RED_600,
 				(CycleTurnability::Never, true) => {
-					warn!("Never cycle has turning somehow");
+					log::warn!("Never cycle has turning somehow");
 					palettes::tailwind::GREEN_600
 				}
 			},
