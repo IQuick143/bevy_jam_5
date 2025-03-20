@@ -21,7 +21,7 @@ fn play_sfx(
 		AudioPlayer(sfx_handles[&sfx_key].clone_weak()),
 		PlaybackSettings {
 			mode: PlaybackMode::Despawn,
-			volume: Volume::new(sfx_key.volume_multiplier()),
+			volume: Volume::Linear(sfx_key.volume_multiplier()),
 			..default()
 		},
 	));

@@ -28,7 +28,7 @@ fn play_soundtrack(
 		AudioPlayer(soundtrack_handles[&soundtrack_key].clone_weak()),
 		PlaybackSettings {
 			mode: PlaybackMode::Loop,
-			volume: Volume::new(3.5),
+			volume: Volume::Linear(3.5),
 			..default()
 		},
 		IsSoundtrack,
