@@ -65,7 +65,7 @@ struct UndoButton;
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct LevelNameBox;
 
-#[derive(Event, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
 	Reset,
@@ -74,7 +74,7 @@ enum GameUiAction {
 }
 
 /// Event that is sent to signal that the currently selected level should be (re)loaded
-#[derive(Event, Clone, Copy, Debug, Default)]
+#[derive(Event, Component, Clone, Copy, Debug, Default)]
 pub struct LoadLevel;
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
