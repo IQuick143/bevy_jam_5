@@ -122,9 +122,9 @@ fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<Level
 
 pub fn _debug_inputs(
 	input: Res<ButtonInput<MouseButton>>,
-	window_q: Query<&Window>,
+	window: Single<&Window>,
+	camera: Single<(&Camera, &GlobalTransform)>,
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
-	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut rotate_cycle_events: EventWriter<RotateCycleGroup>,
 ) {
 	let lmb = input.just_pressed(MouseButton::Left);
@@ -135,8 +135,7 @@ pub fn _debug_inputs(
 		(false, true) => CycleTurningDirection::Reverse,
 		(false, false) => return,
 	};
-	let window = window_q.single();
-	let (camera, camera_transform) = camera_q.single();
+	let (camera, camera_transform) = *camera;
 	if let Some(cursor_pos) = window
 		.cursor_position()
 		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok())

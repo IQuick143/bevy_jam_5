@@ -1,6 +1,7 @@
 use crate::{ui::freeze::ui_not_frozen, AppSet};
 
 use super::{
+	camera::CameraHarness,
 	level::{CyclePlacement, CycleShape},
 	logic::*,
 	prelude::*,
@@ -76,8 +77,8 @@ pub enum CycleInteraction {
 fn cycle_inputs_system(
 	input_mouse: Res<ButtonInput<MouseButton>>,
 	input_key: Res<ButtonInput<KeyCode>>,
-	window_q: Query<&Window>,
-	camera_q: Query<(&Camera, &GlobalTransform)>,
+	window: Single<&Window>,
+	camera: Single<(&Camera, &GlobalTransform), With<CameraHarness>>,
 	mut cycles_q: Query<(
 		Entity,
 		&CyclePlacement,
@@ -86,12 +87,6 @@ fn cycle_inputs_system(
 		&mut CycleInteraction,
 	)>,
 ) {
-	// This system may get called when exiting the app, after these entities
-	// have been despawned, we do not want to crash in that case
-	if window_q.is_empty() || camera_q.is_empty() {
-		return;
-	}
-
 	let lmb = input_mouse.just_pressed(MouseButton::Left) || input_key.just_pressed(KeyCode::KeyD);
 	let rmb = input_mouse.just_pressed(MouseButton::Right) || input_key.just_pressed(KeyCode::KeyA);
 	let new_interaction = match (lmb, rmb) {
@@ -100,8 +95,7 @@ fn cycle_inputs_system(
 		(false, true) => CycleInteraction::RightClick,
 		(false, false) => CycleInteraction::Hover,
 	};
-	let window = window_q.single();
-	let (camera, camera_transform) = camera_q.single();
+	let (camera, camera_transform) = *camera;
 	let cursor_pos = window
 		.cursor_position()
 		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok());
