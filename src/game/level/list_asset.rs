@@ -72,7 +72,7 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 		reader: &mut dyn bevy::asset::io::Reader,
 		_settings: &Self::Settings,
 		load_context: &mut bevy::asset::LoadContext,
-	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
+	) -> impl bevy::tasks::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
