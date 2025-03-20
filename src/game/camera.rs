@@ -99,13 +99,13 @@ fn spawn_camera(mut commands: Commands) {
 			clear_color: ClearColorConfig::Custom(Color::WHITE),
 			..default()
 		},
-		OrthographicProjection {
+		Projection::Orthographic(OrthographicProjection {
 			scaling_mode: ScalingMode::AutoMin {
 				min_width: GAME_AREA.x,
 				min_height: GAME_AREA.y,
 			},
 			..OrthographicProjection::default_2d()
-		},
+		}),
 		// Render all UI to this camera.
 		// Not strictly necessary since we only use one camera,
 		// but if we don't use this component, our UI will disappear as soon
@@ -149,11 +149,7 @@ fn set_camera_level_view(
 }
 
 fn update_camera(
-	camera: Single<(
-		&mut CameraHarness,
-		&mut OrthographicProjection,
-		&mut Transform,
-	)>,
+	camera: Single<(&mut CameraHarness, &mut Projection, &mut Transform)>,
 	mut move_events: EventReader<MoveCameraEvent>,
 	mut zoom_events: EventReader<ZoomCameraEvent>,
 	time: Res<Time<Real>>,
@@ -170,10 +166,17 @@ fn update_camera(
 	let bounds =
 		level_size / harness.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));
 
-	projection.scaling_mode = ScalingMode::AutoMin {
-		min_width: bounds.x,
-		min_height: bounds.y,
-	};
+	match projection.as_mut() {
+		Projection::Orthographic(proj) => {
+			proj.scaling_mode = ScalingMode::AutoMin {
+				min_width: bounds.x,
+				min_height: bounds.y,
+			};
+		}
+		_ => {
+			log::warn!("Camera has invalid (non-orthographic) projection.");
+		}
+	}
 
 	let movement = move_events
 		.read()
@@ -201,10 +204,9 @@ fn apply_paralax(
 	mut query: Query<(&mut Transform, &Parallax, &ParallaxBasis), Without<Camera2d>>,
 	camera_q: Query<&Transform, (With<Camera2d>, Changed<Transform>)>,
 ) {
-	if camera_q.is_empty() {
+	let Ok(camera_transform) = camera_q.single() else {
 		return;
-	}
-	let camera_transform = camera_q.single();
+	};
 	for (mut transform, Parallax(parallax), ParallaxBasis(basis)) in &mut query {
 		let new_position = basis + camera_transform.translation.xy() * parallax;
 		transform.translation.x = new_position.x;
