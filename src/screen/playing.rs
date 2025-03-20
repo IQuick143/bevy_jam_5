@@ -286,7 +286,11 @@ fn update_level_name_display(
 		let level_data = level_assets
 			.get(level_handle)
 			.expect("Got an invalid level handle");
-		level_name_q.single_mut().0.clone_from(&level_data.name);
+		level_name_q
+			.single_mut()
+			.unwrap()
+			.0
+			.clone_from(&level_data.name);
 	}
 }
 
