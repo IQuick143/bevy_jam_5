@@ -328,9 +328,9 @@ fn cycle_center_interaction_visuals_update_system(
 		return;
 	};
 
-	let mut meshes_to_repaint = HashMap::new();
-	let mut outlines_to_repaint = HashMap::new();
-	let mut sprites_to_repaint = HashMap::new();
+	let mut meshes_to_repaint = HashMap::<_, _>::default();
+	let mut outlines_to_repaint = HashMap::<_, _>::default();
+	let mut sprites_to_repaint = HashMap::<_, _>::default();
 
 	for (interaction, cycle) in &cycles_q {
 		let is_selected = *interaction != CycleInteraction::None;
@@ -478,7 +478,7 @@ fn cycle_blocked_marker_system(
 		return;
 	};
 
-	let mut marked_vertices = HashSet::new();
+	let mut marked_vertices = HashSet::<_>::default();
 	for event in events.read() {
 		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
 			log::error!("Incorrect level data!?");

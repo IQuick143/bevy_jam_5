@@ -267,7 +267,7 @@ pub fn _simulate_vertices(
 ) {
 	const TARGET_RADIUS: f32 = 150.0;
 
-	let mut gradients: HashMap<Entity, Vec2> = HashMap::new();
+	let mut gradients: HashMap<Entity, Vec2> = HashMap::default();
 
 	let mut add_gradient = |e: Entity, grad: Vec2| {
 		gradients.insert(e, gradients.get(&e).copied().unwrap_or_default() + grad);

@@ -66,7 +66,7 @@ impl LevelBuilder {
 			return Err(LevelBuilderError::VertexIndexOutOfRange(i));
 		}
 		// Max with 1 to avoid a possible panic in rem_euclid.
-		let n_vertices = vertex_indices.len().max(1) as i32;
+		let n_vertices = usize::max(vertex_indices.len(), 1) as i32;
 		let detectors = detectors
 			.into_iter()
 			.map(|(detector, position)| (detector, i32::rem_euclid(position, n_vertices) as usize))
@@ -550,7 +550,7 @@ impl LevelBuilder {
 		// TODO: Use a better algorithm, like come on O(n^6) ???
 		for group_a in 0..groups.len() {
 			for group_b in group_a..groups.len() {
-				let mut problems = HashSet::new();
+				let mut problems = HashSet::default();
 				for &(cycle_a, _) in groups[group_a].cycles.iter() {
 					for &(cycle_b, _) in groups[group_b].cycles.iter() {
 						if cycle_a == cycle_b {

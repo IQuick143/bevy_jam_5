@@ -400,7 +400,7 @@ pub struct VariablePool<'a, T: DomainVariableValue + 'a>(HashMap<&'a str, Variab
 impl<'a, T: DomainVariableValue + 'a> VariablePool<'a, T> {
 	/// Constructs an empty variable pool
 	pub fn new() -> Self {
-		Self(HashMap::new())
+		Self(HashMap::default())
 	}
 
 	/// Creates a new built-in variable and returns the previous value of that name, if any
