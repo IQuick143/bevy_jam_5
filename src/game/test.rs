@@ -74,7 +74,7 @@ mod utils {
 		mut spawn_trigger: EventWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
 		let handle = asset_server.add(level);
-		spawn_trigger.send(EnterLevel(Some(handle)));
+		spawn_trigger.write(EnterLevel(Some(handle)));
 		Ok(())
 	}
 
@@ -157,7 +157,7 @@ mod utils {
 		mut events: EventWriter<RotateCycleGroup>,
 		cycle_list: Res<CycleEntities>,
 	) {
-		events.send(RotateCycleGroup(RotateCycle {
+		events.write(RotateCycleGroup(RotateCycle {
 			target_cycle: cycle_list.0[id],
 			direction: if amount >= 0 {
 				CycleTurningDirection::Nominal

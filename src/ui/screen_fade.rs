@@ -153,7 +153,7 @@ fn send_delayed_fade_events<E: Event + Component + Clone>(
 ) {
 	for (animation, event) in &query {
 		if animation.prev_progress() < PEAK_OFFSET && animation.progress() >= PEAK_OFFSET {
-			events.send(event.clone());
+			events.write(event.clone());
 		}
 	}
 }

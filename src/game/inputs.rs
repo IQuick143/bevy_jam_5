@@ -54,13 +54,13 @@ fn send_input_events(
 		if input_key.pressed(KeyCode::ArrowRight) {
 			camera_direction += Vec2::X;
 		}
-		camera_move.send(MoveCameraEvent(camera_direction * camera_velocity));
+		camera_move.write(MoveCameraEvent(camera_direction * camera_velocity));
 
 		if input_key.just_pressed(KeyCode::NumpadAdd) {
-			camera_zoom.send(ZoomCameraEvent(1.1));
+			camera_zoom.write(ZoomCameraEvent(1.1));
 		}
 		if input_key.just_pressed(KeyCode::NumpadSubtract) {
-			camera_zoom.send(ZoomCameraEvent(1.0 / 1.1));
+			camera_zoom.write(ZoomCameraEvent(1.0 / 1.1));
 		}
 	}
 }
@@ -158,7 +158,7 @@ fn cycle_rotation_with_inputs_system(
 			direction,
 			amount: 1,
 		};
-		rot_events.send(RotateCycleGroup(rotation));
-		record_events.send(RecordCycleGroupRotation(rotation));
+		rot_events.write(RotateCycleGroup(rotation));
+		record_events.write(RecordCycleGroupRotation(rotation));
 	}
 }

@@ -184,7 +184,7 @@ fn game_ui_input_recording_system(
 ) {
 	for (interaction, action) in &query {
 		if *interaction == Interaction::Pressed {
-			events.send(*action);
+			events.write(*action);
 		}
 	}
 }
@@ -229,7 +229,7 @@ fn game_ui_input_processing_system(
 				}
 			}
 			GameUiAction::Undo => {
-				undo_commands.send(UndoMove);
+				undo_commands.write(UndoMove);
 			}
 		}
 	}
@@ -312,5 +312,5 @@ fn load_level(
 		.expect("PlayingLevel is out of range")
 		.data_handle
 		.clone_weak();
-	events.send(EnterLevel(Some(level_handle)));
+	events.write(EnterLevel(Some(level_handle)));
 }

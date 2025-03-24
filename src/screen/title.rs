@@ -130,7 +130,7 @@ fn handle_title_action(
 				}
 				#[cfg(not(target_family = "wasm"))]
 				TitleAction::Exit => {
-					app_exit.send(AppExit::Success);
+					app_exit.write(AppExit::Success);
 				}
 			}
 		}

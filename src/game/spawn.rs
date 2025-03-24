@@ -116,7 +116,7 @@ fn handle_enter_level(
 		expiring_session_id.0 = last_session_id.0;
 		if let Some(level_handle) = &event.0 {
 			last_session_id.0 .0 += 1;
-			spawn_events.send(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+			spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
 		}
 	}
 }
@@ -128,7 +128,7 @@ fn despawn_expired_level_entities(
 ) {
 	for (id, session) in &query {
 		if *session <= expiring_session_id.0 {
-			commands.entity(id).despawn_recursive();
+			commands.entity(id).despawn();
 		}
 	}
 }

@@ -307,7 +307,7 @@ fn cycle_group_rotation_relay_system(
 					}
 					if a == group_a_id && group_rotations[b] != 0 {
 						forbidden = true;
-						blocked_event.send(TurnBlockedByGroupConflict(pair_index));
+						blocked_event.write(TurnBlockedByGroupConflict(pair_index));
 					}
 					pair_index += 1;
 				}
@@ -331,8 +331,8 @@ fn cycle_group_rotation_relay_system(
 		} else {
 			CycleTurningDirection::Reverse
 		};
-		update_event.send(GameLayoutChanged);
-		single_events.send_batch(
+		update_event.write(GameLayoutChanged);
+		single_events.write_batch(
 			group_data
 				.cycles
 				.iter()

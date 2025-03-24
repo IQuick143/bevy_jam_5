@@ -100,6 +100,6 @@ enum AppSet {
 /// Use together with input-based run conditions to send input events
 fn send_event<E: Event + Clone>(event: E) -> impl Fn(EventWriter<E>) {
 	move |mut events| {
-		events.send(event.clone());
+		events.write(event.clone());
 	}
 }

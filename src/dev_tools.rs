@@ -158,7 +158,7 @@ pub fn _debug_inputs(
 			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
 			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a })
 		{
-			rotate_cycle_events.send(RotateCycleGroup(RotateCycle {
+			rotate_cycle_events.write(RotateCycleGroup(RotateCycle {
 				target_cycle: target_id,
 				direction,
 				amount: 1,
