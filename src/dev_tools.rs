@@ -21,12 +21,24 @@ pub(super) fn plugin(app: &mut App) {
 		(
 			log_transitions::<Screen>,
 			log_transitions::<PlayingLevel>,
-			automatic_reloading.run_if(in_state(Screen::Playing)),
-			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
-			debug_oneways.run_if(resource_equals(RenderOutlines(true))),
-			draw_layout.run_if(resource_equals(RenderOutlines(true))),
-			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
-			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
+			automatic_reloading
+				.warn_param_missing()
+				.run_if(in_state(Screen::Playing)),
+			print_level_data
+				.warn_param_missing()
+				.run_if(input_just_pressed(KeyCode::KeyY)),
+			debug_oneways
+				.warn_param_missing()
+				.run_if(resource_equals(RenderOutlines(true))),
+			draw_layout
+				.warn_param_missing()
+				.run_if(resource_equals(RenderOutlines(true))),
+			draw_hover_boxes
+				.warn_param_missing()
+				.run_if(resource_equals(RenderOutlines(true))),
+			toggle_box_outlines
+				.warn_param_missing()
+				.run_if(input_just_pressed(KeyCode::KeyB)),
 		),
 	);
 	app.init_resource::<RenderOutlines>();
