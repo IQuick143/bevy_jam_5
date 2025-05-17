@@ -48,7 +48,7 @@ bevy = { version = "0.16.0", default-features=false, features = [
     "configurable_error_handler",
 ] }
 
-itertools = "0.13.0"
+itertools = "0.14.0"
 # Disable low-severity logs at compile time for performance.
 log = { version = "0.4", features = [
     "max_level_debug",
@@ -57,7 +57,7 @@ log = { version = "0.4", features = [
 rand =  { version = "0.8", features = ["small_rng"] }
 regex = "1.10.5"
 logos = "0.15.0"
-pomelo = "0.1.5"
+pomelo = "0.2.1"
 
 [features]
 default = [
