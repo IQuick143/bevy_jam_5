@@ -78,7 +78,7 @@ pub struct CycleEntities(pub Vec<Entity>);
 pub struct VertexEntities(pub Vec<Entity>);
 
 /// Reference to the target cycle of a link entity.
-/// The source cycle is its [`Parent`].
+/// The source cycle is its [`ChildOf`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct LinkTargetCycle(pub Entity);
 
