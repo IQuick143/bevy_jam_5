@@ -87,6 +87,9 @@ impl PathAnimation {
 	/// If possible, the new segment is spliced into the last
 	/// existing segment.
 	pub fn add_segment(&mut self, segment: AnimationPathSegment) {
+		if segment.length() < Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
+			return;
+		}
 		self.static_position = segment.end_position();
 		self.reset_progress();
 		self.append_segment(segment);

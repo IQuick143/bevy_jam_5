@@ -365,7 +365,7 @@ fn cycle_rotation_system(
 		{
 			let n_vertices = cycle_vertices.0.len();
 			if n_vertices == 0 {
-				// Nothing to rotate
+				// No vertices, skip the cycle
 				continue;
 			}
 			let amount = {
