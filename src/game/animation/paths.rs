@@ -211,8 +211,9 @@ impl AnimationPathSegment {
 				if (first.radius - second.radius).abs() > Self::SPLICE_DISTANCE_THRESHOLD {
 					return None;
 				}
-				if (first.final_angle - second.initial_angle).rem_euclid(TAU)
-					> Self::SPLICE_DISTANCE_THRESHOLD
+				if (first.final_angle - second.initial_angle + Self::SPLICE_DISTANCE_THRESHOLD)
+					.rem_euclid(TAU)
+					> Self::SPLICE_DISTANCE_THRESHOLD * 2.0
 				{
 					return None;
 				}
@@ -253,7 +254,13 @@ impl CircleArcPathSegment {
 		mut full_rotations: usize,
 		direction: RotationDirection,
 	) -> f32 {
-		if start != end && (start < end) == (direction == RotationDirection::Clockwise) {
+		const ANGLE_EQUALITY_THRESHOLD: f32 = 0.0001;
+		let is_integer_multiple_of_full_rotation = (start - end + ANGLE_EQUALITY_THRESHOLD)
+			.rem_euclid(TAU)
+			< ANGLE_EQUALITY_THRESHOLD * 2.0;
+		let start_and_end_are_swapped =
+			(start < end) == (direction == RotationDirection::Clockwise);
+		if !is_integer_multiple_of_full_rotation && start_and_end_are_swapped {
 			full_rotations += 1;
 		}
 		let angle_bias = TAU * full_rotations as f32;
