@@ -1,4 +1,4 @@
-use bevy::{app::App, ecs::resource::Resource, platform_support::collections::HashMap};
+use bevy::{app::App, ecs::resource::Resource, platform::collections::HashMap};
 
 use crate::persistent::{register_saveable_resource, Saveable};
 
@@ -65,5 +65,18 @@ impl Saveable for SaveGame {
 				}
 			}
 		}
+	}
+}
+
+impl SaveGame {
+	#[expect(dead_code)]
+	fn is_level_completed(&self, level_id: &str) -> bool {
+		*self.completed_levels.get(level_id).unwrap_or(&false)
+	}
+
+	#[expect(dead_code)]
+	fn set_level_completion(&mut self, level_id: &str, completion: bool) {
+		self.completed_levels
+			.insert(level_id.to_string(), completion);
 	}
 }
