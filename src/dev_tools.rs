@@ -137,7 +137,7 @@ fn toggle_turning_animation_speed(
 	mut animation_time: ResMut<TurnAnimationLength>,
 	mut current_setting: ResMut<TurnAnimationSpeedState>,
 ) {
-	const OPTIONS: [f32; 4] = [TurnAnimationLength::DEFAULT.0, 1.0, 2.0, 3.0];
+	const OPTIONS: [f32; 6] = [TurnAnimationLength::DEFAULT.0, 1.0, 2.0, 3.0, 5.0, 10.0];
 	**current_setting = (**current_setting + 1) % OPTIONS.len();
 	**animation_time = OPTIONS[**current_setting];
 }
