@@ -10,6 +10,7 @@ use rand::Rng as _;
 use std::f32::consts::TAU;
 
 pub fn plugin(app: &mut App) {
+	app.init_resource::<TurnAnimationLength>();
 	app.add_systems(
 		LevelInitialization,
 		(
@@ -39,6 +40,20 @@ fn animation_easing_function(t: f32) -> f32 {
 		1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
 	} else {
 		t * 4.0 / 3.0
+	}
+}
+
+/// Length in seconds of animations that are played when a cycle is turned
+#[derive(Resource, Clone, Copy, PartialEq, PartialOrd, Deref, DerefMut, Debug, Reflect)]
+pub struct TurnAnimationLength(pub f32);
+
+impl TurnAnimationLength {
+	pub const DEFAULT: Self = Self(0.5);
+}
+
+impl Default for TurnAnimationLength {
+	fn default() -> Self {
+		Self::DEFAULT
 	}
 }
 
@@ -118,8 +133,6 @@ impl Default for JumpTurnAnimation {
 	}
 }
 
-const ANIMATION_TIME: f32 = 0.5;
-
 fn listen_for_moves(
 	mut rotation_events: EventReader<RotateSingleCycle>,
 	cycles: Query<(&CycleVertices, &GlobalTransform)>,
@@ -191,12 +204,16 @@ fn listen_for_moves(
 	}
 }
 
-fn move_objects(mut objects: Query<(&mut Transform, &mut PathAnimation)>, time: Res<Time<Real>>) {
+fn move_objects(
+	mut objects: Query<(&mut Transform, &mut PathAnimation)>,
+	time: Res<Time<Real>>,
+	animation_time: Res<TurnAnimationLength>,
+) {
 	for (mut transform, mut animation) in objects.iter_mut() {
 		if !animation.is_in_progress() {
 			continue;
 		}
-		animation.add_progress(time.delta_secs() / ANIMATION_TIME);
+		animation.add_progress(time.delta_secs() / **animation_time);
 		let new_position = animation.sample();
 		transform.translation.x = new_position.x;
 		transform.translation.y = new_position.y;
@@ -231,6 +248,7 @@ fn cycle_turning_animation_system(
 	cycles_q: Query<&CycleCenterVisualEntities>,
 	mut jump_q: Query<&mut JumpTurnAnimation>,
 	mut events: EventReader<RotateSingleCycle>,
+	animation_time: Res<TurnAnimationLength>,
 ) {
 	for event in events.read() {
 		let Ok(visuals) = cycles_q.get(event.0.target_cycle) else {
@@ -247,7 +265,7 @@ fn cycle_turning_animation_system(
 		};
 		animation.make_jump(
 			direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
-			ANIMATION_TIME,
+			**animation_time,
 		);
 	}
 }

@@ -1,7 +1,10 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
+	game::{
+		animation::TurnAnimationLength, components::*, level::CycleTurnability, logic::*,
+		prelude::*,
+	},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
@@ -27,14 +30,24 @@ pub(super) fn plugin(app: &mut App) {
 			draw_layout.run_if(resource_equals(RenderOutlines(true))),
 			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
+			toggle_turning_animation_speed.run_if(input_just_pressed(KeyCode::KeyT)),
 		),
 	);
 	app.init_resource::<RenderOutlines>();
+	app.init_resource::<AutoReload>();
+	app.init_resource::<TurnAnimationSpeedState>();
 }
 
 /// Whether hover and layout boxes should be drawn
 #[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
 struct RenderOutlines(pub bool);
+
+/// Whether the autoreloading system should run
+#[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
+struct AutoReload(pub bool);
+
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug, Default, Reflect)]
+struct TurnAnimationSpeedState(pub usize);
 
 fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
 	render.0 = !render.0;
@@ -118,6 +131,15 @@ fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<Level
 		return;
 	};
 	log::info!("{:?}", level);
+}
+
+fn toggle_turning_animation_speed(
+	mut animation_time: ResMut<TurnAnimationLength>,
+	mut current_setting: ResMut<TurnAnimationSpeedState>,
+) {
+	const OPTIONS: [f32; 4] = [TurnAnimationLength::DEFAULT.0, 1.0, 2.0, 3.0];
+	**current_setting = (**current_setting + 1) % OPTIONS.len();
+	**animation_time = OPTIONS[**current_setting];
 }
 
 pub fn _debug_inputs(

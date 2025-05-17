@@ -1,6 +1,6 @@
 //! Game mechanics and content.
 
-mod animation;
+pub mod animation;
 pub mod camera;
 pub mod components;
 mod drawing;
