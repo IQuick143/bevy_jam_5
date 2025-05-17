@@ -144,21 +144,21 @@ pub enum AnimationPathSegment {
 }
 
 impl AnimationPathSegment {
-	fn end_position(&self) -> Vec2 {
+	pub fn end_position(&self) -> Vec2 {
 		match self {
 			Self::Line(_, x) => *x,
 			Self::CircleArc(x) => x.center_point + Vec2::from_angle(x.final_angle) * x.radius,
 		}
 	}
 
-	fn length(&self) -> f32 {
+	pub fn length(&self) -> f32 {
 		match self {
 			Self::Line(x, y) => x.distance(*y),
 			Self::CircleArc(x) => (x.initial_angle - x.final_angle).abs() * x.radius,
 		}
 	}
 
-	fn sample(&self, progress: f32) -> Vec2 {
+	pub fn sample(&self, progress: f32) -> Vec2 {
 		match self {
 			Self::Line(x, y) => x.lerp(*y, progress),
 			Self::CircleArc(x) => {
@@ -245,18 +245,21 @@ pub struct CircleArcPathSegment {
 
 impl CircleArcPathSegment {
 	/// Calculates the value that should be put into [`CircleArcPathSegment::final_angle`]
-	/// in order to make a path that is up to a full circle in a specified direction
-	pub fn final_angle_from_single_rotation(
+	/// in order to make a path that is `full_rotations` plus up to one full circle
+	/// in a specified direction
+	pub fn final_angle_from_expected_rotation(
 		start: f32,
 		end: f32,
+		mut full_rotations: usize,
 		direction: RotationDirection,
 	) -> f32 {
-		if start >= end && direction == RotationDirection::CounterClockwise {
-			end + TAU
-		} else if start <= end && direction == RotationDirection::Clockwise {
-			end - TAU
-		} else {
-			end
+		if start != end && (start < end) == (direction == RotationDirection::Clockwise) {
+			full_rotations += 1;
+		}
+		let angle_bias = TAU * full_rotations as f32;
+		match direction {
+			RotationDirection::Clockwise => end - angle_bias,
+			RotationDirection::CounterClockwise => end + angle_bias,
 		}
 	}
 }

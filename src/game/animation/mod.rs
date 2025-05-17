@@ -123,69 +123,70 @@ const ANIMATION_TIME: f32 = 0.5;
 fn listen_for_moves(
 	mut rotation_events: EventReader<RotateSingleCycle>,
 	cycles: Query<(&CycleVertices, &GlobalTransform)>,
-	vertices: Query<&GlobalTransform, With<Vertex>>,
+	vertices_q: Query<&GlobalTransform, With<Vertex>>,
 	mut objects: Query<(&mut Transform, &VertexPosition, Option<&mut PathAnimation>), With<Object>>,
 ) {
-	// Maps current vertices to previous vertices and the center of rotation as well as direction
-	let mut permutation_map = HashMap::new();
+	// Maps vertices that have been affected to the path segments taken by the objects on them
+	let mut vertex_paths = HashMap::new();
 	for event in rotation_events.read() {
 		let Ok((vertices, transform)) = cycles.get(event.0.target_cycle) else {
 			log::warn!("Target of RotateSingleCycle is not a cycle entity");
 			continue;
 		};
-		let location = transform.translation().xy();
-		let mut vertex_loop = get_flipped_wrapped_iterator(&vertices.0, event.0.direction);
-		let Some(mut last_id) = vertex_loop.next() else {
-			continue;
+		let center_point = transform.translation().xy();
+		let vertex_positions = vertices
+			.0
+			.iter()
+			.copied()
+			.map(|id| {
+				vertices_q
+					.get(id)
+					.map(|t| t.translation().xy())
+					.inspect_err(|_| log::warn!("CycleVertices item is not a vertex entity"))
+					.unwrap_or_default()
+			})
+			.collect::<Vec<_>>();
+		let full_rotations = event.0.amount / vertices.0.len();
+		let absolute_movement_offset = event.0.amount % vertices.0.len();
+		let movement_offset = match event.0.direction.into() {
+			RotationDirection::Clockwise => vertices.0.len() - absolute_movement_offset,
+			RotationDirection::CounterClockwise => absolute_movement_offset,
 		};
-		for vertex in vertex_loop {
-			permutation_map.insert(vertex, (last_id, location, event.0.direction));
-			last_id = vertex;
+		for (i, (&end_position, &vertex_id)) in vertex_positions.iter().zip(&vertices.0).enumerate()
+		{
+			let start_index = (i + movement_offset) % vertices.0.len();
+			let start_position = vertex_positions[start_index];
+			let initial_angle = (start_position - center_point).to_angle();
+			let final_angle = (end_position - center_point).to_angle();
+			let radius = end_position.distance(center_point);
+			let adjusted_final_angle = CircleArcPathSegment::final_angle_from_expected_rotation(
+				initial_angle,
+				final_angle,
+				full_rotations,
+				event.0.direction.into(),
+			);
+			vertex_paths.insert(
+				vertex_id,
+				AnimationPathSegment::CircleArc(CircleArcPathSegment {
+					center_point,
+					radius,
+					initial_angle,
+					final_angle: adjusted_final_angle,
+				}),
+			);
 		}
 	}
 
 	for (mut transform, vertex_position, animation) in objects.iter_mut() {
-		let end_vertex = vertex_position.0;
-
-		let Ok(end_vertex_transform) = vertices.get(end_vertex) else {
-			log::warn!("VertexPosition of an object is not a vertex entity");
-			continue;
-		};
-
-		let end_position = end_vertex_transform.translation().xy();
-
-		if let Some(mut animation) = animation {
-			let Some(&(start_vertex, center_point, direction)) = permutation_map.get(&end_vertex)
-			else {
-				// No movement, we can skip
-				continue;
-			};
-
-			let Ok(start_vertex_transform) = vertices.get(start_vertex) else {
-				log::warn!("CycleVertices item is not a vertex entity");
-				continue;
-			};
-
-			let start_position = start_vertex_transform.translation().xy();
-			let initial_angle = (start_position - center_point).to_angle();
-			let final_angle = (end_position - center_point).to_angle();
-			let radius = end_position.distance(center_point);
-			let adjusted_final_angle = CircleArcPathSegment::final_angle_from_single_rotation(
-				initial_angle,
-				final_angle,
-				direction.into(),
-			);
-
-			animation.add_segment(AnimationPathSegment::CircleArc(CircleArcPathSegment {
-				center_point,
-				radius,
-				initial_angle,
-				final_angle: adjusted_final_angle,
-			}));
-		} else {
-			// Object is not animated, so we just set the translation to the desired place.
-			transform.translation.x = end_position.x;
-			transform.translation.y = end_position.y;
+		if let Some(path) = vertex_paths.get(&vertex_position.0) {
+			if let Some(mut animation) = animation {
+				animation.add_segment(*path);
+			} else {
+				// Object is not animated, so we just set the translation to the desired place.
+				let end_position = path.end_position();
+				transform.translation.x = end_position.x;
+				transform.translation.y = end_position.y;
+			}
 		}
 	}
 }
