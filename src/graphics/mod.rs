@@ -10,6 +10,10 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_plugins(scrolling_texture::plugin);
 }
 
+/// Fraction of vertical space that should be reserved for UI.
+/// Half of it is at the bottom and half of it is at the top.
+pub const VERTICAL_PADDING_FRACTION: f32 = 0.2;
+
 /// Rectangle centered on (0,0), into which everything should fit in order to guarantee it being rendered.
 pub const GAME_AREA: Vec2 = Vec2::new(1600.0, 900.0);
 
@@ -97,6 +101,9 @@ pub const COLOR_SPRITE_OFFSET: f32 = 0.0;
 /// Spacing of digit sprites, relative to full width of a sprite slot
 pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
 
+/// Parallax factor of background
+pub const BACKGROUND_PARALLAX: f32 = 0.5;
+
 /// Various dimensions of button color labels.
 /// In a separate module, because there are too many of them
 pub mod color_labels {
@@ -179,8 +186,6 @@ pub mod layers {
 	pub const BUTTON_COLOR_LABELS: f32 = -49.0;
 	/// Z depth of sprites for flags and buttons
 	pub const GLYPH_SPRITES: f32 = -50.0;
-	/// Z depth of the bottom text box
-	pub const HINT_TEXT_PANEL: f32 = -100.0;
 	/// Z depth of meshes for perimeters of cycles that are currently selected
 	pub const ACTIVE_CYCLE_RINGS: f32 = -150.0;
 	/// Z depth of meshes for outlines of perimeters of cycles that are currently selected

@@ -9,6 +9,7 @@ mod layout;
 mod logic;
 
 use super::*;
+use bevy::math::bounding::Aabb2d;
 
 /// Helper object for constructing a valid [`LevelData`]
 #[derive(Debug)]
@@ -31,6 +32,11 @@ pub struct LevelBuilder {
 	// TODO: Populate and use this
 	#[expect(dead_code)]
 	declared_one_way_detector_links: Vec<DeclaredOneWayLinkData>,
+	/// Bounding box
+	bounding_box: Option<Aabb2d>,
+	/// A conversion factor from logical "epilang" units to level units.
+	/// If `None` then this conversion is computed in order to fit the level into the usual bounding box.
+	scale_override: Option<f32>,
 }
 
 /// Enumerates the possible sets of positions

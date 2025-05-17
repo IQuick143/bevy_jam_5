@@ -1,6 +1,7 @@
 //! Game mechanics and content.
 
 mod animation;
+pub mod camera;
 pub mod components;
 mod drawing;
 mod game_sfx;
@@ -40,5 +41,6 @@ pub(super) fn plugin(app: &mut App) {
 		game_sfx::plugin,
 		history::plugin,
 		hints::plugin,
+		camera::plugin,
 	));
 }

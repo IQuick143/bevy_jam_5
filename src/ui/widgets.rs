@@ -1,6 +1,10 @@
 //! Helper traits for creating common widgets.
 
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::Val::*};
+use bevy::{
+	ecs::{relationship::RelatedSpawnerCommands, system::EntityCommands},
+	prelude::*,
+	ui::Val::*,
+};
 
 use super::{interaction::InteractionPalette, palette::*};
 
@@ -253,7 +257,7 @@ impl Spawn for Commands<'_, '_> {
 	}
 }
 
-impl Spawn for ChildBuilder<'_> {
+impl Spawn for RelatedSpawnerCommands<'_, ChildOf> {
 	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands {
 		self.spawn(bundle)
 	}

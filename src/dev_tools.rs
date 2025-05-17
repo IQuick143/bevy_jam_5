@@ -9,7 +9,7 @@ use crate::{
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions,
 	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
-	utils::hashbrown::HashMap,
+	platform::collections::HashMap,
 };
 
 use crate::screen::Screen;
@@ -117,14 +117,14 @@ fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<Level
 	let Some(level) = level_asset.get(&level_handle.0) else {
 		return;
 	};
-	info!("{:?}", level);
+	log::info!("{:?}", level);
 }
 
 pub fn _debug_inputs(
 	input: Res<ButtonInput<MouseButton>>,
-	window_q: Query<&Window>,
+	window: Single<&Window>,
+	camera: Single<(&Camera, &GlobalTransform)>,
 	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
-	camera_q: Query<(&Camera, &GlobalTransform)>,
 	mut rotate_cycle_events: EventWriter<RotateCycleGroup>,
 ) {
 	let lmb = input.just_pressed(MouseButton::Left);
@@ -135,8 +135,7 @@ pub fn _debug_inputs(
 		(false, true) => CycleTurningDirection::Reverse,
 		(false, false) => return,
 	};
-	let window = window_q.single();
-	let (camera, camera_transform) = camera_q.single();
+	let (camera, camera_transform) = *camera;
 	if let Some(cursor_pos) = window
 		.cursor_position()
 		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok())
@@ -147,7 +146,7 @@ pub fn _debug_inputs(
 			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
 			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a })
 		{
-			rotate_cycle_events.send(RotateCycleGroup(RotateCycle {
+			rotate_cycle_events.write(RotateCycleGroup(RotateCycle {
 				target_cycle: target_id,
 				direction,
 				amount: 1,
@@ -165,8 +164,8 @@ pub fn _gizmo_draw(
 		&CycleTurnability,
 	)>,
 	players: Query<&Transform, With<Player>>,
-	boxes: Query<&Transform, With<Box>>,
-	buttons: Query<&Transform, With<BoxSlot>>,
+	boxes: Query<&Transform, With<SokoBox>>,
+	buttons: Query<&Transform, With<SokoButton>>,
 	flags: Query<&Transform, With<Goal>>,
 	mut gizmos: Gizmos,
 ) {
@@ -220,14 +219,14 @@ pub fn _gizmo_draw(
 			match (turnability, current_turnability.0) {
 				(CycleTurnability::Always, true) => palettes::tailwind::GREEN_600,
 				(CycleTurnability::Always, false) => {
-					warn!("Always cycle has no turning somehow");
+					log::warn!("Always cycle has no turning somehow");
 					palettes::tailwind::RED_600
 				}
 				(CycleTurnability::WithPlayer, true) => palettes::tailwind::AMBER_100,
 				(CycleTurnability::WithPlayer, false) => palettes::tailwind::AMBER_600,
 				(CycleTurnability::Never, false) => palettes::tailwind::RED_600,
 				(CycleTurnability::Never, true) => {
-					warn!("Never cycle has turning somehow");
+					log::warn!("Never cycle has turning somehow");
 					palettes::tailwind::GREEN_600
 				}
 			},
@@ -268,7 +267,7 @@ pub fn _simulate_vertices(
 ) {
 	const TARGET_RADIUS: f32 = 150.0;
 
-	let mut gradients: HashMap<Entity, Vec2> = HashMap::new();
+	let mut gradients: HashMap<Entity, Vec2> = HashMap::default();
 
 	let mut add_gradient = |e: Entity, grad: Vec2| {
 		gradients.insert(e, gradients.get(&e).copied().unwrap_or_default() + grad);

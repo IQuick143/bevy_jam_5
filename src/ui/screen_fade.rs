@@ -114,11 +114,11 @@ impl Default for FadeAnimationBundle {
 pub trait AddFadeEvent {
 	/// Registers an [`Event`] type and enables forwarding
 	/// of components of this type from [`FadeAnimation`] entities.
-	fn add_fade_event<E: Event + Clone>(&mut self) -> &mut Self;
+	fn add_fade_event<E: Event + Component + Clone>(&mut self) -> &mut Self;
 }
 
 impl AddFadeEvent for App {
-	fn add_fade_event<E: Event + Clone>(&mut self) -> &mut Self {
+	fn add_fade_event<E: Event + Component + Clone>(&mut self) -> &mut Self {
 		self.add_event::<E>().add_systems(
 			Update,
 			send_delayed_fade_events::<E>
@@ -147,13 +147,13 @@ fn despawn_expired_fade_animations(mut commands: Commands, query: Query<(Entity,
 	}
 }
 
-fn send_delayed_fade_events<E: Event + Clone>(
+fn send_delayed_fade_events<E: Event + Component + Clone>(
 	mut events: EventWriter<E>,
 	query: Query<(&FadeAnimation, &E)>,
 ) {
 	for (animation, event) in &query {
 		if animation.prev_progress() < PEAK_OFFSET && animation.progress() >= PEAK_OFFSET {
-			events.send(event.clone());
+			events.write(event.clone());
 		}
 	}
 }

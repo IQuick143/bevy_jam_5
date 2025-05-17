@@ -15,7 +15,7 @@ pub struct Player;
 
 /// [`Object`] entity that represents a push box
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct Box;
+pub struct SokoBox;
 
 /// [`Glyph`] entity that represents the destination of a [`Player`] entity
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -23,7 +23,7 @@ pub struct Goal;
 
 /// [`Glyph`] entity that represents the destination of a [`Box`] entity
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct BoxSlot;
+pub struct SokoButton;
 
 /// Movable thing
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -78,7 +78,7 @@ pub struct CycleEntities(pub Vec<Entity>);
 pub struct VertexEntities(pub Vec<Entity>);
 
 /// Reference to the target cycle of a link entity.
-/// The source cycle is its [`Parent`].
+/// The source cycle is its [`ChildOf`].
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct LinkTargetCycle(pub Entity);
 

@@ -1,7 +1,7 @@
 use super::error::*;
 use super::*;
 
-use bevy::utils::hashbrown::HashSet;
+use bevy::platform::collections::HashSet;
 use itertools::Itertools as _;
 
 impl LevelBuilder {
@@ -17,6 +17,8 @@ impl LevelBuilder {
 			declared_links: Vec::new(),
 			declared_one_way_cycle_links: Vec::new(),
 			declared_one_way_detector_links: Vec::new(),
+			bounding_box: None,
+			scale_override: None,
 		}
 	}
 
@@ -64,7 +66,7 @@ impl LevelBuilder {
 			return Err(LevelBuilderError::VertexIndexOutOfRange(i));
 		}
 		// Max with 1 to avoid a possible panic in rem_euclid.
-		let n_vertices = vertex_indices.len().max(1) as i32;
+		let n_vertices = usize::max(vertex_indices.len(), 1) as i32;
 		let detectors = detectors
 			.into_iter()
 			.map(|(detector, position)| (detector, i32::rem_euclid(position, n_vertices) as usize))
@@ -236,6 +238,7 @@ impl LevelBuilder {
 			building_error.get_or_insert(err);
 		});
 		self.build_layout();
+		let bounding_box = self.bounding_box.unwrap_or_else(|| self.get_bounding_box());
 		let cycles = self
 			.cycles
 			.into_iter()
@@ -261,6 +264,7 @@ impl LevelBuilder {
 				declared_one_way_links: self.declared_one_way_cycle_links,
 				forbidden_group_pairs,
 				execution_order,
+				bounding_box,
 			},
 			building_error,
 		))
@@ -546,7 +550,7 @@ impl LevelBuilder {
 		// TODO: Use a better algorithm, like come on O(n^6) ???
 		for group_a in 0..groups.len() {
 			for group_b in group_a..groups.len() {
-				let mut problems = HashSet::new();
+				let mut problems = HashSet::default();
 				for &(cycle_a, _) in groups[group_a].cycles.iter() {
 					for &(cycle_b, _) in groups[group_b].cycles.iter() {
 						if cycle_a == cycle_b {
@@ -593,7 +597,7 @@ impl LevelBuilder {
 			IntermediateVertexPosition::Free => Vec2::ZERO,
 			// Prevented by [`materialize_all_partial_vertex_placements`]
 			IntermediateVertexPosition::Partial(_) => {
-				warn!("Partially placed vertex in build phase, should have been materialized");
+				log::warn!("Partially placed vertex in build phase, should have been materialized");
 				Vec2::ONE
 			}
 		};
@@ -608,11 +612,11 @@ impl LevelBuilder {
 	fn build_cycle_data(intermediate: IntermediateCycleData) -> CycleData {
 		let placement = intermediate
 			.placement.unwrap_or_else(|| {
-				warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
+				log::warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
 				CyclePlacement { position: Vec2::ZERO, shape: CycleShape::Circle(1.0) }
 			});
 		let center_sprite_position = intermediate.center_sprite_position.unwrap_or_else(|| {
-			warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
+			log::warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
 			None
 		});
 		let center_sprite_appearence =
@@ -620,7 +624,7 @@ impl LevelBuilder {
 		let (group, relative_direction) = match intermediate.linked_cycle {
 			IntermediateLinkStatus::Group(group, relative_direction) => (group, relative_direction),
 			_ => {
-				warn!(
+				log::warn!(
 					"Cycle built without a valid group assignment, defaulting to an invalid value"
 				);
 				(0, LinkedCycleDirection::Coincident)

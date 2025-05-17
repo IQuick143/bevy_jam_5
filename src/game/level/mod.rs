@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::hashbrown::HashSet};
+use bevy::{math::bounding::Aabb2d, platform::collections::HashSet, prelude::*};
 
 pub mod asset;
 pub mod backend;
@@ -35,6 +35,8 @@ pub struct LevelData {
 	/// Data for all one way links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_one_way_links: Vec<DeclaredOneWayLinkData>,
+	/// Bounding box
+	pub bounding_box: Aabb2d,
 }
 
 /// Either the index of a detector or a group

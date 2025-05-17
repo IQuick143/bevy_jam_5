@@ -57,14 +57,15 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		reader: &mut dyn bevy::asset::io::Reader,
 		_settings: &Self::Settings,
 		load_context: &mut bevy::asset::LoadContext,
-	) -> impl bevy::utils::ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>> {
+	) -> impl bevy::tasks::ConditionalSendFuture<Output = std::result::Result<Self::Asset, Self::Error>>
+	{
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			match parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path())) {
+			match parse_and_run(&s, |w| log::warn!("{}: {w}", load_context.asset_path())) {
 				builder::ResultNonExclusive::Ok(level) => Ok(level),
 				builder::ResultNonExclusive::Partial(level, err) => {
-					warn!("{}: partially loaded: {err}", load_context.asset_path());
+					log::warn!("{}: partially loaded: {err}", load_context.asset_path());
 					Ok(level)
 				}
 				builder::ResultNonExclusive::Err(err) => Err(LevelLoadingError::Parsing(err)),

@@ -305,7 +305,7 @@ fn cycle_group_rotation_relay_system(
 					}
 					if a == group_a_id && group_rotations[b] != 0 {
 						forbidden = true;
-						blocked_event.send(TurnBlockedByGroupConflict(pair_index));
+						blocked_event.write(TurnBlockedByGroupConflict(pair_index));
 					}
 					pair_index += 1;
 				}
@@ -329,8 +329,8 @@ fn cycle_group_rotation_relay_system(
 		} else {
 			CycleTurningDirection::Reverse
 		};
-		update_event.send(GameLayoutChanged);
-		single_events.send_batch(
+		update_event.write(GameLayoutChanged);
+		single_events.write_batch(
 			group_data
 				.cycles
 				.iter()
@@ -520,7 +520,7 @@ fn button_trigger_check_system(
 
 fn level_completion_check_system(
 	flags_q: Query<&IsTriggered, With<Goal>>,
-	buttons_q: Query<&IsTriggered, With<BoxSlot>>,
+	buttons_q: Query<&IsTriggered, With<SokoButton>>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
 ) {

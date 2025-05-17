@@ -4,7 +4,7 @@ use super::{
 	components::*, drawing::CycleCenterVisualEntities, level::ThingData, logic::*, prelude::*,
 };
 use crate::AppSet;
-use bevy::utils::hashbrown::HashMap;
+use bevy::platform::collections::HashMap;
 use rand::Rng as _;
 
 pub fn plugin(app: &mut App) {
@@ -190,7 +190,7 @@ fn listen_for_moves(
 	>,
 ) {
 	// Maps current vertices to previous vertices and the center of rotation as well as direction
-	let mut permutation_map = HashMap::new();
+	let mut permutation_map: HashMap<_, _> = HashMap::default();
 	for event in rotation_events.read() {
 		let Ok((vertices, transform)) = cycles.get(event.0.target_cycle) else {
 			log::warn!("Target of RotateSingleCycle is not a cycle entity");

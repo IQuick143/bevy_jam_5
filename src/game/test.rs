@@ -74,7 +74,7 @@ mod utils {
 		mut spawn_trigger: EventWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
 		let handle = asset_server.add(level);
-		spawn_trigger.send(EnterLevel(Some(handle)));
+		spawn_trigger.write(EnterLevel(Some(handle)));
 		Ok(())
 	}
 
@@ -86,7 +86,7 @@ mod utils {
 		assert!(level.is_valid);
 
 		app.world_mut()
-			.run_system_once_with(level, load_level)
+			.run_system_once_with(load_level, level)
 			.expect("System should've ran.")
 			.expect("Level should've parsed!");
 		// An update is needed to trigger the spawning logic
@@ -157,7 +157,7 @@ mod utils {
 		mut events: EventWriter<RotateCycleGroup>,
 		cycle_list: Res<CycleEntities>,
 	) {
-		events.send(RotateCycleGroup(RotateCycle {
+		events.write(RotateCycleGroup(RotateCycle {
 			target_cycle: cycle_list.0[id],
 			direction: if amount >= 0 {
 				CycleTurningDirection::Nominal
@@ -189,7 +189,7 @@ mod utils {
 
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) {
 			self.world_mut()
-				.run_system_once_with((cycle_id, amount), turn_system)
+				.run_system_once_with(turn_system, (cycle_id, amount))
 				.expect("System should have all necessary objects.")
 		}
 	}

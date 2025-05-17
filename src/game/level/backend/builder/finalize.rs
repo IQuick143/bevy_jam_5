@@ -45,6 +45,19 @@ pub fn finalize(
 		}
 	}
 
+	match variable_pool
+		.load_as::<f32>("local_to_world_units")
+		.transpose()
+	{
+		Ok(Some(level_scale)) => {
+			builder.set_level_scale(level_scale);
+		}
+		Ok(None) => {}
+		Err(err) => {
+			return FinalizeError::InvalidVariableType(err).into();
+		}
+	}
+
 	builder.build().map_err(FinalizeError::BuilderError)
 }
 

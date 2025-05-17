@@ -13,7 +13,7 @@ use crate::{
 use bevy::{
 	color::palettes,
 	math::bounding::Aabb2d,
-	utils::hashbrown::{HashMap, HashSet},
+	platform::collections::{HashMap, HashSet},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -265,7 +265,7 @@ fn goal_unlock_animation_system(
 
 fn button_trigger_animation_system(
 	mut sprites_q: Query<&mut Sprite>,
-	buttons_q: Query<(&Children, &IsTriggered), (With<BoxSlot>, Changed<IsTriggered>)>,
+	buttons_q: Query<(&Children, &IsTriggered), (With<SokoButton>, Changed<IsTriggered>)>,
 	palette: Res<ThingPalette>,
 ) {
 	for (children, is_triggered) in &buttons_q {
@@ -328,9 +328,9 @@ fn cycle_center_interaction_visuals_update_system(
 		return;
 	};
 
-	let mut meshes_to_repaint = HashMap::new();
-	let mut outlines_to_repaint = HashMap::new();
-	let mut sprites_to_repaint = HashMap::new();
+	let mut meshes_to_repaint = HashMap::<_, _>::default();
+	let mut outlines_to_repaint = HashMap::<_, _>::default();
+	let mut sprites_to_repaint = HashMap::<_, _>::default();
 
 	for (interaction, cycle) in &cycles_q {
 		let is_selected = *interaction != CycleInteraction::None;
@@ -478,10 +478,10 @@ fn cycle_blocked_marker_system(
 		return;
 	};
 
-	let mut marked_vertices = HashSet::new();
+	let mut marked_vertices = HashSet::<_>::default();
 	for event in events.read() {
 		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
-			error!("Incorrect level data!?");
+			log::error!("Incorrect level data!?");
 			return;
 		};
 		for &vert in conflicting_vertices.iter() {
@@ -495,7 +495,7 @@ fn cycle_blocked_marker_system(
 			.get(vertex)
 			.and_then(|entity| vertices_q.get(*entity).ok())
 		else {
-			warn!("Nonexistent vertex!");
+			log::warn!("Nonexistent vertex!");
 			continue;
 		};
 		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);

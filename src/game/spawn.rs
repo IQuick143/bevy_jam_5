@@ -116,7 +116,7 @@ fn handle_enter_level(
 		expiring_session_id.0 = last_session_id.0;
 		if let Some(level_handle) = &event.0 {
 			last_session_id.0 .0 += 1;
-			spawn_events.send(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+			spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
 		}
 	}
 }
@@ -128,7 +128,7 @@ fn despawn_expired_level_entities(
 ) {
 	for (id, session) in &query {
 		if *session <= expiring_session_id.0 {
-			commands.entity(id).despawn_recursive();
+			commands.entity(id).despawn();
 		}
 	}
 }
@@ -276,7 +276,7 @@ fn spawn_thing_entities(
 			ObjectData::Box(None) => commands
 				.spawn((
 					Object,
-					Box,
+					SokoBox,
 					object,
 					ThingData::Object(object),
 					*session,
@@ -289,7 +289,7 @@ fn spawn_thing_entities(
 			ObjectData::Box(Some(color)) => commands
 				.spawn((
 					Object,
-					Box,
+					SokoBox,
 					color,
 					object,
 					ThingData::Object(object),
@@ -318,7 +318,7 @@ fn spawn_thing_entities(
 			GlyphData::Button(None) => commands
 				.spawn((
 					Glyph,
-					BoxSlot,
+					SokoButton,
 					glyph,
 					ThingData::Glyph(glyph),
 					*session,
@@ -331,7 +331,7 @@ fn spawn_thing_entities(
 			GlyphData::Button(Some(color_data)) => commands
 				.spawn((
 					Glyph,
-					BoxSlot,
+					SokoButton,
 					glyph,
 					color_data,
 					ThingData::Glyph(glyph),
@@ -502,7 +502,7 @@ fn create_link_visuals(
 	links_q: Query<
 		(
 			Entity,
-			&Parent,
+			&ChildOf,
 			&LinkTargetCycle,
 			&LinkedCycleDirection,
 			Option<&LinkMultiplicity>,
@@ -513,7 +513,7 @@ fn create_link_visuals(
 ) {
 	for (id, source, dest, direction, multiplicity) in &links_q {
 		// Fetch endpoints
-		let a = get_link_endpoint(source.get(), cycles_q.reborrow());
+		let a = get_link_endpoint(source.parent(), cycles_q.reborrow());
 		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
 		let (Some(a), Some(b)) = (a, b) else {
 			continue;
@@ -571,7 +571,7 @@ fn get_link_endpoint(
 }
 
 fn create_hard_link_visual(
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	a: Vec2,
 	b: Vec2,
 	direction: LinkedCycleDirection,
@@ -623,7 +623,7 @@ fn create_hard_link_visual(
 }
 
 fn create_one_way_link_visual(
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	a: Vec2,
 	b: Vec2,
 	direction: LinkedCycleDirection,
@@ -832,7 +832,7 @@ fn create_box_color_markers(
 	sprite_atlas: Res<BoxColorSpriteAtlas>,
 	digit_atlas: Res<DigitAtlas>,
 	palette: Res<ThingPalette>,
-	query: Query<(Entity, &LogicalColor), (With<Box>, Added<LogicalColor>)>,
+	query: Query<(Entity, &LogicalColor), (With<SokoBox>, Added<LogicalColor>)>,
 ) {
 	for (id, color) in &query {
 		commands.entity(id).with_children(|children| {
@@ -857,7 +857,7 @@ fn create_button_color_markers(
 	palette: Res<ThingPalette>,
 	query: Query<
 		(Entity, &LogicalColor, &ButtonColorLabelAppearence),
-		(With<BoxSlot>, Added<LogicalColor>),
+		(With<SokoButton>, Added<LogicalColor>),
 	>,
 ) {
 	for (id, color, label_appearence) in &query {
@@ -891,7 +891,7 @@ fn create_button_color_markers(
 }
 
 fn create_logical_color_sprite(
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	logical_color: LogicalColor,
 	sprite_color: Color,
 	sprite_atlas: &BoxColorSpriteAtlas,
@@ -985,7 +985,7 @@ fn get_number_typeset_width(digits: &str) -> f32 {
 /// - `digit_sprite_size` - Size of the sprite for each digit
 fn typeset_number(
 	digits: &str,
-	children: &mut ChildBuilder,
+	children: &mut ChildSpawnerCommands,
 	start_transform: Transform,
 	digit_atlas: &DigitAtlas,
 	color: Color,

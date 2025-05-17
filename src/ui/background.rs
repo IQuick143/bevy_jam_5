@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 
 use crate::{
 	assets::{HandleMap, ImageKey},
+	game::camera::Parallax,
 	graphics::*,
 };
 use bevy::{color::palettes, prelude::*};
@@ -30,5 +31,6 @@ fn spawn_background(
 		MeshMaterial2d(materials.add(material)),
 		Transform::from_translation(Vec3::Z * layers::BACKGROUND)
 			.with_rotation(Quat::from_rotation_z(BACKGROUND_ROTATION)),
+		Parallax(BACKGROUND_PARALLAX),
 	));
 }

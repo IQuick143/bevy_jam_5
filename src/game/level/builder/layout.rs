@@ -336,6 +336,15 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	/// Sets the scale override to the level.
+	/// Argument is a float converting epilang units to world units
+	pub fn set_level_scale(&mut self, mut scale: f32) {
+		if !scale.is_finite() {
+			scale = 1.0;
+		}
+		self.scale_override = Some(scale.max(0.0));
+	}
+
 	/// Iterates through all vertices and applies their intermediate
 	/// color label position to button objects on them if present.
 	///
@@ -345,11 +354,11 @@ impl LevelBuilder {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
 				if let Some(p) = vertex.color_label_appearence {
 					let Some(vertex_position) = vertex.position.get_fixed() else {
-						warn!("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
+						log::warn!("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
 						continue;
 					};
 					let Some(placement) = self.cycles[p.owner_cycle].placement else {
-						warn!("Color label appearences cannot be applied before all cycles are placed");
+						log::warn!("Color label appearences cannot be applied before all cycles are placed");
 						continue;
 					};
 					let owner_cycle_position = placement.position;
@@ -575,7 +584,7 @@ impl LevelBuilder {
 		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
 	) -> bool {
 		let Some(cycle_placement) = self.cycles[cycle_index].placement else {
-			warn!("Partial materialization checks can only be run on placed cycles");
+			log::warn!("Partial materialization checks can only be run on placed cycles");
 			return false;
 		};
 		// Positions of all checked vertices, in cyclic order
@@ -621,7 +630,7 @@ impl LevelBuilder {
 		}
 	}
 	/// Calculates the bounding box of all currently placed cycles and their center sprites
-	fn get_bounding_box(&self) -> Aabb2d {
+	pub(super) fn get_bounding_box(&self) -> Aabb2d {
 		let min = self
 			.cycles
 			.iter()
@@ -678,9 +687,23 @@ impl LevelBuilder {
 	/// Resizes all currently placed objects to fit a bounding box
 	fn fit_to_viewport(&mut self, viewport: Aabb2d) {
 		let bounds = self.get_bounding_box();
-		let scale = viewport.half_size() / bounds.half_size();
-		// Scaling must be equal in both directions
-		let scale = scale.x.min(scale.y);
+		let scale = match self.scale_override {
+			Some(scale) => scale,
+			None => {
+				let scale = viewport.half_size() / bounds.half_size();
+				// Scaling must be equal in both directions
+				scale.x.min(scale.y)
+			}
+		};
+		let scale = if scale.is_finite() {
+			scale.abs()
+		} else {
+			log::warn!(
+				"Non-finite scale value in level bound computation, level likely has 0 size."
+			);
+			1.0
+		};
+
 		let viewport_center = viewport.center();
 		let bounds_center = bounds.center();
 
@@ -700,6 +723,10 @@ impl LevelBuilder {
 				*p = (*p - bounds_center) * scale + viewport_center;
 			}
 		}
+		self.bounding_box = Some(Aabb2d::new(
+			Vec2::ZERO,
+			(bounds.half_size() * scale).max(Vec2::ONE),
+		));
 	}
 }
 

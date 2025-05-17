@@ -6,7 +6,7 @@ use crate::{
 	assets::{GlobalFont, LoadedLevelList},
 	game::{level::list::LevelList, prelude::*},
 	send_event,
-	ui::prelude::*,
+	ui::{hover::HoverText, prelude::*},
 	AppSet,
 };
 
@@ -65,7 +65,7 @@ struct UndoButton;
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct LevelNameBox;
 
-#[derive(Event, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
 	Reset,
@@ -74,7 +74,7 @@ enum GameUiAction {
 }
 
 /// Event that is sent to signal that the currently selected level should be (re)loaded
-#[derive(Event, Clone, Copy, Debug, Default)]
+#[derive(Event, Component, Clone, Copy, Debug, Default)]
 pub struct LoadLevel;
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
@@ -84,7 +84,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 		.with_children(|parent| {
 			parent
 				.spawn(Node {
-					width: Val::Percent(100.0),
+					width: Val::Vw(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: Val::Px(10.0),
 					padding: UiRect::all(Val::Px(10.0)),
@@ -105,7 +105,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 				});
 			parent
 				.spawn(Node {
-					width: Val::Percent(100.0),
+					width: Val::Vw(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: Val::Px(10.0),
 					padding: UiRect::all(Val::Px(10.0)),
@@ -129,8 +129,8 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 				});
 			parent
 				.spawn(Node {
-					width: Val::Percent(100.0),
-					height: Val::Px(50.0),
+					width: Val::Vw(100.0),
+					height: Val::Vh(10.0),
 					margin: UiRect::all(Val::Px(10.0)),
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
@@ -150,6 +150,32 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 					));
 				});
 		});
+
+	commands
+		.ui_root_justified(JustifyContent::End)
+		.insert(StateScoped(Screen::Playing))
+		.with_children(|parent| {
+			parent
+				.spawn(Node {
+					width: Val::Vh(100.0),
+					min_width: Val::Vw(50.0),
+					max_width: Val::Vw(100.0),
+					padding: UiRect::all(Val::Px(10.0)),
+					justify_content: JustifyContent::Center,
+					..default()
+				})
+				.with_child((
+					HoverText,
+					Text::default(),
+					TextFont {
+						font: font.0.clone_weak(),
+						font_size: 20.0,
+						..default()
+					},
+					TextLayout::new_with_justify(JustifyText::Center),
+					TextColor(ui_palette::LABEL_TEXT),
+				));
+		});
 }
 
 fn game_ui_input_recording_system(
@@ -158,7 +184,7 @@ fn game_ui_input_recording_system(
 ) {
 	for (interaction, action) in &query {
 		if *interaction == Interaction::Pressed {
-			events.send(*action);
+			events.write(*action);
 		}
 	}
 }
@@ -203,7 +229,7 @@ fn game_ui_input_processing_system(
 				}
 			}
 			GameUiAction::Undo => {
-				undo_commands.send(UndoMove);
+				undo_commands.write(UndoMove);
 			}
 		}
 	}
@@ -260,7 +286,11 @@ fn update_level_name_display(
 		let level_data = level_assets
 			.get(level_handle)
 			.expect("Got an invalid level handle");
-		level_name_q.single_mut().0.clone_from(&level_data.name);
+		level_name_q
+			.single_mut()
+			.unwrap()
+			.0
+			.clone_from(&level_data.name);
 	}
 }
 
@@ -282,5 +312,5 @@ fn load_level(
 		.expect("PlayingLevel is out of range")
 		.data_handle
 		.clone_weak();
-	events.send(EnterLevel(Some(level_handle)));
+	events.write(EnterLevel(Some(level_handle)));
 }
