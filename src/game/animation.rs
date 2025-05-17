@@ -4,7 +4,7 @@ use super::{
 	components::*, drawing::CycleCenterVisualEntities, level::ThingData, logic::*, prelude::*,
 };
 use crate::AppSet;
-use bevy::platform_support::collections::HashMap;
+use bevy::platform::collections::HashMap;
 use rand::Rng as _;
 
 pub fn plugin(app: &mut App) {

@@ -13,7 +13,7 @@ use crate::{
 use bevy::{
 	color::palettes,
 	math::bounding::Aabb2d,
-	platform_support::collections::{HashMap, HashSet},
+	platform::collections::{HashMap, HashSet},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -33,13 +33,10 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(on_event::<GameLayoutChanged>),
 				(
 					marker_despawn_system.run_if(on_event::<RotateCycleGroup>),
-					cycle_blocked_marker_system
-						.warn_param_missing()
-						.run_if(on_event::<TurnBlockedByGroupConflict>),
+					cycle_blocked_marker_system.run_if(on_event::<TurnBlockedByGroupConflict>),
 				)
 					.chain(),
 				cycle_center_interaction_visuals_update_system
-					.warn_param_missing()
 					.run_if(cycle_interaction_visuals_changed),
 			)
 				.in_set(AppSet::UpdateVisuals),

@@ -1,4 +1,4 @@
-use bevy::{platform_support::collections::HashMap, prelude::*};
+use bevy::{platform::collections::HashMap, prelude::*};
 
 use crate::game::level::{
 	asset::plugin as level_asset_plugin, list::LevelList,

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.16.0-rc", default-features=false, features = [
+bevy = { version = "0.16.0", default-features=false, features = [
 #    "animation",
 #    "async_executor",
 #    "bevy_animation",
@@ -45,6 +45,7 @@ bevy = { version = "0.16.0-rc", default-features=false, features = [
     "webgl2",
     "x11",
 #    "zstd",
+    "configurable_error_handler",
 ] }
 
 itertools = "0.13.0"

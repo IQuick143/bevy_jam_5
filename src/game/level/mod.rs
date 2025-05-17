@@ -1,4 +1,4 @@
-use bevy::{math::bounding::Aabb2d, platform_support::collections::HashSet, prelude::*};
+use bevy::{math::bounding::Aabb2d, platform::collections::HashSet, prelude::*};
 
 pub mod asset;
 pub mod backend;

@@ -513,7 +513,7 @@ fn create_link_visuals(
 ) {
 	for (id, source, dest, direction, multiplicity) in &links_q {
 		// Fetch endpoints
-		let a = get_link_endpoint(source.parent, cycles_q.reborrow());
+		let a = get_link_endpoint(source.parent(), cycles_q.reborrow());
 		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
 		let (Some(a), Some(b)) = (a, b) else {
 			continue;
