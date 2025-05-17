@@ -8,7 +8,7 @@ use super::{
 };
 
 /// An event sent to move the camera
-/// 
+///
 /// Units are fraction of the camera top speed, [-1, 1]
 /// Sent during [`AppSet::RecordInput`]
 #[derive(Event)]
