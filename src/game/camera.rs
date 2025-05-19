@@ -64,6 +64,7 @@ struct ParallaxBasis(Vec2);
 #[derive(Component, Clone, Copy, Default)]
 struct CameraIntertia {
 	pub velocity: Vec2,
+	pub zoom: f32,
 }
 
 impl Default for CameraHarness {
@@ -163,6 +164,12 @@ const PAN_FRICTION: f32 = 0.0005;
 /// World units covered per second when at 1:1 zoom
 const PAN_SPEED: f32 = 600.0;
 
+/// Fraction of inertia that is conserved after one second
+const ZOOM_FRICTION: f32 = PAN_FRICTION;
+
+/// Orders of magnitude of zoom covered per second
+const ZOOM_SPEED: f32 = 1.0;
+
 fn update_camera(
 	camera: Single<(
 		&mut CameraHarness,
@@ -176,21 +183,27 @@ fn update_camera(
 ) {
 	let (mut harness, mut projection, mut transform, mut inertia) = camera.into_inner();
 
-	harness.scale *= zoom_events
+	let zoom_movement = zoom_events
 		.read()
-		.map(|event| {
-			match event {
-				ZoomCameraEvent::In => 2.0_f32,
-				ZoomCameraEvent::Out => 0.5,
-			}
-			.powf(time.delta_secs())
+		.map(|event| match event {
+			ZoomCameraEvent::In => 1.0,
+			ZoomCameraEvent::Out => -1.0,
 		})
-		.product::<f32>();
+		.sum::<f32>()
+		* ZOOM_SPEED;
 
 	let level_size = 2.0 * harness.level_bounds.half_size();
-
 	let maximum_zoom = level_size.max_element() / SPRITE_LENGTH;
-	harness.scale = harness.scale.max(1.0).min(maximum_zoom);
+
+	let accelerate_zoom = (harness.scale > 1.0 && zoom_movement < 0.0)
+		|| (harness.scale < maximum_zoom && zoom_movement > 0.0);
+	if accelerate_zoom {
+		inertia.zoom = zoom_movement;
+	} else {
+		inertia.zoom *= ZOOM_FRICTION.powf(time.delta_secs());
+	}
+
+	harness.scale *= 2f32.powf(inertia.zoom * time.delta_secs());
 
 	let bounds =
 		level_size / harness.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));
@@ -207,13 +220,8 @@ fn update_camera(
 		}
 	}
 
-	let movement = move_events
-		.read()
-		.map(|event| event.0)
-		.reduce(<Vec2 as std::ops::Add>::add)
-		.unwrap_or_default()
-		* PAN_SPEED
-		/ harness.scale;
+	let movement =
+		move_events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / harness.scale;
 
 	let accelerate_x = (harness.level_bounds.min.x < harness.center.x && movement.x < 0.0)
 		|| (harness.level_bounds.max.x > harness.center.x && movement.x > 0.0);
