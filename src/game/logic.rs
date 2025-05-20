@@ -365,7 +365,7 @@ fn cycle_rotation_system(
 		{
 			let n_vertices = cycle_vertices.0.len();
 			if n_vertices == 0 {
-				// Nothing to rotate
+				// No vertices, skip the cycle
 				continue;
 			}
 			let amount = {
@@ -409,31 +409,6 @@ fn cycle_rotation_system(
 				}
 			}
 		}
-	}
-}
-
-/// Returns an iterator which wraps the first element to the end and also flips the direction based on `direction`
-pub fn get_flipped_wrapped_iterator<T: Copy>(
-	array: &[T],
-	direction: CycleTurningDirection,
-) -> impl Iterator<Item = T> + '_ {
-	// Visit the first vertex again at the end to close the loop
-	// Leave it empty if the input is empty
-	let vertex_ids_wrapped = array
-		.iter()
-		.copied()
-		.chain(array.first().into_iter().copied());
-	// Messy but simple way of chosing the iterator direction at run time
-	// https://stackoverflow.com/a/52064434
-	match direction {
-		CycleTurningDirection::Nominal => Some(vertex_ids_wrapped)
-			.into_iter()
-			.flatten()
-			.chain(None.into_iter().flatten()),
-		CycleTurningDirection::Reverse => None
-			.into_iter()
-			.flatten()
-			.chain(Some(vertex_ids_wrapped.rev()).into_iter().flatten()),
 	}
 }
 

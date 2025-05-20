@@ -783,6 +783,42 @@ fn test_divisibilitor() {
 	}
 }
 
+/// Tests the edge case of a cycle without vertices
+#[test]
+fn turning_empty_cycle() {
+	let mut app = app_with_level(
+		r"
+name = 'EmptyCycleTurning';
+hint = 'A player should not be reading this message!';
+
+a = circle(cycle(); 0 0 100);
+b = circle(cycle(box() _); 0 200 100);
+c = circle(cycle(box() _); 0, -200, 100);
+link(b a);
+oneway(c a);
+	",
+	);
+
+	// Indices of the cycles
+	let tested_cycle = 0;
+	let hard_linked_cycle = 1;
+	let oneway_linked_cycle = 2;
+
+	// Turn the cycles one or more times
+	// This should not cause a zero division error
+	for i in -4..=4 {
+		// Turn the cycle directly
+		app.turn_cycle(tested_cycle, i);
+		app.update();
+		// Turn a hard-linked cycle
+		app.turn_cycle(hard_linked_cycle, i);
+		app.update();
+		// Turn a one-way-linked cycle
+		app.turn_cycle(oneway_linked_cycle, i);
+		app.update();
+	}
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk(
 	n_cycles: usize,

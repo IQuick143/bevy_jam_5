@@ -1,13 +1,16 @@
-use std::f32::consts::TAU;
+mod paths;
 
 use super::{
 	components::*, drawing::CycleCenterVisualEntities, level::ThingData, logic::*, prelude::*,
 };
 use crate::AppSet;
 use bevy::platform::collections::HashMap;
+use paths::*;
 use rand::Rng as _;
+use std::f32::consts::TAU;
 
 pub fn plugin(app: &mut App) {
+	app.init_resource::<TurnAnimationLength>();
 	app.add_systems(
 		LevelInitialization,
 		(
@@ -29,76 +32,28 @@ pub fn plugin(app: &mut App) {
 	);
 }
 
-#[derive(Debug, Clone, Copy, Default, Reflect)]
-pub enum RotationDirection {
-	#[default]
-	Clockwise,
-	CounterClockwise,
-}
-
-impl From<CycleTurningDirection> for RotationDirection {
-	fn from(value: CycleTurningDirection) -> Self {
-		match value {
-			CycleTurningDirection::Nominal => RotationDirection::Clockwise,
-			CycleTurningDirection::Reverse => RotationDirection::CounterClockwise,
-		}
-	}
-}
-
-/// Component for enabling animation behaviour
-#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
-pub struct AnimatedObject {
-	/// Which way the slerp should go.
-	pub rotation_direction: RotationDirection,
-	/// <0.0-1.0> percentage of the animation progress
-	pub progress: f32,
-	/// Center of rotation
-	pub cycle_center: Vec3,
-	/// The direction we're starting from, if None, the animation skips to the end
-	pub start_direction: Option<Dir2>,
-	pub start_magnitude: f32,
-	/// The direction we're ending on, if None, the animation cannot play
-	pub final_direction: Option<Dir2>,
-	pub final_magnitude: f32,
-}
-
-impl AnimatedObject {
-	pub fn sample(&self) -> Option<Vec3> {
-		let target = self.final_direction?;
-		Some(if let Some(source) = self.start_direction {
-			let t = animation_easing_function(self.progress).clamp(0.0, 1.0);
-			let dir = {
-				let mut angle = Vec2::angle_to(*source, *target);
-				match self.rotation_direction {
-					RotationDirection::Clockwise => {
-						if angle > 0.0 {
-							angle -= TAU
-						}
-					}
-					RotationDirection::CounterClockwise => {
-						if angle < 0.0 {
-							angle += TAU
-						}
-					}
-				}
-				Rot2::radians(angle * t) * source
-			};
-			let magnitude = f32::lerp(self.start_magnitude, self.final_magnitude, t);
-			self.cycle_center + (magnitude * dir).extend(0.0)
-		} else {
-			self.cycle_center + (self.final_magnitude * target).extend(0.0)
-		})
-	}
-}
-
 fn animation_easing_function(t: f32) -> f32 {
 	// Quadratic ease-out.
-	// Looks better that a flat rotation, but is easier
-	// to chain like we do that a double-ended easing function
+	// Looks better than a flat rotation, but is easier
+	// to chain like we do than a double-ended easing function
 	if t > 0.5 {
 		1.0 - (1.0 - t).powi(2) * 4.0 / 3.0
 	} else {
 		t * 4.0 / 3.0
+	}
+}
+
+/// Length in seconds of animations that are played when a cycle is turned
+#[derive(Resource, Clone, Copy, PartialEq, PartialOrd, Deref, DerefMut, Debug, Reflect)]
+pub struct TurnAnimationLength(pub f32);
+
+impl TurnAnimationLength {
+	pub const DEFAULT: Self = Self(0.5);
+}
+
+impl Default for TurnAnimationLength {
+	fn default() -> Self {
+		Self::DEFAULT
 	}
 }
 
@@ -178,101 +133,94 @@ impl Default for JumpTurnAnimation {
 	}
 }
 
-const ANIMATION_TIME: f32 = 0.5;
-
 fn listen_for_moves(
 	mut rotation_events: EventReader<RotateSingleCycle>,
 	cycles: Query<(&CycleVertices, &GlobalTransform)>,
-	vertices: Query<&GlobalTransform, With<Vertex>>,
-	mut objects: Query<
-		(&mut Transform, &VertexPosition, Option<&mut AnimatedObject>),
-		With<Object>,
-	>,
+	vertices_q: Query<&GlobalTransform, With<Vertex>>,
+	mut objects: Query<(&mut Transform, &VertexPosition, Option<&mut PathAnimation>), With<Object>>,
 ) {
-	// Maps current vertices to previous vertices and the center of rotation as well as direction
-	let mut permutation_map: HashMap<_, _> = HashMap::default();
+	// Maps vertices that have been affected to the path segments taken by the objects on them
+	let mut vertex_paths = HashMap::new();
 	for event in rotation_events.read() {
 		let Ok((vertices, transform)) = cycles.get(event.0.target_cycle) else {
 			log::warn!("Target of RotateSingleCycle is not a cycle entity");
 			continue;
 		};
-		let location = transform.translation();
-		let mut vertex_loop = get_flipped_wrapped_iterator(&vertices.0, event.0.direction);
-		let Some(mut last_id) = vertex_loop.next() else {
+		if vertices.0.is_empty() {
+			// Cycle has no vertices, no need to observe it further
 			continue;
+		}
+		let center_point = transform.translation().xy();
+		let vertex_positions = vertices
+			.0
+			.iter()
+			.copied()
+			.map(|id| {
+				vertices_q
+					.get(id)
+					.map(|t| t.translation().xy())
+					.inspect_err(|_| log::warn!("CycleVertices item is not a vertex entity"))
+					.unwrap_or_default()
+			})
+			.collect::<Vec<_>>();
+		let full_rotations = event.0.amount / vertices.0.len();
+		let absolute_movement_offset = event.0.amount % vertices.0.len();
+		let movement_offset = match event.0.direction.into() {
+			RotationDirection::Clockwise => vertices.0.len() - absolute_movement_offset,
+			RotationDirection::CounterClockwise => absolute_movement_offset,
 		};
-		for vertex in vertex_loop {
-			permutation_map.insert(vertex, (last_id, location, event.0.direction));
-			last_id = vertex;
+		for (i, (&end_position, &vertex_id)) in vertex_positions.iter().zip(&vertices.0).enumerate()
+		{
+			let start_index = (i + movement_offset) % vertices.0.len();
+			let start_position = vertex_positions[start_index];
+			let initial_angle = (start_position - center_point).to_angle();
+			let final_angle = (end_position - center_point).to_angle();
+			let radius = end_position.distance(center_point);
+			let adjusted_final_angle = CircleArcPathSegment::final_angle_from_expected_rotation(
+				initial_angle,
+				final_angle,
+				full_rotations,
+				event.0.direction.into(),
+			);
+			vertex_paths.insert(
+				vertex_id,
+				AnimationPathSegment::CircleArc(CircleArcPathSegment {
+					center_point,
+					radius,
+					initial_angle,
+					final_angle: adjusted_final_angle,
+				}),
+			);
 		}
 	}
 
 	for (mut transform, vertex_position, animation) in objects.iter_mut() {
-		let end_vertex = vertex_position.0;
-
-		let Ok(end_vertex_transform) = vertices.get(end_vertex) else {
-			log::warn!("VertexPosition of an object is not a vertex entity");
-			continue;
-		};
-
-		let end_position = end_vertex_transform.translation();
-
-		if let Some(mut animation) = animation {
-			let Some(&(start_vertex, center_of_rotation, direction)) =
-				permutation_map.get(&end_vertex)
-			else {
-				// No movement, we can skip
-				continue;
-			};
-
-			let Ok(start_vertex_transform) = vertices.get(start_vertex) else {
-				log::warn!("CycleVertices item is not a vertex entity");
-				continue;
-			};
-
-			// If the animation hasn't finished playing, we give it a chance to catch up.
-			let sample = animation.sample();
-			#[allow(clippy::unnecessary_unwrap)]
-			// Clippy is annoying and it cannot be fixed cleanly
-			let start_vector = if sample.is_some() && animation.progress < 1.0 {
-				sample.unwrap()
+		if let Some(path) = vertex_paths.get(&vertex_position.0) {
+			if let Some(mut animation) = animation {
+				animation.add_segment(*path);
 			} else {
-				start_vertex_transform.translation()
-			};
-
-			animation.rotation_direction = direction.into();
-
-			animation.progress = 0.0;
-			animation.cycle_center = center_of_rotation;
-			let (start_dir, start_magnitude) =
-				Dir2::new_and_length((start_vector - center_of_rotation).xy())
-					.unwrap_or((Dir2::X, 0.0));
-			let (end_dir, end_magnitude) = Dir2::new_and_length(
-				(end_vertex_transform.translation() - center_of_rotation).xy(),
-			)
-			.unwrap_or((Dir2::X, 0.0));
-			animation.start_direction = Some(start_dir);
-			animation.start_magnitude = start_magnitude;
-			animation.final_direction = Some(end_dir);
-			animation.final_magnitude = end_magnitude;
-		} else {
-			// Object is not animated, so we just set the translation to the desired place.
-			transform.translation.x = end_position.x;
-			transform.translation.y = end_position.y;
+				// Object is not animated, so we just set the translation to the desired place.
+				let end_position = path.end_position();
+				transform.translation.x = end_position.x;
+				transform.translation.y = end_position.y;
+			}
 		}
 	}
 }
 
-fn move_objects(mut objects: Query<(&mut Transform, &mut AnimatedObject)>, time: Res<Time<Real>>) {
+fn move_objects(
+	mut objects: Query<(&mut Transform, &mut PathAnimation)>,
+	time: Res<Time<Real>>,
+	animation_time: Res<TurnAnimationLength>,
+) {
 	for (mut transform, mut animation) in objects.iter_mut() {
-		if animation.progress >= 1.0 {
+		if !animation.is_in_progress() {
 			continue;
 		}
-		animation.progress += (time.delta_secs() / ANIMATION_TIME).min(1.0);
-		if let Some(goal) = animation.sample() {
-			transform.translation.x = goal.x;
-			transform.translation.y = goal.y;
-		}
+		animation.add_progress(time.delta_secs() / **animation_time);
+		let new_position = animation.sample();
+		transform.translation.x = new_position.x;
+		transform.translation.y = new_position.y;
 	}
 }
 
@@ -304,6 +252,7 @@ fn cycle_turning_animation_system(
 	cycles_q: Query<&CycleCenterVisualEntities>,
 	mut jump_q: Query<&mut JumpTurnAnimation>,
 	mut events: EventReader<RotateSingleCycle>,
+	animation_time: Res<TurnAnimationLength>,
 ) {
 	for event in events.read() {
 		let Ok(visuals) = cycles_q.get(event.0.target_cycle) else {
@@ -320,7 +269,7 @@ fn cycle_turning_animation_system(
 		};
 		animation.make_jump(
 			direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
-			ANIMATION_TIME,
+			**animation_time,
 		);
 	}
 }
@@ -342,6 +291,9 @@ fn init_cycle_animation(
 
 fn init_thing_animation(mut commands: Commands, query: Query<Entity, Added<ThingData>>) {
 	for id in &query {
-		commands.entity(id).insert(AnimatedObject::default());
+		// We do not need to initialize its static position
+		// since the animation does not get queried until
+		// something actually animates
+		commands.entity(id).insert(PathAnimation::default());
 	}
 }
