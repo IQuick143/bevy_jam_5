@@ -11,6 +11,7 @@ mod inputs;
 pub mod level;
 pub mod logic;
 pub mod spawn;
+mod synchronization;
 #[cfg(test)]
 pub mod test;
 
@@ -42,5 +43,6 @@ pub(super) fn plugin(app: &mut App) {
 		history::plugin,
 		hints::plugin,
 		camera::plugin,
+		synchronization::plugin,
 	));
 }

@@ -28,7 +28,8 @@ fn load_system<T: Saveable + Resource>(
 	match io::read(&path) {
 		Ok(value) => {
 			store.value = value;
-			resource.read_json(&store.value);
+			resource.bypass_change_detection().read_json(&store.value);
+			log::info!("Loaded file {}", path.display());
 		}
 		Err(error) => {
 			log::error!("Failed to load {} with error {}", path.display(), error);
@@ -44,7 +45,9 @@ fn save_system<T: Saveable + Resource>(
 	let path = T::get_path(storage_path.0.clone());
 	resource.write_json(&mut store.value);
 	if let Err(error) = io::write(&store.value, &path) {
-		log::error!("Failed to load {} with error {}", path.display(), error);
+		log::error!("Failed to save {} with error {}", path.display(), error);
+	} else {
+		log::info!("Saved file {}", path.display());
 	}
 }
 
