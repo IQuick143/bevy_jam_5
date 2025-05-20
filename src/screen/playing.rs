@@ -1,10 +1,13 @@
 //! The screen state for the main game loop.
 
-use bevy::prelude::*;
+use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, LoadedLevelList},
-	game::{level::list::LevelList, prelude::*},
+	game::{
+		level::list::{LevelInfo, LevelList},
+		prelude::*,
+	},
 	send_event,
 	ui::{hover::HoverText, prelude::*},
 	AppSet,
@@ -76,6 +79,33 @@ enum GameUiAction {
 /// Event that is sent to signal that the currently selected level should be (re)loaded
 #[derive(Event, Component, Clone, Copy, Debug, Default)]
 pub struct LoadLevel;
+
+/// [`SystemParam`] that provides a reference to the entry
+/// of the level list that describes the level being played
+#[derive(SystemParam)]
+pub struct PlayingLevelListEntry<'w> {
+	level_list: Res<'w, LoadedLevelList>,
+	level_list_asset: Res<'w, Assets<LevelList>>,
+	playing_level: Res<'w, State<PlayingLevel>>,
+}
+
+impl PlayingLevelListEntry<'_> {
+	/// Gets the level info entry of the current level
+	pub fn get(&self) -> Result<&LevelInfo, BevyError> {
+		let level_index = self.playing_level.get().0.ok_or_else(|| {
+			"Systems that transition into Screen::Playing must also set PlayingLevel state"
+				.to_owned()
+		})?;
+		let level_info = self
+			.level_list_asset
+			.get(&self.level_list.0)
+			.ok_or_else(|| "The LevelList asset should be valid".to_owned())?
+			.levels
+			.get(level_index)
+			.ok_or_else(|| "PlayingLevel is out of range".to_owned())?;
+		Ok(level_info)
+	}
+}
 
 fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
@@ -191,9 +221,7 @@ fn game_ui_input_recording_system(
 
 fn game_ui_input_processing_system(
 	mut events: EventReader<GameUiAction>,
-	playing_level: Res<State<PlayingLevel>>,
-	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelList>>,
+	playing_level: PlayingLevelListEntry,
 	mut commands: Commands,
 	mut next_level: ResMut<NextState<PlayingLevel>>,
 	mut undo_commands: EventWriter<UndoMove>,
@@ -210,17 +238,7 @@ fn game_ui_input_processing_system(
 				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
 			}
 			GameUiAction::NextLevel => {
-				let playing_level = playing_level
-					.get()
-					.0
-					.expect("When in Screen::Playing state, PlayingLevel must also be set");
-				let next_level_id = level_list_asset
-					.get(&level_list.0)
-					.expect("The LevelList asset should be valid")
-					.levels
-					.get(playing_level)
-					.expect("PlayingLevel is out of range")
-					.next_level;
+				let next_level_id = playing_level.get().ok().and_then(|l| l.next_level);
 				if next_level_id.is_none() {
 					log::warn!("Received a Next level action on a level without a successor");
 				} else {
@@ -237,22 +255,10 @@ fn game_ui_input_processing_system(
 
 fn update_next_level_button_display(
 	is_level_completed: Res<IsLevelCompleted>,
-	playing_level: Res<State<PlayingLevel>>,
-	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelList>>,
+	playing_level: PlayingLevelListEntry,
 	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
-	let level_index = playing_level
-		.get()
-		.0
-		.expect("When in Screen::Playing state, PlayingLevel must also be set");
-	let next_level = level_list_asset
-		.get(&level_list.0)
-		.expect("The LevelList asset should be valid")
-		.levels
-		.get(level_index)
-		.expect("PlayingLevel is out of range")
-		.next_level;
+	let next_level = playing_level.get().ok().and_then(|l| l.next_level);
 	let display = if is_level_completed.0 && next_level.is_some() {
 		Display::DEFAULT
 	} else {
@@ -294,22 +300,10 @@ fn update_level_name_display(
 	}
 }
 
-fn load_level(
-	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelList>>,
-	playing_level: Res<State<PlayingLevel>>,
-	mut events: EventWriter<EnterLevel>,
-) {
-	let level_index = playing_level
+fn load_level(playing_level: PlayingLevelListEntry, mut events: EventWriter<EnterLevel>) {
+	let level_handle = playing_level
 		.get()
-		.0
-		.expect("Systems that transition into Screen::Playing must also set PlayingLevel state");
-	let level_handle = level_list_asset
-		.get(&level_list.0)
-		.expect("The LevelList asset should be valid")
-		.levels
-		.get(level_index)
-		.expect("PlayingLevel is out of range")
+		.expect("load_level called but current level could not be loaded")
 		.data_handle
 		.clone_weak();
 	events.write(EnterLevel(Some(level_handle)));
