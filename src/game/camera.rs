@@ -6,8 +6,7 @@ use bevy::{
 use crate::{
 	game::prelude::*,
 	graphics::{
-		GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, SPRITE_LENGTH, SPRITE_SIZE,
-		VERTICAL_PADDING_FRACTION,
+		GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, SPRITE_SIZE, VERTICAL_PADDING_FRACTION,
 	},
 	screen::{DoScreenTransition, Screen},
 	AppSet,
@@ -193,10 +192,19 @@ fn update_camera(
 		* ZOOM_SPEED;
 
 	let level_size = 2.0 * harness.level_bounds.half_size();
-	let maximum_zoom = level_size.max_element() / SPRITE_LENGTH;
+	// Allow zooming in to double g11 scale, or to see the whole level
+	// if it is too small
+	let maximum_zoom = (level_size / LEVEL_AREA_WIDTH * 2.0).max_element().max(1.0);
+	// Allow zooming out to see the whole level,
+	// or to g11 scale if the level is smaller than that
+	let minimum_zoom = (level_size / LEVEL_AREA_WIDTH).max_element().min(1.0);
 
-	let accelerate_zoom = (harness.scale > 1.0 && zoom_movement < 0.0)
-		|| (harness.scale < maximum_zoom && zoom_movement > 0.0);
+	// Margin tells how far from the bounds should we already stop
+	// accepting input so we just get to it by inertia
+	let zoom_margin = 2f32.powf(ZOOM_SPEED / ZOOM_FRICTION.ln());
+	// Reject the input if we are past the margins
+	let accelerate_zoom = (harness.scale > minimum_zoom / zoom_margin && zoom_movement < 0.0)
+		|| (harness.scale < maximum_zoom * zoom_margin && zoom_movement > 0.0);
 	if accelerate_zoom {
 		inertia.zoom = zoom_movement;
 	} else {
@@ -204,6 +212,8 @@ fn update_camera(
 	}
 
 	harness.scale *= 2f32.powf(inertia.zoom * time.delta_secs());
+	// Still clamp the positions, as a failsafe
+	harness.scale = harness.scale.clamp(minimum_zoom, maximum_zoom);
 
 	let bounds =
 		level_size / harness.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));
@@ -223,10 +233,16 @@ fn update_camera(
 	let movement =
 		move_events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / harness.scale;
 
-	let accelerate_x = (harness.level_bounds.min.x < harness.center.x && movement.x < 0.0)
-		|| (harness.level_bounds.max.x > harness.center.x && movement.x > 0.0);
-	let accelerate_y = (harness.level_bounds.min.y < harness.center.y && movement.y < 0.0)
-		|| (harness.level_bounds.max.y > harness.center.y && movement.y > 0.0);
+	// Margin tells how far from the bounds should we already stop
+	// accepting input so we just get to it by inertia
+	let pan_margin = -PAN_SPEED / PAN_FRICTION.ln() / harness.scale;
+	// Reject the input if we are past the margins
+	let accelerate_x = (harness.level_bounds.min.x + pan_margin < harness.center.x
+		&& movement.x < 0.0)
+		|| (harness.level_bounds.max.x - pan_margin > harness.center.x && movement.x > 0.0);
+	let accelerate_y = (harness.level_bounds.min.y + pan_margin < harness.center.y
+		&& movement.y < 0.0)
+		|| (harness.level_bounds.max.y - pan_margin > harness.center.y && movement.y > 0.0);
 	if accelerate_x {
 		inertia.velocity.x = movement.x;
 	} else {
@@ -239,6 +255,8 @@ fn update_camera(
 	}
 
 	harness.center += inertia.velocity * time.delta_secs();
+	// Still clamp the positions, as a failsafe
+	harness.center = harness.level_bounds.closest_point(harness.center);
 
 	transform.translation.x = harness.center.x;
 	transform.translation.y = harness.center.y;
