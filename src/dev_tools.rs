@@ -1,14 +1,19 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
+	game::{camera::CameraHarness, components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
 };
 use bevy::{
-	color::palettes, dev_tools::states::log_transitions,
-	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
+	color::palettes,
+	dev_tools::{
+		fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
+		states::log_transitions,
+	},
+	input::common_conditions::input_just_pressed,
+	math::bounding::BoundingVolume,
 	platform::collections::HashMap,
 };
 
@@ -23,13 +28,27 @@ pub(super) fn plugin(app: &mut App) {
 			log_transitions::<PlayingLevel>,
 			automatic_reloading.run_if(in_state(Screen::Playing)),
 			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
-			debug_oneways.run_if(resource_equals(RenderOutlines(true))),
-			draw_layout.run_if(resource_equals(RenderOutlines(true))),
-			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
+			(
+				debug_oneways,
+				debug_camera_bounds,
+				draw_layout,
+				draw_hover_boxes,
+			)
+				.run_if(resource_equals(RenderOutlines(true))),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 		),
 	);
 	app.init_resource::<RenderOutlines>();
+	app.add_plugins(FpsOverlayPlugin {
+		config: FpsOverlayConfig {
+			text_color: Color::BLACK,
+			text_config: TextFont {
+				font_size: 12.0,
+				..default()
+			},
+			..default()
+		},
+	});
 }
 
 /// Whether hover and layout boxes should be drawn
@@ -65,6 +84,14 @@ fn draw_layout(mut gizmos: Gizmos) {
 		LEVEL_AREA_CENTER.extend(0.0),
 		LEVEL_AREA_WIDTH,
 		palettes::basic::NAVY,
+	);
+}
+
+fn debug_camera_bounds(camera: Single<&CameraHarness>, mut gizmos: Gizmos) {
+	gizmos.rect(
+		Vec3::ZERO,
+		camera.level_bounds.half_size() * 2.0,
+		palettes::basic::LIME,
 	);
 }
 
