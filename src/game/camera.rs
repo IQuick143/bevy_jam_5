@@ -230,6 +230,26 @@ fn update_camera(
 		}
 	}
 
+	// +--------------------+------------+
+	// |                    |viewport    |bounding box
+	// |                    |            |
+	// |          X - - - - + +          |
+	// |          |         | |camera pan bounds
+	// |          |     O   | |          |
+	// +----------+---------+ |          |
+	// |          + - - - - - +          |
+	// |                                 |
+	// |                                 |
+	// +---------------------------------+
+	//
+	// O = Origin (center of world coordinate system and of level bounding box)
+	// X = Center of viewport (harness.center)
+	// Approximate (size of VP) = (size of BB) / scale
+	// Pan bounds = BB - VP = BB * (1 - 1 / scale)
+	let movement_bounds = harness
+		.level_bounds
+		.scale_around_center(Vec2::splat((1.0 - 1.0 / harness.scale).max(0.0)));
+
 	let movement =
 		move_events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / harness.scale;
 
@@ -237,12 +257,10 @@ fn update_camera(
 	// accepting input so we just get to it by inertia
 	let pan_margin = -PAN_SPEED / PAN_FRICTION.ln() / harness.scale;
 	// Reject the input if we are past the margins
-	let accelerate_x = (harness.level_bounds.min.x + pan_margin < harness.center.x
-		&& movement.x < 0.0)
-		|| (harness.level_bounds.max.x - pan_margin > harness.center.x && movement.x > 0.0);
-	let accelerate_y = (harness.level_bounds.min.y + pan_margin < harness.center.y
-		&& movement.y < 0.0)
-		|| (harness.level_bounds.max.y - pan_margin > harness.center.y && movement.y > 0.0);
+	let accelerate_x = (movement_bounds.min.x + pan_margin < harness.center.x && movement.x < 0.0)
+		|| (movement_bounds.max.x - pan_margin > harness.center.x && movement.x > 0.0);
+	let accelerate_y = (movement_bounds.min.y + pan_margin < harness.center.y && movement.y < 0.0)
+		|| (movement_bounds.max.y - pan_margin > harness.center.y && movement.y > 0.0);
 	if accelerate_x {
 		inertia.velocity.x = movement.x;
 	} else {
@@ -256,7 +274,7 @@ fn update_camera(
 
 	harness.center += inertia.velocity * time.delta_secs();
 	// Still clamp the positions, as a failsafe
-	harness.center = harness.level_bounds.closest_point(harness.center);
+	harness.center = movement_bounds.closest_point(harness.center);
 
 	transform.translation.x = harness.center.x;
 	transform.translation.y = harness.center.y;
