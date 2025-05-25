@@ -199,14 +199,13 @@ fn update_camera(
 	// or to g11 scale if the level is smaller than that
 	let minimum_zoom = (level_size / LEVEL_AREA_WIDTH).max_element().min(1.0);
 
-	// Margin tells how far from the bounds should we already stop
-	// accepting input so we just get to it by inertia
-	let zoom_margin = 2f32.powf(ZOOM_SPEED / ZOOM_FRICTION.ln());
-	// Reject the input if we are past the margins
-	let accelerate_zoom = (harness.scale > minimum_zoom / zoom_margin && zoom_movement < 0.0)
-		|| (harness.scale < maximum_zoom * zoom_margin && zoom_movement > 0.0);
-	if accelerate_zoom {
-		inertia.zoom = zoom_movement;
+	if zoom_movement != 0.0 {
+		// The zooming speed needed to cover a zoom ratio by inertia alone
+		let zoom_terminal_speed = -ZOOM_FRICTION.ln();
+		// Cap the zoom speed to the terminal speed to ease the movement near bounds
+		let min_zoom_speed = (minimum_zoom / harness.scale).ln() * zoom_terminal_speed;
+		let max_zoom_speed = (maximum_zoom / harness.scale).ln() * zoom_terminal_speed;
+		inertia.zoom = zoom_movement.clamp(min_zoom_speed, max_zoom_speed);
 	} else {
 		inertia.zoom *= ZOOM_FRICTION.powf(time.delta_secs());
 	}
@@ -253,21 +252,18 @@ fn update_camera(
 	let movement =
 		move_events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / harness.scale;
 
-	// Margin tells how far from the bounds should we already stop
-	// accepting input so we just get to it by inertia
-	let pan_margin = -PAN_SPEED / PAN_FRICTION.ln() / harness.scale;
-	// Reject the input if we are past the margins
-	let accelerate_x = (movement_bounds.min.x + pan_margin < harness.center.x && movement.x < 0.0)
-		|| (movement_bounds.max.x - pan_margin > harness.center.x && movement.x > 0.0);
-	let accelerate_y = (movement_bounds.min.y + pan_margin < harness.center.y && movement.y < 0.0)
-		|| (movement_bounds.max.y - pan_margin > harness.center.y && movement.y > 0.0);
-	if accelerate_x {
-		inertia.velocity.x = movement.x;
+	// The panning speed needed to cover a unit of distance by inertia alone
+	let pan_terminal_speed = -PAN_FRICTION.ln();
+	// Cap the pan speed to the terminal speed to ease the movement near bounds
+	let min_pan_speed = (movement_bounds.min - harness.center) * pan_terminal_speed;
+	let max_pan_speed = (movement_bounds.max - harness.center) * pan_terminal_speed;
+	if movement.x != 0.0 {
+		inertia.velocity.x = movement.x.clamp(min_pan_speed.x, max_pan_speed.x);
 	} else {
 		inertia.velocity.x *= PAN_FRICTION.powf(time.delta_secs());
 	}
-	if accelerate_y {
-		inertia.velocity.y = movement.y;
+	if movement.y != 0.0 {
+		inertia.velocity.y = movement.y.clamp(min_pan_speed.y, max_pan_speed.y);
 	} else {
 		inertia.velocity.y *= PAN_FRICTION.powf(time.delta_secs());
 	}
