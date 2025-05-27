@@ -2,7 +2,7 @@
 
 use crate::{
 	game::{camera::CameraHarness, components::*, level::CycleTurnability, logic::*, prelude::*},
-	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
+	graphics::VERTICAL_PADDING_FRACTION,
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
 };
@@ -28,16 +28,13 @@ pub(super) fn plugin(app: &mut App) {
 			log_transitions::<PlayingLevel>,
 			automatic_reloading.run_if(in_state(Screen::Playing)),
 			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
-			(
-				debug_oneways,
-				debug_camera_bounds,
-				draw_layout,
-				draw_hover_boxes,
-			)
+			(debug_oneways, debug_camera_bounds, draw_hover_boxes)
 				.run_if(resource_equals(RenderOutlines(true))),
+			toggle_debug_outline_display.run_if(resource_changed::<RenderOutlines>),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 		),
 	);
+	app.add_systems(Startup, init_viewport_box);
 	app.init_resource::<RenderOutlines>();
 	app.add_plugins(FpsOverlayPlugin {
 		config: FpsOverlayConfig {
@@ -54,6 +51,49 @@ pub(super) fn plugin(app: &mut App) {
 /// Whether hover and layout boxes should be drawn
 #[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
 struct RenderOutlines(pub bool);
+
+/// Marks a [`Node`] as a debug outline, only making it visible
+/// when [`RenderOutlines`] is set to true
+#[derive(Component, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Reflect)]
+struct IsDebugOutline;
+
+fn init_viewport_box(mut commands: Commands) {
+	commands
+		.spawn((
+			Node {
+				display: Display::None,
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0),
+				flex_direction: FlexDirection::Column,
+				justify_content: JustifyContent::Center,
+				..default()
+			},
+			IsDebugOutline,
+		))
+		.with_child((
+			Node {
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0 * (1.0 - VERTICAL_PADDING_FRACTION)),
+				border: UiRect::all(Val::Px(1.0)),
+				..default()
+			},
+			BorderColor(palettes::basic::NAVY.into()),
+		));
+}
+
+fn toggle_debug_outline_display(
+	mut query: Query<&mut Node, With<IsDebugOutline>>,
+	render_outlines: Res<RenderOutlines>,
+) {
+	let display = if render_outlines.0 {
+		Display::Flex
+	} else {
+		Display::None
+	};
+	for mut node in &mut query {
+		node.display = display;
+	}
+}
 
 fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
 	render.0 = !render.0;
@@ -76,15 +116,6 @@ fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTr
 			);
 		}
 	}
-}
-
-fn draw_layout(mut gizmos: Gizmos) {
-	gizmos.rect(Vec3::ZERO, GAME_AREA, palettes::basic::RED);
-	gizmos.rect(
-		LEVEL_AREA_CENTER.extend(0.0),
-		LEVEL_AREA_WIDTH,
-		palettes::basic::NAVY,
-	);
 }
 
 fn debug_camera_bounds(camera: Single<&CameraHarness>, mut gizmos: Gizmos) {
