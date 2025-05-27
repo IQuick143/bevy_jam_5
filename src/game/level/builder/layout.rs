@@ -629,8 +629,9 @@ impl LevelBuilder {
 			true
 		}
 	}
+
 	/// Calculates the bounding box of all currently placed cycles and their center sprites
-	pub(super) fn get_bounding_box(&self) -> Aabb2d {
+	fn get_content_bounding_box(&self) -> Aabb2d {
 		let min = self
 			.cycles
 			.iter()
@@ -663,6 +664,21 @@ impl LevelBuilder {
 					)
 			})
 			.fold(Vec2::NEG_INFINITY, Vec2::max);
+		Aabb2d { min, max }
+	}
+
+	/// Gets the true bounding box of the level, either computed or set explicitly by the caller
+	fn get_bounding_box(&self) -> Aabb2d {
+		let content = self.get_content_bounding_box();
+		// Replace bounds with explicit ones if appropriate
+		let min = Vec2::new(
+			self.explicit_bounding_box.left.unwrap_or(content.min.x),
+			self.explicit_bounding_box.top.unwrap_or(content.min.y),
+		);
+		let max = Vec2::new(
+			self.explicit_bounding_box.right.unwrap_or(content.max.x),
+			self.explicit_bounding_box.bottom.unwrap_or(content.max.y),
+		);
 		let center = (max + min) / 2.0;
 		let mut half = (max - min) / 2.0;
 		// Prevent zero-size bounding boxes

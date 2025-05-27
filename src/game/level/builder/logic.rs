@@ -17,6 +17,7 @@ impl LevelBuilder {
 			declared_links: Vec::new(),
 			declared_one_way_cycle_links: Vec::new(),
 			declared_one_way_detector_links: Vec::new(),
+			explicit_bounding_box: default(),
 			bounding_box: None,
 			scale_override: None,
 		}
@@ -36,6 +37,10 @@ impl LevelBuilder {
 		}
 		self.hint = Some(hint);
 		Ok(())
+	}
+
+	pub fn explicit_bounding_box(&mut self) -> &mut PartialBoundingBox {
+		&mut self.explicit_bounding_box
 	}
 
 	pub fn add_vertex(&mut self) -> Result<usize, LevelBuilderError> {
@@ -238,7 +243,9 @@ impl LevelBuilder {
 			building_error.get_or_insert(err);
 		});
 		self.build_layout();
-		let bounding_box = self.bounding_box.unwrap_or_else(|| self.get_bounding_box());
+		let bounding_box = self
+			.bounding_box
+			.expect("Bounding box should have been set by build_layout");
 		let cycles = self
 			.cycles
 			.into_iter()
