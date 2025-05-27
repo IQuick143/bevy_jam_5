@@ -176,6 +176,7 @@ fn update_camera(
 		&mut Transform,
 		&mut CameraIntertia,
 	)>,
+	window: Single<&Window>,
 	mut move_events: EventReader<MoveCameraEvent>,
 	mut zoom_events: EventReader<ZoomCameraEvent>,
 	time: Res<Time<Real>>,
@@ -243,11 +244,20 @@ fn update_camera(
 	//
 	// O = Origin (center of world coordinate system and of level bounding box)
 	// X = Center of viewport (harness.center)
-	// Approximate (size of VP) = (size of BB) / scale
-	// Pan bounds = BB - VP = BB * (1 - 1 / scale)
-	let movement_bounds = harness
-		.level_bounds
-		.scale_around_center(Vec2::splat((1.0 - 1.0 / harness.scale).max(0.0)));
+	// (size of VP) = (size of BB, expanded to window aspect ratio) / scale
+	// Pan bounds = BB - VP
+	let bb_half_size = harness.level_bounds.half_size();
+	let vp_size = window.size() * Vec2::new(1.0, 1.0 - VERTICAL_PADDING_FRACTION);
+	let mut expanded_bb_half_size = bb_half_size;
+	if vp_size.x * bb_half_size.y > vp_size.y * bb_half_size.x {
+		expanded_bb_half_size.x = bb_half_size.y * vp_size.x / vp_size.y;
+	} else {
+		expanded_bb_half_size.y = bb_half_size.x * vp_size.y / vp_size.x;
+	}
+	let movement_bounds = Aabb2d::new(
+		Vec2::ZERO,
+		(bb_half_size - expanded_bb_half_size / harness.scale).max(Vec2::ZERO),
+	);
 
 	let movement =
 		move_events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / harness.scale;
