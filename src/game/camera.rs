@@ -253,7 +253,7 @@ fn update_camera(
 	let mut expanded_bb_half_size = bb_half_size;
 	if vp_size.x * bb_half_size.y > vp_size.y * bb_half_size.x {
 		expanded_bb_half_size.x = bb_half_size.y * vp_size.x / vp_size.y;
-	} else {
+	} else if vp_size.x * bb_half_size.y < vp_size.y * bb_half_size.x {
 		expanded_bb_half_size.y = bb_half_size.x * vp_size.y / vp_size.x;
 	}
 	let movement_bounds = Aabb2d::new(
