@@ -67,6 +67,10 @@ fn read_variables_before_finalize(
 		builder.explicit_bounding_box().bottom = Some(bb_left);
 	}
 
+	if let Some(init_scale) = variable_pool.load_as::<f32>("init_scale").transpose()? {
+		builder.set_initial_zoom(init_scale);
+	}
+
 	Ok(())
 }
 

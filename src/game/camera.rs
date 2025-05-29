@@ -152,7 +152,9 @@ fn set_camera_level_view(
 		**camera = CameraHarness {
 			center: level.bounding_box.center(),
 			level_bounds: level.bounding_box.grow(SPRITE_SIZE / 2.0),
-			scale: 1.0,
+			// If this is out of range (or NaN),
+			// it is clamped in update_camera in the same frame
+			scale: level.initial_zoom,
 		};
 	}
 }
@@ -213,7 +215,7 @@ fn update_camera(
 
 	harness.scale *= 2f32.powf(inertia.zoom * time.delta_secs());
 	// Still clamp the positions, as a failsafe
-	harness.scale = harness.scale.clamp(minimum_zoom, maximum_zoom);
+	harness.scale = harness.scale.max(minimum_zoom).min(maximum_zoom);
 
 	let bounds =
 		level_size / harness.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));

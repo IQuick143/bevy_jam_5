@@ -20,6 +20,7 @@ impl LevelBuilder {
 			explicit_bounding_box: default(),
 			bounding_box: None,
 			scale_override: None,
+			initial_zoom: None,
 		}
 	}
 
@@ -41,6 +42,10 @@ impl LevelBuilder {
 
 	pub fn explicit_bounding_box(&mut self) -> &mut PartialBoundingBox {
 		&mut self.explicit_bounding_box
+	}
+
+	pub fn set_initial_zoom(&mut self, zoom: f32) {
+		self.initial_zoom = Some(zoom);
 	}
 
 	pub fn add_vertex(&mut self) -> Result<usize, LevelBuilderError> {
@@ -272,6 +277,7 @@ impl LevelBuilder {
 				forbidden_group_pairs,
 				execution_order,
 				bounding_box,
+				initial_zoom: self.initial_zoom.unwrap_or(1.0),
 			},
 			building_error,
 		))

@@ -39,6 +39,8 @@ pub struct LevelBuilder {
 	/// A conversion factor from logical "epilang" units to level units.
 	/// If `None` then this conversion is computed in order to fit the level into the usual bounding box.
 	scale_override: Option<f32>,
+	/// How zoom should be initialized when entering the level
+	initial_zoom: Option<f32>,
 }
 
 /// Enumerates the possible sets of positions
