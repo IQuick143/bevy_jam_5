@@ -41,6 +41,9 @@ pub struct LevelBuilder {
 	scale_override: Option<f32>,
 	/// How zoom should be initialized when entering the level
 	initial_zoom: Option<f32>,
+	/// How camera position should be initialized when entering the level
+	/// (in the builder's coordinate space)
+	initial_camera_pos: PartialVec2,
 }
 
 /// Enumerates the possible sets of positions
@@ -68,6 +71,13 @@ pub struct PartialBoundingBox {
 	pub top: Option<f32>,
 	pub right: Option<f32>,
 	pub bottom: Option<f32>,
+}
+
+/// Vector whose coordinates can be set (or not set) individually
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+pub struct PartialVec2 {
+	pub x: Option<f32>,
+	pub y: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug)]

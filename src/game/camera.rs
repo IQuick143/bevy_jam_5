@@ -150,7 +150,7 @@ fn set_camera_level_view(
 		.last()
 	{
 		**camera = CameraHarness {
-			center: level.bounding_box.center(),
+			center: level.initial_camera_pos,
 			level_bounds: level.bounding_box.grow(SPRITE_SIZE / 2.0),
 			// If this is out of range (or NaN),
 			// it is clamped in update_camera in the same frame

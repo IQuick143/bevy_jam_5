@@ -71,6 +71,14 @@ fn read_variables_before_finalize(
 		builder.set_initial_zoom(init_scale);
 	}
 
+	if let Some(init_cam_x) = variable_pool.load_as::<f32>("init_cam_x").transpose()? {
+		builder.explicit_initial_camera_pos().x = Some(init_cam_x);
+	}
+
+	if let Some(init_cam_y) = variable_pool.load_as::<f32>("init_cam_y").transpose()? {
+		builder.explicit_initial_camera_pos().y = Some(init_cam_y);
+	}
+
 	Ok(())
 }
 

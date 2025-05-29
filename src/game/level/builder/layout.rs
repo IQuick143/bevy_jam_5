@@ -739,6 +739,15 @@ impl LevelBuilder {
 				*p = (*p - bounds_center) * scale + viewport_center;
 			}
 		}
+
+		// Transform explicitly set initial camera position to world coordinates
+		if let Some(x) = &mut self.initial_camera_pos.x {
+			*x = (*x - bounds_center.x) * scale + viewport_center.x;
+		}
+		if let Some(y) = &mut self.initial_camera_pos.y {
+			*y = (*y - bounds_center.y) * scale + viewport_center.y;
+		}
+
 		self.bounding_box = Some(Aabb2d::new(
 			Vec2::ZERO,
 			(bounds.half_size() * scale).max(Vec2::ONE),
