@@ -37,6 +37,10 @@ pub struct LevelData {
 	pub declared_one_way_links: Vec<DeclaredOneWayLinkData>,
 	/// Bounding box
 	pub bounding_box: Aabb2d,
+	/// Camera zoom that should be set when entering the level
+	pub initial_zoom: f32,
+	/// Camera position that should be set when entering the level
+	pub initial_camera_pos: Vec2,
 }
 
 /// Either the index of a detector or a group

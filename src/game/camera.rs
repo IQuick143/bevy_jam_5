@@ -6,8 +6,7 @@ use bevy::{
 use crate::{
 	game::prelude::*,
 	graphics::{
-		GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, SPRITE_LENGTH, SPRITE_SIZE,
-		VERTICAL_PADDING_FRACTION,
+		GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH, SPRITE_SIZE, VERTICAL_PADDING_FRACTION,
 	},
 	screen::{DoScreenTransition, Screen},
 	AppSet,
@@ -18,7 +17,7 @@ use crate::game::spawn::SpawnLevel;
 use super::inputs::{MoveCameraEvent, ZoomCameraEvent};
 
 #[derive(Component, Clone, Copy)]
-#[require(Camera, Camera2d)]
+#[require(Camera, Camera2d, CameraIntertia)]
 pub struct CameraHarness {
 	/// Zooming factor, bigger value means more zoomed, minumum is `1.0`
 	pub scale: f32,
@@ -58,6 +57,14 @@ pub struct Parallax(pub f32);
 /// of the entity before parallax was applied.
 #[derive(Component, Clone, Copy)]
 struct ParallaxBasis(Vec2);
+
+/// Support component for [`CameraHarness`] that tracks
+/// persistent camera state
+#[derive(Component, Clone, Copy, Default)]
+struct CameraIntertia {
+	pub velocity: Vec2,
+	pub zoom: f32,
+}
 
 impl Default for CameraHarness {
 	fn default() -> Self {
@@ -137,31 +144,78 @@ fn set_camera_level_view(
 	mut events: EventReader<SpawnLevel>,
 	levels: Res<Assets<LevelData>>,
 ) {
-	for SpawnLevel(level_handle, _) in events.read() {
-		if let Some(level) = levels.get(level_handle) {
-			**camera = CameraHarness {
-				center: level.bounding_box.center(),
-				level_bounds: level.bounding_box.grow(SPRITE_SIZE / 2.0),
-				scale: 1.0,
-			};
-		}
+	if let Some(level) = events
+		.read()
+		.filter_map(|SpawnLevel(handle, _)| levels.get(handle))
+		.last()
+	{
+		**camera = CameraHarness {
+			center: level.initial_camera_pos,
+			level_bounds: level.bounding_box.grow(SPRITE_SIZE / 2.0),
+			// If this is out of range (or NaN),
+			// it is clamped in update_camera in the same frame
+			scale: level.initial_zoom,
+		};
 	}
 }
 
+/// Fraction of inertia that is conserved after one second
+const PAN_FRICTION: f32 = 0.0005;
+
+/// World units covered per second when at 1:1 zoom
+const PAN_SPEED: f32 = 600.0;
+
+/// Fraction of inertia that is conserved after one second
+const ZOOM_FRICTION: f32 = PAN_FRICTION;
+
+/// Orders of magnitude of zoom covered per second
+const ZOOM_SPEED: f32 = 1.0;
+
 fn update_camera(
-	camera: Single<(&mut CameraHarness, &mut Projection, &mut Transform)>,
+	camera: Single<(
+		&mut CameraHarness,
+		&mut Projection,
+		&mut Transform,
+		&mut CameraIntertia,
+	)>,
+	window: Single<&Window>,
 	mut move_events: EventReader<MoveCameraEvent>,
 	mut zoom_events: EventReader<ZoomCameraEvent>,
 	time: Res<Time<Real>>,
 ) {
-	let (mut harness, mut projection, mut transform) = camera.into_inner();
+	let (mut harness, mut projection, mut transform, mut inertia) = camera.into_inner();
 
-	harness.scale *= zoom_events.read().map(|event| event.0).product::<f32>();
+	let zoom_movement = zoom_events
+		.read()
+		.map(|event| match event {
+			ZoomCameraEvent::In => 1.0,
+			ZoomCameraEvent::Out => -1.0,
+		})
+		.sum::<f32>()
+		* ZOOM_SPEED;
 
 	let level_size = 2.0 * harness.level_bounds.half_size();
+	// Allow zooming in to double g11 scale, or to see the whole level
+	// if it is too small
+	let maximum_zoom = (level_size / LEVEL_AREA_WIDTH * 2.0).max_element().max(1.0);
+	// Allow zooming out to see the whole level,
+	// or to g11 scale if the level is smaller than that
+	let minimum_zoom = (level_size / LEVEL_AREA_WIDTH).max_element().min(1.0);
 
-	let maximum_zoom = level_size.max_element() / SPRITE_LENGTH;
-	harness.scale = harness.scale.max(1.0).min(maximum_zoom);
+	if zoom_movement != 0.0 {
+		// The zooming speed needed to cover a zoom ratio by inertia alone
+		let zoom_terminal_speed = -ZOOM_FRICTION.ln();
+		// Cap the zoom speed to the terminal speed to ease the movement near bounds
+		let min_zoom_speed = (minimum_zoom / harness.scale).ln() * zoom_terminal_speed;
+		let max_zoom_speed = (maximum_zoom / harness.scale).ln() * zoom_terminal_speed;
+		inertia.zoom = zoom_movement.clamp(min_zoom_speed, max_zoom_speed);
+	} else {
+		inertia.zoom *= ZOOM_FRICTION.powf(time.delta_secs());
+	}
+
+	harness.scale *= 2f32.powf(inertia.zoom * time.delta_secs());
+	// Still clamp the positions, as a failsafe
+	harness.scale = harness.scale.max(minimum_zoom).min(maximum_zoom);
 
 	let bounds =
 		level_size / harness.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION));
@@ -178,15 +232,57 @@ fn update_camera(
 		}
 	}
 
-	let movement = move_events
-		.read()
-		.map(|event| event.0)
-		.reduce(<Vec2 as std::ops::Add>::add)
-		.unwrap_or_default();
+	// +--------------------+------------+
+	// |                    |viewport    |bounding box
+	// |                    |            |
+	// |          X - - - - + +          |
+	// |          |         | |camera pan bounds
+	// |          |     O   | |          |
+	// +----------+---------+ |          |
+	// |          + - - - - - +          |
+	// |                                 |
+	// |                                 |
+	// +---------------------------------+
+	//
+	// O = Origin (center of world coordinate system and of level bounding box)
+	// X = Center of viewport (harness.center)
+	// (size of VP) = (size of BB, expanded to window aspect ratio) / scale
+	// Pan bounds = BB - VP
+	let bb_half_size = harness.level_bounds.half_size();
+	let vp_size = window.size() * Vec2::new(1.0, 1.0 - VERTICAL_PADDING_FRACTION);
+	let mut expanded_bb_half_size = bb_half_size;
+	if vp_size.x * bb_half_size.y > vp_size.y * bb_half_size.x {
+		expanded_bb_half_size.x = bb_half_size.y * vp_size.x / vp_size.y;
+	} else if vp_size.x * bb_half_size.y < vp_size.y * bb_half_size.x {
+		expanded_bb_half_size.y = bb_half_size.x * vp_size.y / vp_size.x;
+	}
+	let movement_bounds = Aabb2d::new(
+		Vec2::ZERO,
+		(bb_half_size - expanded_bb_half_size / harness.scale).max(Vec2::ZERO),
+	);
 
-	harness.center += bounds * movement * time.delta_secs();
+	let movement =
+		move_events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / harness.scale;
 
-	harness.center = harness.level_bounds.closest_point(harness.center);
+	// The panning speed needed to cover a unit of distance by inertia alone
+	let pan_terminal_speed = -PAN_FRICTION.ln();
+	// Cap the pan speed to the terminal speed to ease the movement near bounds
+	let min_pan_speed = (movement_bounds.min - harness.center) * pan_terminal_speed;
+	let max_pan_speed = (movement_bounds.max - harness.center) * pan_terminal_speed;
+	if movement.x != 0.0 {
+		inertia.velocity.x = movement.x.clamp(min_pan_speed.x, max_pan_speed.x);
+	} else {
+		inertia.velocity.x *= PAN_FRICTION.powf(time.delta_secs());
+	}
+	if movement.y != 0.0 {
+		inertia.velocity.y = movement.y.clamp(min_pan_speed.y, max_pan_speed.y);
+	} else {
+		inertia.velocity.y *= PAN_FRICTION.powf(time.delta_secs());
+	}
+
+	harness.center += inertia.velocity * time.delta_secs();
+	// Still clamp the positions, as a failsafe
+	harness.center = movement_bounds.closest_point(harness.center);
 
 	transform.translation.x = harness.center.x;
 	transform.translation.y = harness.center.y;

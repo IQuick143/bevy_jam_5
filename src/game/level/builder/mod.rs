@@ -32,11 +32,18 @@ pub struct LevelBuilder {
 	// TODO: Populate and use this
 	#[expect(dead_code)]
 	declared_one_way_detector_links: Vec<DeclaredOneWayLinkData>,
+	/// Bounding box (or parts thereof) set by the caller
+	explicit_bounding_box: PartialBoundingBox,
 	/// Bounding box
 	bounding_box: Option<Aabb2d>,
 	/// A conversion factor from logical "epilang" units to level units.
 	/// If `None` then this conversion is computed in order to fit the level into the usual bounding box.
 	scale_override: Option<f32>,
+	/// How zoom should be initialized when entering the level
+	initial_zoom: Option<f32>,
+	/// How camera position should be initialized when entering the level
+	/// (in the builder's coordinate space)
+	initial_camera_pos: PartialVec2,
 }
 
 /// Enumerates the possible sets of positions
@@ -55,6 +62,22 @@ pub enum CycleBoundColorLabelPositionSet {
 	/// Thelabel can be placed in any direction from the button,
 	/// and it will be rotated
 	AllDirectionsRotated,
+}
+
+/// Bounding box whose bounds can be set (or not set) individually
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+pub struct PartialBoundingBox {
+	pub left: Option<f32>,
+	pub top: Option<f32>,
+	pub right: Option<f32>,
+	pub bottom: Option<f32>,
+}
+
+/// Vector whose coordinates can be set (or not set) individually
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+pub struct PartialVec2 {
+	pub x: Option<f32>,
+	pub y: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug)]
