@@ -2,18 +2,14 @@ use super::{logic::IsLevelCompleted, *};
 use crate::{game::spawn::LevelInitialization, save::SaveGame, screen::PlayingLevelListEntry};
 
 pub(super) fn plugin(app: &mut App) {
-	app
-		.init_resource::<IsLevelPersistentlyCompleted>()
+	app.init_resource::<IsLevelPersistentlyCompleted>()
 		.add_systems(
 			Update,
 			progress_persistence_sync_system.run_if(
 				resource_changed::<IsLevelCompleted>.and(resource_equals(IsLevelCompleted(true))),
 			),
 		)
-		.add_systems(
-			LevelInitialization,
-			load_persistent_completion_indicator,
-		);
+		.add_systems(LevelInitialization, load_persistent_completion_indicator);
 }
 
 /// Indicates whether the level being played has ever been completed,
