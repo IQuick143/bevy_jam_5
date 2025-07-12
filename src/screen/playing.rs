@@ -30,7 +30,8 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
 					send_event(GameUiAction::NextLevel).run_if(
-						char_input_pressed('n').and(resource_equals(IsLevelCompleted(true))),
+						char_input_pressed('n')
+							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
 					),
 					send_event(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
@@ -44,7 +45,7 @@ pub(super) fn plugin(app: &mut App) {
 				(load_level, update_level_name_display)
 					.chain()
 					.run_if(on_event::<LoadLevel>),
-				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
+				update_next_level_button_display.run_if(resource_changed::<IsLevelPersistentlyCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
@@ -150,6 +151,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						.insert((
 							GameUiAction::NextLevel,
 							NextLevelButton,
+							BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
 							InteractionPalette {
 								none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
 								hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
@@ -254,7 +256,7 @@ fn game_ui_input_processing_system(
 }
 
 fn update_next_level_button_display(
-	is_level_completed: Res<IsLevelCompleted>,
+	is_level_completed: Res<IsLevelPersistentlyCompleted>,
 	playing_level: PlayingLevelListEntry,
 	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
