@@ -26,6 +26,7 @@ pub mod prelude {
 			RotateCycle,
 		},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
+		synchronization::IsLevelPersistentlyCompleted,
 	};
 	pub use bevy::prelude::*;
 }

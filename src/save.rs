@@ -47,7 +47,7 @@ impl Saveable for SaveGame {
 }
 
 impl SaveGame {
-	pub fn _is_level_completed(&self, level_id: &str) -> bool {
+	pub fn is_level_completed(&self, level_id: &str) -> bool {
 		self.completed_levels.contains(level_id)
 	}
 
