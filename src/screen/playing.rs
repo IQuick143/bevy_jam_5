@@ -3,8 +3,9 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
-	assets::{GlobalFont, LoadedLevelList},
+	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList},
 	game::{
+		drawing::ThingPalette,
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
 	},
@@ -45,7 +46,8 @@ pub(super) fn plugin(app: &mut App) {
 				(load_level, update_level_name_display)
 					.chain()
 					.run_if(on_event::<LoadLevel>),
-				update_next_level_button_display.run_if(resource_changed::<IsLevelPersistentlyCompleted>),
+				(update_next_level_button_display, update_checkmark_display)
+					.run_if(resource_changed::<IsLevelPersistentlyCompleted>),
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
@@ -68,6 +70,10 @@ struct UndoButton;
 /// Marker component for the level name label
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct LevelNameBox;
+
+/// Marker component for the slot where the checkmark will go to indicate completion
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct LevelCompletionCheckmarkBox;
 
 #[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
@@ -108,7 +114,15 @@ impl PlayingLevelListEntry<'_> {
 	}
 }
 
-fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
+/// Size of the level title label on the playing screen
+const LEVEL_TITLE_SIZE: f32 = 35.0;
+
+fn spawn_game_ui(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	images: Res<HandleMap<ImageKey>>,
+	colors: Res<ThingPalette>,
+) {
 	commands
 		.ui_root_justified(JustifyContent::Start)
 		.insert(StateScoped(Screen::Playing))
@@ -167,6 +181,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
 					align_items: AlignItems::Center,
+					column_gap: Val::Px(15.0),
 					..default()
 				})
 				.with_children(|parent| {
@@ -175,10 +190,24 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						Text::default(),
 						TextFont {
 							font: font.0.clone_weak(),
-							font_size: 35.0,
+							font_size: LEVEL_TITLE_SIZE,
 							..default()
 						},
 						TextColor(ui_palette::LABEL_TEXT),
+					));
+					parent.spawn((
+						LevelCompletionCheckmarkBox,
+						Node {
+							width: Val::Px(LEVEL_TITLE_SIZE),
+							height: Val::Px(LEVEL_TITLE_SIZE),
+							..default()
+						},
+						ImageNode {
+							image: images[&ImageKey::Checkmark].clone_weak(),
+							color: colors.checkmark,
+							image_mode: NodeImageMode::Stretch,
+							..default()
+						},
 					));
 				});
 		});
@@ -262,6 +291,20 @@ fn update_next_level_button_display(
 ) {
 	let next_level = playing_level.get().ok().and_then(|l| l.next_level);
 	let display = if is_level_completed.0 && next_level.is_some() {
+		Display::DEFAULT
+	} else {
+		Display::None
+	};
+	for mut node in &mut query {
+		node.display = display;
+	}
+}
+
+fn update_checkmark_display(
+	is_level_completed: Res<IsLevelPersistentlyCompleted>,
+	mut query: Query<&mut Node, With<LevelCompletionCheckmarkBox>>,
+) {
+	let display = if is_level_completed.0 {
 		Display::DEFAULT
 	} else {
 		Display::None

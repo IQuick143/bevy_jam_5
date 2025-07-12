@@ -3,7 +3,7 @@
 mod animation;
 pub mod camera;
 pub mod components;
-mod drawing;
+pub mod drawing;
 mod game_sfx;
 mod hints;
 pub mod history;

@@ -2,8 +2,12 @@ use bevy::prelude::*;
 
 use super::*;
 use crate::{
-	assets::{GlobalFont, LoadedLevelList},
-	game::level::{list::LevelList, LevelData},
+	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList},
+	game::{
+		drawing::ThingPalette,
+		level::{list::LevelList, LevelData},
+	},
+	save::SaveGame,
 	ui::prelude::*,
 };
 
@@ -28,6 +32,9 @@ fn spawn_screen(
 	font: Res<GlobalFont>,
 	level_assets: Res<Assets<LevelData>>,
 	level_list_asset: Res<Assets<LevelList>>,
+	save: Res<SaveGame>,
+	images: Res<HandleMap<ImageKey>>,
+	colors: Res<ThingPalette>,
 ) {
 	let levels = level_list_asset
 		.get(&levels.0)
@@ -48,11 +55,30 @@ fn spawn_screen(
 					..default()
 				})
 				.with_children(|parent| {
-					for (level_id, level) in levels.levels.iter().enumerate() {
-						if let Some(level) = level_assets.get(&level.data_handle) {
-							parent
-								.small_button(level.name.clone(), font.0.clone_weak())
-								.insert(LevelSelectAction::PlayLevel(level_id));
+					for (level_id, level_meta) in levels.levels.iter().enumerate() {
+						if let Some(level) = level_assets.get(&level_meta.data_handle) {
+							let mut button =
+								parent.small_button(level.name.clone(), font.0.clone_weak());
+							button.insert(LevelSelectAction::PlayLevel(level_id));
+							if save.is_level_completed(&level_meta.identifier) {
+								button.with_child((
+									Name::new("Level Completed Marker"),
+									Node {
+										width: Val::Px(30.0),
+										height: Val::Px(30.0),
+										position_type: PositionType::Absolute,
+										bottom: Val::Px(10.0),
+										right: Val::Px(10.0),
+										..default()
+									},
+									ImageNode {
+										image: images[&ImageKey::Checkmark].clone_weak(),
+										color: colors.checkmark,
+										image_mode: NodeImageMode::Stretch,
+										..default()
+									},
+								));
+							}
 						} else {
 							log::warn!("Invalid level asset handle");
 						}
