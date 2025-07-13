@@ -67,8 +67,8 @@ fn spawn_screen(
 										width: Val::Px(30.0),
 										height: Val::Px(30.0),
 										position_type: PositionType::Absolute,
-										bottom: Val::Px(10.0),
-										right: Val::Px(10.0),
+										bottom: Val::Px(7.5),
+										right: Val::Px(7.5),
 										..default()
 									},
 									ImageNode {
