@@ -46,8 +46,12 @@ pub(super) fn plugin(app: &mut App) {
 				(load_level, update_level_name_display)
 					.chain()
 					.run_if(on_event::<LoadLevel>),
-				(update_next_level_button_display, update_checkmark_display)
+				(
+					update_next_level_button_display,
+					update_checkmark_display.before(update_checkmark_margin),
+				)
 					.run_if(resource_changed::<IsLevelPersistentlyCompleted>),
+				update_checkmark_margin,
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
@@ -73,7 +77,10 @@ struct LevelNameBox;
 
 /// Marker component for the slot where the checkmark will go to indicate completion
 #[derive(Component, Clone, Copy, Debug, Default)]
-struct LevelCompletionCheckmarkBox;
+struct LevelCompletionCheckmarkBox {
+	/// Progress of the animation where the checkmark appears, [0, 1]
+	appear_progress: f32,
+}
 
 #[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
@@ -116,6 +123,8 @@ impl PlayingLevelListEntry<'_> {
 
 /// Size of the level title label on the playing screen
 const LEVEL_TITLE_SIZE: f32 = 35.0;
+/// Width of the gap between title label and checkmark indicating completion
+const LEVEL_TITLE_CHECK_GAP: f32 = 15.0;
 
 fn spawn_game_ui(
 	mut commands: Commands,
@@ -181,7 +190,7 @@ fn spawn_game_ui(
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
 					align_items: AlignItems::Center,
-					column_gap: Val::Px(15.0),
+					column_gap: Val::Px(LEVEL_TITLE_CHECK_GAP),
 					..default()
 				})
 				.with_children(|parent| {
@@ -196,7 +205,7 @@ fn spawn_game_ui(
 						TextColor(ui_palette::LABEL_TEXT),
 					));
 					parent.spawn((
-						LevelCompletionCheckmarkBox,
+						LevelCompletionCheckmarkBox::default(),
 						Node {
 							width: Val::Px(LEVEL_TITLE_SIZE),
 							height: Val::Px(LEVEL_TITLE_SIZE),
@@ -302,16 +311,60 @@ fn update_next_level_button_display(
 
 fn update_checkmark_display(
 	is_level_completed: Res<IsLevelPersistentlyCompleted>,
-	mut query: Query<&mut Node, With<LevelCompletionCheckmarkBox>>,
+	is_completed_this_session: Res<IsLevelCompleted>,
+	mut query: Query<(&mut Node, &mut ImageNode, &mut LevelCompletionCheckmarkBox)>,
 ) {
-	let display = if is_level_completed.0 {
-		Display::DEFAULT
-	} else {
-		Display::None
-	};
-	for mut node in &mut query {
-		node.display = display;
+	for (mut node, mut image, mut checkmark) in &mut query {
+		if **is_level_completed {
+			// The full animation should only be played if the level was just completed
+			// (entering a level that had been completed in a previous session does not count)
+			// and the checkmark was not displayed before
+			if **is_completed_this_session && node.display == Display::None {
+				checkmark.appear_progress = 0.0;
+			} else {
+				checkmark.appear_progress = 1.0;
+				// The system that animates the margins will not run this way,
+				// so set the mrgin here instead
+				node.margin.left = Val::Px(0.0);
+				node.margin.right = Val::Px(0.0);
+				image.color.set_alpha(1.0);
+			}
+			// Always show the checkmark on completed levels
+			node.display = Display::DEFAULT;
+		} else {
+			node.display = Display::None;
+			checkmark.appear_progress = 1.0;
+		}
 	}
+}
+
+/// How long it takes for a checkmark to fully appear
+const CHECKMARK_APPEAR_TIME: f32 = 0.2;
+
+fn update_checkmark_margin(
+	mut query: Query<(&mut Node, &mut ImageNode, &mut LevelCompletionCheckmarkBox)>,
+	time: Res<Time>,
+) {
+	for (mut node, mut image, mut checkmark) in &mut query {
+		// Do nothing to checkboxes that are already fully animated
+		if checkmark.appear_progress >= 1.0 {
+			continue;
+		}
+		let delta = time.delta_secs() / CHECKMARK_APPEAR_TIME;
+		checkmark.appear_progress = (checkmark.appear_progress + delta).min(1.0);
+		let animation_progress = checkmark_margin_animation_curve(checkmark.appear_progress);
+		let margin = (LEVEL_TITLE_SIZE + LEVEL_TITLE_CHECK_GAP) * (1.0 - animation_progress);
+		// Split the margin between the sides so that the checkmark stays in place
+		// while the level title moves away
+		node.margin.left = Val::Px(-margin / 2.0);
+		node.margin.right = Val::Px(-margin / 2.0);
+		// Fade in the checkmark
+		image.color.set_alpha(animation_progress);
+	}
+}
+
+fn checkmark_margin_animation_curve(x: f32) -> f32 {
+	1.0 - (1.0 - x).powi(2)
 }
 
 fn update_undo_button_display(
