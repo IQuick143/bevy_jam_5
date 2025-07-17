@@ -3,6 +3,7 @@
 use crate::{
 	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
+	save::SaveGame,
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
 };
@@ -27,6 +28,7 @@ pub(super) fn plugin(app: &mut App) {
 			draw_layout.run_if(resource_equals(RenderOutlines(true))),
 			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
+			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
 		),
 	);
 	app.init_resource::<RenderOutlines>();
