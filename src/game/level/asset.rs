@@ -33,14 +33,13 @@ impl From<LevelParsingError> for LevelLoadingError {
 impl std::fmt::Display for LevelLoadingError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			LevelLoadingError::IO(e) => f.write_fmt(format_args!(
-				"Level could not be loaded because of an IO error: {}",
-				e
-			)),
-			LevelLoadingError::Parsing(e) => f.write_fmt(format_args!(
-				"Level could not be loaded because of a parsing error: {}",
-				e
-			)),
+			LevelLoadingError::IO(e) => {
+				write!(f, "Level could not be loaded because of an IO error: {e}",)
+			}
+			LevelLoadingError::Parsing(e) => write!(
+				f,
+				"Level could not be loaded because of a parsing error: {e}"
+			),
 		}
 	}
 }
