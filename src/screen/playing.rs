@@ -52,6 +52,11 @@ pub(super) fn plugin(app: &mut App) {
 				)
 					.run_if(resource_changed::<IsLevelPersistentlyCompleted>),
 				update_checkmark_margin,
+				start_completion_cue_animation.run_if(
+					resource_changed::<IsLevelCompleted>
+						.and(resource_equals(IsLevelCompleted(true))),
+				),
+				tick_completion_cue_animation,
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
@@ -80,6 +85,13 @@ struct LevelNameBox;
 struct LevelCompletionCheckmarkBox {
 	/// Progress of the animation where the checkmark appears, [0, 1]
 	appear_progress: f32,
+}
+
+/// Marker component for the glow effect on the checkmark that indicates level completion
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct LevelCompletionCheckmarkGlow {
+	/// Progress of the level completion cue animation [0, 1]
+	progress: f32,
 }
 
 #[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
@@ -365,6 +377,61 @@ fn update_checkmark_margin(
 
 fn checkmark_margin_animation_curve(x: f32) -> f32 {
 	1.0 - (1.0 - x).powi(2)
+}
+
+fn start_completion_cue_animation(
+	query: Query<Entity, With<LevelCompletionCheckmarkBox>>,
+	images: Res<HandleMap<ImageKey>>,
+	colors: Res<ThingPalette>,
+	mut commands: Commands,
+) {
+	for node_id in &query {
+		commands.entity(node_id).with_child((
+			LevelCompletionCheckmarkGlow::default(),
+			Node {
+				position_type: PositionType::Absolute,
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0),
+				..default()
+			},
+			ImageNode {
+				image: images[&ImageKey::CheckmarkSolid].clone_weak(),
+				color: colors.checkmark,
+				image_mode: NodeImageMode::Stretch,
+				..default()
+			},
+		));
+	}
+}
+
+/// How long the animation of level completion cue takes, in seconds
+const CHECKMARK_GLOW_TIME: f32 = 0.5;
+
+fn tick_completion_cue_animation(
+	mut query: Query<(
+		Entity,
+		&mut Node,
+		&mut ImageNode,
+		&mut LevelCompletionCheckmarkGlow,
+	)>,
+	mut commands: Commands,
+	time: Res<Time>,
+) {
+	for (node_id, mut node, mut image, mut data) in &mut query {
+		data.progress += time.delta_secs() / CHECKMARK_GLOW_TIME;
+		if data.progress >= 1.0 {
+			// Despawn the animation entity once the animation is complete
+			commands.entity(node_id).despawn();
+		} else {
+			// Update the entity to reflect the animation progress
+			image.color.set_alpha(1.0 - data.progress);
+			let glow_size = 150.0 * checkmark_margin_animation_curve(data.progress);
+			node.width = Val::Percent(100.0 + glow_size);
+			node.height = Val::Percent(100.0 + glow_size);
+			node.left = Val::Percent(-glow_size / 2.0);
+			node.top = Val::Percent(-glow_size / 2.0);
+		}
+	}
 }
 
 fn update_undo_button_display(
