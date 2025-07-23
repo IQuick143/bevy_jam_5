@@ -26,10 +26,10 @@ fn spawn_background(
 			.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
 		texture: images[&ImageKey::Background].clone_weak(),
 		colors: [
-			palettes::tailwind::SLATE_50.into(),
+			Srgba::hex("F5F8FB").unwrap().into(),
 			LinearRgba::WHITE,
 			palettes::tailwind::SLATE_200.into(),
-			palettes::tailwind::SLATE_50.into(),
+			Srgba::hex("F5F8FB").unwrap().into(),
 		],
 		sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
 		sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
