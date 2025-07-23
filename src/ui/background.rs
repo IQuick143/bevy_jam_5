@@ -16,15 +16,25 @@ pub fn plugin(app: &mut App) {
 fn spawn_background(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<ScrollingTextureMaterial>>,
+	mut materials: ResMut<Assets<BackgroundMaterial>>,
 	images: Res<HandleMap<ImageKey>>,
 ) {
 	const MESH_SIZE: f32 = 8000.0;
-	let material = ScrollingTextureMaterial {
+	let material = BackgroundMaterial {
 		scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
 		speed: Vec2::from_angle(BACKGROUND_ROTATION)
 			.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
 		texture: images[&ImageKey::Background].clone_weak(),
+		colors: [
+			palettes::tailwind::SLATE_50.into(),
+			LinearRgba::WHITE,
+			palettes::tailwind::SLATE_200.into(),
+			palettes::tailwind::SLATE_50.into(),
+		],
+		sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
+		sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
+		sweep_position: 0.0,
+		sweep_width: 3.0,
 	};
 	commands.spawn((
 		Mesh2d(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),

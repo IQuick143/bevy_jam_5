@@ -1,13 +1,15 @@
 use crate::game::prelude::*;
 use core::f32;
 
+mod background_material;
 pub mod primitives;
 mod scrolling_texture;
 
+pub use background_material::BackgroundMaterial;
 pub use scrolling_texture::ScrollingTextureMaterial;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_plugins(scrolling_texture::plugin);
+	app.add_plugins((scrolling_texture::plugin, background_material::plugin));
 }
 
 /// Fraction of vertical space that should be reserved for UI.
