@@ -8,11 +8,17 @@ use crate::{
 };
 use bevy::{color::palettes, prelude::*};
 
-use super::palette;
-
 pub fn plugin(app: &mut App) {
-	app.add_systems(Startup, spawn_background);
+	app.add_systems(Startup, spawn_background)
+		.add_systems(
+			Update,
+			(flip_background_on_level_completion, update_background_sweep),
+		)
+		.init_resource::<IsBackgroundHighlighted>();
 }
+
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug, Default)]
+struct IsBackgroundHighlighted(bool);
 
 fn spawn_background(
 	mut commands: Commands,
@@ -35,7 +41,7 @@ fn spawn_background(
 		sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
 		sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
 		sweep_position: 0.0,
-		sweep_width: 3.0,
+		sweep_width: 2.0,
 	};
 	commands.spawn((
 		Mesh2d(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),
@@ -44,4 +50,39 @@ fn spawn_background(
 			.with_rotation(Quat::from_rotation_z(BACKGROUND_ROTATION)),
 		Parallax(BACKGROUND_PARALLAX),
 	));
+}
+
+fn flip_background_on_level_completion(
+	mut is_highlighted: ResMut<IsBackgroundHighlighted>,
+	is_completed: Res<IsLevelCompleted>,
+	screen: Res<State<Screen>>,
+) {
+	let next_is_highlighted = is_completed.0 && **screen == Screen::Playing;
+	// Only update if the value is different to take advantage of change detection
+	is_highlighted.set_if_neq(IsBackgroundHighlighted(next_is_highlighted));
+}
+
+fn update_background_sweep(
+	mut materials: ResMut<Assets<BackgroundMaterial>>,
+	is_highlighted: Res<IsBackgroundHighlighted>,
+	time: Res<Time>,
+) {
+	const SWEEP_SPEED: f32 = 8.0;
+	if **is_highlighted {
+		if is_highlighted.is_changed() {
+			for (_, material) in materials.iter_mut() {
+				// TODO: This may not look the same on screens of different sizes
+				material.sweep_position = 10.0;
+			}
+		} else {
+			let delta_position = time.delta_secs() * SWEEP_SPEED;
+			for (_, material) in materials.iter_mut() {
+				material.sweep_position += delta_position;
+			}
+		}
+	} else if is_highlighted.is_changed() {
+		for (_, material) in materials.iter_mut() {
+			material.sweep_position = 0.0;
+		}
+	}
 }
