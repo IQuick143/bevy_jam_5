@@ -1,9 +1,10 @@
-use std::f32::consts::PI;
+//! Animated background of the screen
 
 use crate::{
 	assets::{HandleMap, ImageKey},
-	game::camera::Parallax,
+	game::{camera::Parallax, logic::IsLevelCompleted},
 	graphics::*,
+	screen::Screen,
 };
 use bevy::{color::palettes, prelude::*};
 
