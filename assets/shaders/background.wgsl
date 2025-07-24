@@ -28,9 +28,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4f {
     let scaled_uv: vec2f = in.uv * material_scale;
     // Actual texture coordinates for sampling the material texture
 	let uv: vec2f = fract(scaled_uv - globals.time * material_speed);
-    // Center of the current tile (tile = region that gets painted with one instance
+    // Near corner of the current tile (tile = region that gets painted with one instance
     // of the material texture) in scaled global texture coordinates
-    let tile_center: vec2f = scaled_uv - uv + 0.5;
+    let tile_near_point: vec2f = scaled_uv - uv + sweep_origin / material_scale;
     // Sample of the material texture that corresponds to the current fragment
 	let material_sample: vec4f = textureSample(material_texture, material_sampler, uv);
     // Sample of the material texture in srgba space
@@ -42,9 +42,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4f {
     let sweep_lag: f32 = corrected_material_sample.y * sqrt(2.0);
     // Blue channel of the material texture indicates how long the color transition should take
     let sweep_duration: f32 = corrected_material_sample.z;
-    let sweep_projection: f32 = dot(tile_center - sweep_origin, sweep_direction);
-    let nominal_sweep_point: f32 = (nominal_sweep_start - sweep_projection) / nominal_sweep_width - 1.0;
-    let fragment_sweep_point: f32 = (sweep_lag + nominal_sweep_point) / sweep_duration;
+    let sweep_projection: f32 = dot(tile_near_point - sweep_origin, sweep_direction);
+    let nominal_sweep_point: f32 = (nominal_sweep_start - sweep_projection) / nominal_sweep_width;
+    let fragment_sweep_point: f32 = (nominal_sweep_point - sweep_lag) / sweep_duration;
     let palette_picker: f32 = clamp(fragment_sweep_point, 0.0, 1.0);
     let primary_color: vec4f = mix(colors[0], colors[1], color_picker);
     let secondary_color: vec4f = mix(colors[2], colors[3], color_picker);
