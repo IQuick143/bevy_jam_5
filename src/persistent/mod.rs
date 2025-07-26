@@ -12,11 +12,20 @@ pub fn plugin(app: &mut App) {
 	app.insert_resource(StoragePath::new());
 }
 
-pub fn register_saveable_resource<T: Saveable + Resource>(app: &mut App) {
-	app.init_resource::<T>()
-		.init_resource::<JsonStore<T>>()
-		.add_systems(Startup, load_system::<T>)
-		.add_systems(Update, save_system::<T>.run_if(resource_changed::<T>));
+/// Extension trait that allows registering of resources that are bound to persistent state
+pub trait RegisterSaveableResource {
+	/// Registers a resource that is bound to persistent state
+	/// and a set of systems that synchronize the state of the resource
+	fn register_saveable_resource<T: Saveable + Resource>(&mut self) -> &mut Self;
+}
+
+impl RegisterSaveableResource for App {
+	fn register_saveable_resource<T: Saveable + Resource>(&mut self) -> &mut Self {
+		self.init_resource::<T>()
+			.init_resource::<JsonStore<T>>()
+			.add_systems(Startup, load_system::<T>)
+			.add_systems(Update, save_system::<T>.run_if(resource_changed::<T>))
+	}
 }
 
 fn load_system<T: Saveable + Resource>(

@@ -1,9 +1,10 @@
+//! Persistent state of the game's progression
+
+use crate::persistent::{RegisterSaveableResource as _, Saveable};
 use bevy::{app::App, ecs::resource::Resource, platform::collections::HashSet};
 
-use crate::persistent::{register_saveable_resource, Saveable};
-
 pub fn plugin(app: &mut App) {
-	register_saveable_resource::<SaveGame>(app);
+	app.register_saveable_resource::<SaveGame>();
 }
 
 /// Persistent state of a game

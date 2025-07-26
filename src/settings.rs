@@ -1,9 +1,10 @@
+//! Settings relating to the game interface
+
+use crate::persistent::{RegisterSaveableResource as _, Saveable};
 use bevy::{app::App, ecs::resource::Resource};
 
-use crate::persistent::{register_saveable_resource, Saveable};
-
 pub fn plugin(app: &mut App) {
-	register_saveable_resource::<Settings>(app);
+	app.register_saveable_resource::<Settings>();
 }
 
 #[derive(Resource, Default)]
