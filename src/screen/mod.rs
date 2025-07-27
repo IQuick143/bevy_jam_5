@@ -4,6 +4,7 @@ mod credits;
 mod level_select;
 mod loading;
 mod playing;
+mod settings;
 mod splash;
 mod title;
 
@@ -25,6 +26,7 @@ pub(super) fn plugin(app: &mut App) {
 		credits::plugin,
 		playing::plugin,
 		level_select::plugin,
+		settings::plugin,
 	));
 
 	app.add_systems(
@@ -57,12 +59,13 @@ fn go_to_return_screen(current_screen: Res<State<Screen>>, mut commands: Command
 }
 
 /// The game's main screen states.
-#[derive(States, Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(States, Debug, Hash, PartialEq, Eq, Clone, Copy, Default, Reflect)]
 pub enum Screen {
 	#[default]
 	Splash,
 	Loading,
 	Title,
+	Settings,
 	Credits,
 	LevelSelect,
 	/// The actual playing screen of the game.
@@ -73,6 +76,7 @@ impl Screen {
 	/// Which screen should we return to
 	fn return_screen(self) -> Option<Self> {
 		match self {
+			Self::Settings => Some(Self::Title),
 			Self::Credits => Some(Self::Title),
 			Self::LevelSelect => Some(Self::Title),
 			Self::Playing => Some(Self::LevelSelect),

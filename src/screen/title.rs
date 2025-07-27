@@ -81,6 +81,9 @@ fn enter_title(
 				.button("Play", font.0.clone_weak())
 				.insert(TitleAction::GoToScreen(Screen::LevelSelect));
 			children
+				.button("Settings", font.0.clone_weak())
+				.insert(TitleAction::GoToScreen(Screen::Settings));
+			children
 				.button("Credits", font.0.clone_weak())
 				.insert(TitleAction::GoToScreen(Screen::Credits));
 
