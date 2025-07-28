@@ -21,9 +21,9 @@ pub(super) fn plugin(app: &mut App) {
 #[require(Node, Interaction, RelativeCursorPosition)]
 pub struct Slider {
 	/// Number of positions that the slider can be in
-	step_count: u32,
+	pub step_count: u32,
 	/// Current position of the slider
-	position: u32,
+	pub position: u32,
 }
 
 impl Slider {
@@ -32,6 +32,14 @@ impl Slider {
 			step_count,
 			position,
 		}
+	}
+
+	pub fn new_fraction(step_count: u32, position: f32) -> Self {
+		Self::new(step_count, (position * step_count as f32).round() as u32)
+	}
+
+	pub fn fraction(&self) -> f32 {
+		self.position as f32 / self.step_count as f32
 	}
 }
 

@@ -3,6 +3,7 @@
 use super::*;
 use crate::{
 	assets::GlobalFont,
+	settings::Settings,
 	ui::{prelude::*, slider::Slider},
 };
 
@@ -10,7 +11,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Settings), enter_settings)
 		.add_systems(
 			Update,
-			handle_settings_action.run_if(in_state(Screen::Settings).and(ui_not_frozen)),
+			(handle_settings_action, handle_settings_slider_input)
+				.run_if(in_state(Screen::Settings).and(ui_not_frozen)),
 		);
 }
 
@@ -32,7 +34,7 @@ const SLIDER_WIDTH: f32 = 200.0;
 /// Number of steps on each slider on the Settings screen
 const SLIDER_STEP_COUNT: u32 = 8;
 
-fn enter_settings(mut commands: Commands, font: Res<GlobalFont>) {
+fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<Settings>) {
 	commands
 		.ui_root()
 		.insert(StateScoped(Screen::Settings))
@@ -55,7 +57,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>) {
 							width: Val::Px(SLIDER_WIDTH),
 							..default()
 						},
-						Slider::new(SLIDER_STEP_COUNT, 0),
+						Slider::new_fraction(SLIDER_STEP_COUNT, settings.soundtrack_volume),
 						SettingsSliderControl::MusicVolume,
 					));
 					children.text("Sfx volume", JustifyContent::End, font.0.clone_weak());
@@ -64,7 +66,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>) {
 							width: Val::Px(SLIDER_WIDTH),
 							..default()
 						},
-						Slider::new(SLIDER_STEP_COUNT, 0),
+						Slider::new_fraction(SLIDER_STEP_COUNT, settings.sfx_volume),
 						SettingsSliderControl::SfxVolume,
 					));
 				});
@@ -85,6 +87,18 @@ fn handle_settings_action(mut commands: Commands, query: InteractionQuery<&Setti
 					));
 				}
 			}
+		}
+	}
+}
+
+fn handle_settings_slider_input(
+	query: Query<(&Slider, &SettingsSliderControl), Changed<Slider>>,
+	mut settings: ResMut<Settings>,
+) {
+	for (slider, control) in &query {
+		match control {
+			SettingsSliderControl::SfxVolume => settings.sfx_volume = slider.fraction(),
+			SettingsSliderControl::MusicVolume => settings.soundtrack_volume = slider.fraction(),
 		}
 	}
 }
