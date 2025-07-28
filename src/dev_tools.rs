@@ -9,7 +9,7 @@ use crate::{
 use bevy::{
 	color::palettes, dev_tools::states::log_transitions,
 	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
-	platform::collections::HashMap,
+	platform::collections::HashMap, ui::UiDebugOptions,
 };
 
 use crate::screen::Screen;
@@ -36,8 +36,9 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
 struct RenderOutlines(pub bool);
 
-fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
+fn toggle_box_outlines(mut render: ResMut<RenderOutlines>, mut ui_debug: ResMut<UiDebugOptions>) {
 	render.0 = !render.0;
+	ui_debug.toggle();
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
