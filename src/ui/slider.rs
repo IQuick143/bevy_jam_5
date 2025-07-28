@@ -1,7 +1,7 @@
 //! The slider UI element
 
 use super::{interaction::InteractionQuery, palette::*};
-use crate::graphics::*;
+use crate::{graphics::*, ui::freeze::ui_not_frozen};
 use bevy::{prelude::*, ui::RelativeCursorPosition};
 use Val::*;
 
@@ -10,8 +10,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			create_slider_children,
-			apply_slider_interaction_palettes,
-			move_sliders,
+			(apply_slider_interaction_palettes, move_sliders).run_if(ui_not_frozen),
 		),
 	);
 }
