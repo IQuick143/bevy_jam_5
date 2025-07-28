@@ -6,6 +6,7 @@ mod epilang;
 mod game;
 mod graphics;
 mod screen;
+mod settings;
 mod ui;
 
 use bevy::{
@@ -70,6 +71,7 @@ impl Plugin for AppPlugin {
 			audio::plugin,
 			assets::plugin,
 			graphics::plugin,
+			settings::plugin,
 		));
 
 		// Enable dev tools for dev builds.
