@@ -9,8 +9,13 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			create_slider_children,
-			(apply_slider_interaction_palettes, move_sliders).run_if(ui_not_frozen),
+			create_slider_children.before(move_slider_handles),
+			(
+				apply_slider_interaction_palettes,
+				accept_slider_inputs.before(move_slider_handles),
+			)
+				.run_if(ui_not_frozen),
+			move_slider_handles,
 		),
 	);
 }
@@ -161,20 +166,18 @@ fn apply_slider_interaction_palettes(
 	}
 }
 
-fn move_sliders(
+fn accept_slider_inputs(
 	mut slider_q: Query<
 		(
 			&mut Slider,
-			&SliderChildren,
 			&Interaction,
 			&ComputedNode,
 			&RelativeCursorPosition,
 		),
 		Changed<RelativeCursorPosition>,
 	>,
-	mut node_q: Query<&mut Node>,
 ) {
-	for (mut slider, children, interaction, node, cursor_pos) in &mut slider_q {
+	for (mut slider, interaction, node, cursor_pos) in &mut slider_q {
 		if *interaction != Interaction::Pressed {
 			continue;
 		}
@@ -190,11 +193,25 @@ fn move_sliders(
 			.clamp(0.0, slider.step_count as f32) as u32;
 		if new_position != slider.position {
 			slider.position = new_position;
-			let Ok(mut handle) = node_q.get_mut(children.handle) else {
-				warn!("Entity referenced by SliderChildren is not a Node");
-				continue;
-			};
-			handle.left = Px(bar_width * new_position as f32 / slider.step_count as f32);
 		}
+	}
+}
+
+fn move_slider_handles(
+	slider_q: Query<
+		(&Slider, &SliderChildren, &ComputedNode),
+		Or<(Changed<Slider>, Changed<ComputedNode>)>,
+	>,
+	mut node_q: Query<&mut Node>,
+) {
+	for (slider, children, node) in &slider_q {
+		let Ok(mut handle) = node_q.get_mut(children.handle) else {
+			warn!("Entity referenced by SliderChildren is not a Node");
+			continue;
+		};
+		let node_width = node.size.x * node.inverse_scale_factor;
+		let bar_offset = NODE_RADIUS + RING_OUTLINE_WIDTH;
+		let bar_width = node_width - 2.0 * bar_offset;
+		handle.left = Px(bar_width * slider.position as f32 / slider.step_count as f32);
 	}
 }
