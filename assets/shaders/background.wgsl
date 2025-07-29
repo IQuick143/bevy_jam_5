@@ -12,16 +12,6 @@
 @group(2) @binding(7) var<uniform> nominal_sweep_start: f32;
 @group(2) @binding(8) var<uniform> nominal_sweep_width: f32;
 
-// https://github.com/bevyengine/bevy/discussions/8937
-// Bevy seems to convert our textures to lrgba without asking
-// TODO: Fix this in a way that actually fixes it
-fn from_linear(linear: vec4f) -> vec4f {
-    let cutoff = step(linear, vec4f(0.0031308));
-    let higher = vec4f(1.055) * pow(linear, vec4(1.0 / 2.4)) - vec4(0.055);
-    let lower = linear * vec4f(12.92);
-    return mix(higher, lower, cutoff);
-}
-
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4f {
     // Texture coordinates, scaled for repeating texture
@@ -33,15 +23,13 @@ fn fragment(in: VertexOutput) -> @location(0) vec4f {
     let tile_near_point: vec2f = scaled_uv - uv + sweep_origin / material_scale;
     // Sample of the material texture that corresponds to the current fragment
 	let material_sample: vec4f = textureSample(material_texture, material_sampler, uv);
-    // Sample of the material texture in srgba space
-    let corrected_material_sample: vec4f = from_linear(material_sample);
     // Red channel of material texture indicates which of two colors should be used
-    let color_picker: f32 = corrected_material_sample.x;
+    let color_picker: f32 = material_sample.x;
     // Green channel of material texture indicates how far behind the sweep boundry
     // the current fragment's color transition should lag
-    let sweep_lag: f32 = corrected_material_sample.y * sqrt(2.0);
+    let sweep_lag: f32 = material_sample.y * sqrt(2.0);
     // Blue channel of the material texture indicates how long the color transition should take
-    let sweep_duration: f32 = corrected_material_sample.z;
+    let sweep_duration: f32 = material_sample.z;
     let sweep_projection: f32 = dot(tile_near_point - sweep_origin, sweep_direction);
     let nominal_sweep_point: f32 = (nominal_sweep_start - sweep_projection) / nominal_sweep_width;
     let fragment_sweep_point: f32 = (nominal_sweep_point - sweep_lag) / sweep_duration;
