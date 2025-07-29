@@ -37,20 +37,22 @@ fn spawn_background(
 	images: Res<HandleMap<ImageKey>>,
 ) {
 	let material = BackgroundMaterial {
-		scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
-		speed: Vec2::from_angle(BACKGROUND_ROTATION)
-			.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
 		texture: images[&ImageKey::Background].clone_weak(),
-		colors: [
-			Srgba::hex("F5F8FB").unwrap().into(),
-			LinearRgba::WHITE,
-			palettes::tailwind::SLATE_200.into(),
-			Srgba::hex("F5F8FB").unwrap().into(),
-		],
-		sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
-		sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
-		sweep_position: 0.0,
-		sweep_width: 1.0,
+		params: BackgroundMaterialParams {
+			scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
+			speed: Vec2::from_angle(BACKGROUND_ROTATION)
+				.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
+			colors: [
+				Srgba::hex("F5F8FB").unwrap().into(),
+				LinearRgba::WHITE,
+				palettes::tailwind::SLATE_200.into(),
+				Srgba::hex("F5F8FB").unwrap().into(),
+			],
+			sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
+			sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
+			sweep_position: 0.0,
+			sweep_width: 1.0,
+		},
 	};
 	commands.spawn((
 		Mesh2d(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),
@@ -109,17 +111,17 @@ fn update_background_sweep(
 	if **is_highlighted {
 		if is_highlighted.is_changed() {
 			for (_, material) in materials.iter_mut() {
-				material.sweep_position = highlight.starting_sweep;
+				material.params.sweep_position = highlight.starting_sweep;
 			}
 		} else {
 			let delta_position = time.delta_secs() * highlight.sweep_speed;
 			for (_, material) in materials.iter_mut() {
-				material.sweep_position += delta_position;
+				material.params.sweep_position += delta_position;
 			}
 		}
 	} else if is_highlighted.is_changed() {
 		for (_, material) in materials.iter_mut() {
-			material.sweep_position = 0.0;
+			material.params.sweep_position = 0.0;
 		}
 	}
 }

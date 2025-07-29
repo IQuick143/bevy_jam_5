@@ -5,7 +5,7 @@ mod background_material;
 pub mod primitives;
 mod scrolling_texture;
 
-pub use background_material::BackgroundMaterial;
+pub use background_material::{BackgroundMaterial, BackgroundMaterialParams};
 pub use scrolling_texture::ScrollingTextureMaterial;
 
 pub(super) fn plugin(app: &mut App) {
