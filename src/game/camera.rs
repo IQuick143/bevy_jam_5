@@ -54,9 +54,12 @@ impl Default for EnableParallax {
 pub struct Parallax(pub f32);
 
 /// Support component for [`Parallax`], records the default position
-/// of the entity before parallax was applied.
+/// and scale of the entity before parallax was applied.
 #[derive(Component, Clone, Copy)]
-struct ParallaxBasis(Vec2);
+struct ParallaxBasis {
+	position: Vec2,
+	scale: Vec2,
+}
 
 /// Support component for [`CameraHarness`] that tracks
 /// persistent camera state
@@ -290,22 +293,26 @@ fn update_camera(
 
 fn init_parallax(mut commands: Commands, query: Query<(Entity, &Transform), Added<Parallax>>) {
 	for (id, transform) in &query {
-		commands
-			.entity(id)
-			.insert(ParallaxBasis(transform.translation.xy()));
+		commands.entity(id).insert(ParallaxBasis {
+			position: transform.translation.xy(),
+			scale: transform.scale.xy(),
+		});
 	}
 }
 
 fn apply_paralax(
 	mut query: Query<(&mut Transform, &Parallax, &ParallaxBasis), Without<Camera2d>>,
-	camera_q: Query<&Transform, (With<Camera2d>, Changed<Transform>)>,
+	camera_q: Query<(&Transform, &CameraHarness), (With<Camera2d>, Changed<Transform>)>,
 ) {
-	let Ok(camera_transform) = camera_q.single() else {
+	let Ok((camera_transform, camera_harness)) = camera_q.single() else {
 		return;
 	};
-	for (mut transform, Parallax(parallax), ParallaxBasis(basis)) in &mut query {
-		let new_position = basis + camera_transform.translation.xy() * parallax;
+	for (mut transform, Parallax(parallax), basis) in &mut query {
+		let new_scale = basis.scale / camera_harness.scale.powf(*parallax);
+		let new_position = basis.position + camera_transform.translation.xy() * parallax;
 		transform.translation.x = new_position.x;
 		transform.translation.y = new_position.y;
+		transform.scale.x = new_scale.x;
+		transform.scale.y = new_scale.y;
 	}
 }
