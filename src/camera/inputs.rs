@@ -56,10 +56,10 @@ fn camera_movement_inputs(
 		camera_move.write(MoveCameraEvent(camera_direction));
 	}
 
-	if input_key.pressed(KeyCode::KeyP) {
+	if input_key.pressed(KeyCode::NumpadAdd) {
 		camera_zoom.write(ZoomCameraEvent::In);
 	}
-	if input_key.pressed(KeyCode::KeyO) {
+	if input_key.pressed(KeyCode::NumpadSubtract) {
 		camera_zoom.write(ZoomCameraEvent::Out);
 	}
 }
