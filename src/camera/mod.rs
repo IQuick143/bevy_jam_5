@@ -89,16 +89,11 @@ fn set_camera_on_screen_transition(
 	mut camera: Single<&mut CameraHarness>,
 	mut events: EventReader<DoScreenTransition>,
 ) {
-	let mut reset_camera = false;
-	for event in events.read() {
-		if event.0 != Screen::Playing {
-			reset_camera = true;
-		}
+	// Reset the camera when switching to a screen other than Playing
+	// Playing screen will set its own camera bounds with SpawnLevel
+	if events.read().any(|e| e.0 != Screen::Playing) {
+		**camera = CameraHarness::default();
 	}
-	if !reset_camera {
-		return;
-	}
-	**camera = CameraHarness::default();
 }
 
 fn set_camera_level_view(
