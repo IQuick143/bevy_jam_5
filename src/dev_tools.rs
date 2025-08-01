@@ -1,7 +1,8 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
-	game::{camera::CameraHarness, components::*, level::CycleTurnability, logic::*, prelude::*},
+	camera::CameraHarness,
+	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::VERTICAL_PADDING_FRACTION,
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},

@@ -1,5 +1,6 @@
 mod assets;
 mod audio;
+mod camera;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod epilang;
@@ -70,6 +71,7 @@ impl Plugin for AppPlugin {
 			audio::plugin,
 			assets::plugin,
 			graphics::plugin,
+			camera::plugin,
 		));
 
 		// Enable dev tools for dev builds.
