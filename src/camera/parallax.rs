@@ -1,6 +1,6 @@
 //! Parallax effect on camera movement
 
-use super::CameraHarness;
+use super::{movement::CameraPositionUpdate, CameraHarness};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -10,7 +10,7 @@ pub(super) fn plugin(app: &mut App) {
 			init_parallax,
 			apply_paralax
 				.run_if(resource_equals(EnableParallax(true)))
-				.after(super::update_camera),
+				.after(CameraPositionUpdate),
 		),
 	);
 }
