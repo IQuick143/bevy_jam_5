@@ -97,7 +97,11 @@ fn handle_settings_slider_input(
 ) {
 	for (slider, control) in &query {
 		match control {
-			SettingsSliderControl::SfxVolume => settings.sfx_volume = slider.fraction(),
+			SettingsSliderControl::SfxVolume => {
+				settings.sfx_volume = slider.fraction();
+				// Play a sound to immediately sample the volume
+				commands.trigger(PlaySfx::Effect(SfxKey::ButtonPress));
+			}
 			SettingsSliderControl::MusicVolume => settings.soundtrack_volume = slider.fraction(),
 		}
 	}
