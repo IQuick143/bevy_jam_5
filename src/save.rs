@@ -13,7 +13,7 @@ pub struct SaveGame {
 	completed_levels: HashSet<String>,
 }
 
-/// String identifier for the map storign the completed levels
+/// String identifier for the map storing the completed levels
 const COMPLETED_LEVELS: &str = "completed_levels";
 
 impl Saveable for SaveGame {
