@@ -6,8 +6,19 @@ use bevy::prelude::*;
 pub(super) fn plugin(app: &mut App) {
 	app.add_event::<MoveCameraEvent>()
 		.add_event::<ZoomCameraEvent>()
+		.init_resource::<EnableCursorPanning>()
 		.init_resource::<LastCursorPosition>()
 		.add_systems(Update, camera_movement_inputs.in_set(AppSet::RecordInput));
+}
+
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
+pub struct EnableCursorPanning(pub bool);
+
+impl Default for EnableCursorPanning {
+	fn default() -> Self {
+		// Panning is enabled by default
+		Self(true)
+	}
 }
 
 /// An event sent to move the camera
@@ -34,6 +45,7 @@ struct LastCursorPosition(Option<Vec2>);
 
 fn camera_movement_inputs(
 	window: Single<&Window>,
+	enable_cursor_panning: Res<EnableCursorPanning>,
 	input_key: Res<ButtonInput<KeyCode>>,
 	mut last_cursor_position: ResMut<LastCursorPosition>,
 	mut camera_move: EventWriter<MoveCameraEvent>,
@@ -41,7 +53,7 @@ fn camera_movement_inputs(
 ) {
 	let cursor_pos = window.cursor_position();
 	let camera_direction = camera_pan_from_keys(&input_key);
-	if camera_direction == Vec2::ZERO {
+	if camera_direction == Vec2::ZERO && **enable_cursor_panning {
 		if **last_cursor_position != cursor_pos {
 			// The cursor has moved, so we allow it to trigger panning
 			**last_cursor_position = None;
