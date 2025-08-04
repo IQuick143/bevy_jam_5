@@ -1,4 +1,4 @@
-use bevy::{platform::collections::HashMap, prelude::*};
+use bevy::{image::ImageLoaderSettings, platform::collections::HashMap, prelude::*};
 
 use crate::game::level::{
 	asset::plugin as level_asset_plugin, list::LevelList,
@@ -78,7 +78,10 @@ impl FromWorld for HandleMap<ImageKey> {
 			),
 			(
 				ImageKey::Background,
-				asset_server.load("images/background.png"),
+				asset_server
+					.load_with_settings("images/background.png", |s: &mut ImageLoaderSettings| {
+						s.is_srgb = false
+					}),
 			),
 			(ImageKey::Title, asset_server.load("images/title.png")),
 			(
