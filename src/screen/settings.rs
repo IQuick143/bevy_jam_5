@@ -5,14 +5,22 @@ use crate::{
 	assets::{GlobalFont, SfxKey},
 	audio::sfx::PlaySfx,
 	settings::Settings,
-	ui::{prelude::*, slider::Slider},
+	ui::{
+		checkbox::{Checkbox, CheckboxLabels},
+		prelude::*,
+		slider::Slider,
+	},
 };
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Settings), enter_settings)
 		.add_systems(
 			Update,
-			(handle_settings_action, handle_settings_slider_input)
+			(
+				handle_settings_action,
+				handle_settings_slider_input,
+				handle_settings_checkbox_input,
+			)
 				.run_if(in_state(Screen::Settings).and(ui_not_frozen)),
 		);
 }
@@ -28,6 +36,13 @@ enum SettingsAction {
 enum SettingsSliderControl {
 	SfxVolume,
 	MusicVolume,
+}
+
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[reflect(Component)]
+enum SettingsCheckboxControl {
+	Background,
+	Parallax,
 }
 
 /// Width of a slider control, in pixels
@@ -70,6 +85,22 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 						Slider::new_fraction(SLIDER_STEP_COUNT, settings.sfx_volume),
 						SettingsSliderControl::SfxVolume,
 					));
+					children.text("Background", JustifyContent::End, font.0.clone_weak());
+					children.spawn(Node::DEFAULT).with_children(|children| {
+						children.tool_button("", font.0.clone_weak()).insert((
+							Checkbox(settings.render_background),
+							CheckboxLabels::new("On", "Off"),
+							SettingsCheckboxControl::Background,
+						));
+					});
+					children.text("Parallax", JustifyContent::End, font.0.clone_weak());
+					children.spawn(Node::DEFAULT).with_children(|children| {
+						children.tool_button("", font.0.clone_weak()).insert((
+							Checkbox(settings.enable_parallax),
+							CheckboxLabels::new("On", "Off"),
+							SettingsCheckboxControl::Parallax,
+						));
+					});
 				});
 			children
 				.button("Back", font.0.clone_weak())
@@ -105,6 +136,22 @@ fn handle_settings_slider_input(
 				commands.trigger(PlaySfx::Effect(SfxKey::ButtonPress));
 			}
 			SettingsSliderControl::MusicVolume => settings.soundtrack_volume = slider.fraction(),
+		}
+	}
+}
+
+fn handle_settings_checkbox_input(
+	query: Query<(&Checkbox, &SettingsCheckboxControl), Changed<Checkbox>>,
+	mut settings: ResMut<Settings>,
+) {
+	for (is_checked, control) in &query {
+		match control {
+			SettingsCheckboxControl::Background => {
+				settings.render_background = **is_checked;
+			}
+			SettingsCheckboxControl::Parallax => {
+				settings.enable_parallax = **is_checked;
+			}
 		}
 	}
 }
