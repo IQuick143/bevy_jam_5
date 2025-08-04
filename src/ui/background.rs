@@ -7,25 +7,24 @@ use crate::{
 };
 use bevy::prelude::*;
 
-pub fn plugin(app: &mut App) {
+pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<BackgroundMaterialHandle>()
-		.init_resource::<IsBackgroundEnabled>()
 		.add_systems(Startup, spawn_background)
-		.add_systems(
-			Update,
-			toggle_background_visibility.run_if(resource_changed::<IsBackgroundEnabled>),
-		);
+		.add_observer(set_background_mode);
 }
 
-/// Determines whether the animated background should be rendered
-#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
-pub struct IsBackgroundEnabled(pub bool);
-
-impl Default for IsBackgroundEnabled {
-	fn default() -> Self {
-		// Background should be rendered by default
-		Self(true)
-	}
+/// Display modes that describe how background is rendered
+///
+/// This is also a trigger event that updates the display mode
+#[derive(Event, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum BackgroundMode {
+	/// Background is not rendered
+	None,
+	/// Background is a static image
+	Static,
+	/// Background moves at a steady rate
+	#[default]
+	Animated,
 }
 
 #[derive(Resource, Clone, Debug, Deref, DerefMut)]
@@ -68,15 +67,30 @@ fn spawn_background(
 	));
 }
 
-fn toggle_background_visibility(
+fn set_background_mode(
+	mode: Trigger<BackgroundMode>,
+	material: Res<BackgroundMaterialHandle>,
+	mut materials: ResMut<Assets<ScrollingTextureMaterial>>,
 	mut query: Query<&mut Visibility, With<IsBackground>>,
-	render_background: Res<IsBackgroundEnabled>,
 ) {
-	let new_visibility = if **render_background {
-		Visibility::default()
-	} else {
-		Visibility::Hidden
-	};
+	let material = materials
+		.get_mut(&**material)
+		.expect("Background material should have been inserted");
+	let new_visibility;
+	match mode.event() {
+		BackgroundMode::None => {
+			new_visibility = Visibility::Hidden;
+		}
+		BackgroundMode::Static => {
+			new_visibility = Visibility::default();
+			material.speed = Vec2::ZERO;
+		}
+		BackgroundMode::Animated => {
+			new_visibility = Visibility::default();
+			material.speed = Vec2::from_angle(BACKGROUND_ROTATION)
+				.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING);
+		}
+	}
 	for mut visibility in &mut query {
 		*visibility = new_visibility;
 	}

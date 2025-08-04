@@ -42,6 +42,7 @@ enum SettingsSliderControl {
 #[reflect(Component)]
 enum SettingsCheckboxControl {
 	Background,
+	AnimateBackground,
 	Parallax,
 }
 
@@ -91,6 +92,18 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 							Checkbox(settings.render_background),
 							CheckboxLabels::new("On", "Off"),
 							SettingsCheckboxControl::Background,
+						));
+					});
+					children.text(
+						"Animate background",
+						JustifyContent::End,
+						font.0.clone_weak(),
+					);
+					children.spawn(Node::DEFAULT).with_children(|children| {
+						children.tool_button("", font.0.clone_weak()).insert((
+							Checkbox(settings.animate_background),
+							CheckboxLabels::new("On", "Off"),
+							SettingsCheckboxControl::AnimateBackground,
 						));
 					});
 					children.text("Parallax", JustifyContent::End, font.0.clone_weak());
@@ -148,6 +161,9 @@ fn handle_settings_checkbox_input(
 		match control {
 			SettingsCheckboxControl::Background => {
 				settings.render_background = **is_checked;
+			}
+			SettingsCheckboxControl::AnimateBackground => {
+				settings.animate_background = **is_checked;
 			}
 			SettingsCheckboxControl::Parallax => {
 				settings.enable_parallax = **is_checked;

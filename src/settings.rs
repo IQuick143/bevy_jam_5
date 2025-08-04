@@ -1,6 +1,6 @@
 //! Settings that can be adjusted by the player
 
-use crate::{game::camera::EnableParallax, ui::background::IsBackgroundEnabled};
+use crate::{game::camera::EnableParallax, ui::background::BackgroundMode};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -20,6 +20,8 @@ pub struct Settings {
 	pub soundtrack_volume: f32,
 	/// Whether the background should be rendered
 	pub render_background: bool,
+	/// Whether the background should be animated
+	pub animate_background: bool,
 	/// Whether parallax should be applied to background elements
 	pub enable_parallax: bool,
 }
@@ -28,9 +30,15 @@ pub struct Settings {
 /// specific aspects of the app
 fn update_settings_proxy_resources(
 	settings: Res<Settings>,
-	mut render_background: ResMut<IsBackgroundEnabled>,
 	mut enable_parallax: ResMut<EnableParallax>,
+	mut commands: Commands,
 ) {
-	render_background.set_if_neq(IsBackgroundEnabled(settings.render_background));
 	enable_parallax.set_if_neq(EnableParallax(settings.enable_parallax));
+	if !settings.render_background {
+		commands.trigger(BackgroundMode::None);
+	} else if !settings.animate_background {
+		commands.trigger(BackgroundMode::Static);
+	} else {
+		commands.trigger(BackgroundMode::Animated);
+	}
 }
