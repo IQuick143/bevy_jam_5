@@ -477,9 +477,9 @@ oneway(c1 c5);
 	.split("\n\n");
 
 	for data in linkages {
-		let level = format!("{}\n{}", level_header, data);
+		let level = format!("{level_header}\n{data}");
 		let output = parse(&level);
-		assert!(output.is_ok(), "{:?}", output);
+		assert!(output.is_ok(), "{output:?}");
 	}
 }
 
@@ -548,7 +548,7 @@ oneway(c2 c3);
 	.split("\n\n");
 
 	for data in linkages {
-		let level = format!("{}\n{}", level_header, data);
+		let level = format!("{level_header}\n{data}");
 		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
 	}
 }
@@ -570,7 +570,7 @@ oneway(A, B);
 oneway(B, C);
 oneway(A, C);";
 	let output = parse(level);
-	assert!(output.is_ok(), "{:?}", output);
+	assert!(output.is_ok(), "{output:?}");
 	let output = output.unwrap();
 	let ordering: Vec<usize> = output
 		.execution_order
@@ -618,7 +618,7 @@ circle(C; 0, 0, 1);
 
 oneway(A, B, C);";
 	let output = parse(level);
-	assert!(output.is_ok(), "{:?}", output);
+	assert!(output.is_ok(), "{output:?}");
 	let output = output.unwrap();
 	let ordering: Vec<usize> = output
 		.execution_order
@@ -665,7 +665,7 @@ circle(c2; 0,0,1);
 circle(target; 0,0,1);
 ";
 	let output = parse(level);
-	assert!(output.is_ok(), "{:?}", output);
+	assert!(output.is_ok(), "{output:?}");
 }
 
 #[test]
@@ -699,7 +699,7 @@ circle(target2; 0,0,1);
 circle(target3; 0,0,1);
 ";
 	let output = parse(level);
-	assert!(output.is_ok(), "{:?}", output);
+	assert!(output.is_ok(), "{output:?}");
 }
 
 #[test]
@@ -734,7 +734,7 @@ circle(source2; 0,0,1);
 circle(target; 0,0,1);
 ";
 	let output = parse(level);
-	assert!(output.is_ok(), "{:?}", output);
+	assert!(output.is_ok(), "{output:?}");
 }
 
 #[test]
@@ -822,7 +822,7 @@ oneway(unplaced, c1);
 circle(c1; 0,0,1);
 ";
 	let output = parse(level);
-	assert!(output.is_ok(), "{:?}", output);
+	assert!(output.is_ok(), "{output:?}");
 }
 
 #[test]
