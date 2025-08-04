@@ -18,7 +18,7 @@ pub const HINT_BOX: &str = "Hi!! I'm the BOTTOM TEXT, I tell you about stuff if 
 
 use crate::{
 	assets::GlobalFont,
-	game::camera::CameraHarness,
+	camera::CameraHarness,
 	graphics::{layers, GAME_AREA, HINT_TEXT_SIZE},
 	screen::Screen,
 };
