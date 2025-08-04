@@ -58,6 +58,9 @@ rand =  { version = "0.8", features = ["small_rng"] }
 regex = "1.10.5"
 logos = "0.15.0"
 pomelo = "0.2.1"
+serde = "*"
+serde_json = "*"
+directories = "6.0.0"
 
 [features]
 default = [

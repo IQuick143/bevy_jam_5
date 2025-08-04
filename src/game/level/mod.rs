@@ -11,7 +11,7 @@ pub mod list_asset;
 pub struct LevelData {
 	/// Whether this level is correctly built
 	pub is_valid: bool,
-	/// Name of the level
+	/// Display name of the level
 	pub name: String,
 	/// Hint or comment that relates to the level, if any
 	pub hint: Option<String>,

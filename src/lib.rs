@@ -6,7 +6,10 @@ mod dev_tools;
 mod epilang;
 mod game;
 mod graphics;
+mod persistent;
+mod save;
 mod screen;
+mod settings;
 mod ui;
 
 use bevy::{
@@ -65,6 +68,9 @@ impl Plugin for AppPlugin {
 
 		// Add other plugins.
 		app.add_plugins((
+			persistent::plugin,
+			save::plugin,
+			settings::plugin,
 			game::plugin,
 			screen::plugin,
 			ui::plugin,

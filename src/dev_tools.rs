@@ -4,6 +4,7 @@ use crate::{
 	camera::CameraHarness,
 	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
 	graphics::VERTICAL_PADDING_FRACTION,
+	save::SaveGame,
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
 };
@@ -33,6 +34,7 @@ pub(super) fn plugin(app: &mut App) {
 				.run_if(resource_equals(RenderOutlines(true))),
 			toggle_debug_outline_display.run_if(resource_changed::<RenderOutlines>),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
+			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
 		),
 	);
 	app.add_systems(Startup, init_viewport_box);
