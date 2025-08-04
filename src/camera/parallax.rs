@@ -1,17 +1,17 @@
 //! Parallax effect on camera movement
 
 use super::{movement::CameraPositionUpdate, CameraHarness};
-use bevy::prelude::*;
+use bevy::{
+	ecs::{component::HookContext, world::DeferredWorld},
+	prelude::*,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<EnableParallax>().add_systems(
 		Update,
-		(
-			init_parallax,
-			apply_paralax
-				.run_if(resource_equals(EnableParallax(true)))
-				.after(CameraPositionUpdate),
-		),
+		apply_paralax
+			.run_if(resource_equals(EnableParallax(true)))
+			.after(CameraPositionUpdate),
 	);
 }
 
@@ -38,24 +38,28 @@ impl Default for EnableParallax {
 /// when we need another camera.
 ///
 /// This cannot be applied to a camera entity, for obvious reasons.
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, PartialEq, PartialOrd, Debug, Default, Deref, DerefMut)]
+#[require(ParallaxBasis)]
 pub struct Parallax(pub f32);
 
 /// Support component for [`Parallax`], records the default position
 /// and scale of the entity before parallax was applied.
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, Debug, Default)]
+#[require(Transform)]
+#[component(on_insert = init_parallax_basis)]
 struct ParallaxBasis {
 	position: Vec2,
 	scale: Vec2,
 }
 
-fn init_parallax(mut commands: Commands, query: Query<(Entity, &Transform), Added<Parallax>>) {
-	for (id, transform) in &query {
-		commands.entity(id).insert(ParallaxBasis {
-			position: transform.translation.xy(),
-			scale: transform.scale.xy(),
-		});
-	}
+fn init_parallax_basis(mut world: DeferredWorld, context: HookContext) {
+	let mut entity = world.entity_mut(context.entity);
+	let transform = *entity.components::<&Transform>();
+	let mut basis = entity
+		.get_mut::<ParallaxBasis>()
+		.expect("Insert hook has been triggered, but the component is not present");
+	basis.position = transform.translation.xy();
+	basis.scale = transform.scale.xy();
 }
 
 fn apply_paralax(
