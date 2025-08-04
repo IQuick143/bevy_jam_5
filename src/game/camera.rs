@@ -85,6 +85,9 @@ pub fn plugin(app: &mut App) {
 					apply_paralax.run_if(resource_equals(EnableParallax(true))),
 				)
 					.chain(),
+				restore_parallax.run_if(
+					resource_changed::<EnableParallax>.and(resource_equals(EnableParallax(false))),
+				),
 			),
 		)
 		.init_resource::<EnableParallax>();
@@ -211,5 +214,12 @@ fn apply_paralax(
 		let new_position = basis + camera_transform.translation.xy() * parallax;
 		transform.translation.x = new_position.x;
 		transform.translation.y = new_position.y;
+	}
+}
+
+fn restore_parallax(mut query: Query<(&mut Transform, &ParallaxBasis), Without<Camera2d>>) {
+	for (mut transform, ParallaxBasis(basis)) in &mut query {
+		transform.translation.x = basis.x;
+		transform.translation.y = basis.y;
 	}
 }
