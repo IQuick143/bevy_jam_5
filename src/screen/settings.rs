@@ -2,7 +2,8 @@
 
 use super::*;
 use crate::{
-	assets::GlobalFont,
+	assets::{GlobalFont, SfxKey},
+	audio::sfx::PlaySfx,
 	settings::Settings,
 	ui::{prelude::*, slider::Slider},
 };
@@ -94,6 +95,7 @@ fn handle_settings_action(mut commands: Commands, query: InteractionQuery<&Setti
 fn handle_settings_slider_input(
 	query: Query<(&Slider, &SettingsSliderControl), Changed<Slider>>,
 	mut settings: ResMut<Settings>,
+	mut commands: Commands,
 ) {
 	for (slider, control) in &query {
 		match control {
