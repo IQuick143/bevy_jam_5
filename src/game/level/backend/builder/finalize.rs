@@ -17,48 +17,69 @@ use crate::{
 pub fn finalize(
 	mut builder: LevelBuilder,
 	variable_pool: &VariablePool<DomainValue>,
-	mut warning_handler: impl FnMut(FinalizeWarning),
+	warning_handler: impl FnMut(FinalizeWarning),
 ) -> ResultNonExclusive<LevelData, FinalizeError> {
-	match variable_pool.load_as::<&str>("name").transpose() {
-		Ok(Some(level_name)) => {
-			if let Err(err) = builder.set_level_name(level_name.to_owned()) {
-				return FinalizeError::BuilderError(err).into();
-			}
+	match read_variables_before_finalize(&mut builder, variable_pool, warning_handler) {
+		Ok(()) => builder.build().map_err(FinalizeError::BuilderError),
+		Err(err) => err.into(),
+	}
+}
+
+fn read_variables_before_finalize(
+	builder: &mut LevelBuilder,
+	variable_pool: &VariablePool<DomainValue>,
+	mut warning_handler: impl FnMut(FinalizeWarning),
+) -> Result<(), FinalizeError> {
+	if let Some(level_name) = variable_pool.load_as::<&str>("name").transpose()? {
+		if let Err(err) = builder.set_level_name(level_name.to_owned()) {
+			return Err(FinalizeError::BuilderError(err));
 		}
-		Ok(None) => {
-			warning_handler(FinalizeWarning::LevelNameNotSet);
-		}
-		Err(err) => {
-			return FinalizeError::InvalidVariableType(err).into();
+	} else {
+		warning_handler(FinalizeWarning::LevelNameNotSet);
+	}
+
+	if let Some(level_hint) = variable_pool.load_as::<&str>("hint").transpose()? {
+		if let Err(err) = builder.set_level_hint(level_hint.to_owned()) {
+			return Err(FinalizeError::BuilderError(err));
 		}
 	}
 
-	match variable_pool.load_as::<&str>("hint").transpose() {
-		Ok(Some(level_hint)) => {
-			if let Err(err) = builder.set_level_hint(level_hint.to_owned()) {
-				return FinalizeError::BuilderError(err).into();
-			}
-		}
-		Ok(None) => {}
-		Err(err) => {
-			return FinalizeError::InvalidVariableType(err).into();
-		}
-	}
-
-	match variable_pool
+	if let Some(level_scale) = variable_pool
 		.load_as::<f32>("local_to_world_units")
-		.transpose()
+		.transpose()?
 	{
-		Ok(Some(level_scale)) => {
-			builder.set_level_scale(level_scale);
-		}
-		Ok(None) => {}
-		Err(err) => {
-			return FinalizeError::InvalidVariableType(err).into();
-		}
+		builder.set_level_scale(level_scale);
 	}
 
-	builder.build().map_err(FinalizeError::BuilderError)
+	if let Some(bb_left) = variable_pool.load_as::<f32>("bb_left").transpose()? {
+		builder.explicit_bounding_box().left = Some(bb_left);
+	}
+
+	if let Some(bb_left) = variable_pool.load_as::<f32>("bb_top").transpose()? {
+		builder.explicit_bounding_box().top = Some(bb_left);
+	}
+
+	if let Some(bb_left) = variable_pool.load_as::<f32>("bb_right").transpose()? {
+		builder.explicit_bounding_box().right = Some(bb_left);
+	}
+
+	if let Some(bb_left) = variable_pool.load_as::<f32>("bb_bottom").transpose()? {
+		builder.explicit_bounding_box().bottom = Some(bb_left);
+	}
+
+	if let Some(init_scale) = variable_pool.load_as::<f32>("init_scale").transpose()? {
+		builder.set_initial_zoom(init_scale);
+	}
+
+	if let Some(init_cam_x) = variable_pool.load_as::<f32>("init_cam_x").transpose()? {
+		builder.explicit_initial_camera_pos().x = Some(init_cam_x);
+	}
+
+	if let Some(init_cam_y) = variable_pool.load_as::<f32>("init_cam_y").transpose()? {
+		builder.explicit_initial_camera_pos().y = Some(init_cam_y);
+	}
+
+	Ok(())
 }
 
 #[derive(Clone, PartialEq, Debug)]

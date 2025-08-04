@@ -2,7 +2,7 @@ use std::f32::consts::PI;
 
 use crate::{
 	assets::{HandleMap, ImageKey},
-	game::camera::Parallax,
+	camera::parallax::Parallax,
 	graphics::*,
 };
 use bevy::{color::palettes, prelude::*};

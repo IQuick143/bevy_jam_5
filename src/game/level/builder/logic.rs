@@ -1,6 +1,7 @@
 use super::error::*;
 use super::*;
 
+use bevy::math::bounding::BoundingVolume;
 use bevy::platform::collections::HashSet;
 use itertools::Itertools as _;
 
@@ -17,8 +18,11 @@ impl LevelBuilder {
 			declared_links: Vec::new(),
 			declared_one_way_cycle_links: Vec::new(),
 			declared_one_way_detector_links: Vec::new(),
+			explicit_bounding_box: default(),
 			bounding_box: None,
 			scale_override: None,
+			initial_zoom: None,
+			initial_camera_pos: default(),
 		}
 	}
 
@@ -36,6 +40,18 @@ impl LevelBuilder {
 		}
 		self.hint = Some(hint);
 		Ok(())
+	}
+
+	pub fn explicit_bounding_box(&mut self) -> &mut PartialBoundingBox {
+		&mut self.explicit_bounding_box
+	}
+
+	pub fn set_initial_zoom(&mut self, zoom: f32) {
+		self.initial_zoom = Some(zoom);
+	}
+
+	pub fn explicit_initial_camera_pos(&mut self) -> &mut PartialVec2 {
+		&mut self.initial_camera_pos
 	}
 
 	pub fn add_vertex(&mut self) -> Result<usize, LevelBuilderError> {
@@ -238,7 +254,13 @@ impl LevelBuilder {
 			building_error.get_or_insert(err);
 		});
 		self.build_layout();
-		let bounding_box = self.bounding_box.unwrap_or_else(|| self.get_bounding_box());
+		let bounding_box = self
+			.bounding_box
+			.expect("Bounding box should have been set by build_layout");
+		let initial_camera_pos = Vec2::new(
+			self.initial_camera_pos.x.unwrap_or(bounding_box.center().x),
+			self.initial_camera_pos.y.unwrap_or(bounding_box.center().y),
+		);
 		let cycles = self
 			.cycles
 			.into_iter()
@@ -265,6 +287,8 @@ impl LevelBuilder {
 				forbidden_group_pairs,
 				execution_order,
 				bounding_box,
+				initial_zoom: self.initial_zoom.unwrap_or(1.0),
+				initial_camera_pos,
 			},
 			building_error,
 		))
