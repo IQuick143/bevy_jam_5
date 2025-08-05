@@ -70,25 +70,25 @@ impl Saveable for Settings {
 
 	fn read_json(&mut self, store: &serde_json::Value) {
 		if let Some(m) = store.as_object() {
-			m.get_float(SFX_VOLUME).map(|x| {
+			if let Some(x) = m.get_float(SFX_VOLUME) {
 				// `f32::clamp` to both ensure that the result is in a valid range,
 				// but also to deal with NaN and +-inf
 				self.sfx_volume = x.clamp(0.0, 1.0) as f32;
-			});
-			m.get_float(SOUNDTRACK_VOLUME).map(|x| {
+			}
+			if let Some(x) = m.get_float(SOUNDTRACK_VOLUME) {
 				// `f32::clamp` to both ensure that the result is in a valid range,
 				// but also to deal with NaN and +-inf
 				self.soundtrack_volume = x.clamp(0.0, 1.0) as f32;
-			});
-			m.get_bool(RENDER_BACKGROUND).map(|x| {
+			}
+			if let Some(x) = m.get_bool(RENDER_BACKGROUND) {
 				self.render_background = x;
-			});
-			m.get_bool(ANIMATE_BACKGROUND).map(|x| {
+			}
+			if let Some(x) = m.get_bool(ANIMATE_BACKGROUND) {
 				self.animate_background = x;
-			});
-			m.get_bool(ENABLE_PARALLAX).map(|x| {
+			}
+			if let Some(x) = m.get_bool(ENABLE_PARALLAX) {
 				self.enable_parallax = x;
-			});
+			}
 		}
 	}
 }
