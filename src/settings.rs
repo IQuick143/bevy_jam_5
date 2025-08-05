@@ -83,9 +83,12 @@ pub trait MapExt {
 	/// Reads a float from the dictionary and clamps it to [0-1], if it's set it overwrites the destination
 	fn read_percentage(&self, key: &str, destination: &mut f32) {
 		if let Some(value) = self.get_float(key) {
-			// `f32::clamp` to both ensure that the result is in a valid range,
+			// Clamp to both ensure that the result is in a valid range,
 			// but also to deal with NaN and +-inf
-			*destination = value.clamp(0.0, 1.0) as f32;
+			#[allow(clippy::manual_clamp)] // standard clamp does not take care of NaN
+			{
+				*destination = value.max(0.0).min(1.0) as f32;
+			}
 		}
 	}
 	/// Reads a value that can be fallibly converted from a [`serde_json::Value`]
