@@ -11,8 +11,7 @@ mod title;
 use crate::ui::prelude::*;
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-pub use playing::LoadLevel;
-pub use playing::PlayingLevel;
+pub use playing::{LoadLevel, PlayingLevel, PlayingLevelListEntry};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<Screen>();

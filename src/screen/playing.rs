@@ -1,10 +1,14 @@
 //! The screen state for the main game loop.
 
-use bevy::prelude::*;
+use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
-	assets::{GlobalFont, LoadedLevelList},
-	game::{level::list::LevelList, prelude::*},
+	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList},
+	game::{
+		drawing::ThingPalette,
+		level::list::{LevelInfo, LevelList},
+		prelude::*,
+	},
 	send_event,
 	ui::{hover::HoverText, prelude::*},
 	AppSet,
@@ -27,7 +31,8 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
 					send_event(GameUiAction::NextLevel).run_if(
-						char_input_pressed('n').and(resource_equals(IsLevelCompleted(true))),
+						char_input_pressed('n')
+							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
 					),
 					send_event(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
@@ -41,7 +46,17 @@ pub(super) fn plugin(app: &mut App) {
 				(load_level, update_level_name_display)
 					.chain()
 					.run_if(on_event::<LoadLevel>),
-				update_next_level_button_display.run_if(resource_changed::<IsLevelCompleted>),
+				(
+					update_next_level_button_display,
+					update_checkmark_display.before(update_checkmark_margin),
+				)
+					.run_if(resource_changed::<IsLevelPersistentlyCompleted>),
+				update_checkmark_margin,
+				start_completion_cue_animation.run_if(
+					resource_changed::<IsLevelCompleted>
+						.and(resource_equals(IsLevelCompleted(true))),
+				),
+				tick_completion_cue_animation,
 				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
@@ -65,6 +80,20 @@ struct UndoButton;
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct LevelNameBox;
 
+/// Marker component for the slot where the checkmark will go to indicate completion
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct LevelCompletionCheckmarkBox {
+	/// Progress of the animation where the checkmark appears, [0, 1]
+	appear_progress: f32,
+}
+
+/// Marker component for the glow effect on the checkmark that indicates level completion
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct LevelCompletionCheckmarkGlow {
+	/// Progress of the level completion cue animation [0, 1]
+	progress: f32,
+}
+
 #[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
@@ -77,7 +106,44 @@ enum GameUiAction {
 #[derive(Event, Component, Clone, Copy, Debug, Default)]
 pub struct LoadLevel;
 
-fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
+/// [`SystemParam`] that provides a reference to the entry
+/// of the level list that describes the level being played
+#[derive(SystemParam)]
+pub struct PlayingLevelListEntry<'w> {
+	level_list: Res<'w, LoadedLevelList>,
+	level_list_asset: Res<'w, Assets<LevelList>>,
+	playing_level: Res<'w, State<PlayingLevel>>,
+}
+
+impl PlayingLevelListEntry<'_> {
+	/// Gets the level info entry of the current level
+	pub fn get(&self) -> Result<&LevelInfo, BevyError> {
+		let level_index = self.playing_level.get().0.ok_or_else(|| {
+			"Systems that transition into Screen::Playing must also set PlayingLevel state"
+				.to_owned()
+		})?;
+		let level_info = self
+			.level_list_asset
+			.get(&self.level_list.0)
+			.ok_or_else(|| "The LevelList asset should be valid".to_owned())?
+			.levels
+			.get(level_index)
+			.ok_or_else(|| "PlayingLevel is out of range".to_owned())?;
+		Ok(level_info)
+	}
+}
+
+/// Size of the level title label on the playing screen
+const LEVEL_TITLE_SIZE: f32 = 35.0;
+/// Width of the gap between title label and checkmark indicating completion
+const LEVEL_TITLE_CHECK_GAP: f32 = 15.0;
+
+fn spawn_game_ui(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	images: Res<HandleMap<ImageKey>>,
+	colors: Res<ThingPalette>,
+) {
 	commands
 		.ui_root_justified(JustifyContent::Start)
 		.insert(StateScoped(Screen::Playing))
@@ -120,6 +186,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						.insert((
 							GameUiAction::NextLevel,
 							NextLevelButton,
+							BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
 							InteractionPalette {
 								none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
 								hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
@@ -135,6 +202,7 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
 					align_items: AlignItems::Center,
+					column_gap: Val::Px(LEVEL_TITLE_CHECK_GAP),
 					..default()
 				})
 				.with_children(|parent| {
@@ -143,10 +211,24 @@ fn spawn_game_ui(mut commands: Commands, font: Res<GlobalFont>) {
 						Text::default(),
 						TextFont {
 							font: font.0.clone_weak(),
-							font_size: 35.0,
+							font_size: LEVEL_TITLE_SIZE,
 							..default()
 						},
 						TextColor(ui_palette::LABEL_TEXT),
+					));
+					parent.spawn((
+						LevelCompletionCheckmarkBox::default(),
+						Node {
+							width: Val::Px(LEVEL_TITLE_SIZE),
+							height: Val::Px(LEVEL_TITLE_SIZE),
+							..default()
+						},
+						ImageNode {
+							image: images[&ImageKey::Checkmark].clone_weak(),
+							color: colors.checkmark,
+							image_mode: NodeImageMode::Stretch,
+							..default()
+						},
 					));
 				});
 		});
@@ -191,9 +273,7 @@ fn game_ui_input_recording_system(
 
 fn game_ui_input_processing_system(
 	mut events: EventReader<GameUiAction>,
-	playing_level: Res<State<PlayingLevel>>,
-	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelList>>,
+	playing_level: PlayingLevelListEntry,
 	mut commands: Commands,
 	mut next_level: ResMut<NextState<PlayingLevel>>,
 	mut undo_commands: EventWriter<UndoMove>,
@@ -210,17 +290,7 @@ fn game_ui_input_processing_system(
 				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
 			}
 			GameUiAction::NextLevel => {
-				let playing_level = playing_level
-					.get()
-					.0
-					.expect("When in Screen::Playing state, PlayingLevel must also be set");
-				let next_level_id = level_list_asset
-					.get(&level_list.0)
-					.expect("The LevelList asset should be valid")
-					.levels
-					.get(playing_level)
-					.expect("PlayingLevel is out of range")
-					.next_level;
+				let next_level_id = playing_level.get().ok().and_then(|l| l.next_level);
 				if next_level_id.is_none() {
 					log::warn!("Received a Next level action on a level without a successor");
 				} else {
@@ -236,23 +306,11 @@ fn game_ui_input_processing_system(
 }
 
 fn update_next_level_button_display(
-	is_level_completed: Res<IsLevelCompleted>,
-	playing_level: Res<State<PlayingLevel>>,
-	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelList>>,
+	is_level_completed: Res<IsLevelPersistentlyCompleted>,
+	playing_level: PlayingLevelListEntry,
 	mut query: Query<&mut Node, With<NextLevelButton>>,
 ) {
-	let level_index = playing_level
-		.get()
-		.0
-		.expect("When in Screen::Playing state, PlayingLevel must also be set");
-	let next_level = level_list_asset
-		.get(&level_list.0)
-		.expect("The LevelList asset should be valid")
-		.levels
-		.get(level_index)
-		.expect("PlayingLevel is out of range")
-		.next_level;
+	let next_level = playing_level.get().ok().and_then(|l| l.next_level);
 	let display = if is_level_completed.0 && next_level.is_some() {
 		Display::DEFAULT
 	} else {
@@ -260,6 +318,119 @@ fn update_next_level_button_display(
 	};
 	for mut node in &mut query {
 		node.display = display;
+	}
+}
+
+fn update_checkmark_display(
+	is_level_completed: Res<IsLevelPersistentlyCompleted>,
+	is_completed_this_session: Res<IsLevelCompleted>,
+	mut query: Query<(&mut Node, &mut ImageNode, &mut LevelCompletionCheckmarkBox)>,
+) {
+	for (mut node, mut image, mut checkmark) in &mut query {
+		if **is_level_completed {
+			// The full animation should only be played if the level was just completed
+			// (entering a level that had been completed in a previous session does not count)
+			// and the checkmark was not displayed before
+			if **is_completed_this_session && node.display == Display::None {
+				checkmark.appear_progress = 0.0;
+			} else {
+				checkmark.appear_progress = 1.0;
+				// The system that animates the margins will not run this way,
+				// so set the mrgin here instead
+				node.margin.left = Val::Px(0.0);
+				node.margin.right = Val::Px(0.0);
+				image.color.set_alpha(1.0);
+			}
+			// Always show the checkmark on completed levels
+			node.display = Display::DEFAULT;
+		} else {
+			node.display = Display::None;
+			checkmark.appear_progress = 1.0;
+		}
+	}
+}
+
+/// How long it takes for a checkmark to fully appear
+const CHECKMARK_APPEAR_TIME: f32 = 0.2;
+
+fn update_checkmark_margin(
+	mut query: Query<(&mut Node, &mut ImageNode, &mut LevelCompletionCheckmarkBox)>,
+	time: Res<Time>,
+) {
+	for (mut node, mut image, mut checkmark) in &mut query {
+		// Do nothing to checkboxes that are already fully animated
+		if checkmark.appear_progress >= 1.0 {
+			continue;
+		}
+		let delta = time.delta_secs() / CHECKMARK_APPEAR_TIME;
+		checkmark.appear_progress = (checkmark.appear_progress + delta).min(1.0);
+		let animation_progress = checkmark_margin_animation_curve(checkmark.appear_progress);
+		let margin = (LEVEL_TITLE_SIZE + LEVEL_TITLE_CHECK_GAP) * (1.0 - animation_progress);
+		// Split the margin between the sides so that the checkmark stays in place
+		// while the level title moves away
+		node.margin.left = Val::Px(-margin / 2.0);
+		node.margin.right = Val::Px(-margin / 2.0);
+		// Fade in the checkmark
+		image.color.set_alpha(animation_progress);
+	}
+}
+
+fn checkmark_margin_animation_curve(x: f32) -> f32 {
+	1.0 - (1.0 - x).powi(2)
+}
+
+fn start_completion_cue_animation(
+	query: Query<Entity, With<LevelCompletionCheckmarkBox>>,
+	images: Res<HandleMap<ImageKey>>,
+	colors: Res<ThingPalette>,
+	mut commands: Commands,
+) {
+	for node_id in &query {
+		commands.entity(node_id).with_child((
+			LevelCompletionCheckmarkGlow::default(),
+			Node {
+				position_type: PositionType::Absolute,
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0),
+				..default()
+			},
+			ImageNode {
+				image: images[&ImageKey::CheckmarkSolid].clone_weak(),
+				color: colors.checkmark,
+				image_mode: NodeImageMode::Stretch,
+				..default()
+			},
+		));
+	}
+}
+
+/// How long the animation of level completion cue takes, in seconds
+const CHECKMARK_GLOW_TIME: f32 = 0.5;
+
+fn tick_completion_cue_animation(
+	mut query: Query<(
+		Entity,
+		&mut Node,
+		&mut ImageNode,
+		&mut LevelCompletionCheckmarkGlow,
+	)>,
+	mut commands: Commands,
+	time: Res<Time>,
+) {
+	for (node_id, mut node, mut image, mut data) in &mut query {
+		data.progress += time.delta_secs() / CHECKMARK_GLOW_TIME;
+		if data.progress >= 1.0 {
+			// Despawn the animation entity once the animation is complete
+			commands.entity(node_id).despawn();
+		} else {
+			// Update the entity to reflect the animation progress
+			image.color.set_alpha(1.0 - data.progress);
+			let glow_size = 150.0 * checkmark_margin_animation_curve(data.progress);
+			node.width = Val::Percent(100.0 + glow_size);
+			node.height = Val::Percent(100.0 + glow_size);
+			node.left = Val::Percent(-glow_size / 2.0);
+			node.top = Val::Percent(-glow_size / 2.0);
+		}
 	}
 }
 
@@ -294,22 +465,10 @@ fn update_level_name_display(
 	}
 }
 
-fn load_level(
-	level_list: Res<LoadedLevelList>,
-	level_list_asset: Res<Assets<LevelList>>,
-	playing_level: Res<State<PlayingLevel>>,
-	mut events: EventWriter<EnterLevel>,
-) {
-	let level_index = playing_level
+fn load_level(playing_level: PlayingLevelListEntry, mut events: EventWriter<EnterLevel>) {
+	let level_handle = playing_level
 		.get()
-		.0
-		.expect("Systems that transition into Screen::Playing must also set PlayingLevel state");
-	let level_handle = level_list_asset
-		.get(&level_list.0)
-		.expect("The LevelList asset should be valid")
-		.levels
-		.get(level_index)
-		.expect("PlayingLevel is out of range")
+		.expect("load_level called but current level could not be loaded")
 		.data_handle
 		.clone_weak();
 	events.write(EnterLevel(Some(level_handle)));

@@ -1,10 +1,13 @@
 mod assets;
 mod audio;
+mod camera;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod epilang;
 mod game;
 mod graphics;
+mod persistent;
+mod save;
 mod screen;
 mod settings;
 mod ui;
@@ -65,6 +68,8 @@ impl Plugin for AppPlugin {
 
 		// Add other plugins.
 		app.add_plugins((
+			persistent::plugin,
+			save::plugin,
 			game::plugin,
 			screen::plugin,
 			audio::plugin,
@@ -72,6 +77,7 @@ impl Plugin for AppPlugin {
 			assets::plugin,
 			ui::plugin,
 			settings::plugin,
+			camera::plugin,
 		));
 
 		// Enable dev tools for dev builds.

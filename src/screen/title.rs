@@ -3,7 +3,7 @@
 use super::*;
 use crate::{
 	assets::{self, GlobalFont, HandleMap, ImageKey},
-	game::camera::Parallax,
+	camera::parallax::Parallax,
 	graphics,
 	ui::prelude::*,
 };

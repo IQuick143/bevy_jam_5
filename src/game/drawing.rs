@@ -209,6 +209,7 @@ pub struct ThingPalette {
 	pub link_multiplicity_label: Color,
 	pub inverted_link_multiplicity_label: Color,
 	pub warning_sign: Color,
+	pub checkmark: Color,
 }
 
 impl Default for ThingPalette {
@@ -227,6 +228,7 @@ impl Default for ThingPalette {
 			link_multiplicity_label: p::SLATE_300.into(),
 			inverted_link_multiplicity_label: Srgba::hex("F29FA7").unwrap().into(),
 			warning_sign: p::RED_400.into(),
+			checkmark: p::GREEN_300.into(),
 		}
 	}
 }
