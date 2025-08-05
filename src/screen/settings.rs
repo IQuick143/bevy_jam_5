@@ -6,6 +6,7 @@ use crate::{
 	audio::sfx::PlaySfx,
 	settings::Settings,
 	ui::{
+		background::BackgroundMode,
 		multistate::{MultiStateButton, MultiStateButtonLabels},
 		prelude::*,
 		slider::Slider,
@@ -42,7 +43,6 @@ enum SettingsSliderControl {
 #[reflect(Component)]
 enum SettingsCheckboxControl {
 	Background,
-	AnimateBackground,
 	Parallax,
 }
 
@@ -89,21 +89,12 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 					children.text("Background", JustifyContent::End, font.0.clone_weak());
 					children.spawn(Node::DEFAULT).with_children(|children| {
 						children.tool_button("", font.0.clone_weak()).insert((
-							MultiStateButton::new(2, settings.render_background as u32),
-							MultiStateButtonLabels::new(["Off", "On"]),
+							MultiStateButton::new(
+								3,
+								background_mode_to_option_index(settings.background_mode),
+							),
+							MultiStateButtonLabels::new(["Off", "Static", "Animated"]),
 							SettingsCheckboxControl::Background,
-						));
-					});
-					children.text(
-						"Animate background",
-						JustifyContent::End,
-						font.0.clone_weak(),
-					);
-					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.tool_button("", font.0.clone_weak()).insert((
-							MultiStateButton::new(2, settings.animate_background as u32),
-							MultiStateButtonLabels::new(["Off", "On"]),
-							SettingsCheckboxControl::AnimateBackground,
 						));
 					});
 					children.text("Parallax", JustifyContent::End, font.0.clone_weak());
@@ -119,6 +110,14 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 				.button("Back", font.0.clone_weak())
 				.insert(SettingsAction::Back);
 		});
+}
+
+fn background_mode_to_option_index(mode: BackgroundMode) -> u32 {
+	match mode {
+		BackgroundMode::None => 0,
+		BackgroundMode::Static => 1,
+		BackgroundMode::Animated => 2,
+	}
 }
 
 fn handle_settings_action(mut commands: Commands, query: InteractionQuery<&SettingsAction>) {
@@ -155,16 +154,16 @@ fn handle_settings_checkbox_input(
 	mut settings: ResMut<Settings>,
 ) {
 	for (MultiStateButton { current_state, .. }, control) in &query {
-		let is_set = *current_state == 1;
 		match control {
 			SettingsCheckboxControl::Background => {
-				settings.render_background = is_set;
-			}
-			SettingsCheckboxControl::AnimateBackground => {
-				settings.animate_background = is_set;
+				settings.background_mode = match current_state {
+					0 => BackgroundMode::None,
+					1 => BackgroundMode::Static,
+					2.. => BackgroundMode::Animated,
+				};
 			}
 			SettingsCheckboxControl::Parallax => {
-				settings.enable_parallax = is_set;
+				settings.enable_parallax = *current_state != 0;
 			}
 		}
 	}

@@ -25,7 +25,7 @@ pub(super) fn plugin(app: &mut App) {
 /// Display modes that describe how background is rendered
 ///
 /// This is also a trigger event that updates the display mode
-#[derive(Event, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Event, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect)]
 pub enum BackgroundMode {
 	/// Background is not rendered
 	None,

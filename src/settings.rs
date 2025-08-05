@@ -22,10 +22,8 @@ pub struct Settings {
 	pub sfx_volume: f32,
 	/// Volume of music, as a fraction of maximum volume
 	pub soundtrack_volume: f32,
-	/// Whether the background should be rendered
-	pub render_background: bool,
-	/// Whether the background should be animated
-	pub animate_background: bool,
+	/// How the background should be rendered
+	pub background_mode: BackgroundMode,
 	/// Whether parallax should be applied to background elements
 	pub enable_parallax: bool,
 }
@@ -35,8 +33,7 @@ impl Default for Settings {
 		Self {
 			sfx_volume: 0.5,
 			soundtrack_volume: 0.25,
-			render_background: true,
-			animate_background: true,
+			background_mode: BackgroundMode::Animated,
 			enable_parallax: true,
 		}
 	}
@@ -45,8 +42,7 @@ impl Default for Settings {
 /// String identifier for the sfx_volume
 const SFX_VOLUME: &str = "sfx_volume";
 const SOUNDTRACK_VOLUME: &str = "soundtrack_volume";
-const RENDER_BACKGROUND: &str = "render_background";
-const ANIMATE_BACKGROUND: &str = "animate_background";
+const BACKGROUND_MODE: &str = "background_mode";
 const ENABLE_PARALLAX: &str = "enable_parallax";
 
 impl Saveable for Settings {
@@ -60,8 +56,7 @@ impl Saveable for Settings {
 		let store_dict = store.as_object_mut().unwrap();
 		store_dict.write(SFX_VOLUME, self.sfx_volume);
 		store_dict.write(SOUNDTRACK_VOLUME, self.soundtrack_volume);
-		store_dict.write(RENDER_BACKGROUND, self.render_background);
-		store_dict.write(ANIMATE_BACKGROUND, self.animate_background);
+		store_dict.write(BACKGROUND_MODE, self.background_mode);
 		store_dict.write(ENABLE_PARALLAX, self.enable_parallax);
 	}
 
@@ -69,8 +64,7 @@ impl Saveable for Settings {
 		if let Some(m) = store.as_object() {
 			m.read_percentage(SFX_VOLUME, &mut self.sfx_volume);
 			m.read_percentage(SOUNDTRACK_VOLUME, &mut self.soundtrack_volume);
-			m.read_bool(RENDER_BACKGROUND, &mut self.render_background);
-			m.read_bool(ANIMATE_BACKGROUND, &mut self.animate_background);
+			m.read_from(BACKGROUND_MODE, &mut self.background_mode);
 			m.read_bool(ENABLE_PARALLAX, &mut self.enable_parallax);
 		}
 	}
@@ -94,6 +88,10 @@ pub trait MapExt {
 			*destination = value.clamp(0.0, 1.0) as f32;
 		}
 	}
+	/// Reads a value that can be fallibly converted from a [`serde_json::Value`]
+	fn read_from<T>(&self, key: &str, destination: &mut T)
+	where
+		for<'a> &'a serde_json::Value: TryInto<T>;
 }
 
 impl MapExt for serde_json::Map<String, serde_json::Value> {
@@ -108,6 +106,39 @@ impl MapExt for serde_json::Map<String, serde_json::Value> {
 	fn get_float(&self, key: &str) -> Option<f64> {
 		self.get(key).and_then(serde_json::Value::as_f64)
 	}
+
+	fn read_from<T>(&self, key: &str, destination: &mut T)
+	where
+		for<'a> &'a serde_json::Value: TryInto<T>,
+	{
+		if let Some(value) = self.get(key) {
+			if let Ok(value) = value.try_into() {
+				*destination = value;
+			}
+		}
+	}
+}
+
+impl From<BackgroundMode> for serde_json::Value {
+	fn from(value: BackgroundMode) -> Self {
+		match value {
+			BackgroundMode::None => 0.into(),
+			BackgroundMode::Static => 1.into(),
+			BackgroundMode::Animated => 2.into(),
+		}
+	}
+}
+
+impl TryFrom<&serde_json::Value> for BackgroundMode {
+	type Error = ();
+	fn try_from(value: &serde_json::Value) -> std::result::Result<Self, Self::Error> {
+		match value.as_u64() {
+			Some(0) => Ok(BackgroundMode::None),
+			Some(1) => Ok(BackgroundMode::Static),
+			Some(2) => Ok(BackgroundMode::Animated),
+			_ => Err(()),
+		}
+	}
 }
 
 /// Mirrors updates in [`Settings`] into resources that control
@@ -118,11 +149,5 @@ fn update_settings_proxy_resources(
 	mut commands: Commands,
 ) {
 	enable_parallax.set_if_neq(EnableParallax(settings.enable_parallax));
-	if !settings.render_background {
-		commands.trigger(BackgroundMode::None);
-	} else if !settings.animate_background {
-		commands.trigger(BackgroundMode::Static);
-	} else {
-		commands.trigger(BackgroundMode::Animated);
-	}
+	commands.trigger(settings.background_mode);
 }
