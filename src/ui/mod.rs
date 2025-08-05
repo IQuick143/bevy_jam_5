@@ -4,10 +4,10 @@
 #![allow(dead_code, unused_imports)]
 
 pub mod background;
-pub mod checkbox;
 pub mod freeze;
 pub mod hover;
 pub mod interaction;
+pub mod multistate;
 pub mod palette;
 pub mod screen_fade;
 pub mod slider;
@@ -49,6 +49,6 @@ pub(super) fn plugin(app: &mut App) {
 		hover::plugin,
 		background::plugin,
 		slider::plugin,
-		checkbox::plugin,
+		multistate::plugin,
 	));
 }
