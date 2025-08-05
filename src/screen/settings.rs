@@ -126,10 +126,7 @@ fn handle_settings_action(mut commands: Commands, query: InteractionQuery<&Setti
 		if *interaction == Interaction::Pressed {
 			match action {
 				SettingsAction::Back => {
-					commands.spawn((
-						FadeAnimationBundle::default(),
-						DoScreenTransition(Screen::Title),
-					));
+					commands.do_screen_transition(Screen::Title);
 				}
 			}
 		}

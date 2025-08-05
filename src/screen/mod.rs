@@ -42,6 +42,22 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Event, Component, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug)]
 pub struct DoScreenTransition(pub Screen);
 
+/// Extension trait for [`Commands`] that adds a method
+/// for triggering screen transitions
+pub trait DoScreenTransitionCommands {
+	/// Shorthand for triggering a screen transition accompanied by a screen fade
+	fn do_screen_transition(&mut self, next_screen: Screen);
+}
+
+impl DoScreenTransitionCommands for Commands<'_, '_> {
+	fn do_screen_transition(&mut self, next_screen: Screen) {
+		self.spawn((
+			FadeAnimationBundle::default(),
+			DoScreenTransition(next_screen),
+		));
+	}
+}
+
 fn do_screen_transitions(
 	mut events: EventReader<DoScreenTransition>,
 	mut next_screen: ResMut<NextState<Screen>>,
@@ -53,7 +69,7 @@ fn do_screen_transitions(
 
 fn go_to_return_screen(current_screen: Res<State<Screen>>, mut commands: Commands) {
 	if let Some(next) = current_screen.return_screen() {
-		commands.spawn((FadeAnimationBundle::default(), DoScreenTransition(next)));
+		commands.do_screen_transition(next);
 	}
 }
 

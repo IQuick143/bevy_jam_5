@@ -119,7 +119,7 @@ fn handle_title_action(
 		if matches!(interaction, Interaction::Pressed) {
 			match action {
 				TitleAction::GoToScreen(screen) => {
-					commands.spawn((FadeAnimationBundle::default(), DoScreenTransition(*screen)));
+					commands.do_screen_transition(*screen);
 				}
 				#[cfg(not(target_family = "wasm"))]
 				TitleAction::Exit => {
