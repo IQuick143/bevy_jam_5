@@ -58,37 +58,20 @@ impl Saveable for Settings {
 			*store = Value::Object(Map::new());
 		}
 		let store_dict = store.as_object_mut().unwrap();
-		store_dict.insert(SFX_VOLUME.to_owned(), self.sfx_volume.into());
-		store_dict.insert(SOUNDTRACK_VOLUME.to_owned(), self.soundtrack_volume.into());
-		store_dict.insert(RENDER_BACKGROUND.to_owned(), self.render_background.into());
-		store_dict.insert(
-			ANIMATE_BACKGROUND.to_owned(),
-			self.animate_background.into(),
-		);
-		store_dict.insert(ENABLE_PARALLAX.to_owned(), self.enable_parallax.into());
+		store_dict.write(SFX_VOLUME, self.sfx_volume);
+		store_dict.write(SOUNDTRACK_VOLUME, self.soundtrack_volume);
+		store_dict.write(RENDER_BACKGROUND, self.render_background);
+		store_dict.write(ANIMATE_BACKGROUND, self.animate_background);
+		store_dict.write(ENABLE_PARALLAX, self.enable_parallax);
 	}
 
 	fn read_json(&mut self, store: &serde_json::Value) {
 		if let Some(m) = store.as_object() {
-			if let Some(x) = m.get_float(SFX_VOLUME) {
-				// `f32::clamp` to both ensure that the result is in a valid range,
-				// but also to deal with NaN and +-inf
-				self.sfx_volume = x.clamp(0.0, 1.0) as f32;
-			}
-			if let Some(x) = m.get_float(SOUNDTRACK_VOLUME) {
-				// `f32::clamp` to both ensure that the result is in a valid range,
-				// but also to deal with NaN and +-inf
-				self.soundtrack_volume = x.clamp(0.0, 1.0) as f32;
-			}
-			if let Some(x) = m.get_bool(RENDER_BACKGROUND) {
-				self.render_background = x;
-			}
-			if let Some(x) = m.get_bool(ANIMATE_BACKGROUND) {
-				self.animate_background = x;
-			}
-			if let Some(x) = m.get_bool(ENABLE_PARALLAX) {
-				self.enable_parallax = x;
-			}
+			m.read_percentage(SFX_VOLUME, &mut self.sfx_volume);
+			m.read_percentage(SOUNDTRACK_VOLUME, &mut self.soundtrack_volume);
+			m.read_bool(RENDER_BACKGROUND, &mut self.render_background);
+			m.read_bool(ANIMATE_BACKGROUND, &mut self.animate_background);
+			m.read_bool(ENABLE_PARALLAX, &mut self.enable_parallax);
 		}
 	}
 }
@@ -96,9 +79,28 @@ impl Saveable for Settings {
 pub trait MapExt {
 	fn get_bool(&self, key: &str) -> Option<bool>;
 	fn get_float(&self, key: &str) -> Option<f64>;
+	fn write(&mut self, key: &str, value: impl Into<serde_json::Value>);
+	/// Reads a bool from the dictionary, if it's set it overwrites the destination
+	fn read_bool(&self, key: &str, destination: &mut bool) {
+		if let Some(value) = self.get_bool(key) {
+			*destination = value;
+		}
+	}
+	/// Reads a float from the dictionary and clamps it to [0-1], if it's set it overwrites the destination
+	fn read_percentage(&self, key: &str, destination: &mut f32) {
+		if let Some(value) = self.get_float(key) {
+			// `f32::clamp` to both ensure that the result is in a valid range,
+			// but also to deal with NaN and +-inf
+			*destination = value.clamp(0.0, 1.0) as f32;
+		}
+	}
 }
 
 impl MapExt for serde_json::Map<String, serde_json::Value> {
+	fn write(&mut self, key: &str, value: impl Into<serde_json::Value>) {
+		self.insert(key.to_owned(), value.into());
+	}
+
 	fn get_bool(&self, key: &str) -> Option<bool> {
 		self.get(key).and_then(serde_json::Value::as_bool)
 	}
