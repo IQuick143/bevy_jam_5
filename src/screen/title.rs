@@ -24,8 +24,7 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 #[reflect(Component)]
 enum TitleAction {
-	Play,
-	Credits,
+	GoToScreen(Screen),
 	/// Exit doesn't work well with embedded applications.
 	#[cfg(not(target_family = "wasm"))]
 	Exit,
@@ -80,10 +79,13 @@ fn enter_title(
 			});
 			children
 				.button("Play", font.0.clone_weak())
-				.insert(TitleAction::Play);
+				.insert(TitleAction::GoToScreen(Screen::LevelSelect));
+			children
+				.button("Settings", font.0.clone_weak())
+				.insert(TitleAction::GoToScreen(Screen::Settings));
 			children
 				.button("Credits", font.0.clone_weak())
-				.insert(TitleAction::Credits);
+				.insert(TitleAction::GoToScreen(Screen::Credits));
 
 			#[cfg(not(target_family = "wasm"))]
 			children
@@ -116,17 +118,8 @@ fn handle_title_action(
 	for (interaction, action) in &mut button_query {
 		if matches!(interaction, Interaction::Pressed) {
 			match action {
-				TitleAction::Play => {
-					commands.spawn((
-						FadeAnimationBundle::default(),
-						DoScreenTransition(Screen::LevelSelect),
-					));
-				}
-				TitleAction::Credits => {
-					commands.spawn((
-						FadeAnimationBundle::default(),
-						DoScreenTransition(Screen::Credits),
-					));
+				TitleAction::GoToScreen(screen) => {
+					commands.do_screen_transition(*screen);
 				}
 				#[cfg(not(target_family = "wasm"))]
 				TitleAction::Exit => {

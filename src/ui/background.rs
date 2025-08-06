@@ -7,17 +7,68 @@ use crate::{
 	graphics::*,
 	screen::Screen,
 };
-use bevy::{color::palettes, prelude::*};
+use bevy::color::palettes;
+use bevy::prelude::*;
 
-pub fn plugin(app: &mut App) {
+pub(super) fn plugin(app: &mut App) {
 	app.add_systems(Startup, spawn_background)
 		.add_systems(
 			Update,
 			(flip_background_on_level_completion, update_background_sweep),
 		)
+		.add_observer(set_background_mode)
+		.init_resource::<BackgroundMaterialHandle>()
 		.init_resource::<IsBackgroundHighlighted>()
 		.init_resource::<BackgroundHighlightParameters>();
 }
+
+/// Display modes that describe how background is rendered
+///
+/// This is also a trigger event that updates the display mode
+#[derive(Event, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect)]
+pub enum BackgroundMode {
+	/// Background is not rendered
+	None,
+	/// Background is a static image
+	Static,
+	/// Background moves at a steady rate
+	#[default]
+	Animated,
+}
+
+#[derive(Resource, Clone, Debug, Deref, DerefMut)]
+struct BackgroundMaterialHandle(Handle<BackgroundMaterial>);
+
+impl FromWorld for BackgroundMaterialHandle {
+	fn from_world(world: &mut World) -> Self {
+		let images = world.resource::<HandleMap<ImageKey>>();
+		let texture = images[&ImageKey::Background].clone_weak();
+		let mut materials = world.resource_mut::<Assets<BackgroundMaterial>>();
+		let handle = materials.add(BackgroundMaterial {
+			texture,
+			params: BackgroundMaterialParams {
+				scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
+				speed: Vec2::from_angle(BACKGROUND_ROTATION)
+					.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
+				colors: [
+					Srgba::hex("F5F8FB").unwrap().into(),
+					LinearRgba::WHITE,
+					palettes::tailwind::SLATE_200.into(),
+					Srgba::hex("F5F8FB").unwrap().into(),
+				],
+				sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
+				sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
+				sweep_position: 0.0,
+				sweep_width: 1.0,
+			},
+		});
+		Self(handle)
+	}
+}
+
+/// Marker component that allows querying for the background mesh
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default)]
+struct IsBackground;
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug, Default)]
 struct IsBackgroundHighlighted(bool);
@@ -34,34 +85,45 @@ const MESH_SIZE: f32 = 8000.0;
 fn spawn_background(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<BackgroundMaterial>>,
-	images: Res<HandleMap<ImageKey>>,
+	material: Res<BackgroundMaterialHandle>,
 ) {
-	let material = BackgroundMaterial {
-		texture: images[&ImageKey::Background].clone_weak(),
-		params: BackgroundMaterialParams {
-			scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
-			speed: Vec2::from_angle(BACKGROUND_ROTATION)
-				.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
-			colors: [
-				Srgba::hex("F5F8FB").unwrap().into(),
-				LinearRgba::WHITE,
-				palettes::tailwind::SLATE_200.into(),
-				Srgba::hex("F5F8FB").unwrap().into(),
-			],
-			sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
-			sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
-			sweep_position: 0.0,
-			sweep_width: 1.0,
-		},
-	};
 	commands.spawn((
 		Mesh2d(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),
-		MeshMaterial2d(materials.add(material)),
+		MeshMaterial2d(material.clone_weak()),
 		Transform::from_translation(Vec3::Z * layers::BACKGROUND)
 			.with_rotation(Quat::from_rotation_z(BACKGROUND_ROTATION)),
 		Parallax(BACKGROUND_PARALLAX),
+		IsBackground,
 	));
+}
+
+fn set_background_mode(
+	mode: Trigger<BackgroundMode>,
+	material: Res<BackgroundMaterialHandle>,
+	mut materials: ResMut<Assets<BackgroundMaterial>>,
+	mut query: Query<&mut Visibility, With<IsBackground>>,
+) {
+	let material = materials
+		.get_mut(&**material)
+		.expect("Background material should have been inserted");
+	let new_visibility;
+	match mode.event() {
+		BackgroundMode::None => {
+			new_visibility = Visibility::Hidden;
+		}
+		BackgroundMode::Static => {
+			new_visibility = Visibility::default();
+			material.params.speed = Vec2::ZERO;
+		}
+		BackgroundMode::Animated => {
+			new_visibility = Visibility::default();
+			material.params.speed = Vec2::from_angle(BACKGROUND_ROTATION)
+				.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING);
+		}
+	}
+	for mut visibility in &mut query {
+		*visibility = new_visibility;
+	}
 }
 
 /// Seconds it takes for the sweep animation to cover the height of the viewport

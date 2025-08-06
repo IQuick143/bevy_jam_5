@@ -281,10 +281,7 @@ fn game_ui_input_processing_system(
 	if let Some(action) = events.read().last() {
 		match action {
 			GameUiAction::Back => {
-				commands.spawn((
-					FadeAnimationBundle::default(),
-					DoScreenTransition(Screen::LevelSelect),
-				));
+				commands.do_screen_transition(Screen::LevelSelect);
 			}
 			GameUiAction::Reset => {
 				commands.spawn((FadeAnimationBundle::default(), LoadLevel));

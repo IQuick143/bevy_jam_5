@@ -4,6 +4,7 @@ mod credits;
 mod level_select;
 mod loading;
 mod playing;
+mod settings;
 mod splash;
 mod title;
 
@@ -24,6 +25,7 @@ pub(super) fn plugin(app: &mut App) {
 		credits::plugin,
 		playing::plugin,
 		level_select::plugin,
+		settings::plugin,
 	));
 
 	app.add_systems(
@@ -40,6 +42,22 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Event, Component, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug)]
 pub struct DoScreenTransition(pub Screen);
 
+/// Extension trait for [`Commands`] that adds a method
+/// for triggering screen transitions
+pub trait DoScreenTransitionCommands {
+	/// Shorthand for triggering a screen transition accompanied by a screen fade
+	fn do_screen_transition(&mut self, next_screen: Screen);
+}
+
+impl DoScreenTransitionCommands for Commands<'_, '_> {
+	fn do_screen_transition(&mut self, next_screen: Screen) {
+		self.spawn((
+			FadeAnimationBundle::default(),
+			DoScreenTransition(next_screen),
+		));
+	}
+}
+
 fn do_screen_transitions(
 	mut events: EventReader<DoScreenTransition>,
 	mut next_screen: ResMut<NextState<Screen>>,
@@ -51,17 +69,18 @@ fn do_screen_transitions(
 
 fn go_to_return_screen(current_screen: Res<State<Screen>>, mut commands: Commands) {
 	if let Some(next) = current_screen.return_screen() {
-		commands.spawn((FadeAnimationBundle::default(), DoScreenTransition(next)));
+		commands.do_screen_transition(next);
 	}
 }
 
 /// The game's main screen states.
-#[derive(States, Debug, Hash, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(States, Debug, Hash, PartialEq, Eq, Clone, Copy, Default, Reflect)]
 pub enum Screen {
 	#[default]
 	Splash,
 	Loading,
 	Title,
+	Settings,
 	Credits,
 	LevelSelect,
 	/// The actual playing screen of the game.
@@ -72,6 +91,7 @@ impl Screen {
 	/// Which screen should we return to
 	fn return_screen(self) -> Option<Self> {
 		match self {
+			Self::Settings => Some(Self::Title),
 			Self::Credits => Some(Self::Title),
 			Self::LevelSelect => Some(Self::Title),
 			Self::Playing => Some(Self::LevelSelect),

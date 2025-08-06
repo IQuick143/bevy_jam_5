@@ -1,6 +1,7 @@
 //! Parallax effect on camera movement
 
-use super::{movement::CameraPositionUpdate, CameraHarness};
+use super::movement::CameraPositionUpdate;
+use super::CameraHarness;
 use bevy::{
 	ecs::{component::HookContext, world::DeferredWorld},
 	prelude::*,
@@ -9,9 +10,14 @@ use bevy::{
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<EnableParallax>().add_systems(
 		Update,
-		apply_paralax
-			.run_if(resource_equals(EnableParallax(true)))
-			.after(CameraPositionUpdate),
+		(
+			apply_paralax
+				.run_if(resource_equals(EnableParallax(true)))
+				.after(CameraPositionUpdate),
+			restore_parallax.run_if(
+				resource_changed::<EnableParallax>.and(resource_equals(EnableParallax(false))),
+			),
+		),
 	);
 }
 
@@ -71,10 +77,26 @@ fn apply_paralax(
 	};
 	for (mut transform, Parallax(parallax), basis) in &mut query {
 		let new_scale = basis.scale / camera_harness.scale.powf(*parallax);
+		transform.scale.x = new_scale.x;
+		transform.scale.y = new_scale.y;
 		let new_position = basis.position + camera_transform.translation.xy() * parallax;
 		transform.translation.x = new_position.x;
 		transform.translation.y = new_position.y;
-		transform.scale.x = new_scale.x;
-		transform.scale.y = new_scale.y;
+	}
+}
+
+fn restore_parallax(mut query: Query<(&mut Transform, &ParallaxBasis), Without<Camera2d>>) {
+	for (
+		mut transform,
+		ParallaxBasis {
+			position: basis,
+			scale,
+		},
+	) in &mut query
+	{
+		transform.scale.x = scale.x;
+		transform.scale.y = scale.y;
+		transform.translation.x = basis.x;
+		transform.translation.y = basis.y;
 	}
 }

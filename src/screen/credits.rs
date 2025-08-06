@@ -75,10 +75,7 @@ fn handle_credits_action(
 		if matches!(interaction, Interaction::Pressed) {
 			match action {
 				CreditsAction::Back => {
-					commands.spawn((
-						FadeAnimationBundle::default(),
-						DoScreenTransition(Screen::Title),
-					));
+					commands.do_screen_transition(Screen::Title);
 				}
 			}
 		}

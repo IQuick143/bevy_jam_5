@@ -101,17 +101,11 @@ fn handle_level_select_screen_action(
 		}
 		match action {
 			LevelSelectAction::Back => {
-				commands.spawn((
-					FadeAnimationBundle::default(),
-					DoScreenTransition(Screen::Title),
-				));
+				commands.do_screen_transition(Screen::Title);
 			}
 			LevelSelectAction::PlayLevel(id) => {
 				next_level.set(PlayingLevel(Some(*id)));
-				commands.spawn((
-					FadeAnimationBundle::default(),
-					DoScreenTransition(Screen::Playing),
-				));
+				commands.do_screen_transition(Screen::Playing);
 			}
 		}
 	}

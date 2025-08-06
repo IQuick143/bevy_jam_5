@@ -7,8 +7,10 @@ pub mod background;
 pub mod freeze;
 pub mod hover;
 pub mod interaction;
+pub mod multistate;
 pub mod palette;
 pub mod screen_fade;
+pub mod slider;
 mod widgets;
 
 pub mod prelude {
@@ -46,5 +48,7 @@ pub(super) fn plugin(app: &mut App) {
 		screen_fade::plugin,
 		hover::plugin,
 		background::plugin,
+		slider::plugin,
+		multistate::plugin,
 	));
 }

@@ -70,13 +70,13 @@ impl Plugin for AppPlugin {
 		app.add_plugins((
 			persistent::plugin,
 			save::plugin,
-			settings::plugin,
 			game::plugin,
 			screen::plugin,
-			ui::plugin,
 			audio::plugin,
-			assets::plugin,
 			graphics::plugin,
+			assets::plugin,
+			ui::plugin,
+			settings::plugin,
 			camera::plugin,
 		));
 

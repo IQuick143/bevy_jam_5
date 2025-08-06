@@ -98,8 +98,9 @@ fn toggle_debug_outline_display(
 	}
 }
 
-fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
+fn toggle_box_outlines(mut render: ResMut<RenderOutlines>, mut ui_debug: ResMut<UiDebugOptions>) {
 	render.0 = !render.0;
+	ui_debug.toggle();
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
