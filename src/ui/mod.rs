@@ -1,8 +1,5 @@
 //! Reusable UI widgets & theming.
 
-// Unused utilities and re-exports may trigger these lints undesirably.
-#![allow(dead_code, unused_imports)]
-
 pub mod background;
 pub mod freeze;
 pub mod hover;
@@ -13,6 +10,7 @@ pub mod screen_fade;
 pub mod slider;
 mod widgets;
 
+#[allow(unused_imports)]
 pub mod prelude {
 	pub use super::{
 		char_input_pressed,
@@ -25,10 +23,7 @@ pub mod prelude {
 }
 
 use bevy::{
-	input::{
-		keyboard::{Key, KeyboardInput},
-		ButtonState,
-	},
+	input::keyboard::{Key, KeyboardInput},
 	prelude::*,
 };
 

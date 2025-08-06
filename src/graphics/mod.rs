@@ -25,10 +25,6 @@ pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 650.0);
 /// See [`LEVEL_AREA_WIDTH`]
 pub const LEVEL_AREA_CENTER: Vec2 = Vec2::ZERO;
 
-/// Size of the hint text at the bottom of the level
-/// Position is glued to the bottom of the [`GAME_AREA`]
-pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
-
 /// Size of a sprite in world-units.
 pub const SPRITE_LENGTH: f32 = 100.0;
 
