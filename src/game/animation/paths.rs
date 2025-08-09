@@ -1,19 +1,29 @@
-use super::*;
+//! Animation of movement of objects along cycles
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
-pub enum RotationDirection {
-	#[default]
-	Clockwise,
-	CounterClockwise,
-}
+use super::{animation_easing_function, RotationDirection, TurnAnimationLength};
+use crate::{
+	game::{
+		components::*,
+		level::ThingData,
+		logic::RotateSingleCycle,
+		spawn::{LevelInitialization, LevelInitializationSet},
+	},
+	AppSet,
+};
+use bevy::{platform::collections::HashMap, prelude::*};
+use std::f32::consts::TAU;
 
-impl From<CycleTurningDirection> for RotationDirection {
-	fn from(value: CycleTurningDirection) -> Self {
-		match value {
-			CycleTurningDirection::Nominal => RotationDirection::Clockwise,
-			CycleTurningDirection::Reverse => RotationDirection::CounterClockwise,
-		}
-	}
+pub(super) fn plugin(app: &mut App) {
+	app.add_systems(
+		LevelInitialization,
+		init_thing_animation.after(LevelInitializationSet::SpawnPrimaryEntities),
+	)
+	.add_systems(
+		Update,
+		(listen_for_moves, move_objects)
+			.chain()
+			.in_set(AppSet::UpdateVisuals),
+	);
 }
 
 /// Component for enabling path animations
@@ -271,5 +281,105 @@ impl CircleArcPathSegment {
 			RotationDirection::Clockwise => end - angle_bias,
 			RotationDirection::CounterClockwise => end + angle_bias,
 		}
+	}
+}
+
+fn listen_for_moves(
+	mut rotation_events: EventReader<RotateSingleCycle>,
+	cycles: Query<(&CycleVertices, &GlobalTransform)>,
+	vertices_q: Query<&GlobalTransform, With<Vertex>>,
+	mut objects: Query<(&mut Transform, &VertexPosition, Option<&mut PathAnimation>), With<Object>>,
+) {
+	// Maps vertices that have been affected to the path segments taken by the objects on them
+	let mut vertex_paths = HashMap::new();
+	for event in rotation_events.read() {
+		let Ok((vertices, transform)) = cycles.get(event.0.target_cycle) else {
+			log::warn!("Target of RotateSingleCycle is not a cycle entity");
+			continue;
+		};
+		if vertices.0.is_empty() {
+			// Cycle has no vertices, no need to observe it further
+			continue;
+		}
+		let center_point = transform.translation().xy();
+		let vertex_positions = vertices
+			.0
+			.iter()
+			.copied()
+			.map(|id| {
+				vertices_q
+					.get(id)
+					.map(|t| t.translation().xy())
+					.inspect_err(|_| log::warn!("CycleVertices item is not a vertex entity"))
+					.unwrap_or_default()
+			})
+			.collect::<Vec<_>>();
+		let full_rotations = event.0.amount / vertices.0.len();
+		let absolute_movement_offset = event.0.amount % vertices.0.len();
+		let movement_offset = match event.0.direction.into() {
+			RotationDirection::Clockwise => vertices.0.len() - absolute_movement_offset,
+			RotationDirection::CounterClockwise => absolute_movement_offset,
+		};
+		for (i, (&end_position, &vertex_id)) in vertex_positions.iter().zip(&vertices.0).enumerate()
+		{
+			let start_index = (i + movement_offset) % vertices.0.len();
+			let start_position = vertex_positions[start_index];
+			let initial_angle = (start_position - center_point).to_angle();
+			let final_angle = (end_position - center_point).to_angle();
+			let radius = end_position.distance(center_point);
+			let adjusted_final_angle = CircleArcPathSegment::final_angle_from_expected_rotation(
+				initial_angle,
+				final_angle,
+				full_rotations,
+				event.0.direction.into(),
+			);
+			vertex_paths.insert(
+				vertex_id,
+				AnimationPathSegment::CircleArc(CircleArcPathSegment {
+					center_point,
+					radius,
+					initial_angle,
+					final_angle: adjusted_final_angle,
+				}),
+			);
+		}
+	}
+
+	for (mut transform, vertex_position, animation) in objects.iter_mut() {
+		if let Some(path) = vertex_paths.get(&vertex_position.0) {
+			if let Some(mut animation) = animation {
+				animation.add_segment(*path);
+			} else {
+				// Object is not animated, so we just set the translation to the desired place.
+				let end_position = path.end_position();
+				transform.translation.x = end_position.x;
+				transform.translation.y = end_position.y;
+			}
+		}
+	}
+}
+
+fn move_objects(
+	mut objects: Query<(&mut Transform, &mut PathAnimation)>,
+	time: Res<Time<Real>>,
+	animation_time: Res<TurnAnimationLength>,
+) {
+	for (mut transform, mut animation) in objects.iter_mut() {
+		if !animation.is_in_progress() {
+			continue;
+		}
+		animation.add_progress(time.delta_secs() / **animation_time);
+		let new_position = animation.sample();
+		transform.translation.x = new_position.x;
+		transform.translation.y = new_position.y;
+	}
+}
+
+fn init_thing_animation(mut commands: Commands, query: Query<Entity, Added<ThingData>>) {
+	for id in &query {
+		// We do not need to initialize its static position
+		// since the animation does not get queried until
+		// something actually animates
+		commands.entity(id).insert(PathAnimation::default());
 	}
 }
