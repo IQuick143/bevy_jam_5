@@ -9,13 +9,17 @@ use super::{
 	prelude::*,
 };
 use crate::{assets::*, graphics::*, AppSet};
-use bevy::{ecs::schedule::ScheduleLabel, sprite::Anchor};
+use bevy::{
+	ecs::{schedule::ScheduleLabel, system::SystemParam},
+	sprite::Anchor,
+};
 use std::f32::consts::{PI, TAU};
 
 pub(super) fn plugin(app: &mut App) {
 	use LevelInitializationSet::*;
 	app.init_resource::<LastLevelSessionId>()
 		.init_resource::<ExpiringLevelSessionId>()
+		.init_resource::<ActiveLevel>()
 		.add_event::<EnterLevel>()
 		.add_event::<SpawnLevel>()
 		.configure_sets(
@@ -87,6 +91,30 @@ pub struct EnterLevel(pub Option<Handle<LevelData>>);
 #[derive(Event, Clone, Debug)]
 pub struct SpawnLevel(pub Handle<LevelData>, pub LevelSessionId);
 
+/// Handle to the last level that has been entered with [`EnterLevel`]
+#[derive(Resource, Clone, Debug, Default, Deref)]
+pub struct ActiveLevel(Option<Handle<LevelData>>);
+
+/// Shorthand [`SystemParam`] that accesses the data os the current level
+#[derive(SystemParam)]
+pub struct ActiveLevelData<'w> {
+	handle: Res<'w, ActiveLevel>,
+	assets: Res<'w, Assets<LevelData>>,
+}
+
+impl ActiveLevelData<'_> {
+	pub fn get(&self) -> Result<&LevelData, BevyError> {
+		let handle = self
+			.handle
+			.0
+			.as_ref()
+			.ok_or_else(|| "No level is currently being played".to_owned())?;
+		self.assets
+			.get(handle)
+			.ok_or_else(|| "No data found for active level".to_owned().into())
+	}
+}
+
 /// Identifier of a level session.
 /// Every time a level is entered, all its entities are assigned a unique identifier.
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Debug, Reflect)]
@@ -111,9 +139,11 @@ fn handle_enter_level(
 	mut spawn_events: EventWriter<SpawnLevel>,
 	mut last_session_id: ResMut<LastLevelSessionId>,
 	mut expiring_session_id: ResMut<ExpiringLevelSessionId>,
+	mut active_level: ResMut<ActiveLevel>,
 ) {
 	if let Some(event) = enter_events.read().last() {
 		expiring_session_id.0 = last_session_id.0;
+		active_level.0 = event.0.clone();
 		if let Some(level_handle) = &event.0 {
 			last_session_id.0 .0 += 1;
 			spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));

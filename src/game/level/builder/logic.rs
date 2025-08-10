@@ -1,6 +1,5 @@
 use super::error::*;
 use super::*;
-
 use bevy::platform::collections::HashSet;
 use itertools::Itertools as _;
 
@@ -239,15 +238,15 @@ impl LevelBuilder {
 		});
 		self.build_layout();
 		let bounding_box = self.bounding_box.unwrap_or_else(|| self.get_bounding_box());
-		let cycles = self
-			.cycles
-			.into_iter()
-			.map(Self::build_cycle_data)
-			.collect();
 		let vertices = self
 			.vertices
 			.into_iter()
 			.map(Self::build_vertex_data)
+			.collect::<Vec<_>>();
+		let cycles = self
+			.cycles
+			.into_iter()
+			.map(|c| Self::build_cycle_data(c, &vertices))
 			.collect();
 		ResultNonExclusive::from((
 			LevelData {
@@ -609,7 +608,10 @@ impl LevelBuilder {
 	}
 
 	/// Asserts that a cycle data object is complete and assembles it
-	fn build_cycle_data(intermediate: IntermediateCycleData) -> CycleData {
+	fn build_cycle_data(
+		intermediate: IntermediateCycleData,
+		vertex_data: &[VertexData],
+	) -> CycleData {
 		let placement = intermediate
 			.placement.unwrap_or_else(|| {
 				log::warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
@@ -630,10 +632,22 @@ impl LevelBuilder {
 				(0, LinkedCycleDirection::Coincident)
 			}
 		};
+		// This only works for circles
+		// TODO: Make different versions for other cycle shapes
+		let vertex_positions = intermediate
+			.vertex_indices
+			.iter()
+			.map(|i| {
+				let relative_vertex_position = vertex_data[*i].position - placement.position;
+				let angle = Vec2::X.angle_to(relative_vertex_position);
+				(angle / TAU).rem_euclid(1.0)
+			})
+			.collect();
 		CycleData {
 			placement,
 			center_sprite_appearence,
 			vertex_indices: intermediate.vertex_indices,
+			vertex_positions,
 			detector_indices: intermediate.placed_detectors,
 			turnability: intermediate.turnability,
 			group,

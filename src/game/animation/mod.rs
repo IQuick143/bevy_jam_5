@@ -31,6 +31,15 @@ impl From<CycleTurningDirection> for RotationDirection {
 	}
 }
 
+impl RotationDirection {
+	pub fn as_number(self) -> f32 {
+		match self {
+			Self::Clockwise => 1.0,
+			Self::CounterClockwise => -1.0,
+		}
+	}
+}
+
 fn animation_easing_function(t: f32) -> f32 {
 	// Quadratic ease-out.
 	// Looks better than a flat rotation, but is easier
