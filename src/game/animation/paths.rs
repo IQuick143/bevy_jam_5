@@ -1,0 +1,381 @@
+//! Animation of movement of objects along cycles
+
+use super::{animation_easing_function, RotationDirection, TurnAnimationLength};
+use crate::{
+	game::{
+		components::*,
+		level::{CyclePlacement, LevelData, ThingData},
+		logic::RotateSingleCycle,
+		spawn::{ActiveLevelData, LevelInitialization, LevelInitializationSet},
+	},
+	screen::Screen,
+	AppSet,
+};
+use bevy::{platform::collections::HashMap, prelude::*};
+
+pub(super) fn plugin(app: &mut App) {
+	app.add_systems(
+		LevelInitialization,
+		init_thing_animation.after(LevelInitializationSet::SpawnPrimaryEntities),
+	)
+	.add_systems(
+		Update,
+		(listen_for_moves, move_objects)
+			.chain()
+			.in_set(AppSet::UpdateVisuals)
+			.run_if(in_state(Screen::Playing)),
+	);
+}
+
+/// Component for enabling path animations
+#[derive(Component, Debug, Clone, Default, Reflect)]
+struct PathAnimation {
+	/// The position where the object should be when no animation plays
+	static_position: Vec2,
+	/// The segments of the path that the object should take
+	segments: std::collections::VecDeque<AnimationPathSegment>,
+	/// Combined length of all path segments
+	/// since the path was last modified
+	total_length: f32,
+	/// Combined length of all expired path segments
+	/// since the path was last modified
+	traversed_length: f32,
+	/// Progress on the full animation in [0, 1]
+	progress: f32,
+	/// Spatial progress through the first segment [0, 1]
+	first_segment_progress: f32,
+}
+
+impl PathAnimation {
+	fn is_in_progress(&self) -> bool {
+		!self.segments.is_empty()
+	}
+
+	/// Advances the animation by a given fraction of its length
+	fn add_progress(&mut self, delta_progress: f32) {
+		self.progress += delta_progress;
+		// Progress corrected by the easing function
+		// Also relative distance [0, 1] covered so far
+		let distance_progress = animation_easing_function(self.progress);
+		// How far (by distance) we are into the first segment
+		let mut delta_distance = distance_progress * self.total_length - self.traversed_length;
+
+		while let Some(first_segment) = self.segments.front() {
+			let first_segment_length = first_segment.length;
+			// Correct for rounding errors by explicitly overriding at 1
+			let first_segment_completed =
+				first_segment_length <= delta_distance || self.progress >= 1.0;
+			if first_segment_completed {
+				// The whole segment has been animated, so remove it
+				// and move on to the next
+				self.traversed_length += first_segment_length;
+				delta_distance -= first_segment_length;
+				self.segments.pop_front();
+			} else {
+				// Stop in the middle of the segment
+				self.first_segment_progress = delta_distance / first_segment_length;
+				return;
+			}
+		}
+
+		// No segments are left to animate, so use static position
+		self.progress = 1.0;
+		self.total_length = 0.0;
+		self.traversed_length = 0.0;
+	}
+
+	/// Gets the current position on the path
+	fn sample(&self, level_data: &LevelData) -> Vec2 {
+		self.segments
+			.front()
+			.map(|x| x.sample(self.first_segment_progress, level_data))
+			.unwrap_or(self.static_position)
+	}
+
+	/// Adds another segment to the animation
+	///
+	/// This resets animation progress to zero.
+	/// If possible, the new segment is spliced into the last
+	/// existing segment.
+	fn add_segment(&mut self, segment: AnimationPathSegment, new_static_pos: Vec2) {
+		if segment.length < Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
+			return;
+		}
+		self.static_position = new_static_pos;
+		self.reset_progress();
+		self.append_segment(segment);
+	}
+
+	/// Restarts the remaining path as a new animation sequence
+	fn reset_progress(&mut self) {
+		if let Some(first_segment) = self.segments.front_mut() {
+			let shortened_first_segment = first_segment.cut(self.first_segment_progress);
+			let first_segment_length = first_segment.length;
+			let first_segment_remaining_length = shortened_first_segment.length;
+			self.total_length += first_segment_remaining_length - first_segment_length;
+			*first_segment = shortened_first_segment;
+		}
+		self.progress = 0.0;
+		self.first_segment_progress = 0.0;
+		self.total_length -= self.traversed_length;
+		self.traversed_length = 0.0;
+	}
+
+	/// Adds a path segment to current animation sequence
+	fn append_segment(&mut self, segment: AnimationPathSegment) {
+		if let Some(last_segment) = self.segments.pop_back() {
+			if let Some(new_last_segment) = segment.splice(&last_segment) {
+				let last_segment_length = last_segment.length;
+				let new_last_segment_length = new_last_segment.length;
+				self.total_length += new_last_segment_length - last_segment_length;
+				if new_last_segment_length >= Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
+					self.segments.push_back(new_last_segment);
+				}
+			} else {
+				self.segments.push_back(last_segment);
+				let added_length = segment.length;
+				self.total_length += added_length;
+				self.segments.push_back(segment);
+			}
+		} else {
+			let added_length = segment.length;
+			self.total_length += added_length;
+			self.segments.push_back(segment);
+		}
+	}
+
+	/// How long a path segment has to be in order to not be skipped
+	const SKIP_SEGMENT_LENGTH_THRESHOLD: f32 = 0.0001;
+}
+
+/// A simple segment of a path animation
+#[derive(Clone, Copy, Debug, Reflect, Deref)]
+struct AnimationPathSegment {
+	/// Index of the cycle along which the object moves
+	owner_cycle: usize,
+	/// Position data of the segment
+	#[deref]
+	measurements: AnimationPathSegmentMeasurements,
+}
+
+impl AnimationPathSegment {
+	fn end_position(&self, level_data: &LevelData) -> Vec2 {
+		self.sample(1.0, level_data)
+	}
+
+	fn sample(&self, progress: f32, level_data: &LevelData) -> Vec2 {
+		let cycle_placement = &level_data.cycles[self.owner_cycle].placement;
+		self.measurements.sample(cycle_placement, progress)
+	}
+
+	/// Constructs a new path segment that is what will remain
+	/// of this path segment after a given progression is elapsed
+	fn cut(&self, progress: f32) -> Self {
+		Self {
+			owner_cycle: self.owner_cycle,
+			measurements: self.measurements.cut(progress),
+		}
+	}
+
+	/// Attempts to splice a segment into the previous one
+	/// ## Parameters
+	/// - `other` - the segment that precedes this one
+	/// ## Returns
+	/// Path segment equivalent to both arguments in a sequence,
+	/// sans backtracking, or [`None`] if they cannot be spliced
+	fn splice(&self, other: &Self) -> Option<Self> {
+		// Only paths that lie on the same cycle can be spliced
+		if self.owner_cycle != other.owner_cycle {
+			return None;
+		}
+		Some(Self {
+			owner_cycle: self.owner_cycle,
+			measurements: self.measurements.splice(&other.measurements),
+		})
+	}
+}
+
+#[derive(Clone, Copy, Debug, Reflect)]
+struct AnimationPathSegmentMeasurements {
+	/// Starting position, relative to zero point of the owner cycle,
+	/// of the animation
+	///
+	/// The value should be in range [0, 1), though this is not necessary
+	start_pos: f32,
+	/// Final position, relative to the zero point of the owner cycle,
+	/// of the animation
+	///
+	/// `end_pos - start_pos > 1.0` indicates that the object should
+	/// take multiple full turns around the cycle
+	///
+	/// `end_pos < start_pos` indicates turning counterclockwise
+	end_pos: f32,
+	/// Cached precomputed length of the path segment, in world units
+	length: f32,
+}
+
+impl AnimationPathSegmentMeasurements {
+	fn splice(&self, other: &Self) -> Self {
+		Self {
+			start_pos: other.start_pos,
+			end_pos: other.end_pos + self.end_pos - self.start_pos,
+			length: self.spliced_length(other),
+		}
+	}
+
+	fn spliced_length(&self, other: &Self) -> f32 {
+		if (self.start_pos > self.end_pos) == (other.start_pos > other.end_pos) {
+			self.length + other.length
+		} else {
+			(self.length - other.length).abs()
+		}
+	}
+
+	fn cut(&self, progress: f32) -> Self {
+		Self {
+			start_pos: self.sample_t(progress),
+			end_pos: self.end_pos,
+			length: self.length * (1.0 - progress),
+		}
+	}
+
+	fn sample(&self, placement: &CyclePlacement, progress: f32) -> Vec2 {
+		placement.sample(self.sample_t(progress))
+	}
+
+	fn sample_t(&self, progress: f32) -> f32 {
+		self.start_pos.lerp(self.end_pos, progress)
+	}
+}
+
+#[derive(Clone, Copy, Debug, Reflect)]
+pub struct CircleArcPathSegment {
+	/// Center of the arc
+	pub center_point: Vec2,
+	/// Radius of the arc
+	pub radius: f32,
+	/// Position angle of the start point
+	pub initial_angle: f32,
+	/// Position angle of the end point
+	///
+	/// This is always compared to the initial angle,
+	/// and the direction of animation is determined
+	/// by which angle is larger. This means it is possible for the path
+	/// to span more than a full circle. by putting in angles that differ
+	/// by more than 2 pi
+	pub final_angle: f32,
+}
+
+fn listen_for_moves(
+	mut rotation_events: EventReader<RotateSingleCycle>,
+	cycles: Query<(&CycleVertices, &Cycle)>,
+	mut objects: Query<(&mut Transform, &VertexPosition, Option<&mut PathAnimation>), With<Object>>,
+	active_level: ActiveLevelData,
+) {
+	let level_data = match active_level.get() {
+		Ok(d) => d,
+		Err(e) => {
+			error!("Active level data could not be loaded: {e}");
+			return;
+		}
+	};
+
+	// Maps vertices that have been affected to the path segments taken by the objects on them
+	let mut vertex_paths = HashMap::new();
+	for event in rotation_events.read() {
+		let Ok((vertices, cycle)) = cycles.get(event.0.target_cycle) else {
+			log::warn!("Target of RotateSingleCycle is not a cycle entity");
+			continue;
+		};
+		if vertices.0.is_empty() {
+			// Cycle has no vertices, no need to observe it further
+			continue;
+		}
+		let vertex_count = vertices.0.len();
+		let rotate_amount = event.0.amount;
+		let full_rotations = rotate_amount / vertex_count;
+		let absolute_movement_offset = rotate_amount % vertex_count;
+		let movement_offset = match event.0.direction.into() {
+			RotationDirection::Clockwise => vertex_count - absolute_movement_offset,
+			RotationDirection::CounterClockwise => absolute_movement_offset,
+		};
+		for (end_index, &vertex_id) in vertices.0.iter().enumerate() {
+			let cycle_data = &level_data.cycles[cycle.id];
+			let start_index = (end_index + movement_offset) % vertex_count;
+			let start_position = cycle_data.vertex_positions[start_index];
+			let end_position = cycle_data.vertex_positions[end_index];
+			let adjusted_end_position = {
+				let direction: RotationDirection = event.0.direction.into();
+				let mut full_rotations = full_rotations;
+				let is_integer_multiple_of_full_rotation = start_index == end_index;
+				let start_and_end_are_swapped =
+					(start_position < end_position) == (direction == RotationDirection::Clockwise);
+				if !is_integer_multiple_of_full_rotation && start_and_end_are_swapped {
+					full_rotations += 1;
+				}
+				let bias = full_rotations as f32;
+				end_position - bias * direction.as_number()
+			};
+			let cycle_length = cycle_data.placement.shape.length();
+			let path_length = (start_position - adjusted_end_position).abs() * cycle_length;
+			vertex_paths.insert(
+				vertex_id,
+				AnimationPathSegment {
+					owner_cycle: cycle.id,
+					measurements: AnimationPathSegmentMeasurements {
+						start_pos: start_position,
+						end_pos: adjusted_end_position,
+						length: path_length,
+					},
+				},
+			);
+		}
+	}
+
+	for (mut transform, vertex_position, animation) in objects.iter_mut() {
+		if let Some(path) = vertex_paths.get(&vertex_position.0) {
+			let end_position = path.end_position(level_data);
+			if let Some(mut animation) = animation {
+				animation.add_segment(*path, end_position);
+			} else {
+				// Object is not animated, so we just set the translation to the desired place.
+				transform.translation.x = end_position.x;
+				transform.translation.y = end_position.y;
+			}
+		}
+	}
+}
+
+fn move_objects(
+	mut objects: Query<(&mut Transform, &mut PathAnimation)>,
+	time: Res<Time<Real>>,
+	animation_time: Res<TurnAnimationLength>,
+	active_level: ActiveLevelData,
+) {
+	let level_data = match active_level.get() {
+		Ok(d) => d,
+		Err(e) => {
+			error!("Active level data could not be loaded: {e}");
+			return;
+		}
+	};
+
+	for (mut transform, mut animation) in objects.iter_mut() {
+		if !animation.is_in_progress() {
+			continue;
+		}
+		animation.add_progress(time.delta_secs() / **animation_time);
+		let new_position = animation.sample(level_data);
+		transform.translation.x = new_position.x;
+		transform.translation.y = new_position.y;
+	}
+}
+
+fn init_thing_animation(mut commands: Commands, query: Query<Entity, Added<ThingData>>) {
+	for id in &query {
+		// We do not need to initialize its static position
+		// since the animation does not get queried until
+		// something actually animates
+		commands.entity(id).insert(PathAnimation::default());
+	}
+}

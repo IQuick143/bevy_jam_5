@@ -2,7 +2,10 @@
 
 use crate::{
 	camera::CameraHarness,
-	game::{components::*, level::CycleTurnability, logic::*, prelude::*},
+	game::{
+		animation::TurnAnimationLength, components::*, level::CycleTurnability, logic::*,
+		prelude::*,
+	},
 	graphics::VERTICAL_PADDING_FRACTION,
 	save::SaveGame,
 	screen::PlayingLevel,
@@ -34,11 +37,14 @@ pub(super) fn plugin(app: &mut App) {
 				.run_if(resource_equals(RenderOutlines(true))),
 			toggle_debug_outline_display.run_if(resource_changed::<RenderOutlines>),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
+			toggle_turning_animation_speed.run_if(input_just_pressed(KeyCode::KeyT)),
 			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
 		),
 	);
 	app.add_systems(Startup, init_viewport_box);
 	app.init_resource::<RenderOutlines>();
+	app.init_resource::<AutoReload>();
+	app.init_resource::<TurnAnimationSpeedState>();
 	app.add_plugins(FpsOverlayPlugin {
 		config: FpsOverlayConfig {
 			text_color: Color::BLACK,
@@ -54,6 +60,13 @@ pub(super) fn plugin(app: &mut App) {
 /// Whether hover and layout boxes should be drawn
 #[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
 struct RenderOutlines(pub bool);
+
+/// Whether the autoreloading system should run
+#[derive(Resource, PartialEq, Eq, Debug, Default, Reflect)]
+struct AutoReload(pub bool);
+
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug, Default, Reflect)]
+struct TurnAnimationSpeedState(pub usize);
 
 /// Marks a [`Node`] as a debug outline, only making it visible
 /// when [`RenderOutlines`] is set to true
@@ -180,6 +193,15 @@ fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<Level
 		return;
 	};
 	log::info!("{:?}", level);
+}
+
+fn toggle_turning_animation_speed(
+	mut animation_time: ResMut<TurnAnimationLength>,
+	mut current_setting: ResMut<TurnAnimationSpeedState>,
+) {
+	const OPTIONS: [f32; 6] = [TurnAnimationLength::DEFAULT.0, 1.0, 2.0, 3.0, 5.0, 10.0];
+	**current_setting = (**current_setting + 1) % OPTIONS.len();
+	**animation_time = OPTIONS[**current_setting];
 }
 
 pub fn _debug_inputs(

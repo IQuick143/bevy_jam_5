@@ -1,0 +1,15 @@
+name = 'AT: Corners';
+hint = 'Manual animation testing: Turn both cycles in short succession. The corner turn should look natural. Use the gear to turn second cycle twice. Hit [T] to change animation speed.';
+
+a = cycle(u = vertex(player() flag()), v = vertex());
+b = cycle(v _ _ _);
+gear = cycle();
+gear2 = cycle('still');
+oneway(gear gear2 b);
+oneway(gear b);
+
+circle(a; -1, 0, 1);
+circle(b; 1, 0, 1);
+circle(gear; 0, 1, 0.1);
+circle(gear2; 0, -1, 0.1);
+set_vertex_angle(u; 180);

@@ -1,6 +1,6 @@
 //! Game mechanics and content.
 
-mod animation;
+pub mod animation;
 pub mod components;
 pub mod drawing;
 mod game_sfx;

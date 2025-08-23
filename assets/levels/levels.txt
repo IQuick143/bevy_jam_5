@@ -31,6 +31,12 @@ hub(
 		car = level('levels/car.txt'),
 		# rubik = level('levels/rubik.txt'),
 	)
+	hub(
+		at_full = level('levels/at_full_circles.txt'),
+		at_single = level('levels/at_single_vertices.txt'),
+		at_corner = level('levels/at_corner.txt'),
+		at_companion = level('levels/at_corner_boxes.txt'),
+	)
 );
 
 next(
@@ -58,4 +64,11 @@ next(
 	grid2
 	car
 	# rubik
+);
+
+next(
+	at_full
+	at_single
+	at_corner
+	at_companion
 );
