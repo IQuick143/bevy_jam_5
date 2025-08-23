@@ -11,19 +11,19 @@ use super::{interaction::InteractionPalette, palette::*};
 /// An extension trait for spawning UI widgets.
 pub trait Widgets {
 	/// Spawn a simple button with text.
-	fn button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands;
+	fn button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
 	/// Spawn a compact button. Smaller than [`Widgets::button`].
-	fn small_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands;
+	fn small_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
 	/// Spawn a very compact toolbar button. Smaller than [`Widgets::small_button`]
-	fn tool_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands;
+	fn tool_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
 	/// Spawn a simple header label. Bigger than [`Widgets::label`].
-	fn header(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands;
+	fn header(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
 	/// Spawn a simple text label.
-	fn label(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands;
+	fn label(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
 	/// Spawn an aligned text label with automatic width
 	fn text(
@@ -31,11 +31,11 @@ pub trait Widgets {
 		text: impl Into<String>,
 		align: JustifyContent,
 		font: Handle<Font>,
-	) -> EntityCommands;
+	) -> EntityCommands<'_>;
 }
 
 impl<T: Spawn> Widgets for T {
-	fn button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
+	fn button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_> {
 		let mut entity = self.spawn_internal((
 			Name::new("Button"),
 			Button,
@@ -68,7 +68,7 @@ impl<T: Spawn> Widgets for T {
 		entity
 	}
 
-	fn small_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
+	fn small_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_> {
 		let mut entity = self.spawn_internal((
 			Name::new("Button"),
 			Button,
@@ -101,7 +101,7 @@ impl<T: Spawn> Widgets for T {
 		entity
 	}
 
-	fn tool_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
+	fn tool_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_> {
 		let mut entity = self.spawn_internal((
 			Name::new("Button"),
 			Button,
@@ -132,7 +132,7 @@ impl<T: Spawn> Widgets for T {
 		entity
 	}
 
-	fn header(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
+	fn header(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_> {
 		let mut entity = self.spawn_internal((
 			Name::new("Header"),
 			Node {
@@ -159,7 +159,7 @@ impl<T: Spawn> Widgets for T {
 		entity
 	}
 
-	fn label(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands {
+	fn label(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_> {
 		let mut entity = self.spawn_internal((
 			Name::new("Label"),
 			Node {
@@ -189,7 +189,7 @@ impl<T: Spawn> Widgets for T {
 		text: impl Into<String>,
 		align: JustifyContent,
 		font: Handle<Font>,
-	) -> EntityCommands {
+	) -> EntityCommands<'_> {
 		let mut entity = self.spawn_internal((
 			Name::new("Text"),
 			Node {
@@ -218,15 +218,15 @@ impl<T: Spawn> Widgets for T {
 pub trait Containers {
 	/// Spawns a root node that covers the full screen
 	/// and centers its content horizontally and vertically.
-	fn ui_root(&mut self) -> EntityCommands {
+	fn ui_root(&mut self) -> EntityCommands<'_> {
 		self.ui_root_justified(JustifyContent::Center)
 	}
 
-	fn ui_root_justified(&mut self, justify_content: JustifyContent) -> EntityCommands;
+	fn ui_root_justified(&mut self, justify_content: JustifyContent) -> EntityCommands<'_>;
 }
 
 impl Containers for Commands<'_, '_> {
-	fn ui_root_justified(&mut self, justify_content: JustifyContent) -> EntityCommands {
+	fn ui_root_justified(&mut self, justify_content: JustifyContent) -> EntityCommands<'_> {
 		self.spawn((
 			Name::new("UI Root"),
 			Node {
@@ -248,17 +248,17 @@ impl Containers for Commands<'_, '_> {
 /// are able to spawn entities.
 /// Ideally, this trait should be [part of Bevy itself](https://github.com/bevyengine/bevy/issues/14231).
 trait Spawn {
-	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands;
+	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands<'_>;
 }
 
 impl Spawn for Commands<'_, '_> {
-	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands {
+	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands<'_> {
 		self.spawn(bundle)
 	}
 }
 
 impl Spawn for RelatedSpawnerCommands<'_, ChildOf> {
-	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands {
+	fn spawn_internal<B: Bundle>(&mut self, bundle: B) -> EntityCommands<'_> {
 		self.spawn(bundle)
 	}
 }

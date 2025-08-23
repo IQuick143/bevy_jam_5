@@ -248,24 +248,6 @@ impl AnimationPathSegmentMeasurements {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Reflect)]
-pub struct CircleArcPathSegment {
-	/// Center of the arc
-	pub center_point: Vec2,
-	/// Radius of the arc
-	pub radius: f32,
-	/// Position angle of the start point
-	pub initial_angle: f32,
-	/// Position angle of the end point
-	///
-	/// This is always compared to the initial angle,
-	/// and the direction of animation is determined
-	/// by which angle is larger. This means it is possible for the path
-	/// to span more than a full circle. by putting in angles that differ
-	/// by more than 2 pi
-	pub final_angle: f32,
-}
-
 fn listen_for_moves(
 	mut rotation_events: EventReader<RotateSingleCycle>,
 	cycles: Query<(&CycleVertices, &Cycle)>,

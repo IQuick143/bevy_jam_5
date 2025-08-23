@@ -1,13 +1,8 @@
 //! Structural components for gameplay objects.
 //! Components with a more specialized puspose belong to their respective modules
 
-use bevy::prelude::*;
-
 use super::level::{LevelData, LinkedCycleDirection};
-
-/// Marker component for entities that belong to a single level
-#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
-pub struct LevelScoped;
+use bevy::prelude::*;
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]

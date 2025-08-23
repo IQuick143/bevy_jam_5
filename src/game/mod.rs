@@ -17,7 +17,6 @@ pub mod test;
 pub mod prelude {
 	#[allow(unused_imports)]
 	pub use super::{
-		components::LevelScoped,
 		history::{MoveHistory, UndoMove},
 		level::LevelData,
 		logic::{
