@@ -1,4 +1,4 @@
-use bevy::{platform::collections::HashMap, prelude::*};
+use bevy::{image::ImageLoaderSettings, platform::collections::HashMap, prelude::*};
 
 use crate::game::level::{
 	asset::plugin as level_asset_plugin, list::LevelList,
@@ -34,6 +34,8 @@ pub enum ImageKey {
 	Title,
 	TitleBack,
 	InGameWarning,
+	Checkmark,
+	CheckmarkSolid,
 }
 
 impl AssetKey for ImageKey {
@@ -78,7 +80,10 @@ impl FromWorld for HandleMap<ImageKey> {
 			),
 			(
 				ImageKey::Background,
-				asset_server.load("images/background.png"),
+				asset_server
+					.load_with_settings("images/background.png", |s: &mut ImageLoaderSettings| {
+						s.is_srgb = false
+					}),
 			),
 			(ImageKey::Title, asset_server.load("images/title.png")),
 			(
@@ -88,6 +93,11 @@ impl FromWorld for HandleMap<ImageKey> {
 			(
 				ImageKey::InGameWarning,
 				asset_server.load("images/warning.png"),
+			),
+			(ImageKey::Checkmark, asset_server.load("images/check.png")),
+			(
+				ImageKey::CheckmarkSolid,
+				asset_server.load("images/check-solid.png"),
 			),
 		]
 		.into()

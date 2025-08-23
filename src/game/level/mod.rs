@@ -12,7 +12,7 @@ pub mod list_asset;
 pub struct LevelData {
 	/// Whether this level is correctly built
 	pub is_valid: bool,
-	/// Name of the level
+	/// Display name of the level
 	pub name: String,
 	/// Hint or comment that relates to the level, if any
 	pub hint: Option<String>,
@@ -38,6 +38,10 @@ pub struct LevelData {
 	pub declared_one_way_links: Vec<DeclaredOneWayLinkData>,
 	/// Bounding box
 	pub bounding_box: Aabb2d,
+	/// Camera zoom that should be set when entering the level
+	pub initial_zoom: f32,
+	/// Camera position that should be set when entering the level
+	pub initial_camera_pos: Vec2,
 }
 
 /// Either the index of a detector or a group

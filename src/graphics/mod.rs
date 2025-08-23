@@ -1,13 +1,15 @@
 use crate::game::prelude::*;
 use core::f32;
 
+mod background_material;
 pub mod primitives;
 mod scrolling_texture;
 
+pub use background_material::{BackgroundMaterial, BackgroundMaterialParams};
 pub use scrolling_texture::ScrollingTextureMaterial;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_plugins(scrolling_texture::plugin);
+	app.add_plugins((scrolling_texture::plugin, background_material::plugin));
 }
 
 /// Fraction of vertical space that should be reserved for UI.
@@ -22,10 +24,6 @@ pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 650.0);
 /// Center of the rectangle into which the level should fit for layout purposes.
 /// See [`LEVEL_AREA_WIDTH`]
 pub const LEVEL_AREA_CENTER: Vec2 = Vec2::ZERO;
-
-/// Size of the hint text at the bottom of the level
-/// Position is glued to the bottom of the [`GAME_AREA`]
-pub const HINT_TEXT_SIZE: Vec2 = Vec2::new(1600.0, 100.0);
 
 /// Size of a sprite in world-units.
 pub const SPRITE_LENGTH: f32 = 100.0;

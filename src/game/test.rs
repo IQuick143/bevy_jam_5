@@ -323,7 +323,6 @@ circle(cycle(); 0 0 100);
 #[test]
 fn test_rotation_direction() {
 	fn test_case(level: &'static str) {
-		println!("Level: {}", level);
 		let mut app = app_with_level(level);
 
 		let state_start = app.read_vertices();
@@ -666,7 +665,7 @@ circle(";
 		);
 	}
 	for circle in should_activate_instantly_forward.iter() {
-		let level = format!("{}{}{}", level_header, circle, level_footer);
+		let level = format!("{level_header}{circle}{level_footer}");
 		let mut app = app_with_level(&level);
 		// Test cycle should be unrotated
 		check_test_cycle_in_position(&mut app, 0);
@@ -678,7 +677,7 @@ circle(";
 		check_test_cycle_in_position(&mut app, 0);
 	}
 	for circle in should_activate_instantly_backward.iter() {
-		let level = format!("{}{}{}", level_header, circle, level_footer);
+		let level = format!("{level_header}{circle}{level_footer}");
 		let mut app = app_with_level(&level);
 		// Test cycle should be unrotated
 		check_test_cycle_in_position(&mut app, 0);

@@ -1,20 +1,27 @@
+use crate::{
+	assets::{HandleMap, SoundtrackKey},
+	settings::Settings,
+};
 use bevy::{
 	audio::{PlaybackMode, Volume},
 	prelude::*,
 };
 
-use crate::assets::{HandleMap, SoundtrackKey};
-
 pub(super) fn plugin(app: &mut App) {
-	app.register_type::<IsSoundtrack>();
-	app.add_observer(play_soundtrack);
+	app.add_observer(play_soundtrack).add_systems(
+		Update,
+		update_soundtrack_volume.run_if(resource_changed::<Settings>),
+	);
 }
+
+const MAX_VOLUME: f32 = 4.0;
 
 fn play_soundtrack(
 	trigger: Trigger<PlaySoundtrack>,
 	mut commands: Commands,
 	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
 	soundtrack_query: Query<Entity, With<IsSoundtrack>>,
+	settings: Res<Settings>,
 ) {
 	for entity in &soundtrack_query {
 		commands.entity(entity).despawn();
@@ -28,7 +35,7 @@ fn play_soundtrack(
 		AudioPlayer(soundtrack_handles[&soundtrack_key].clone_weak()),
 		PlaybackSettings {
 			mode: PlaybackMode::Loop,
-			volume: Volume::Linear(3.5),
+			volume: Volume::Linear(settings.soundtrack_volume * MAX_VOLUME),
 			..default()
 		},
 		IsSoundtrack,
@@ -49,3 +56,12 @@ pub enum PlaySoundtrack {
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 struct IsSoundtrack;
+
+fn update_soundtrack_volume(
+	mut query: Query<&mut AudioSink, With<IsSoundtrack>>,
+	settings: Res<Settings>,
+) {
+	for mut soundtrack in &mut query {
+		soundtrack.set_volume(Volume::Linear(settings.soundtrack_volume * MAX_VOLUME));
+	}
+}

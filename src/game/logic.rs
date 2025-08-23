@@ -118,7 +118,7 @@ impl LevelCompletionConditions {
 
 /// Contains an information whether the level being played has been completed
 /// in this session (making moves after completion does not matter)
-#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
 pub struct IsLevelCompleted(pub bool);
 
 /// Relays rotation events on a cycle group to the individual cycles

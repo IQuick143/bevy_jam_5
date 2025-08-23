@@ -1,17 +1,24 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
 use crate::{
+	camera::CameraHarness,
 	game::{
 		animation::TurnAnimationLength, components::*, level::CycleTurnability, logic::*,
 		prelude::*,
 	},
-	graphics::{GAME_AREA, LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH},
+	graphics::VERTICAL_PADDING_FRACTION,
+	save::SaveGame,
 	screen::PlayingLevel,
 	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
 };
 use bevy::{
-	color::palettes, dev_tools::states::log_transitions,
-	input::common_conditions::input_just_pressed, math::bounding::BoundingVolume,
+	color::palettes,
+	dev_tools::{
+		fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
+		states::log_transitions,
+	},
+	input::common_conditions::input_just_pressed,
+	math::bounding::BoundingVolume,
 	platform::collections::HashMap,
 };
 
@@ -26,16 +33,28 @@ pub(super) fn plugin(app: &mut App) {
 			log_transitions::<PlayingLevel>,
 			automatic_reloading.run_if(in_state(Screen::Playing)),
 			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
-			debug_oneways.run_if(resource_equals(RenderOutlines(true))),
-			draw_layout.run_if(resource_equals(RenderOutlines(true))),
-			draw_hover_boxes.run_if(resource_equals(RenderOutlines(true))),
+			(debug_oneways, debug_camera_bounds, draw_hover_boxes)
+				.run_if(resource_equals(RenderOutlines(true))),
+			toggle_debug_outline_display.run_if(resource_changed::<RenderOutlines>),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 			toggle_turning_animation_speed.run_if(input_just_pressed(KeyCode::KeyT)),
+			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
 		),
 	);
+	app.add_systems(Startup, init_viewport_box);
 	app.init_resource::<RenderOutlines>();
 	app.init_resource::<AutoReload>();
 	app.init_resource::<TurnAnimationSpeedState>();
+	app.add_plugins(FpsOverlayPlugin {
+		config: FpsOverlayConfig {
+			text_color: Color::BLACK,
+			text_config: TextFont {
+				font_size: 12.0,
+				..default()
+			},
+			..default()
+		},
+	});
 }
 
 /// Whether hover and layout boxes should be drawn
@@ -49,8 +68,52 @@ struct AutoReload(pub bool);
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug, Default, Reflect)]
 struct TurnAnimationSpeedState(pub usize);
 
-fn toggle_box_outlines(mut render: ResMut<RenderOutlines>) {
+/// Marks a [`Node`] as a debug outline, only making it visible
+/// when [`RenderOutlines`] is set to true
+#[derive(Component, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Reflect)]
+struct IsDebugOutline;
+
+fn init_viewport_box(mut commands: Commands) {
+	commands
+		.spawn((
+			Node {
+				display: Display::None,
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0),
+				flex_direction: FlexDirection::Column,
+				justify_content: JustifyContent::Center,
+				..default()
+			},
+			IsDebugOutline,
+		))
+		.with_child((
+			Node {
+				width: Val::Percent(100.0),
+				height: Val::Percent(100.0 * (1.0 - VERTICAL_PADDING_FRACTION)),
+				border: UiRect::all(Val::Px(1.0)),
+				..default()
+			},
+			BorderColor(palettes::basic::NAVY.into()),
+		));
+}
+
+fn toggle_debug_outline_display(
+	mut query: Query<&mut Node, With<IsDebugOutline>>,
+	render_outlines: Res<RenderOutlines>,
+) {
+	let display = if render_outlines.0 {
+		Display::Flex
+	} else {
+		Display::None
+	};
+	for mut node in &mut query {
+		node.display = display;
+	}
+}
+
+fn toggle_box_outlines(mut render: ResMut<RenderOutlines>, mut ui_debug: ResMut<UiDebugOptions>) {
 	render.0 = !render.0;
+	ui_debug.toggle();
 }
 
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
@@ -72,12 +135,11 @@ fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTr
 	}
 }
 
-fn draw_layout(mut gizmos: Gizmos) {
-	gizmos.rect(Vec3::ZERO, GAME_AREA, palettes::basic::RED);
+fn debug_camera_bounds(camera: Single<&CameraHarness>, mut gizmos: Gizmos) {
 	gizmos.rect(
-		LEVEL_AREA_CENTER.extend(0.0),
-		LEVEL_AREA_WIDTH,
-		palettes::basic::NAVY,
+		Vec3::ZERO,
+		camera.level_bounds.half_size() * 2.0,
+		palettes::basic::LIME,
 	);
 }
 

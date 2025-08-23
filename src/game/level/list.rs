@@ -20,6 +20,8 @@ pub struct LevelList {
 pub struct LevelInfo {
 	/// Path to the level asset
 	pub path: AssetPath<'static>,
+	/// Unique indentifier for persistence purposes
+	pub identifier: String,
 	/// Handle to the level data asset in the level file
 	pub data_handle: Handle<LevelData>,
 	/// Index of the hub that this level logically belongs to
@@ -65,6 +67,7 @@ impl LevelListBuilder {
 			path: AssetPath::try_parse(path)
 				.map_err(|err| LevelListBuildError::BadAssetPath(path.to_owned(), err))?
 				.into_owned(),
+			identifier: path.to_string(),
 		});
 		self.has_parent_hub.push(false);
 		Ok(self.list.levels.len() - 1)
