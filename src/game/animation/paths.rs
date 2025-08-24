@@ -1,17 +1,16 @@
 //! Animation of movement of objects along cycles
 
-use super::{animation_easing_function, RotationDirection, TurnAnimationLength};
+use super::{animation_easing_function, TurnAnimationLength};
 use crate::{
 	game::{
 		components::*,
 		level::{CyclePlacement, LevelData, ThingData},
 		logic_relay::RotateSingleCycle,
-		spawn::{LevelInitialization, LevelInitializationSet},
+		prelude::*,
 	},
 	screen::Screen,
 	AppSet,
 };
-use bevy::{platform::collections::HashMap, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -250,9 +249,10 @@ impl AnimationPathSegmentMeasurements {
 
 fn listen_for_moves(
 	mut rotation_events: EventReader<RotateSingleCycle>,
-	cycles: Query<(&CycleVertices, &Cycle)>,
-	mut objects: Query<(&mut Transform, &VertexPosition, Option<&mut PathAnimation>), With<Object>>,
+	mut objects: Query<(&mut Transform, Option<&mut PathAnimation>), With<Object>>,
 	active_level: PlayingLevelData,
+	game_state: Res<GameState>,
+	entity_index: Res<GameStateEcsIndex>,
 ) {
 	let level_data = match active_level.get() {
 		Ok(d) => d,
@@ -263,67 +263,75 @@ fn listen_for_moves(
 	};
 
 	// Maps vertices that have been affected to the path segments taken by the objects on them
-	let mut vertex_paths = HashMap::new();
+	let mut vertex_paths = vec![None; level_data.vertices.len()];
 	for event in rotation_events.read() {
-		let Ok((vertices, cycle)) = cycles.get(event.0.target_cycle) else {
-			log::warn!("Target of RotateSingleCycle is not a cycle entity");
+		let cycle_id = event.0.target_cycle;
+		let Some(cycle_data) = level_data.cycles.get(cycle_id) else {
+			log::warn!("Target of RotateSingleCycle is out of range");
 			continue;
 		};
-		if vertices.0.is_empty() {
+		if cycle_data.vertex_indices.is_empty() {
 			// Cycle has no vertices, no need to observe it further
 			continue;
 		}
-		let vertex_count = vertices.0.len();
-		let rotate_amount = event.0.amount;
+		let vertex_count = cycle_data.vertex_indices.len();
+		let rotate_amount = event.0.amount.unsigned_abs() as usize;
 		let full_rotations = rotate_amount / vertex_count;
 		let absolute_movement_offset = rotate_amount % vertex_count;
-		let movement_offset = match event.0.direction.into() {
-			RotationDirection::Clockwise => vertex_count - absolute_movement_offset,
-			RotationDirection::CounterClockwise => absolute_movement_offset,
+		let movement_offset = if event.0.amount > 0 {
+			vertex_count - absolute_movement_offset
+		} else {
+			absolute_movement_offset
 		};
-		for (end_index, &vertex_id) in vertices.0.iter().enumerate() {
-			let cycle_data = &level_data.cycles[cycle.id];
+		for (end_index, &vertex_id) in cycle_data.vertex_indices.iter().enumerate() {
 			let start_index = (end_index + movement_offset) % vertex_count;
 			let start_position = cycle_data.vertex_positions[start_index];
 			let end_position = cycle_data.vertex_positions[end_index];
 			let adjusted_end_position = {
-				let direction: RotationDirection = event.0.direction.into();
+				let is_clockwise = event.0.amount > 0;
 				let mut full_rotations = full_rotations;
 				let is_integer_multiple_of_full_rotation = start_index == end_index;
-				let start_and_end_are_swapped =
-					(start_position < end_position) == (direction == RotationDirection::Clockwise);
+				let start_and_end_are_swapped = (start_position < end_position) == is_clockwise;
 				if !is_integer_multiple_of_full_rotation && start_and_end_are_swapped {
 					full_rotations += 1;
 				}
 				let bias = full_rotations as f32;
-				end_position - bias * direction.as_number()
+				end_position - bias * event.0.amount.signum() as f32
 			};
 			let cycle_length = cycle_data.placement.shape.length();
 			let path_length = (start_position - adjusted_end_position).abs() * cycle_length;
-			vertex_paths.insert(
-				vertex_id,
-				AnimationPathSegment {
-					owner_cycle: cycle.id,
-					measurements: AnimationPathSegmentMeasurements {
-						start_pos: start_position,
-						end_pos: adjusted_end_position,
-						length: path_length,
-					},
+			vertex_paths[vertex_id] = Some(AnimationPathSegment {
+				owner_cycle: cycle_id,
+				measurements: AnimationPathSegmentMeasurements {
+					start_pos: start_position,
+					end_pos: adjusted_end_position,
+					length: path_length,
 				},
-			);
+			});
 		}
 	}
 
-	for (mut transform, vertex_position, animation) in objects.iter_mut() {
-		if let Some(path) = vertex_paths.get(&vertex_position.0) {
-			let end_position = path.end_position(level_data);
-			if let Some(mut animation) = animation {
-				animation.add_segment(*path, end_position);
-			} else {
-				// Object is not animated, so we just set the translation to the desired place.
-				transform.translation.x = end_position.x;
-				transform.translation.y = end_position.y;
-			}
+	let moved_objects = game_state
+		.objects_by_vertex
+		.iter()
+		.zip(vertex_paths)
+		.filter_map(|(i, p)| i.and_then(|i| p.map(|p| (i, p))));
+	for (object_index, path) in moved_objects {
+		let Some(object_id) = entity_index.objects.get(object_index) else {
+			warn!("Rotation target cycle is out of range");
+			continue;
+		};
+		let Ok((mut transform, animation)) = objects.get_mut(*object_id) else {
+			warn!("Object referenced by entity index not found in ECS");
+			continue;
+		};
+		let end_position = path.end_position(level_data);
+		if let Some(mut animation) = animation {
+			animation.add_segment(path, end_position);
+		} else {
+			// Object is not animated, so we just set the translation to the desired place.
+			transform.translation.x = end_position.x;
+			transform.translation.y = end_position.y;
 		}
 	}
 }

@@ -59,34 +59,10 @@ pub enum CycleTurningDirection {
 /// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
 #[derive(Clone, Copy, Debug)]
 pub struct RotateCycle {
-	/// Id of the cycle entity to rotate
-	pub target_cycle: Entity,
-	/// Direction in which the cycle should turn
-	pub direction: CycleTurningDirection,
+	/// Index of the cycle to rotate
+	pub target_cycle: usize,
 	/// How many steps the cycle should rotate by
-	pub amount: usize,
-}
-
-impl RotateCycle {
-	pub fn from_flat_amount(target_cycle: Entity, amount: i64) -> Self {
-		Self {
-			target_cycle,
-			direction: if amount > 0 {
-				CycleTurningDirection::Nominal
-			} else {
-				CycleTurningDirection::Reverse
-			},
-			amount: amount.unsigned_abs() as usize,
-		}
-	}
-
-	pub fn flat_amount(&self) -> i64 {
-		let amount = self.amount as i64;
-		match self.direction {
-			CycleTurningDirection::Nominal => amount,
-			CycleTurningDirection::Reverse => -amount,
-		}
-	}
+	pub amount: i64,
 }
 
 /// Internal event sent to a cycle entity to rotate [`super::components::Object`]
@@ -131,18 +107,13 @@ fn cycle_group_rotation_system(
 	mut update_event: EventWriter<GameLayoutChanged>,
 	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
 	mut game_state: ResMut<GameState>,
-	cycles_q: Query<&Cycle>,
-	entity_index: Res<GameStateEcsIndex>,
 	active_level: PlayingLevelData,
 ) -> Result<(), BevyError> {
 	let level = active_level.get()?;
 	for event in group_events.read() {
-		let Ok(target_cycle) = cycles_q.get(event.0.target_cycle) else {
-			warn!("Cycle referenced by rotation event not found in ECS");
-			continue;
-		};
-		let rotate_by = event.0.flat_amount();
-		match game_state.turn_cycle_with_links(level, target_cycle.id, rotate_by) {
+		let target_cycle = event.0.target_cycle;
+		let rotate_by = event.0.amount;
+		match game_state.turn_cycle_with_links(level, target_cycle, rotate_by) {
 			Err(err) => warn!("Could not turn cycle: {err}"),
 			Ok(result) => {
 				for clash in &result.clashes {
@@ -150,14 +121,11 @@ fn cycle_group_rotation_system(
 				}
 				if !result.blocked() && result.layout_changed() {
 					update_event.write(GameLayoutChanged);
-					for (cycle, amount) in result.cycles_turned_by(level) {
-						let Some(cycle_id) = entity_index.cycles.get(cycle) else {
-							warn!("Cycle referenced by rotation event not found in ECS");
-							continue;
-						};
-						single_events.write(RotateSingleCycle(RotateCycle::from_flat_amount(
-							*cycle_id, amount,
-						)));
+					for (target_cycle, amount) in result.cycles_turned_by(level) {
+						single_events.write(RotateSingleCycle(RotateCycle {
+							target_cycle,
+							amount,
+						}));
 					}
 				}
 			}

@@ -4,7 +4,6 @@ mod jump_turn;
 mod paths;
 mod spin;
 
-use super::logic_relay::CycleTurningDirection;
 use bevy::prelude::*;
 
 pub fn plugin(app: &mut App) {
@@ -13,31 +12,6 @@ pub fn plugin(app: &mut App) {
 		paths::plugin,
 		spin::plugin,
 	));
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
-pub enum RotationDirection {
-	#[default]
-	Clockwise,
-	CounterClockwise,
-}
-
-impl From<CycleTurningDirection> for RotationDirection {
-	fn from(value: CycleTurningDirection) -> Self {
-		match value {
-			CycleTurningDirection::Nominal => RotationDirection::Clockwise,
-			CycleTurningDirection::Reverse => RotationDirection::CounterClockwise,
-		}
-	}
-}
-
-impl RotationDirection {
-	pub fn as_number(self) -> f32 {
-		match self {
-			Self::Clockwise => 1.0,
-			Self::CounterClockwise => -1.0,
-		}
-	}
 }
 
 fn animation_easing_function(t: f32) -> f32 {

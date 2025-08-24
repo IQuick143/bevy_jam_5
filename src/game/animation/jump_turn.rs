@@ -1,8 +1,9 @@
 //! One-off rotation animations of cycle centers
 
-use super::{animation_easing_function, RotationDirection, TurnAnimationLength};
+use super::{animation_easing_function, TurnAnimationLength};
 use crate::{
 	game::{
+		components::GameStateEcsIndex,
 		drawing::CycleCenterVisualEntities,
 		logic_relay::RotateSingleCycle,
 		spawn::{LevelInitialization, LevelInitializationSet},
@@ -90,9 +91,14 @@ fn cycle_turning_animation_system(
 	mut jump_q: Query<&mut JumpTurnAnimation>,
 	mut events: EventReader<RotateSingleCycle>,
 	animation_time: Res<TurnAnimationLength>,
+	entity_index: Res<GameStateEcsIndex>,
 ) {
 	for event in events.read() {
-		let Ok(visuals) = cycles_q.get(event.0.target_cycle) else {
+		let Some(target_cycle) = entity_index.cycles.get(event.0.target_cycle) else {
+			warn!("Rotation target cycle is out of range");
+			continue;
+		};
+		let Ok(visuals) = cycles_q.get(*target_cycle) else {
 			log::warn!("RotateSingleCycle event does not target a cycle entity");
 			continue;
 		};
@@ -100,10 +106,7 @@ fn cycle_turning_animation_system(
 			log::warn!("Cycle center sprite does not have JumpTurnAnimation component");
 			continue;
 		};
-		let direction_multiplier = match event.0.direction.into() {
-			RotationDirection::Clockwise => -1.0,
-			RotationDirection::CounterClockwise => 1.0,
-		};
+		let direction_multiplier = -event.0.amount.signum() as f32;
 		animation.make_jump(
 			direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
 			**animation_time,

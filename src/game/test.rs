@@ -2,7 +2,7 @@ mod utils {
 	use crate::game::{
 		components::{Cycle, GameStateEcsIndex, PlacedGlyph, PlacedObject, Vertex},
 		level::{backend::builder as parser, GlyphData, LevelData, ObjectData, ThingData},
-		logic_relay::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
+		logic_relay::{RotateCycle, RotateCycleGroup},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
@@ -156,19 +156,10 @@ mod utils {
 		cycle_count
 	}
 
-	fn turn_system(
-		In((id, amount)): In<(usize, i32)>,
-		mut events: EventWriter<RotateCycleGroup>,
-		entity_index: Res<GameStateEcsIndex>,
-	) {
+	fn turn_system(In((id, amount)): In<(usize, i32)>, mut events: EventWriter<RotateCycleGroup>) {
 		events.write(RotateCycleGroup(RotateCycle {
-			target_cycle: entity_index.cycles[id],
-			direction: if amount >= 0 {
-				CycleTurningDirection::Nominal
-			} else {
-				CycleTurningDirection::Reverse
-			},
-			amount: amount.unsigned_abs() as usize,
+			target_cycle: id,
+			amount: amount as i64,
 		}));
 	}
 

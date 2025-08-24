@@ -230,41 +230,6 @@ fn toggle_turning_animation_speed(
 	**animation_time = OPTIONS[**current_setting];
 }
 
-pub fn _debug_inputs(
-	input: Res<ButtonInput<MouseButton>>,
-	window: Single<&Window>,
-	camera: Single<(&Camera, &GlobalTransform)>,
-	cycles_q: Query<(Entity, &Transform, &ComputedCycleTurnability)>,
-	mut rotate_cycle_events: EventWriter<RotateCycleGroup>,
-) {
-	let lmb = input.just_pressed(MouseButton::Left);
-	let rmb = input.just_pressed(MouseButton::Right);
-	let direction = match (lmb, rmb) {
-		(true, true) => return,
-		(true, false) => CycleTurningDirection::Nominal,
-		(false, true) => CycleTurningDirection::Reverse,
-		(false, false) => return,
-	};
-	let (camera, camera_transform) = *camera;
-	if let Some(cursor_pos) = window
-		.cursor_position()
-		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok())
-	{
-		if let (Some(target_id), _) = cycles_q
-			.iter()
-			.filter(|(_, _, x)| x.0)
-			.map(|(e, t, _)| (Some(e), t.translation.xy().distance_squared(cursor_pos)))
-			.fold((None, f32::INFINITY), |a, b| if a.1 > b.1 { b } else { a })
-		{
-			rotate_cycle_events.write(RotateCycleGroup(RotateCycle {
-				target_cycle: target_id,
-				direction,
-				amount: 1,
-			}));
-		}
-	}
-}
-
 pub fn _gizmo_draw(
 	vertices: Query<&Transform, With<Vertex>>,
 	circles: Query<(
