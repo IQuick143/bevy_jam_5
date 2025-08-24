@@ -182,7 +182,7 @@ impl GameState {
 			return Err(GameStateActionError::CycleIndexOutOfRange(cycle_index));
 		};
 
-		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
+		// We assume that the calls to this function always target a valid target and a rotation happens.
 		// Queue the rotation
 		group_rotations[source_cycle.group] += source_cycle.orientation_within_group * rotate_by;
 
