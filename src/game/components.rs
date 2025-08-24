@@ -94,7 +94,7 @@ pub struct GameStateEcsIndex {
 	/// in [`LevelData::vertices`]
 	pub vertices: Vec<Entity>,
 	/// Entities that represent objects, in the same order they appear
-	/// in [`GameState::objects`](super::ecs_free_logic::GameState::objects)
+	/// in [`GameState::objects`](super::logic::GameState::objects)
 	pub objects: Vec<Entity>,
 }
 
