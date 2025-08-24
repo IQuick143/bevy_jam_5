@@ -1,12 +1,13 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
-use super::{components::*, level::*, prelude::*};
+use super::{components::*, level::*, logic::TurnCycleResult, prelude::*};
 use crate::{send_event, AppSet};
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
 		.init_resource::<GameState>()
 		.init_resource::<IsLevelCompleted>()
+		.add_event::<TurnCycleResult>()
 		.add_event::<GameLayoutChanged>()
 		.add_event::<RotateCycleGroup>()
 		.add_event::<RotateSingleCycle>()
@@ -106,6 +107,7 @@ fn cycle_group_rotation_system(
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
 	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
+	mut turn_events: EventWriter<TurnCycleResult>,
 	mut game_state: ResMut<GameState>,
 	active_level: PlayingLevelData,
 ) -> Result<(), BevyError> {
@@ -128,6 +130,7 @@ fn cycle_group_rotation_system(
 						}));
 					}
 				}
+				turn_events.write(result);
 			}
 		}
 	}

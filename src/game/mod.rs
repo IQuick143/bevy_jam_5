@@ -18,10 +18,10 @@ pub mod test;
 pub mod prelude {
 	#[allow(unused_imports)]
 	pub use super::{
-		components::{LevelHandle, PlayingLevelData},
+		components::{GameStateEcsIndex, LevelHandle, PlayingLevelData},
 		history::{MoveHistory, UndoMove},
 		level::LevelData,
-		logic::{GameState, LevelCompletionConditions},
+		logic::{GameState, LevelCompletionConditions, TurnCycleResult},
 		logic_relay::{CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, RotateCycle},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 		synchronization::IsLevelPersistentlyCompleted,
