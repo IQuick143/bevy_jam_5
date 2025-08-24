@@ -10,7 +10,11 @@ mod utils {
 	pub fn setup_app() -> App {
 		let mut app = App::new();
 		app.add_plugins((
-			AssetPlugin::default(),
+			AssetPlugin {
+				// Turn this of because it suddenly turned into a performance bottleneck
+				watch_for_changes_override: Some(false),
+				..default()
+			},
 			super::super::level::asset::plugin,
 			super::super::logic::plugin,
 			super::super::history::plugin,
