@@ -1,7 +1,7 @@
 //! Recording and rewinding of moves
 
 use super::{
-	logic::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup},
+	logic_relay::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup},
 	spawn::LevelInitialization,
 };
 use crate::AppSet;

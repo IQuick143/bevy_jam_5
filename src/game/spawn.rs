@@ -5,7 +5,7 @@ use super::{
 	drawing::*,
 	inputs::CycleInteraction,
 	level::*,
-	logic::{ComputedCycleTurnability, IsTriggered},
+	logic_relay::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
 };
 use crate::{assets::*, graphics::*, AppSet};

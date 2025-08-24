@@ -1,313 +1,404 @@
-use super::{components::*, level::*, prelude::*};
-use crate::{send_event, AppSet};
+//! ECS-independent gameplay logic
 
-pub fn plugin(app: &mut App) {
-	app.init_resource::<LevelCompletionConditions>()
-		.init_resource::<GameState>()
-		.init_resource::<IsLevelCompleted>()
-		.add_event::<GameLayoutChanged>()
-		.add_event::<RotateCycleGroup>()
-		.add_event::<RotateSingleCycle>()
-		.add_event::<RecordCycleGroupRotation>()
-		.add_event::<TurnBlockedByGroupConflict>()
-		.add_systems(
-			LevelInitialization,
-			(
-				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
-				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
-				send_event(GameLayoutChanged),
-			),
-		)
-		.add_systems(
-			Update,
-			(
-				cycle_group_rotation_system.run_if(on_event::<RotateCycleGroup>),
-				update_vertex_and_object_relations_in_ecs.run_if(on_event::<RotateSingleCycle>),
-				(
-					(button_trigger_check_system, level_completion_check_system).chain(),
-					cycle_turnability_update_system,
-				)
-					.run_if(on_event::<GameLayoutChanged>),
-			)
-				.chain()
-				.in_set(AppSet::GameLogic),
-		);
+use super::level::{DetectorOrGroup, GlyphData, LevelData, ObjectData};
+use bevy::prelude::*;
+
+/// Contains an overview of conditions that are needed to complete the level
+#[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
+pub struct LevelCompletionConditions {
+	pub buttons_present: u32,
+	pub buttons_triggered: u32,
+	pub flags_present: u32,
+	pub flags_occupied: u32,
 }
 
-/// Determines whether a cycle may be turned at any given moment
-#[derive(Component, Debug, Clone, Reflect)]
-pub struct ComputedCycleTurnability(pub bool);
+impl LevelCompletionConditions {
+	/// Whether the level has been completed
+	pub fn is_level_completed(&self) -> bool {
+		self.is_goal_unlocked() && self.flags_occupied == self.flags_present
+	}
 
-/// Denotes whether an [`Object`] or [`Glyph`] entity is currently
-/// on the same vertex as a matching entity of the other kind.
+	/// Whether all secondary completion criteria have been met,
+	/// and the level will be completed as soon as all players travel to a goal
+	pub fn is_goal_unlocked(&self) -> bool {
+		self.buttons_present == self.buttons_triggered
+	}
+}
+
+/// Contains all game state that is not fixed in the level description
 ///
-/// A boolean flag is used instead of a marker to enable change detection.
-#[derive(Component, Clone, Copy, PartialEq, Eq, Default, Debug, Reflect)]
-pub struct IsTriggered(pub bool);
-
-/// Enumerates directions in which a cycle can turn
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CycleTurningDirection {
-	/// Rotate in nominal direction of the cycle
-	Nominal,
-	/// Rotate in reverse direction of the cycle
-	Reverse,
+/// The state object does not hold references to the structural level
+/// data, so most operations on it require borrowing the level data
+#[derive(Resource, Clone, PartialEq, Eq, Hash, Debug, Default)]
+pub struct GameState {
+	/// All objects present in the level
+	pub objects: Vec<ObjectData>,
+	/// Mapping between vertices and objects that lie on them,
+	/// as indices into [`Self::objects`]
+	pub objects_by_vertex: Vec<Option<usize>>,
 }
 
-/// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
-#[derive(Clone, Copy, Debug)]
-pub struct RotateCycle {
-	/// Id of the cycle entity to rotate
-	pub target_cycle: Entity,
-	/// Direction in which the cycle should turn
-	pub direction: CycleTurningDirection,
-	/// How many steps the cycle should rotate by
-	pub amount: usize,
-}
-
-impl RotateCycle {
-	pub fn from_flat_amount(target_cycle: Entity, amount: i64) -> Self {
-		Self {
-			target_cycle,
-			direction: if amount > 0 {
-				CycleTurningDirection::Nominal
+impl GameState {
+	/// Constructs a new game state object from a level description,
+	/// initialized to the position defined by the level
+	pub fn new(level_data: &LevelData) -> Self {
+		let mut objects = Vec::new();
+		let mut objects_by_vertex = Vec::new();
+		for vertex in &level_data.vertices {
+			if let Some(object) = vertex.object {
+				objects_by_vertex.push(Some(objects.len()));
+				objects.push(object);
 			} else {
-				CycleTurningDirection::Reverse
-			},
-			amount: amount.unsigned_abs() as usize,
+				objects_by_vertex.push(None);
+			}
+		}
+		Self {
+			objects,
+			objects_by_vertex,
 		}
 	}
 
-	pub fn flat_amount(&self) -> i64 {
-		let amount = self.amount as i64;
-		match self.direction {
-			CycleTurningDirection::Nominal => amount,
-			CycleTurningDirection::Reverse => -amount,
-		}
-	}
-}
-
-/// Internal event sent to a cycle entity to rotate [`super::components::Object`]
-/// entities that lie on the cycle, ignores linkages.
-///
-/// Signals a rotation of a cycle occuring.
-#[derive(Event, Clone, Copy, Debug)]
-pub struct RotateSingleCycle(pub RotateCycle);
-
-/// Event sent to a cycle entity to rotate [`super::components::Object`]
-/// entities that lie on the cycle and all cycles linked to it
-/// Should be sent only if it is valid to rotate the given cycle.
-#[derive(Event, Clone, Copy, Debug)]
-pub struct RotateCycleGroup(pub RotateCycle);
-
-/// Event sent together with a [`RotateCycleGroup`] event
-/// if that rotation is eligible for being recorded in move history
-#[derive(Event, Clone, Copy, Debug)]
-pub struct RecordCycleGroupRotation(pub RotateCycle);
-
-/// Event that is sent when state of the game map changes,
-/// usually by turning a cycle
-#[derive(Event, Clone, Copy, Default, Debug)]
-pub struct GameLayoutChanged;
-
-/// Event indicating that a pair of groups that cannot be turned together
-/// blocked the execution of a turn.
-/// Emitted for each pair of conflicting groups.
-/// The value indexes into [`LevelData::forbidden_group_pairs`]
-#[derive(Event, Clone, Copy, Default, Debug)]
-pub struct TurnBlockedByGroupConflict(pub usize);
-
-/// Contains an information whether the level being played has been completed
-/// in this session (making moves after completion does not matter)
-#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
-pub struct IsLevelCompleted(pub bool);
-
-/// Rotates cycles in game state and sends out events to other systems
-fn cycle_group_rotation_system(
-	mut group_events: EventReader<RotateCycleGroup>,
-	mut single_events: EventWriter<RotateSingleCycle>,
-	mut update_event: EventWriter<GameLayoutChanged>,
-	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
-	mut game_state: ResMut<GameState>,
-	cycles_q: Query<&Cycle>,
-	entity_index: Res<GameStateEcsIndex>,
-	active_level: ActiveLevelData,
-) -> Result<(), BevyError> {
-	let level = active_level.get()?;
-	for event in group_events.read() {
-		let Ok(target_cycle) = cycles_q.get(event.0.target_cycle) else {
-			warn!("Cycle referenced by rotation event not found in ECS");
-			continue;
-		};
-		let rotate_by = event.0.flat_amount();
-		match game_state.turn_cycle_with_links(level, target_cycle.id, rotate_by) {
-			Err(err) => warn!("Could not turn cycle: {err}"),
-			Ok(result) => {
-				for clash in &result.clashes {
-					blocked_event.write(TurnBlockedByGroupConflict(*clash));
+	/// Turns a cycle and all cycles linked to it by any number of ticks
+	pub fn turn_cycle_with_links(
+		&mut self,
+		level: &LevelData,
+		cycle_index: usize,
+		rotate_by: i64,
+	) -> Result<TurnCycleResult, GameStateActionError> {
+		let result = self.predict_turn_cycle_with_links(level, cycle_index, rotate_by)?;
+		if !result.blocked() {
+			for (group_data, &rotation) in level.groups.iter().zip(&result.groups_turned_by) {
+				if rotation == 0 {
+					continue;
 				}
-				if !result.blocked() && result.layout_changed() {
-					update_event.write(GameLayoutChanged);
-					for (cycle, amount) in result.cycles_turned_by(level) {
-						let Some(cycle_id) = entity_index.cycles.get(cycle) else {
-							warn!("Cycle referenced by rotation event not found in ECS");
-							continue;
+				for &(target_cycle, relative_direction) in &group_data.cycles {
+					let rotate_by = relative_direction * rotation;
+					self.turn_cycle_isolated(level, target_cycle, rotate_by)?;
+				}
+			}
+		}
+		Ok(result)
+	}
+
+	/// Calculates the outcome of trying to turn a cycle and all cycles linked to it
+	pub fn predict_turn_cycle_with_links(
+		&self,
+		level: &LevelData,
+		cycle_index: usize,
+		rotate_by: i64,
+	) -> Result<TurnCycleResult, GameStateActionError> {
+		let groups_turned_by =
+			self.calculate_rotation_tables_for_cycle_turn(level, cycle_index, rotate_by)?;
+		let clashes = self.find_cycle_clashes(level, &groups_turned_by);
+		Ok(TurnCycleResult {
+			groups_turned_by,
+			clashes,
+		})
+	}
+
+	pub fn turn_cycle_isolated(
+		&mut self,
+		level_data: &LevelData,
+		cycle_index: usize,
+		rotate_by: i64,
+	) -> Result<(), GameStateActionError> {
+		if rotate_by == 0 {
+			return Ok(());
+		}
+		let Some(cycle_data) = level_data.cycles.get(cycle_index) else {
+			return Err(GameStateActionError::CycleIndexOutOfRange(cycle_index));
+		};
+		let n_vertices = cycle_data.vertex_indices.len();
+		if n_vertices == 0 {
+			// No vertices, nothing to turn
+			return Ok(());
+		}
+		let amount = rotate_by.rem_euclid(n_vertices as i64) as usize;
+		if amount == 0 {
+			// NOOP, we are done
+			return Ok(());
+		}
+		let n_loops = gcd(amount, n_vertices);
+		let loop_len = n_vertices / n_loops;
+		for loop_id in 0..n_loops {
+			let mut cached_object = None;
+			for i in 0..loop_len + 1 {
+				let index = (loop_id + amount * i) % n_vertices;
+				let vertex_id = cycle_data.vertex_indices[index];
+				let Some(object_on_target_vertex) = self.objects_by_vertex.get_mut(vertex_id)
+				else {
+					return Err(GameStateActionError::MismatchedLevelData);
+				};
+				std::mem::swap(object_on_target_vertex, &mut cached_object);
+			}
+		}
+		Ok(())
+	}
+
+	/// Evaluate the level's completion conditions
+	pub fn get_completion(&self, level_data: &LevelData) -> LevelCompletionConditions {
+		let mut completion = LevelCompletionConditions::default();
+		for (vertex, object_index) in level_data.vertices.iter().zip(&self.objects_by_vertex) {
+			let object = object_index.map(|i| self.objects[i]);
+			match &vertex.glyph {
+				Some(GlyphData::Flag) => {
+					completion.flags_present += 1;
+					if matches!(object, Some(ObjectData::Player)) {
+						completion.flags_occupied += 1;
+					}
+				}
+				Some(GlyphData::Button(button_color)) => {
+					completion.buttons_present += 1;
+					if let Some(ObjectData::Box(box_color)) = object {
+						let is_triggered = button_color.is_none_or(|(button_color, _)| {
+							box_color.is_none_or(|box_color| button_color == box_color)
+						});
+						if is_triggered {
+							completion.buttons_triggered += 1;
+						}
+					}
+				}
+				_ => {}
+			}
+		}
+		completion
+	}
+
+	/// Calculates how many turns of individual cycles are caused by turning a given cycle
+	/// a specified number of times
+	///
+	/// ## Return Value
+	/// Number of turns (positive is clockwise) taken by each cycle group
+	fn calculate_rotation_tables_for_cycle_turn(
+		&self,
+		level: &LevelData,
+		cycle_index: usize,
+		rotate_by: i64,
+	) -> Result<Vec<i64>, GameStateActionError> {
+		let mut detector_rotations = vec![0i64; level.detectors.len()];
+		let mut group_rotations = vec![0i64; level.groups.len()];
+
+		let Some(source_cycle) = level.cycles.get(cycle_index) else {
+			return Err(GameStateActionError::CycleIndexOutOfRange(cycle_index));
+		};
+
+		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
+		// Queue the rotation
+		group_rotations[source_cycle.group] += source_cycle.orientation_within_group * rotate_by;
+
+		// Propagate one-way links
+		for step in &level.execution_order {
+			match *step {
+				DetectorOrGroup::Group(group_id) => {
+					if group_rotations[group_id] == 0 {
+						continue;
+					}
+					for link in &level.groups[group_id].linked_groups {
+						group_rotations[link.target_group] +=
+							link.direction * group_rotations[group_id] * link.multiplicity as i64
+					}
+					for &detector_cycle_id in &level.groups[group_id].outgoing_detector_cycles {
+						// Gather data
+						let Some(detector_cycle) = level.cycles.get(detector_cycle_id) else {
+							return Err(GameStateActionError::BrokenLevelData(
+								"outgoing_detector_cycles references cycle out of range",
+							));
 						};
-						single_events.write(RotateSingleCycle(RotateCycle::from_flat_amount(
-							*cycle_id, amount,
-						)));
+						let n_vertices = detector_cycle.vertex_indices.len();
+						let n_detectors = detector_cycle.detector_indices.len();
+						if n_vertices == 0 || n_detectors == 0 {
+							return Err(GameStateActionError::BrokenLevelData("cycle with no vertices or no detectors is somehow in the outgoing_detector_cycles list."));
+						}
+						// Grab vertex occupancy data from state
+						let vertex_occupation = detector_cycle
+							.vertex_indices
+							.iter()
+							.copied()
+							.map(|i| {
+								self.objects_by_vertex
+									.get(i)
+									.map(|object| object.is_some())
+									.ok_or(GameStateActionError::MismatchedLevelData)
+							})
+							.collect::<Result<Vec<_>, _>>()?;
+						let n_objects = vertex_occupation.iter().filter(|x| **x).count();
+						// Nothing to detect
+						if n_objects == 0 {
+							continue;
+						}
+						// Compute rotation characteristics
+						let n_rotations =
+							detector_cycle.orientation_within_group * group_rotations[group_id];
+						let full_turns = n_rotations.signum()
+							* i64::div_euclid(n_rotations.abs(), n_vertices as i64);
+						let partial_turns = (n_rotations.signum()
+							* i64::rem_euclid(n_rotations.abs(), n_vertices as i64))
+							as isize;
+						for (detector_id, _) in &detector_cycle.detector_indices {
+							detector_rotations[*detector_id] += (n_objects as i64) * full_turns;
+						}
+						if partial_turns != 0 {
+							// How long of a strip of vertices needs to be scanned for objects
+							let interval_length = partial_turns.unsigned_abs();
+							// Counts how many objects are in a interval <i - interval_length, i) (accounting for looping)
+							let mut objects_in_interval = vec![0; n_vertices];
+							let mut running_total: i32 = 0;
+							#[allow(clippy::needless_range_loop)]
+							for i in (n_vertices - interval_length)..n_vertices {
+								if vertex_occupation[i] {
+									running_total += 1;
+								}
+							}
+							for i in 0..n_vertices {
+								// Write the value
+								objects_in_interval[i] = running_total;
+								// Move the interval
+								let back_index = (n_vertices - interval_length + i) % n_vertices;
+								if vertex_occupation[back_index] {
+									running_total -= 1;
+								}
+								if vertex_occupation[i] {
+									running_total += 1;
+								}
+							}
+							for &(detector_id, offset) in &detector_cycle.detector_indices {
+								let detections = if partial_turns > 0 {
+									objects_in_interval[(offset + 1) % n_vertices]
+								} else {
+									-objects_in_interval
+										[(offset + 1 + interval_length) % n_vertices]
+								} as i64;
+								detector_rotations[detector_id] += detections;
+							}
+						}
+					}
+				}
+				DetectorOrGroup::Detector(detector_id) => {
+					if detector_rotations[detector_id] == 0 {
+						continue;
+					}
+					for link in &level.detectors[detector_id].linked_groups {
+						group_rotations[link.target_group] += link.direction
+							* detector_rotations[detector_id]
+							* link.multiplicity as i64;
 					}
 				}
 			}
 		}
-	}
-	Ok(())
-}
 
-/// System that carries out the rotations on cycles hit by an event queueing a rotation.
-fn update_vertex_and_object_relations_in_ecs(
-	mut vertices_q: Query<&mut PlacedObject>,
-	mut objects_q: Query<&mut VertexPosition>,
-	entity_index: Res<GameStateEcsIndex>,
-	game_state: Res<GameState>,
-) {
-	for (object_index, vertex_id) in game_state
-		.objects_by_vertex
-		.iter()
-		.zip(&entity_index.vertices)
-	{
-		let Ok(mut vertex_object_ref) = vertices_q.get_mut(*vertex_id) else {
-			warn!("Vertex referenced by game state not found in ECS");
-			continue;
-		};
-		if let Some(object_index) = object_index {
-			let Some(object_id) = entity_index.objects.get(*object_index) else {
-				warn!("Mismatched GameStateEcsIndex and GameState");
-				continue;
-			};
-			let Ok(mut object_vertex_ref) = objects_q.get_mut(*object_id) else {
-				warn!("Object referenced by game state not found in ECS");
-				continue;
-			};
-			vertex_object_ref.set_if_neq(PlacedObject(Some(*object_id)));
-			object_vertex_ref.set_if_neq(VertexPosition(*vertex_id));
-		} else {
-			vertex_object_ref.set_if_neq(PlacedObject(None));
-		}
+		Ok(group_rotations)
 	}
-}
 
-fn cycle_turnability_update_system(
-	vertices_q: Query<&PlacedObject>,
-	players_q: Query<(), With<Player>>,
-	mut cycles_q: Query<(
-		&CycleVertices,
-		&CycleTurnability,
-		&mut ComputedCycleTurnability,
-	)>,
-) {
-	'next_cycle: for (vertex_ids, turnability, mut computed_turnability) in &mut cycles_q {
-		match *turnability {
-			CycleTurnability::Always => computed_turnability.0 = true,
-			CycleTurnability::Never => computed_turnability.0 = false,
-			CycleTurnability::WithPlayer => {
-				for &vertex_id in &vertex_ids.0 {
-					let player_is_present = vertices_q
-						.get(vertex_id)
-						.inspect_err(|e| log::warn!("{e}"))
-						.ok()
-						.and_then(|object_id| object_id.0.and_then(|id| players_q.get(id).ok()))
-						.is_some();
-					if player_is_present {
-						computed_turnability.0 = true;
-						continue 'next_cycle;
+	/// Finds all pairs of cycles that cannot turn at the same time,
+	/// but are both being rotated anyway
+	///
+	/// ## Return Value
+	/// Indices into [`LevelData::forbidden_group_pairs`] where both groups turned
+	fn find_cycle_clashes(&self, level: &LevelData, group_rotations: &[i64]) -> Vec<usize> {
+		// TODO: Change this code, so that it takes into account the modulo rotations
+		// to enable certain mechanisms, Unless this is decided against.
+		let mut clashes = Vec::new();
+		let mut pair_index = 0;
+		for group_a_id in 0..level.groups.len() {
+			if group_rotations[group_a_id] != 0 {
+				while pair_index < level.forbidden_group_pairs.len() {
+					let (a, b, _) = level.forbidden_group_pairs[pair_index];
+					if a > group_a_id {
+						break;
 					}
+					if a == group_a_id && group_rotations[b] != 0 {
+						clashes.push(pair_index);
+					}
+					pair_index += 1;
 				}
-				computed_turnability.0 = false;
 			}
 		}
+		clashes
 	}
 }
 
-fn button_trigger_check_system(
-	vertices_q: Query<(&PlacedObject, &PlacedGlyph)>,
-	mut objects_q: Query<(&mut IsTriggered, &ObjectData)>,
-	mut glyphs_q: Query<(&mut IsTriggered, &GlyphData), Without<ObjectData>>,
-) {
-	for (object, glyph) in &vertices_q {
-		let mut object = object.0.and_then(|id| {
-			objects_q
-				.get_mut(id)
-				.inspect_err(|e| log::warn!("{e}"))
-				.ok()
-		});
-		let mut glyph = glyph
-			.0
-			.and_then(|id| glyphs_q.get_mut(id).inspect_err(|e| log::warn!("{e}")).ok());
+/// Information about a cycle turning action that took place
+#[derive(Clone, Debug, Default)]
+pub struct TurnCycleResult {
+	/// How many ticks (clockwise) each cycle group turned,
+	/// or would have if the rotation was blocked
+	///
+	/// Can be zipped with [`LevelData::groups`]
+	pub groups_turned_by: Vec<i64>,
+	/// All pairs of mutually conflicting groups
+	/// that would have had to turn simultaneously
+	///
+	/// Unless empty, the rotation was blocked
+	///
+	/// Elements can be used to index [`LevelData::forbidden_group_pairs`]
+	pub clashes: Vec<usize>,
+}
 
-		match (&mut object, &mut glyph) {
-			(
-				Some((ref mut object_triggered, ObjectData::Player)),
-				Some((ref mut glyph_triggered, GlyphData::Flag)),
-			) => {
-				object_triggered.set_if_neq(IsTriggered(true));
-				glyph_triggered.set_if_neq(IsTriggered(true));
-			}
-			(
-				Some((ref mut object_triggered, ObjectData::Box(box_color))),
-				Some((ref mut glyph_triggered, GlyphData::Button(button_color))),
-			) => {
-				let colors_compatible = (*box_color)
-					.and_then(|box_color| {
-						button_color.map(|button_color| box_color == button_color.0)
-					})
-					// If either thing is colorless, they are considered compatible
-					.unwrap_or(true);
-				object_triggered.set_if_neq(IsTriggered(colors_compatible));
-				glyph_triggered.set_if_neq(IsTriggered(colors_compatible));
-			}
-			_ => {
-				if let Some((mut is_triggered, _)) = object {
-					is_triggered.set_if_neq(IsTriggered(false));
-				}
-				if let Some((mut is_triggered, _)) = glyph {
-					is_triggered.set_if_neq(IsTriggered(false));
-				}
-			}
-		};
+impl TurnCycleResult {
+	/// Whether the rotation was blocked by a clash
+	pub fn blocked(&self) -> bool {
+		!self.clashes.is_empty()
+	}
+
+	/// True if the rotation caused a shift in layout,
+	/// or would have if the rotation was blocked
+	pub fn layout_changed(&self) -> bool {
+		self.groups_turned_by
+			.iter()
+			.any(|rotate_by| *rotate_by != 0)
+	}
+
+	/// Iterate the indices to cycles that turned with the amount they turned
+	///
+	/// Cycles that did not turn are not included
+	pub fn cycles_turned_by<'a>(
+		&'a self,
+		level: &'a LevelData,
+	) -> impl Iterator<Item = (usize, i64)> + 'a {
+		self.groups_turned_by
+			.iter()
+			.zip(&level.groups)
+			.filter(|&(amount, _)| *amount != 0)
+			.flat_map(|(amount, group)| {
+				group
+					.cycles
+					.iter()
+					.map(|&(cycle, direction)| (cycle, direction * *amount))
+			})
 	}
 }
 
-fn level_completion_check_system(
-	level: ActiveLevelData,
-	game_state: ResMut<GameState>,
-	mut completion: ResMut<LevelCompletionConditions>,
-	mut is_completed: ResMut<IsLevelCompleted>,
-) -> Result<(), BevyError> {
-	*completion = game_state.get_completion(level.get()?);
-	if completion.is_level_completed() {
-		// This stays true until a different level is loaded
-		is_completed.set_if_neq(IsLevelCompleted(true));
-	}
-	Ok(())
+/// Error codes returned by operations on level data
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum GameStateActionError {
+	CycleIndexOutOfRange(usize),
+	MismatchedLevelData,
+	BrokenLevelData(&'static str),
 }
 
-impl std::ops::Mul<LinkedCycleDirection> for CycleTurningDirection {
-	type Output = Self;
-	fn mul(self, rhs: LinkedCycleDirection) -> Self::Output {
-		match rhs {
-			LinkedCycleDirection::Coincident => self,
-			LinkedCycleDirection::Inverse => -self,
-		}
-	}
-}
+impl std::error::Error for GameStateActionError {}
 
-impl std::ops::Neg for CycleTurningDirection {
-	type Output = Self;
-	fn neg(self) -> Self::Output {
+impl std::fmt::Display for GameStateActionError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			CycleTurningDirection::Nominal => CycleTurningDirection::Reverse,
-			CycleTurningDirection::Reverse => CycleTurningDirection::Nominal,
+			Self::CycleIndexOutOfRange(i) => write!(
+				f,
+				"attempted to access cycle {i}, but there are not that many cycles"
+			),
+			Self::MismatchedLevelData => write!(
+				f,
+				"game state method got different LevelData than it was created with"
+			),
+			Self::BrokenLevelData(reason) => {
+				write!(f, "level data invariants have been violated: {reason}")
+			}
 		}
 	}
+}
+
+fn gcd(mut a: usize, mut b: usize) -> usize {
+	while a > 0 {
+		(a, b) = (b % a, a);
+	}
+	b
 }

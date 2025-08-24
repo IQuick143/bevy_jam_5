@@ -4,7 +4,7 @@ mod jump_turn;
 mod paths;
 mod spin;
 
-use crate::game::logic::CycleTurningDirection;
+use super::logic_relay::CycleTurningDirection;
 use bevy::prelude::*;
 
 pub fn plugin(app: &mut App) {

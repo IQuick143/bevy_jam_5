@@ -1,6 +1,6 @@
 use super::{
 	level::{CyclePlacement, CycleShape},
-	logic::*,
+	logic_relay::*,
 	prelude::*,
 };
 use crate::{camera::CameraHarness, ui::freeze::ui_not_frozen, AppSet};

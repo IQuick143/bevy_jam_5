@@ -1,4 +1,4 @@
-use super::{logic::IsLevelCompleted, *};
+use super::{logic_relay::IsLevelCompleted, *};
 use crate::{game::spawn::LevelInitialization, save::SaveGame, screen::PlayingLevelListEntry};
 
 pub(super) fn plugin(app: &mut App) {

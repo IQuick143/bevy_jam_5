@@ -1,5 +1,5 @@
 use super::{
-	components::*, inputs::CycleInteraction, logic::*, prelude::*, spawn::LastLevelSessionId,
+	components::*, inputs::CycleInteraction, logic_relay::*, prelude::*, spawn::LastLevelSessionId,
 };
 use crate::{
 	assets::{HandleMap, ImageKey},

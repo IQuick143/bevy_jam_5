@@ -4,7 +4,7 @@ use super::{animation_easing_function, RotationDirection, TurnAnimationLength};
 use crate::{
 	game::{
 		drawing::CycleCenterVisualEntities,
-		logic::RotateSingleCycle,
+		logic_relay::RotateSingleCycle,
 		spawn::{LevelInitialization, LevelInitializationSet},
 	},
 	AppSet,

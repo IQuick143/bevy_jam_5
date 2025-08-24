@@ -2,7 +2,7 @@ mod utils {
 	use crate::game::{
 		components::{Cycle, GameStateEcsIndex, PlacedGlyph, PlacedObject, Vertex},
 		level::{backend::builder as parser, GlyphData, LevelData, ObjectData, ThingData},
-		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
+		logic_relay::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 	};
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
@@ -16,7 +16,7 @@ mod utils {
 				..default()
 			},
 			super::super::level::asset::plugin,
-			super::super::logic::plugin,
+			super::super::logic_relay::plugin,
 			super::super::history::plugin,
 			super::super::spawn::plugin,
 		))

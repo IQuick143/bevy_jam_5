@@ -3,7 +3,7 @@
 use crate::{
 	camera::CameraHarness,
 	game::{
-		animation::TurnAnimationLength, components::*, level::CycleTurnability, logic::*,
+		animation::TurnAnimationLength, components::*, level::CycleTurnability, logic_relay::*,
 		prelude::*,
 	},
 	graphics::VERTICAL_PADDING_FRACTION,

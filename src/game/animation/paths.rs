@@ -5,7 +5,7 @@ use crate::{
 	game::{
 		components::*,
 		level::{CyclePlacement, LevelData, ThingData},
-		logic::RotateSingleCycle,
+		logic_relay::RotateSingleCycle,
 		spawn::{ActiveLevelData, LevelInitialization, LevelInitializationSet},
 	},
 	screen::Screen,
