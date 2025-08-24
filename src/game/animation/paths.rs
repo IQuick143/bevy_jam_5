@@ -6,7 +6,7 @@ use crate::{
 		components::*,
 		level::{CyclePlacement, LevelData, ThingData},
 		logic_relay::RotateSingleCycle,
-		spawn::{ActiveLevelData, LevelInitialization, LevelInitializationSet},
+		spawn::{LevelInitialization, LevelInitializationSet},
 	},
 	screen::Screen,
 	AppSet,
@@ -252,7 +252,7 @@ fn listen_for_moves(
 	mut rotation_events: EventReader<RotateSingleCycle>,
 	cycles: Query<(&CycleVertices, &Cycle)>,
 	mut objects: Query<(&mut Transform, &VertexPosition, Option<&mut PathAnimation>), With<Object>>,
-	active_level: ActiveLevelData,
+	active_level: PlayingLevelData,
 ) {
 	let level_data = match active_level.get() {
 		Ok(d) => d,
@@ -332,7 +332,7 @@ fn move_objects(
 	mut objects: Query<(&mut Transform, &mut PathAnimation)>,
 	time: Res<Time<Real>>,
 	animation_time: Res<TurnAnimationLength>,
-	active_level: ActiveLevelData,
+	active_level: PlayingLevelData,
 ) {
 	let level_data = match active_level.get() {
 		Ok(d) => d,

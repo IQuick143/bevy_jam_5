@@ -174,10 +174,9 @@ fn debug_oneways(
 	mut gizmos: Gizmos,
 	cycles_q: Query<&Transform>,
 	entity_index: Res<GameStateEcsIndex>,
-	level_asset: Res<Assets<LevelData>>,
-	level_handle: Res<LevelHandle>,
+	level: PlayingLevelData,
 ) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
+	let Ok(level) = level.get() else {
 		return;
 	};
 	for link in level.declared_one_way_links.iter() {
@@ -193,7 +192,7 @@ fn debug_oneways(
 	}
 }
 
-fn debug_detectors(mut gizmos: Gizmos, level: ActiveLevelData) {
+fn debug_detectors(mut gizmos: Gizmos, level: PlayingLevelData) {
 	let Ok(level) = level.get() else {
 		return;
 	};
@@ -215,8 +214,8 @@ fn debug_detectors(mut gizmos: Gizmos, level: ActiveLevelData) {
 	}
 }
 
-fn print_level_data(level_asset: Res<Assets<LevelData>>, level_handle: Res<LevelHandle>) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
+fn print_level_data(level: PlayingLevelData) {
+	let Ok(level) = level.get() else {
 		return;
 	};
 	log::info!("{:?}", level);

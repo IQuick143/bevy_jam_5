@@ -317,15 +317,14 @@ fn cycle_center_interaction_visuals_update_system(
 		Option<&CycleRingVisualEntities>,
 	)>,
 	entity_index: Res<GameStateEcsIndex>,
-	level_asset: Res<Assets<LevelData>>,
-	level_handle: Res<LevelHandle>,
+	level: PlayingLevelData,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
 	mut meshes_q: Query<(&mut Transform, &mut MeshMaterial2d<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
+	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
@@ -469,13 +468,12 @@ fn cycle_blocked_marker_system(
 	mut events: EventReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
 	entity_index: Res<GameStateEcsIndex>,
-	level_asset: Res<Assets<LevelData>>,
-	level_handle: Res<LevelHandle>,
+	level: PlayingLevelData,
 	images: Res<HandleMap<ImageKey>>,
 	session: Res<LastLevelSessionId>,
 	palette: Res<ThingPalette>,
 ) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
+	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};

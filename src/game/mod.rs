@@ -18,13 +18,12 @@ pub mod test;
 pub mod prelude {
 	#[allow(unused_imports)]
 	pub use super::{
+		components::{LevelHandle, PlayingLevelData},
 		history::{MoveHistory, UndoMove},
 		level::LevelData,
 		logic::{GameState, LevelCompletionConditions},
 		logic_relay::{CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, RotateCycle},
-		spawn::{
-			ActiveLevel, ActiveLevelData, EnterLevel, LevelInitialization, LevelInitializationSet,
-		},
+		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 		synchronization::IsLevelPersistentlyCompleted,
 	};
 	pub use bevy::prelude::*;

@@ -9,17 +9,14 @@ use super::{
 	prelude::*,
 };
 use crate::{assets::*, graphics::*, AppSet};
-use bevy::{
-	ecs::{schedule::ScheduleLabel, system::SystemParam},
-	sprite::Anchor,
-};
+use bevy::{ecs::schedule::ScheduleLabel, sprite::Anchor};
 use std::f32::consts::{PI, TAU};
 
 pub(super) fn plugin(app: &mut App) {
 	use LevelInitializationSet::*;
 	app.init_resource::<LastLevelSessionId>()
 		.init_resource::<ExpiringLevelSessionId>()
-		.init_resource::<ActiveLevel>()
+		.init_resource::<LevelHandle>()
 		.add_event::<EnterLevel>()
 		.add_event::<SpawnLevel>()
 		.configure_sets(
@@ -91,30 +88,6 @@ pub struct EnterLevel(pub Option<Handle<LevelData>>);
 #[derive(Event, Clone, Debug)]
 pub struct SpawnLevel(pub Handle<LevelData>, pub LevelSessionId);
 
-/// Handle to the last level that has been entered with [`EnterLevel`]
-#[derive(Resource, Clone, Debug, Default, Deref)]
-pub struct ActiveLevel(Option<Handle<LevelData>>);
-
-/// Shorthand [`SystemParam`] that accesses the data os the current level
-#[derive(SystemParam)]
-pub struct ActiveLevelData<'w> {
-	handle: Res<'w, ActiveLevel>,
-	assets: Res<'w, Assets<LevelData>>,
-}
-
-impl ActiveLevelData<'_> {
-	pub fn get(&self) -> Result<&LevelData, BevyError> {
-		let handle = self
-			.handle
-			.0
-			.as_ref()
-			.ok_or_else(|| "No level is currently being played".to_owned())?;
-		self.assets
-			.get(handle)
-			.ok_or_else(|| "No data found for active level".to_owned().into())
-	}
-}
-
 /// Identifier of a level session.
 /// Every time a level is entered, all its entities are assigned a unique identifier.
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Debug, Reflect)]
@@ -139,7 +112,7 @@ fn handle_enter_level(
 	mut spawn_events: EventWriter<SpawnLevel>,
 	mut last_session_id: ResMut<LastLevelSessionId>,
 	mut expiring_session_id: ResMut<ExpiringLevelSessionId>,
-	mut active_level: ResMut<ActiveLevel>,
+	mut active_level: ResMut<LevelHandle>,
 	mut game_state: ResMut<GameState>,
 	level_assets: Res<Assets<LevelData>>,
 ) {
@@ -147,7 +120,11 @@ fn handle_enter_level(
 		expiring_session_id.0 = last_session_id.0;
 		if let Some(level_handle) = &event.0 {
 			if let Some(level) = level_assets.get(level_handle) {
-				active_level.0 = Some(level_handle.clone());
+				active_level.0 = if level.is_valid {
+					Some(level_handle.clone())
+				} else {
+					None
+				};
 				*game_state = GameState::new(level);
 				last_session_id.0 .0 += 1;
 				spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
@@ -176,7 +153,7 @@ fn despawn_expired_level_entities(
 fn spawn_primary_level_entities(
 	mut commands: Commands,
 	mut events: EventReader<SpawnLevel>,
-	mut levels: ResMut<Assets<LevelData>>,
+	levels: Res<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {
 		// Get the level data
@@ -283,14 +260,7 @@ fn spawn_primary_level_entities(
 				objects: Vec::new(),
 			};
 			commands.insert_resource(entity_index);
-			commands.insert_resource(LevelHandle(
-				levels
-					.get_strong_handle(level_handle.id())
-					.expect("I expect you to work."),
-			));
 		} else {
-			// Ensure the [`LevelHandle`] is not around for an invalid level.
-			commands.remove_resource::<LevelHandle>();
 			// Just to be sure, remove these resources as well.
 			commands.remove_resource::<GameStateEcsIndex>();
 		}
@@ -301,7 +271,7 @@ fn spawn_thing_entities(
 	mut commands: Commands,
 	mut entity_index: ResMut<GameStateEcsIndex>,
 	session_id: Res<LastLevelSessionId>,
-	active_level: ActiveLevelData,
+	active_level: PlayingLevelData,
 ) {
 	let Ok(level) = active_level.get() else {
 		warn!("Current playing level is not available");

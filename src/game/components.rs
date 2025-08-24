@@ -2,7 +2,7 @@
 //! Components with a more specialized puspose belong to their respective modules
 
 use super::level::{LevelData, LinkedCycleDirection};
-use bevy::prelude::*;
+use bevy::{ecs::system::SystemParam, prelude::*};
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -61,8 +61,28 @@ pub struct CycleVertices(pub Vec<Entity>);
 
 /// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
 /// Is only present if the level is correct and logical systems can run on it.
-#[derive(Resource, Debug, Clone, Reflect)]
-pub struct LevelHandle(pub Handle<LevelData>);
+#[derive(Resource, Clone, Debug, Default, Deref, DerefMut, Reflect)]
+pub struct LevelHandle(pub Option<Handle<LevelData>>);
+
+/// Shorthand [`SystemParam`] that accesses the data of the current level
+#[derive(SystemParam)]
+pub struct PlayingLevelData<'w> {
+	handle: Res<'w, LevelHandle>,
+	assets: Res<'w, Assets<LevelData>>,
+}
+
+impl PlayingLevelData<'_> {
+	pub fn get(&self) -> Result<&LevelData, BevyError> {
+		let handle = self
+			.handle
+			.0
+			.as_ref()
+			.ok_or_else(|| "No level is currently being played".to_owned())?;
+		self.assets
+			.get(handle)
+			.ok_or_else(|| "No data found for active level".to_owned().into())
+	}
+}
 
 /// Maps entity IDs to all game entities
 #[derive(Resource, Clone, Debug, Default, Reflect)]

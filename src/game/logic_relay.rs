@@ -133,7 +133,7 @@ fn cycle_group_rotation_system(
 	mut game_state: ResMut<GameState>,
 	cycles_q: Query<&Cycle>,
 	entity_index: Res<GameStateEcsIndex>,
-	active_level: ActiveLevelData,
+	active_level: PlayingLevelData,
 ) -> Result<(), BevyError> {
 	let level = active_level.get()?;
 	for event in group_events.read() {
@@ -281,7 +281,7 @@ fn button_trigger_check_system(
 }
 
 fn level_completion_check_system(
-	level: ActiveLevelData,
+	level: PlayingLevelData,
 	game_state: ResMut<GameState>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
