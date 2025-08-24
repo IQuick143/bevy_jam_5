@@ -173,7 +173,7 @@ fn automatic_reloading(
 fn debug_oneways(
 	mut gizmos: Gizmos,
 	cycles_q: Query<&Transform>,
-	cycle_index: Res<CycleEntities>,
+	entity_index: Res<GameStateEcsIndex>,
 	level_asset: Res<Assets<LevelData>>,
 	level_handle: Res<LevelHandle>,
 ) {
@@ -181,11 +181,11 @@ fn debug_oneways(
 		return;
 	};
 	for link in level.declared_one_way_links.iter() {
-		let Ok(start) = cycles_q.get(cycle_index.0[link.source]) else {
+		let Ok(start) = cycles_q.get(entity_index.cycles[link.source]) else {
 			return;
 		};
 		let start = start.translation;
-		let Ok(end) = cycles_q.get(cycle_index.0[link.dest_cycle]) else {
+		let Ok(end) = cycles_q.get(entity_index.cycles[link.dest_cycle]) else {
 			return;
 		};
 		let end = end.translation;

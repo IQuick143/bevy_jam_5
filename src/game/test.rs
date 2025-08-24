@@ -1,6 +1,6 @@
 mod utils {
 	use crate::game::{
-		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, Vertex},
+		components::{Cycle, GameStateEcsIndex, PlacedGlyph, PlacedObject, Vertex},
 		level::{backend::builder as parser, GlyphData, LevelData, ObjectData, ThingData},
 		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
@@ -146,9 +146,9 @@ mod utils {
 	}
 
 	/// System that counts how many cycles there are.
-	fn count_cycles_system(cycles: Query<&Cycle>, cycle_master: Res<CycleEntities>) -> usize {
+	fn count_cycles_system(cycles: Query<&Cycle>, entity_index: Res<GameStateEcsIndex>) -> usize {
 		let cycle_count = cycles.iter().count();
-		let declared_count = cycle_master.0.len();
+		let declared_count = entity_index.cycles.len();
 		assert_eq!(
 			cycle_count, declared_count,
 			"Number of Cycle entities should match the number of entities in CycleEntities"
@@ -159,10 +159,10 @@ mod utils {
 	fn turn_system(
 		In((id, amount)): In<(usize, i32)>,
 		mut events: EventWriter<RotateCycleGroup>,
-		cycle_list: Res<CycleEntities>,
+		entity_index: Res<GameStateEcsIndex>,
 	) {
 		events.write(RotateCycleGroup(RotateCycle {
-			target_cycle: cycle_list.0[id],
+			target_cycle: entity_index.cycles[id],
 			direction: if amount >= 0 {
 				CycleTurningDirection::Nominal
 			} else {

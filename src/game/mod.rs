@@ -3,6 +3,7 @@
 pub mod animation;
 pub mod components;
 pub mod drawing;
+mod ecs_free_logic;
 mod game_sfx;
 mod hints;
 pub mod history;
@@ -17,13 +18,13 @@ pub mod test;
 pub mod prelude {
 	#[allow(unused_imports)]
 	pub use super::{
+		ecs_free_logic::{GameState, LevelCompletionConditions},
 		history::{MoveHistory, UndoMove},
 		level::LevelData,
-		logic::{
-			CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, LevelCompletionConditions,
-			RotateCycle,
+		logic::{CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, RotateCycle},
+		spawn::{
+			ActiveLevel, ActiveLevelData, EnterLevel, LevelInitialization, LevelInitializationSet,
 		},
-		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 		synchronization::IsLevelPersistentlyCompleted,
 	};
 	pub use bevy::prelude::*;

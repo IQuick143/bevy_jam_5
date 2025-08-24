@@ -316,7 +316,7 @@ fn cycle_center_interaction_visuals_update_system(
 		Option<&CycleCenterVisualEntities>,
 		Option<&CycleRingVisualEntities>,
 	)>,
-	cycle_index: Res<CycleEntities>,
+	entity_index: Res<GameStateEcsIndex>,
 	level_asset: Res<Assets<LevelData>>,
 	level_handle: Res<LevelHandle>,
 	vertices_q: Query<&VertexVisualEntities>,
@@ -339,7 +339,7 @@ fn cycle_center_interaction_visuals_update_system(
 		for cycle_id in level.groups[cycle.group_id]
 			.cycles
 			.iter()
-			.map(|(cycle_id, _)| cycle_index.0[*cycle_id])
+			.map(|(cycle_id, _)| entity_index.cycles[*cycle_id])
 		{
 			let (is_turnable, vertices, center_visuals, ring_visuals) =
 				match all_cycles_q.get(cycle_id) {
@@ -468,7 +468,7 @@ fn cycle_blocked_marker_system(
 	mut commands: Commands,
 	mut events: EventReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
-	vertex_index: Res<VertexEntities>,
+	entity_index: Res<GameStateEcsIndex>,
 	level_asset: Res<Assets<LevelData>>,
 	level_handle: Res<LevelHandle>,
 	images: Res<HandleMap<ImageKey>>,
@@ -492,8 +492,8 @@ fn cycle_blocked_marker_system(
 	}
 
 	for &vertex in marked_vertices.iter() {
-		let Some(vertex_transform) = vertex_index
-			.0
+		let Some(vertex_transform) = entity_index
+			.cycles
 			.get(vertex)
 			.and_then(|entity| vertices_q.get(*entity).ok())
 		else {

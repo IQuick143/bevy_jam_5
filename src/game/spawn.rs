@@ -140,13 +140,23 @@ fn handle_enter_level(
 	mut last_session_id: ResMut<LastLevelSessionId>,
 	mut expiring_session_id: ResMut<ExpiringLevelSessionId>,
 	mut active_level: ResMut<ActiveLevel>,
+	mut game_state: ResMut<GameState>,
+	level_assets: Res<Assets<LevelData>>,
 ) {
 	if let Some(event) = enter_events.read().last() {
 		expiring_session_id.0 = last_session_id.0;
-		active_level.0 = event.0.clone();
 		if let Some(level_handle) = &event.0 {
-			last_session_id.0 .0 += 1;
-			spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+			if let Some(level) = level_assets.get(level_handle) {
+				active_level.0 = Some(level_handle.clone());
+				*game_state = GameState::new(level);
+				last_session_id.0 .0 += 1;
+				spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+			} else {
+				log::warn!("Got an invalid level handle");
+				active_level.0 = None;
+			}
+		} else {
+			active_level.0 = None;
 		}
 	}
 }
@@ -267,8 +277,12 @@ fn spawn_primary_level_entities(
 
 		// Spawn cycle list
 		if level.is_valid {
-			commands.insert_resource(CycleEntities(cycles));
-			commands.insert_resource(VertexEntities(vertices));
+			let entity_index = GameStateEcsIndex {
+				cycles,
+				vertices,
+				objects: Vec::new(),
+			};
+			commands.insert_resource(entity_index);
 			commands.insert_resource(LevelHandle(
 				levels
 					.get_strong_handle(level_handle.id())
@@ -278,17 +292,24 @@ fn spawn_primary_level_entities(
 			// Ensure the [`LevelHandle`] is not around for an invalid level.
 			commands.remove_resource::<LevelHandle>();
 			// Just to be sure, remove these resources as well.
-			commands.remove_resource::<CycleEntities>();
-			commands.remove_resource::<VertexEntities>();
+			commands.remove_resource::<GameStateEcsIndex>();
 		}
 	}
 }
 
 fn spawn_thing_entities(
 	mut commands: Commands,
-	query: Query<(Entity, &VertexData, &LevelSessionId), Added<VertexData>>,
+	mut entity_index: ResMut<GameStateEcsIndex>,
+	session_id: Res<LastLevelSessionId>,
+	active_level: ActiveLevelData,
 ) {
-	for (id, data, session) in &query {
+	let Ok(level) = active_level.get() else {
+		warn!("Current playing level is not available");
+		return;
+	};
+	let session = session_id.0;
+	let mut object_ids = Vec::new();
+	for (&id, data) in entity_index.vertices.iter().zip(&level.vertices) {
 		let object_id = data.object.map(|object| match object {
 			ObjectData::Player => commands
 				.spawn((
@@ -296,7 +317,7 @@ fn spawn_thing_entities(
 					Player,
 					object,
 					ThingData::Object(object),
-					*session,
+					session,
 					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
@@ -309,7 +330,7 @@ fn spawn_thing_entities(
 					SokoBox,
 					object,
 					ThingData::Object(object),
-					*session,
+					session,
 					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
@@ -323,7 +344,7 @@ fn spawn_thing_entities(
 					color,
 					object,
 					ThingData::Object(object),
-					*session,
+					session,
 					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
@@ -338,7 +359,7 @@ fn spawn_thing_entities(
 					Goal,
 					glyph,
 					ThingData::Glyph(glyph),
-					*session,
+					session,
 					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
@@ -351,7 +372,7 @@ fn spawn_thing_entities(
 					SokoButton,
 					glyph,
 					ThingData::Glyph(glyph),
-					*session,
+					session,
 					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
@@ -365,7 +386,7 @@ fn spawn_thing_entities(
 					glyph,
 					color_data,
 					ThingData::Glyph(glyph),
-					*session,
+					session,
 					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
@@ -376,7 +397,11 @@ fn spawn_thing_entities(
 		commands
 			.entity(id)
 			.insert((PlacedObject(object_id), PlacedGlyph(glyph_id)));
+		if let Some(object_id) = object_id {
+			object_ids.push(object_id);
+		}
 	}
+	entity_index.objects = object_ids;
 }
 
 fn set_vertex_transforms(mut query: Query<(&VertexData, &mut Transform), Added<VertexData>>) {

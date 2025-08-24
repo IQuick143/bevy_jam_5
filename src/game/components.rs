@@ -29,7 +29,7 @@ pub struct Object;
 pub struct Glyph;
 
 /// Link to a vertex this object is occupying
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, PartialEq, Eq, Reflect)]
 pub struct VertexPosition(pub Entity);
 
 /// A vertex (node) on the circle
@@ -37,11 +37,11 @@ pub struct VertexPosition(pub Entity);
 pub struct Vertex;
 
 /// Component of the Vertex representing a link to an object occupying this place
-#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub struct PlacedObject(pub Option<Entity>);
 
 /// Component of the Vertex representing a link to a glyph occupying this place
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub struct PlacedGlyph(pub Option<Entity>);
 
 /// A component describing a cycle
@@ -64,13 +64,19 @@ pub struct CycleVertices(pub Vec<Entity>);
 #[derive(Resource, Debug, Clone, Reflect)]
 pub struct LevelHandle(pub Handle<LevelData>);
 
-/// Component carrying the data mapping level indices to cycle entities.
+/// Maps entity IDs to all game entities
 #[derive(Resource, Clone, Debug, Default, Reflect)]
-pub struct CycleEntities(pub Vec<Entity>);
-
-/// Component carrying the data mapping level indices to vertex entities.
-#[derive(Resource, Clone, Debug, Default, Reflect)]
-pub struct VertexEntities(pub Vec<Entity>);
+pub struct GameStateEcsIndex {
+	/// Entities that represent cycles, in the same order they appear
+	/// in [`LevelData::cycles`]
+	pub cycles: Vec<Entity>,
+	/// Entities that represent vertices, in the same order they appear
+	/// in [`LevelData::vertices`]
+	pub vertices: Vec<Entity>,
+	/// Entities that represent objects, in the same order they appear
+	/// in [`GameState::objects`](super::ecs_free_logic::GameState::objects)
+	pub objects: Vec<Entity>,
+}
 
 /// Reference to the target cycle of a link entity.
 /// The source cycle is its [`ChildOf`].

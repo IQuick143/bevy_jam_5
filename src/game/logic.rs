@@ -3,6 +3,7 @@ use crate::{send_event, AppSet};
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
+		.init_resource::<GameState>()
 		.init_resource::<IsLevelCompleted>()
 		.add_event::<GameLayoutChanged>()
 		.add_event::<RotateCycleGroup>()
@@ -20,8 +21,8 @@ pub fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				cycle_group_rotation_relay_system.run_if(on_event::<RotateCycleGroup>),
-				cycle_rotation_system.run_if(on_event::<RotateSingleCycle>),
+				cycle_group_rotation_system.run_if(on_event::<RotateCycleGroup>),
+				update_vertex_and_object_relations_in_ecs.run_if(on_event::<RotateSingleCycle>),
 				(
 					(button_trigger_check_system, level_completion_check_system).chain(),
 					cycle_turnability_update_system,
@@ -64,6 +65,28 @@ pub struct RotateCycle {
 	pub amount: usize,
 }
 
+impl RotateCycle {
+	pub fn from_flat_amount(target_cycle: Entity, amount: i64) -> Self {
+		Self {
+			target_cycle,
+			direction: if amount > 0 {
+				CycleTurningDirection::Nominal
+			} else {
+				CycleTurningDirection::Reverse
+			},
+			amount: amount.unsigned_abs() as usize,
+		}
+	}
+
+	pub fn flat_amount(&self) -> i64 {
+		let amount = self.amount as i64;
+		match self.direction {
+			CycleTurningDirection::Nominal => amount,
+			CycleTurningDirection::Reverse => -amount,
+		}
+	}
+}
+
 /// Internal event sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle, ignores linkages.
 ///
@@ -94,320 +117,82 @@ pub struct GameLayoutChanged;
 #[derive(Event, Clone, Copy, Default, Debug)]
 pub struct TurnBlockedByGroupConflict(pub usize);
 
-/// Contains an overview of conditions that are needed to complete the level
-#[derive(Resource, Debug, Clone, Copy, Reflect, Default)]
-pub struct LevelCompletionConditions {
-	pub buttons_present: u32,
-	pub buttons_triggered: u32,
-	pub flags_present: u32,
-	pub flags_occupied: u32,
-}
-
-impl LevelCompletionConditions {
-	/// Whether the level has been completed
-	pub fn is_level_completed(&self) -> bool {
-		self.is_goal_unlocked() && self.flags_occupied == self.flags_present
-	}
-
-	/// Whether all secondary completion criteria have been met,
-	/// and the level will be completed as soon as all players travel to a goal
-	pub fn is_goal_unlocked(&self) -> bool {
-		self.buttons_present == self.buttons_triggered
-	}
-}
-
 /// Contains an information whether the level being played has been completed
 /// in this session (making moves after completion does not matter)
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
 pub struct IsLevelCompleted(pub bool);
 
-/// Relays rotation events on a cycle group to the individual cycles
-fn cycle_group_rotation_relay_system(
+/// Rotates cycles in game state and sends out events to other systems
+fn cycle_group_rotation_system(
 	mut group_events: EventReader<RotateCycleGroup>,
 	mut single_events: EventWriter<RotateSingleCycle>,
 	mut update_event: EventWriter<GameLayoutChanged>,
 	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
-	cycles_q: Query<(&Cycle, &CycleVertices)>,
-	vertex_q: Query<(&Vertex, &PlacedObject)>,
-	cycle_index: Res<CycleEntities>,
-	level_asset: Res<Assets<LevelData>>,
-	level_handle: Res<LevelHandle>,
-) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
-		log::error!("Non-existent level asset being referenced.");
-		return;
-	};
-	let mut detector_rotations = vec![0i64; level.detectors.len()];
-	let mut group_rotations = vec![0i64; level.groups.len()];
-	for group_rotation in group_events.read() {
-		let Ok((source_cycle, _)) = cycles_q.get(group_rotation.0.target_cycle) else {
+	mut game_state: ResMut<GameState>,
+	cycles_q: Query<&Cycle>,
+	entity_index: Res<GameStateEcsIndex>,
+	active_level: ActiveLevelData,
+) -> Result<(), BevyError> {
+	let level = active_level.get()?;
+	for event in group_events.read() {
+		let Ok(target_cycle) = cycles_q.get(event.0.target_cycle) else {
+			warn!("Cycle referenced by rotation event not found in ECS");
 			continue;
 		};
-		// We assume that the RotateCycleGroup event always targets a valid target and a rotation happens.
-		// Queue the rotation
-		match group_rotation.0.direction * source_cycle.orientation_within_group {
-			CycleTurningDirection::Nominal => {
-				group_rotations[source_cycle.group_id] += group_rotation.0.amount as i64
-			}
-			CycleTurningDirection::Reverse => {
-				group_rotations[source_cycle.group_id] -= group_rotation.0.amount as i64
-			}
-		}
-	}
-
-	// Propagate one-way links
-	for step in level.execution_order.iter().copied() {
-		match step {
-			DetectorOrGroup::Group(group_id) => {
-				if group_rotations[group_id] == 0 {
-					continue;
+		let rotate_by = event.0.flat_amount();
+		match game_state.turn_cycle_with_links(level, target_cycle.id, rotate_by) {
+			Err(err) => warn!("Could not turn cycle: {err}"),
+			Ok(result) => {
+				for clash in &result.clashes {
+					blocked_event.write(TurnBlockedByGroupConflict(*clash));
 				}
-				for link in level.groups[group_id].linked_groups.iter() {
-					group_rotations[link.target_group] +=
-						link.direction * group_rotations[group_id] * link.multiplicity as i64
-				}
-				for &detector_cycle_id in level.groups[group_id].outgoing_detector_cycles.iter() {
-					// Gather data
-					let detector_cycle = level.cycles.get(detector_cycle_id).unwrap();
-					let n_vertices = detector_cycle.vertex_indices.len();
-					let n_detectors = detector_cycle.detector_indices.len();
-					if n_vertices == 0 || n_detectors == 0 {
-						#[cfg(any(debug_assertions, test))]
-						unreachable!("Cycle with no vertices or no detectors is somehow in the `outgoing_detector_cycles` list.");
-						#[cfg(not(any(debug_assertions, test)))]
-						{
-							warn!("Cycle with no vertices or no detectors is somehow in the `outgoing_detector_cycles` list.");
+				if !result.blocked() && result.layout_changed() {
+					update_event.write(GameLayoutChanged);
+					for (cycle, amount) in result.cycles_turned_by(level) {
+						let Some(cycle_id) = entity_index.cycles.get(cycle) else {
+							warn!("Cycle referenced by rotation event not found in ECS");
 							continue;
-						}
-					}
-					// Grab vertex occupancy data from ECS
-					let Some((_, cycle_vertices)) = cycle_index
-						.0
-						.get(detector_cycle_id)
-						.and_then(|entity| cycles_q.get(*entity).ok())
-					else {
-						#[cfg(any(debug_assertions, test))]
-						unreachable!("Nonexistent cycle!!");
-						#[cfg(not(any(debug_assertions, test)))]
-						{
-							error!(
-								"Cycle {} missing in ECS but referenced in logic!",
-								detector_cycle_id
-							);
-							return;
-						}
-					};
-					if n_vertices != cycle_vertices.0.len() {
-						#[cfg(any(debug_assertions, test))]
-						panic!("Incorrect amount of vertices on a cycle.");
-						#[cfg(not(any(debug_assertions, test)))]
-						{
-							error!("Incorrect amount of vertices on a cycle.");
-							return;
-						}
-					}
-					let vertex_occupation: Vec<bool> = (0..n_vertices)
-						.map(|index| {
-							let Ok((_, occupancy)) = vertex_q.get(cycle_vertices.0[index]) else {
-								#[cfg(any(debug_assertions, test))]
-								unreachable!("Nonexistent vertex!!");
-								#[cfg(not(any(debug_assertions, test)))]
-								{
-									error!("Nonexistent vertex!!");
-									return;
-								}
-							};
-							occupancy.0.is_some()
-						})
-						.collect();
-					let n_objects = vertex_occupation.iter().filter(|x| **x).count();
-					// Nothing to detect
-					if n_objects == 0 {
-						continue;
-					}
-					// Compute rotation characteristics
-					let n_rotations =
-						detector_cycle.orientation_within_group * group_rotations[group_id];
-					let full_turns = n_rotations.signum()
-						* i64::div_euclid(n_rotations.abs(), n_vertices as i64);
-					let partial_turns = (n_rotations.signum()
-						* i64::rem_euclid(n_rotations.abs(), n_vertices as i64))
-						as isize;
-					for (detector_id, _) in detector_cycle.detector_indices.iter() {
-						detector_rotations[*detector_id] += (n_objects as i64) * full_turns;
-					}
-					if partial_turns != 0 {
-						// How long of a strip of vertices needs to be scanned for objects
-						let interval_length = partial_turns.unsigned_abs();
-						// Counts how many objects are in a interval <i - interval_length, i) (accounting for looping)
-						let mut objects_in_interval = vec![0; n_vertices];
-						let mut running_total: i32 = 0;
-						#[allow(clippy::needless_range_loop)]
-						for i in (n_vertices - interval_length)..n_vertices {
-							if vertex_occupation[i] {
-								running_total += 1;
-							}
-						}
-						for i in 0..n_vertices {
-							// Write the value
-							objects_in_interval[i] = running_total;
-							// Move the interval
-							let back_index = (n_vertices - interval_length + i) % n_vertices;
-							if vertex_occupation[back_index] {
-								running_total -= 1;
-							}
-							if vertex_occupation[i] {
-								running_total += 1;
-							}
-						}
-						for &(detector_id, offset) in detector_cycle.detector_indices.iter() {
-							let detections = if partial_turns > 0 {
-								objects_in_interval[(offset + 1) % n_vertices]
-							} else {
-								-objects_in_interval[(offset + 1 + interval_length) % n_vertices]
-							} as i64;
-							detector_rotations[detector_id] += detections;
-						}
-					}
-				}
-			}
-			DetectorOrGroup::Detector(detector_id) => {
-				if detector_rotations[detector_id] == 0 {
-					continue;
-				}
-				for link in level.detectors[detector_id].linked_groups.iter() {
-					match link.direction {
-						LinkedCycleDirection::Coincident => {
-							group_rotations[link.target_group] +=
-								detector_rotations[detector_id] * link.multiplicity as i64
-						}
-						LinkedCycleDirection::Inverse => {
-							group_rotations[link.target_group] -=
-								detector_rotations[detector_id] * link.multiplicity as i64
-						}
+						};
+						single_events.write(RotateSingleCycle(RotateCycle::from_flat_amount(
+							*cycle_id, amount,
+						)));
 					}
 				}
 			}
 		}
 	}
-
-	// Decide if the turns is valid
-	let forbidden = {
-		// TODO: Change this code, so that it takes into account the modulo rotations to enable certain mechanisms, Unless this is decided against.
-		let mut forbidden = false;
-		let mut pair_index = 0;
-		for group_a_id in 0..level.groups.len() {
-			if group_rotations[group_a_id] != 0 {
-				while pair_index < level.forbidden_group_pairs.len() {
-					let (a, b, _) = level.forbidden_group_pairs[pair_index];
-					if a > group_a_id {
-						break;
-					}
-					if a == group_a_id && group_rotations[b] != 0 {
-						forbidden = true;
-						blocked_event.write(TurnBlockedByGroupConflict(pair_index));
-					}
-					pair_index += 1;
-				}
-			}
-		}
-		forbidden
-	};
-
-	if forbidden {
-		// TODO: Emit an event informing other systems the rotation hadn't went through.
-		return;
-	}
-
-	// Apply rotations
-	for (group_data, &rotation) in level.groups.iter().zip(group_rotations.iter()) {
-		if rotation == 0 {
-			continue;
-		}
-		let direction = if rotation > 0 {
-			CycleTurningDirection::Nominal
-		} else {
-			CycleTurningDirection::Reverse
-		};
-		update_event.write(GameLayoutChanged);
-		single_events.write_batch(
-			group_data
-				.cycles
-				.iter()
-				.map(|&(id, relative_direction)| {
-					// println!("Sending {}", id);
-					RotateCycle {
-						target_cycle: cycle_index.0[id],
-						direction: direction * relative_direction,
-						amount: rotation.unsigned_abs() as usize,
-					}
-				})
-				.map(RotateSingleCycle),
-		);
-	}
+	Ok(())
 }
 
 /// System that carries out the rotations on cycles hit by an event queueing a rotation.
-fn cycle_rotation_system(
-	cycles_q: Query<&CycleVertices>,
-	mut events: EventReader<RotateSingleCycle>,
+fn update_vertex_and_object_relations_in_ecs(
 	mut vertices_q: Query<&mut PlacedObject>,
 	mut objects_q: Query<&mut VertexPosition>,
+	entity_index: Res<GameStateEcsIndex>,
+	game_state: Res<GameState>,
 ) {
-	for event in events.read() {
-		if event.0.amount == 0 {
-			log::warn!("0 rotation was emitted.");
+	for (object_index, vertex_id) in game_state
+		.objects_by_vertex
+		.iter()
+		.zip(&entity_index.vertices)
+	{
+		let Ok(mut vertex_object_ref) = vertices_q.get_mut(*vertex_id) else {
+			warn!("Vertex referenced by game state not found in ECS");
 			continue;
-		}
-		if let Ok(cycle_vertices) = cycles_q
-			.get(event.0.target_cycle)
-			.inspect_err(|e| log::warn!("{e}"))
-		{
-			let n_vertices = cycle_vertices.0.len();
-			if n_vertices == 0 {
-				// No vertices, skip the cycle
+		};
+		if let Some(object_index) = object_index {
+			let Some(object_id) = entity_index.objects.get(*object_index) else {
+				warn!("Mismatched GameStateEcsIndex and GameState");
 				continue;
-			}
-			let amount = {
-				let step = event.0.amount % n_vertices;
-				if step == 0 {
-					// NOOP, we are done
-					continue;
-				}
-				match event.0.direction {
-					CycleTurningDirection::Nominal => step,
-					CycleTurningDirection::Reverse => n_vertices - step,
-				}
 			};
-			fn gcd(mut a: usize, mut b: usize) -> usize {
-				while a > 0 {
-					(a, b) = (b % a, a);
-				}
-				b
-			}
-			let n_loops = gcd(amount, n_vertices);
-			let loop_len = n_vertices / n_loops;
-			for loop_id in 0..n_loops {
-				let mut cached_object_id = None;
-				for i in 0..loop_len + 1 {
-					let index = (loop_id + amount * i) % n_vertices;
-					let vertex_id = cycle_vertices.0[index];
-					if let Some(cached_object_id) = cached_object_id {
-						if let Ok(mut object_pos) = objects_q
-							.get_mut(cached_object_id)
-							.inspect_err(|e| log::warn!("{e}"))
-						{
-							object_pos.0 = vertex_id;
-						}
-					}
-					if let Ok(mut placed_object_id) = vertices_q
-						.get_mut(vertex_id)
-						.inspect_err(|e| log::warn!("{e}"))
-					{
-						std::mem::swap(&mut cached_object_id, &mut placed_object_id.0);
-					}
-				}
-			}
+			let Ok(mut object_vertex_ref) = objects_q.get_mut(*object_id) else {
+				warn!("Object referenced by game state not found in ECS");
+				continue;
+			};
+			vertex_object_ref.set_if_neq(PlacedObject(Some(*object_id)));
+			object_vertex_ref.set_if_neq(VertexPosition(*vertex_id));
+		} else {
+			vertex_object_ref.set_if_neq(PlacedObject(None));
 		}
 	}
 }
@@ -494,37 +279,17 @@ fn button_trigger_check_system(
 }
 
 fn level_completion_check_system(
-	flags_q: Query<&IsTriggered, With<Goal>>,
-	buttons_q: Query<&IsTriggered, With<SokoButton>>,
+	level: ActiveLevelData,
+	game_state: ResMut<GameState>,
 	mut completion: ResMut<LevelCompletionConditions>,
 	mut is_completed: ResMut<IsLevelCompleted>,
-) {
-	let mut new_completion = LevelCompletionConditions {
-		buttons_present: 0,
-		buttons_triggered: 0,
-		flags_present: 0,
-		flags_occupied: 0,
-	};
-
-	for is_triggered in &flags_q {
-		new_completion.flags_present += 1;
-		if is_triggered.0 {
-			new_completion.flags_occupied += 1;
-		}
-	}
-	for is_triggered in &buttons_q {
-		new_completion.buttons_present += 1;
-		if is_triggered.0 {
-			new_completion.buttons_triggered += 1;
-		}
-	}
-
-	if new_completion.is_level_completed() {
+) -> Result<(), BevyError> {
+	*completion = game_state.get_completion(level.get()?);
+	if completion.is_level_completed() {
 		// This stays true until a different level is loaded
 		is_completed.set_if_neq(IsLevelCompleted(true));
 	}
-
-	*completion = new_completion;
+	Ok(())
 }
 
 impl std::ops::Mul<LinkedCycleDirection> for CycleTurningDirection {
