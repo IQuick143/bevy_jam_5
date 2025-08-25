@@ -96,6 +96,9 @@ pub struct GameStateEcsIndex {
 	/// Entities that represent objects, in the same order they appear
 	/// in [`GameState::objects`](super::logic::GameState::objects)
 	pub objects: Vec<Entity>,
+	/// Entities that represent glyphs, in the same order their
+	/// owner vertices appear in [`LevelData::vertices`]
+	pub glyphs: Vec<Option<Entity>>,
 }
 
 /// Reference to the target cycle of a link entity.

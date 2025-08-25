@@ -1,6 +1,6 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
-use super::{components::*, level::*, logic::TurnCycleResult, prelude::*};
+use super::{components::*, logic::TurnCycleResult, prelude::*};
 use crate::{send_event, AppSet};
 
 pub fn plugin(app: &mut App) {
@@ -25,14 +25,15 @@ pub fn plugin(app: &mut App) {
 			Update,
 			(
 				cycle_group_rotation_system.run_if(on_event::<RotateCycleGroup>),
-				update_vertex_and_object_relations_in_ecs.run_if(on_event::<RotateSingleCycle>),
 				(
-					(button_trigger_check_system, level_completion_check_system).chain(),
+					update_vertex_and_object_relations_in_ecs,
+					button_trigger_check_system,
+					level_completion_check_system,
 					cycle_turnability_update_system,
 				)
-					.run_if(on_event::<GameLayoutChanged>),
+					.run_if(on_event::<GameLayoutChanged>)
+					.after(cycle_group_rotation_system),
 			)
-				.chain()
 				.in_set(AppSet::GameLogic),
 		);
 }
@@ -179,52 +180,32 @@ fn cycle_turnability_update_system(
 }
 
 fn button_trigger_check_system(
-	vertices_q: Query<(&PlacedObject, &PlacedGlyph)>,
-	mut objects_q: Query<(&mut IsTriggered, &ObjectData)>,
-	mut glyphs_q: Query<(&mut IsTriggered, &GlyphData), Without<ObjectData>>,
-) {
-	for (object, glyph) in &vertices_q {
-		let mut object = object.0.and_then(|id| {
-			objects_q
-				.get_mut(id)
-				.inspect_err(|e| log::warn!("{e}"))
-				.ok()
-		});
-		let mut glyph = glyph
-			.0
-			.and_then(|id| glyphs_q.get_mut(id).inspect_err(|e| log::warn!("{e}")).ok());
-
-		match (&mut object, &mut glyph) {
-			(
-				Some((ref mut object_triggered, ObjectData::Player)),
-				Some((ref mut glyph_triggered, GlyphData::Flag)),
-			) => {
-				object_triggered.set_if_neq(IsTriggered(true));
-				glyph_triggered.set_if_neq(IsTriggered(true));
-			}
-			(
-				Some((ref mut object_triggered, ObjectData::Box(box_color))),
-				Some((ref mut glyph_triggered, GlyphData::Button(button_color))),
-			) => {
-				let colors_compatible = (*box_color)
-					.and_then(|box_color| {
-						button_color.map(|button_color| box_color == button_color.0)
-					})
-					// If either thing is colorless, they are considered compatible
-					.unwrap_or(true);
-				object_triggered.set_if_neq(IsTriggered(colors_compatible));
-				glyph_triggered.set_if_neq(IsTriggered(colors_compatible));
-			}
-			_ => {
-				if let Some((mut is_triggered, _)) = object {
-					is_triggered.set_if_neq(IsTriggered(false));
+	mut things_q: Query<&mut IsTriggered>,
+	level: PlayingLevelData,
+	game_state: Res<GameState>,
+	entity_index: Res<GameStateEcsIndex>,
+) -> Result<(), BevyError> {
+	let level = level.get()?;
+	let vertices = game_state
+		.trigger_states(level)
+		.zip(&game_state.objects_by_vertex)
+		.zip(&entity_index.glyphs);
+	for ((is_triggered, object_index), glyph_id) in vertices {
+		let object_id = object_index
+			.and_then(|i| entity_index.objects.get(i))
+			.copied();
+		for id in [object_id, *glyph_id].into_iter().flatten() {
+			match things_q.get_mut(id) {
+				Ok(mut is_entity_triggered) => {
+					is_entity_triggered.set_if_neq(IsTriggered(is_triggered));
 				}
-				if let Some((mut is_triggered, _)) = glyph {
-					is_triggered.set_if_neq(IsTriggered(false));
+				Err(err) => {
+					warn!("Object or glyph referenced by entity index not found in ECS: {err}")
 				}
 			}
-		};
+		}
 	}
+	Ok(())
 }
 
 fn level_completion_check_system(

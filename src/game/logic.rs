@@ -137,27 +137,44 @@ impl GameState {
 		Ok(())
 	}
 
+	/// Iterates the level's vertices in order, checking whether each vertex has
+	/// both a glyph and a matching object
+	pub fn trigger_states<'a>(
+		&'a self,
+		level_data: &'a LevelData,
+	) -> impl Iterator<Item = bool> + 'a {
+		level_data
+			.vertices
+			.iter()
+			.zip(&self.objects_by_vertex)
+			.map(|(vertex, object_index)| {
+				let object = object_index.map(|i| self.objects[i]);
+				match (vertex.glyph, object) {
+					(Some(GlyphData::Flag), Some(ObjectData::Player)) => true,
+					(Some(GlyphData::Button(button_color)), Some(ObjectData::Box(box_color))) => {
+						let button_color = button_color.map(|(c, _)| c);
+						button_color.is_none() || box_color.is_none() || button_color == box_color
+					}
+					_ => false,
+				}
+			})
+	}
+
 	/// Evaluate the level's completion conditions
 	pub fn get_completion(&self, level_data: &LevelData) -> LevelCompletionConditions {
 		let mut completion = LevelCompletionConditions::default();
-		for (vertex, object_index) in level_data.vertices.iter().zip(&self.objects_by_vertex) {
-			let object = object_index.map(|i| self.objects[i]);
+		for (is_triggered, vertex) in self.trigger_states(level_data).zip(&level_data.vertices) {
 			match &vertex.glyph {
 				Some(GlyphData::Flag) => {
 					completion.flags_present += 1;
-					if matches!(object, Some(ObjectData::Player)) {
+					if is_triggered {
 						completion.flags_occupied += 1;
 					}
 				}
-				Some(GlyphData::Button(button_color)) => {
+				Some(GlyphData::Button(_)) => {
 					completion.buttons_present += 1;
-					if let Some(ObjectData::Box(box_color)) = object {
-						let is_triggered = button_color.is_none_or(|(button_color, _)| {
-							box_color.is_none_or(|box_color| button_color == box_color)
-						});
-						if is_triggered {
-							completion.buttons_triggered += 1;
-						}
+					if is_triggered {
+						completion.buttons_triggered += 1;
 					}
 				}
 				_ => {}

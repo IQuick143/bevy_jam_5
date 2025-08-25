@@ -257,7 +257,7 @@ fn spawn_primary_level_entities(
 			let entity_index = GameStateEcsIndex {
 				cycles,
 				vertices,
-				objects: Vec::new(),
+				..default()
 			};
 			commands.insert_resource(entity_index);
 		} else {
@@ -279,6 +279,7 @@ fn spawn_thing_entities(
 	};
 	let session = session_id.0;
 	let mut object_ids = Vec::new();
+	let mut glyph_ids = Vec::new();
 	for (&id, data) in entity_index.vertices.iter().zip(&level.vertices) {
 		let object_id = data.object.map(|object| match object {
 			ObjectData::Player => commands
@@ -370,8 +371,10 @@ fn spawn_thing_entities(
 		if let Some(object_id) = object_id {
 			object_ids.push(object_id);
 		}
+		glyph_ids.push(glyph_id);
 	}
 	entity_index.objects = object_ids;
+	entity_index.glyphs = glyph_ids;
 }
 
 fn set_vertex_transforms(mut query: Query<(&VertexData, &mut Transform), Added<VertexData>>) {
