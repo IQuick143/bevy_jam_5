@@ -38,7 +38,7 @@ pub fn plugin(app: &mut App) {
 }
 
 /// Determines whether a cycle may be turned at any given moment
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, PartialEq, Eq, Debug, Clone, Reflect)]
 pub struct ComputedCycleTurnability(pub bool);
 
 /// Denotes whether an [`Object`] or [`Glyph`] entity is currently
@@ -47,15 +47,6 @@ pub struct ComputedCycleTurnability(pub bool);
 /// A boolean flag is used instead of a marker to enable change detection.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Default, Debug, Reflect)]
 pub struct IsTriggered(pub bool);
-
-/// Enumerates directions in which a cycle can turn
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CycleTurningDirection {
-	/// Rotate in nominal direction of the cycle
-	Nominal,
-	/// Rotate in reverse direction of the cycle
-	Reverse,
-}
 
 /// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
 #[derive(Clone, Copy, Debug)]
@@ -171,35 +162,20 @@ fn update_vertex_and_object_relations_in_ecs(
 }
 
 fn cycle_turnability_update_system(
-	vertices_q: Query<&PlacedObject>,
-	players_q: Query<(), With<Player>>,
-	mut cycles_q: Query<(
-		&CycleVertices,
-		&CycleTurnability,
-		&mut ComputedCycleTurnability,
-	)>,
-) {
-	'next_cycle: for (vertex_ids, turnability, mut computed_turnability) in &mut cycles_q {
-		match *turnability {
-			CycleTurnability::Always => computed_turnability.0 = true,
-			CycleTurnability::Never => computed_turnability.0 = false,
-			CycleTurnability::WithPlayer => {
-				for &vertex_id in &vertex_ids.0 {
-					let player_is_present = vertices_q
-						.get(vertex_id)
-						.inspect_err(|e| log::warn!("{e}"))
-						.ok()
-						.and_then(|object_id| object_id.0.and_then(|id| players_q.get(id).ok()))
-						.is_some();
-					if player_is_present {
-						computed_turnability.0 = true;
-						continue 'next_cycle;
-					}
-				}
-				computed_turnability.0 = false;
+	mut cycles_q: Query<&mut ComputedCycleTurnability>,
+	level: PlayingLevelData,
+	game_state: Res<GameState>,
+	entity_index: Res<GameStateEcsIndex>,
+) -> Result<(), BevyError> {
+	let level = level.get()?;
+	for (cycle_index, cycle_id) in entity_index.cycles.iter().enumerate() {
+		if let Ok(mut computed_turnability) = cycles_q.get_mut(*cycle_id) {
+			if let Ok(is_turnable) = game_state.is_cycle_turnable(level, cycle_index) {
+				computed_turnability.set_if_neq(ComputedCycleTurnability(is_turnable));
 			}
 		}
 	}
+	Ok(())
 }
 
 fn button_trigger_check_system(
@@ -263,24 +239,4 @@ fn level_completion_check_system(
 		is_completed.set_if_neq(IsLevelCompleted(true));
 	}
 	Ok(())
-}
-
-impl std::ops::Mul<LinkedCycleDirection> for CycleTurningDirection {
-	type Output = Self;
-	fn mul(self, rhs: LinkedCycleDirection) -> Self::Output {
-		match rhs {
-			LinkedCycleDirection::Coincident => self,
-			LinkedCycleDirection::Inverse => -self,
-		}
-	}
-}
-
-impl std::ops::Neg for CycleTurningDirection {
-	type Output = Self;
-	fn neg(self) -> Self::Output {
-		match self {
-			CycleTurningDirection::Nominal => CycleTurningDirection::Reverse,
-			CycleTurningDirection::Reverse => CycleTurningDirection::Nominal,
-		}
-	}
 }

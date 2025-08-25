@@ -1,5 +1,7 @@
 //! ECS-independent gameplay logic
 
+use crate::game::level::CycleTurnability;
+
 use super::level::{DetectorOrGroup, GlyphData, LevelData, ObjectData};
 use bevy::prelude::*;
 
@@ -162,6 +164,27 @@ impl GameState {
 			}
 		}
 		completion
+	}
+
+	/// Checks whether a cycle can be turned with regard to current game state
+	pub fn is_cycle_turnable(
+		&self,
+		level: &LevelData,
+		cycle_index: usize,
+	) -> Result<bool, GameStateActionError> {
+		let Some(cycle) = level.cycles.get(cycle_index) else {
+			return Err(GameStateActionError::CycleIndexOutOfRange(cycle_index));
+		};
+		Ok(match cycle.turnability {
+			CycleTurnability::Always => true,
+			CycleTurnability::Never => false,
+			CycleTurnability::WithPlayer => cycle.vertex_indices.iter().copied().any(|vertex_id| {
+				self.objects_by_vertex
+					.get(vertex_id)
+					.and_then(|x| *x)
+					.is_some_and(|object_id| self.objects[object_id] == ObjectData::Player)
+			}),
+		})
 	}
 
 	/// Calculates how many turns of individual cycles are caused by turning a given cycle

@@ -22,7 +22,7 @@ pub mod prelude {
 		history::{MoveHistory, UndoMove},
 		level::LevelData,
 		logic::{GameState, LevelCompletionConditions, TurnCycleResult},
-		logic_relay::{CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, RotateCycle},
+		logic_relay::{GameLayoutChanged, IsLevelCompleted, RotateCycle},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 		synchronization::IsLevelPersistentlyCompleted,
 	};
