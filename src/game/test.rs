@@ -177,7 +177,7 @@ use crate::game::level::ObjectData;
 /// Metatest for asserting that running the headless game works.
 #[test]
 fn test_app() {
-	let mut app = setup_app();
+	let mut app = app_with_level("");
 	for _ in 0..5 {
 		app.update();
 		let vertex_data = app.read_vertices();
