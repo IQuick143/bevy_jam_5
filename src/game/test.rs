@@ -1,9 +1,9 @@
 mod utils {
 	use crate::game::{
-		components::{Cycle, GameStateEcsIndex, PlacedGlyph, PlacedObject, Vertex},
-		level::{backend::builder as parser, GlyphData, LevelData, ObjectData, ThingData},
-		logic_relay::{RotateCycle, RotateCycleGroup},
-		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
+		components::{Cycle, GameStateEcsIndex, Vertex},
+		level::{backend::builder as parser, GlyphData, ObjectData},
+		logic_relay::RotateCycleGroup,
+		prelude::*,
 	};
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
@@ -99,43 +99,17 @@ mod utils {
 	}
 
 	fn read_system(
-		vertices: Query<(&VertexDebugID, &PlacedObject, &PlacedGlyph)>,
-		things: Query<&ThingData>,
+		vertices: Query<&VertexDebugID>,
+		game_state: Res<GameState>,
+		level: PlayingLevelData,
 	) -> VertexDebugData {
+		let level = level.get().expect("Playing level is not available");
 		let n_vertices = vertices.iter().count();
 		let mut glyph_data = vec![None; n_vertices];
 		let mut object_data = vec![None; n_vertices];
-		for (vertex, object, glyph) in vertices.iter() {
-			let i = vertex.0;
-
-			// Extract glyph information
-			glyph_data[i] = glyph
-				.0
-				.map(|e| {
-					things
-						.get(e)
-						.expect("Vertex points to a non-existent entity")
-				})
-				.map(|thing| match thing {
-					ThingData::Object(_object_data) => {
-						panic!("Glyph data points to an object, not a glyph")
-					}
-					ThingData::Glyph(glyph_data) => *glyph_data,
-				});
-			// Extract glyph information
-			object_data[i] = object
-				.0
-				.map(|e| {
-					things
-						.get(e)
-						.expect("Vertex points to a non-existent entity")
-				})
-				.map(|thing| match thing {
-					ThingData::Object(object_data) => *object_data,
-					ThingData::Glyph(_glyph_data) => {
-						panic!("Glyph data points to an object, not a glyph")
-					}
-				});
+		for &VertexDebugID(i) in &vertices {
+			glyph_data[i] = level.vertices[i].glyph;
+			object_data[i] = game_state.objects_by_vertex[i].map(|i| game_state.objects[i]);
 		}
 
 		VertexDebugData {

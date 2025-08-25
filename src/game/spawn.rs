@@ -280,7 +280,7 @@ fn spawn_thing_entities(
 	let session = session_id.0;
 	let mut object_ids = Vec::new();
 	let mut glyph_ids = Vec::new();
-	for (&id, data) in entity_index.vertices.iter().zip(&level.vertices) {
+	for data in &level.vertices {
 		let object_id = data.object.map(|object| match object {
 			ObjectData::Player => commands
 				.spawn((
@@ -289,7 +289,6 @@ fn spawn_thing_entities(
 					object,
 					ThingData::Object(object),
 					session,
-					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -302,7 +301,6 @@ fn spawn_thing_entities(
 					object,
 					ThingData::Object(object),
 					session,
-					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -316,7 +314,6 @@ fn spawn_thing_entities(
 					object,
 					ThingData::Object(object),
 					session,
-					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -331,7 +328,6 @@ fn spawn_thing_entities(
 					glyph,
 					ThingData::Glyph(glyph),
 					session,
-					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -344,7 +340,6 @@ fn spawn_thing_entities(
 					glyph,
 					ThingData::Glyph(glyph),
 					session,
-					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -358,16 +353,12 @@ fn spawn_thing_entities(
 					color_data,
 					ThingData::Glyph(glyph),
 					session,
-					VertexPosition(id),
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
 				))
 				.id(),
 		});
-		commands
-			.entity(id)
-			.insert((PlacedObject(object_id), PlacedGlyph(glyph_id)));
 		if let Some(object_id) = object_id {
 			object_ids.push(object_id);
 		}
@@ -385,16 +376,31 @@ fn set_vertex_transforms(mut query: Query<(&VertexData, &mut Transform), Added<V
 }
 
 fn set_thing_transforms(
-	mut things_q: Query<(&VertexPosition, &mut Transform), Added<VertexPosition>>,
-	vertices_q: Query<&VertexData>,
-) {
-	for (vertex, mut transform) in &mut things_q {
-		let vertex_data = vertices_q
-			.get(vertex.0)
-			.expect("Parent of ThingData does not have VertexData component");
-		transform.translation.x = vertex_data.position.x;
-		transform.translation.y = vertex_data.position.y;
+	mut things_q: Query<&mut Transform>,
+	level: PlayingLevelData,
+	game_state: Res<GameState>,
+	entity_index: Res<GameStateEcsIndex>,
+) -> Result<(), BevyError> {
+	let level = level.get()?;
+	let vertices = level
+		.vertices
+		.iter()
+		.zip(&entity_index.glyphs)
+		.zip(&game_state.objects_by_vertex);
+	for ((vertex_data, glyph_id), object_index) in vertices {
+		let object_id = object_index
+			.and_then(|i| entity_index.objects.get(i))
+			.copied();
+		for id in [object_id, *glyph_id].into_iter().flatten() {
+			if let Ok(mut transform) = things_q.get_mut(id) {
+				transform.translation.x = vertex_data.position.x;
+				transform.translation.y = vertex_data.position.y;
+			} else {
+				warn!("Entity referenced by the index not found in ECS");
+			}
+		}
 	}
+	Ok(())
 }
 
 fn set_cycle_transforms(

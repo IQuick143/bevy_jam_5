@@ -26,7 +26,6 @@ pub fn plugin(app: &mut App) {
 			(
 				cycle_group_rotation_system.run_if(on_event::<RotateCycleGroup>),
 				(
-					update_vertex_and_object_relations_in_ecs,
 					button_trigger_check_system,
 					level_completion_check_system,
 					cycle_turnability_update_system,
@@ -127,39 +126,6 @@ fn cycle_group_rotation_system(
 		}
 	}
 	Ok(())
-}
-
-/// System that carries out the rotations on cycles hit by an event queueing a rotation.
-fn update_vertex_and_object_relations_in_ecs(
-	mut vertices_q: Query<&mut PlacedObject>,
-	mut objects_q: Query<&mut VertexPosition>,
-	entity_index: Res<GameStateEcsIndex>,
-	game_state: Res<GameState>,
-) {
-	for (object_index, vertex_id) in game_state
-		.objects_by_vertex
-		.iter()
-		.zip(&entity_index.vertices)
-	{
-		let Ok(mut vertex_object_ref) = vertices_q.get_mut(*vertex_id) else {
-			warn!("Vertex referenced by game state not found in ECS");
-			continue;
-		};
-		if let Some(object_index) = object_index {
-			let Some(object_id) = entity_index.objects.get(*object_index) else {
-				warn!("Mismatched GameStateEcsIndex and GameState");
-				continue;
-			};
-			let Ok(mut object_vertex_ref) = objects_q.get_mut(*object_id) else {
-				warn!("Object referenced by game state not found in ECS");
-				continue;
-			};
-			vertex_object_ref.set_if_neq(PlacedObject(Some(*object_id)));
-			object_vertex_ref.set_if_neq(VertexPosition(*vertex_id));
-		} else {
-			vertex_object_ref.set_if_neq(PlacedObject(None));
-		}
-	}
 }
 
 fn cycle_turnability_update_system(

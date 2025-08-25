@@ -28,21 +28,9 @@ pub struct Object;
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Glyph;
 
-/// Link to a vertex this object is occupying
-#[derive(Component, Debug, Clone, PartialEq, Eq, Reflect)]
-pub struct VertexPosition(pub Entity);
-
 /// A vertex (node) on the circle
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
-
-/// Component of the Vertex representing a link to an object occupying this place
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
-pub struct PlacedObject(pub Option<Entity>);
-
-/// Component of the Vertex representing a link to a glyph occupying this place
-#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
-pub struct PlacedGlyph(pub Option<Entity>);
 
 /// A component describing a cycle
 #[derive(Component, Debug, Clone, Reflect)]
