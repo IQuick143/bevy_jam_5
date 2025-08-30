@@ -198,7 +198,6 @@ fn spawn_primary_level_entities(
 						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
-						CycleVertices(cycle.vertex_indices.iter().map(|i| vertices[*i]).collect()),
 						Transform::default(),
 						Visibility::default(),
 					))

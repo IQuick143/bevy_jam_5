@@ -312,7 +312,7 @@ fn cycle_center_interaction_visuals_update_system(
 	cycles_q: Query<(&CycleInteraction, &Cycle)>,
 	all_cycles_q: Query<(
 		&ComputedCycleTurnability,
-		&CycleVertices,
+		&Cycle,
 		Option<&CycleCenterVisualEntities>,
 		Option<&CycleRingVisualEntities>,
 	)>,
@@ -340,7 +340,7 @@ fn cycle_center_interaction_visuals_update_system(
 			.iter()
 			.map(|(cycle_id, _)| entity_index.cycles[*cycle_id])
 		{
-			let (is_turnable, vertices, center_visuals, ring_visuals) =
+			let (is_turnable, cycle, center_visuals, ring_visuals) =
 				match all_cycles_q.get(cycle_id) {
 					Ok(x) => x,
 					Err(e) => {
@@ -364,12 +364,12 @@ fn cycle_center_interaction_visuals_update_system(
 				}
 			}
 
-			vertices
-				.0
+			level.cycles[cycle.id]
+				.vertex_indices
 				.iter()
 				.filter_map(|id| {
 					vertices_q
-						.get(*id)
+						.get(entity_index.vertices[*id])
 						.inspect_err(|e| {
 							log::warn!("CycleVertices refers to a non-vertex entity: {e}")
 						})

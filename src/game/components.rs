@@ -43,10 +43,6 @@ pub struct Cycle {
 	pub orientation_within_group: LinkedCycleDirection,
 }
 
-/// A list of [`Vertex`] entities that are part of a single cycle
-#[derive(Component, Debug, Clone, Reflect)]
-pub struct CycleVertices(pub Vec<Entity>);
-
 /// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
 /// Is only present if the level is correct and logical systems can run on it.
 #[derive(Resource, Clone, Debug, Default, Deref, DerefMut, Reflect)]
