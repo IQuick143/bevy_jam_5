@@ -52,7 +52,8 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					create_vertex_visuals,
 					create_cycle_visuals,
-					create_link_visuals,
+					create_hard_link_visuals,
+					create_one_way_link_visuals,
 					create_thing_sprites,
 					create_box_color_markers,
 					create_button_color_markers,
@@ -207,11 +208,7 @@ fn spawn_primary_level_entities(
 
 		// Spawn links
 		// Links are children of their source cycle
-		for link in &level.declared_links {
-			let target_cycle = commands
-				.get_entity(cycles[link.dest_cycle])
-				.expect("The entity has just been spawned")
-				.id();
+		for (index, link) in level.declared_links.iter().enumerate() {
 			let source_center_pos = level.cycles[link.source_cycle]
 				.center_sprite_appearence
 				.0
@@ -221,18 +218,14 @@ fn spawn_primary_level_entities(
 				.expect("The entity has just been spawned")
 				.with_children(|children| {
 					children.spawn((
-						LinkTargetCycle(target_cycle),
+						DeclaredLink(index),
 						link.direction,
 						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
 				});
 		}
-		for link in &level.declared_one_way_links {
-			let target_cycle = commands
-				.get_entity(cycles[link.dest_cycle])
-				.expect("The entity has just been spawned")
-				.id();
+		for (index, link) in level.declared_one_way_links.iter().enumerate() {
 			let source_center_pos = level.cycles[link.source]
 				.center_sprite_appearence
 				.0
@@ -242,9 +235,8 @@ fn spawn_primary_level_entities(
 				.expect("The entity has just been spawned")
 				.with_children(|children| {
 					children.spawn((
-						LinkTargetCycle(target_cycle),
+						DeclaredOneWayLink(index),
 						link.direction,
-						LinkMultiplicity(link.multiplicity),
 						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
@@ -525,77 +517,95 @@ fn create_cycle_visuals(
 	}
 }
 
-fn create_link_visuals(
+fn create_hard_link_visuals(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
-	standard_meshes: Res<GameObjectMeshes>,
-	digit_atlas: Res<DigitAtlas>,
-	palette: Res<ThingPalette>,
-	links_q: Query<
-		(
-			Entity,
-			&ChildOf,
-			&LinkTargetCycle,
-			&LinkedCycleDirection,
-			Option<&LinkMultiplicity>,
-		),
-		Added<LinkTargetCycle>,
-	>,
-	mut cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
+	links_q: Query<(Entity, &DeclaredLink), Added<DeclaredLink>>,
+	level: PlayingLevelData,
 ) {
-	for (id, source, dest, direction, multiplicity) in &links_q {
+	let Ok(level) = level.get() else {
+		error!("Playing level data is not available");
+		return;
+	};
+
+	for (id, &DeclaredLink(index)) in &links_q {
 		// Fetch endpoints
-		let a = get_link_endpoint(source.parent(), cycles_q.reborrow());
-		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
+		let declared_link = &level.declared_links[index];
+		let a = get_link_endpoint(declared_link.source_cycle, level);
+		let b = get_link_endpoint(declared_link.dest_cycle, level);
 		let (Some(a), Some(b)) = (a, b) else {
 			continue;
 		};
 
 		// Spawn the visuals under the link entity
 		commands.entity(id).with_children(|children| {
-			if let Some(multiplicity) = multiplicity {
-				create_one_way_link_visual(
-					children,
-					a,
-					b,
-					*direction,
-					**multiplicity,
-					&mut meshes,
-					materials.link_lines.clone_weak(),
-					standard_meshes.one_way_link_tips.clone_weak(),
-					standard_meshes.one_way_link_backheads.clone_weak(),
-					&digit_atlas,
-					palette.link_multiplicity_label,
-					palette.inverted_link_multiplicity_label,
-				);
-			} else {
-				create_hard_link_visual(
-					children,
-					a,
-					b,
-					*direction,
-					&mut meshes,
-					materials.link_lines.clone_weak(),
-				);
-			}
+			create_hard_link_visual(
+				children,
+				a,
+				b,
+				declared_link.direction,
+				&mut meshes,
+				materials.link_lines.clone_weak(),
+			);
 		});
 	}
 }
 
-fn get_link_endpoint(
-	cycle_id: Entity,
-	query: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
-) -> Option<Vec2> {
-	let Ok((placement, center_sprite)) = query.get(cycle_id) else {
+fn create_one_way_link_visuals(
+	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
+	materials: Res<GameObjectMaterials>,
+	standard_meshes: Res<GameObjectMeshes>,
+	digit_atlas: Res<DigitAtlas>,
+	palette: Res<ThingPalette>,
+	links_q: Query<(Entity, &DeclaredOneWayLink), Added<DeclaredOneWayLink>>,
+	level: PlayingLevelData,
+) {
+	let Ok(level) = level.get() else {
+		error!("Playing level data is not available");
+		return;
+	};
+
+	for (id, &DeclaredOneWayLink(index)) in &links_q {
+		// Fetch endpoints
+		let declared_link = &level.declared_one_way_links[index];
+		let a = get_link_endpoint(declared_link.source, level);
+		let b = get_link_endpoint(declared_link.dest_cycle, level);
+		let (Some(a), Some(b)) = (a, b) else {
+			continue;
+		};
+
+		// Spawn the visuals under the link entity
+		commands.entity(id).with_children(|children| {
+			create_one_way_link_visual(
+				children,
+				a,
+				b,
+				declared_link.direction,
+				declared_link.multiplicity,
+				&mut meshes,
+				materials.link_lines.clone_weak(),
+				standard_meshes.one_way_link_tips.clone_weak(),
+				standard_meshes.one_way_link_backheads.clone_weak(),
+				&digit_atlas,
+				palette.link_multiplicity_label,
+				palette.inverted_link_multiplicity_label,
+			);
+		});
+	}
+}
+
+fn get_link_endpoint(cycle_index: usize, level: &LevelData) -> Option<Vec2> {
+	let Some(cycle) = level.cycles.get(cycle_index) else {
 		// Skip drawing link if its endpoints are not cycles
-		log::warn!("Link endpoint entity does not have CyclePlacement or CycleCenterSpriteAppearence component");
+		log::warn!("Link endpoint is out of range");
 		return None;
 	};
 
-	if let Some(center_offset) = center_sprite.0 {
+	if let Some(center_offset) = cycle.center_sprite_appearence.0 {
 		// Links are anchored at cycle center sprites
-		Some(placement.position + center_offset)
+		Some(cycle.placement.position + center_offset)
 	} else {
 		// Links cannot be drawn if a cycle does not have center sprite
 		log::warn!("Visible link to a cycle with invisible center sprite");

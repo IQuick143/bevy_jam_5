@@ -85,14 +85,17 @@ pub struct GameStateEcsIndex {
 	pub glyphs: Vec<Option<Entity>>,
 }
 
-/// Reference to the target cycle of a link entity.
-/// The source cycle is its [`ChildOf`].
-#[derive(Component, Debug, Clone, Copy, Reflect)]
-pub struct LinkTargetCycle(pub Entity);
+/// Component that identifies an entity that represents a declared hard link
+///
+/// Parametrized by the index of the link in [`LevelData::declared_links`]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, Deref, DerefMut)]
+pub struct DeclaredLink(pub usize);
 
-/// Multiplicity of a one-way link
-#[derive(Component, Clone, Copy, Deref, DerefMut, Debug, Reflect)]
-pub struct LinkMultiplicity(pub u64);
+/// Component that identifies an entity that represents a declared one-way link
+///
+/// Parametrized by the index of the link in [`LevelData::declared_one_way_links`]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, Deref, DerefMut)]
+pub struct DeclaredOneWayLink(pub usize);
 
 /// A temporary marker object used for showing something to the player
 /// Gets invalidated (all these entities despawn)
