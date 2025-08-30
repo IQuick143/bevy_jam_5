@@ -309,10 +309,10 @@ fn cycle_interaction_visuals_changed(
 }
 
 fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<(&CycleInteraction, &Cycle)>,
-	all_cycles_q: Query<(
-		&ComputedCycleTurnability,
+	cycles_q: Query<(
+		&CycleInteraction,
 		&Cycle,
+		&ComputedCycleTurnability,
 		Option<&CycleCenterVisualEntities>,
 		Option<&CycleRingVisualEntities>,
 	)>,
@@ -329,69 +329,53 @@ fn cycle_center_interaction_visuals_update_system(
 		return;
 	};
 
-	let mut meshes_to_repaint = HashMap::<_, _>::default();
-	let mut outlines_to_repaint = HashMap::<_, _>::default();
-	let mut sprites_to_repaint = HashMap::<_, _>::default();
+	let selected_groups = cycles_q
+		.iter()
+		.filter(|(interaction, ..)| **interaction != CycleInteraction::None)
+		.map(|(_, cycle, ..)| cycle.group_id)
+		.collect::<HashSet<_>>();
 
-	for (interaction, cycle) in &cycles_q {
-		let is_selected = *interaction != CycleInteraction::None;
-		for cycle_id in level.groups[cycle.group_id]
-			.cycles
-			.iter()
-			.map(|(cycle_id, _)| entity_index.cycles[*cycle_id])
-		{
-			let (is_turnable, cycle, center_visuals, ring_visuals) =
-				match all_cycles_q.get(cycle_id) {
-					Ok(x) => x,
-					Err(e) => {
-						log::warn!("LinkedCycles refers to a non-cycle entity: {e}");
-						continue;
-					}
-				};
+	let mut meshes_to_repaint = HashMap::<Entity, CycleStatus>::default();
+	let mut outlines_to_repaint = HashMap::<Entity, CycleStatus>::default();
+	let mut sprites_to_repaint = HashMap::<Entity, CycleStatus>::default();
 
-			let cycle_status = if is_selected {
-				CycleStatus::Selected
-			} else if is_turnable.0 {
-				CycleStatus::Ready
-			} else {
-				CycleStatus::Disabled
-			};
+	for (_, cycle, is_turnable, center_visuals, ring_visuals) in &cycles_q {
+		let is_selected = selected_groups.contains(&cycle.group_id);
 
-			if let Some(visuals) = center_visuals {
-				let sprite_status = sprites_to_repaint.entry(visuals.sprite).or_default();
-				if *sprite_status < cycle_status {
-					*sprite_status = cycle_status
-				}
-			}
+		let cycle_status = if is_selected {
+			CycleStatus::Selected
+		} else if is_turnable.0 {
+			CycleStatus::Ready
+		} else {
+			CycleStatus::Disabled
+		};
 
-			level.cycles[cycle.id]
-				.vertex_indices
-				.iter()
-				.filter_map(|id| {
-					vertices_q
-						.get(entity_index.vertices[*id])
-						.inspect_err(|e| {
-							log::warn!("CycleVertices refers to a non-vertex entity: {e}")
-						})
-						.ok()
-						.map(|visuals| (visuals.node, visuals.outline))
-				})
-				.chain(
-					ring_visuals
-						.into_iter()
-						.map(|visuals| (visuals.ring, visuals.outline)),
-				)
-				.for_each(|(body, outline)| {
-					let mesh_status = meshes_to_repaint.entry(body).or_default();
-					if *mesh_status < cycle_status {
-						*mesh_status = cycle_status;
-					}
-					let mesh_status = outlines_to_repaint.entry(outline).or_default();
-					if *mesh_status < cycle_status {
-						*mesh_status = cycle_status;
-					}
-				});
+		if let Some(visuals) = center_visuals {
+			let sprite_status = sprites_to_repaint.entry(visuals.sprite).or_default();
+			*sprite_status = (*sprite_status).max(cycle_status);
 		}
+
+		level.cycles[cycle.id]
+			.vertex_indices
+			.iter()
+			.filter_map(|id| {
+				vertices_q
+					.get(entity_index.vertices[*id])
+					.inspect_err(|e| log::warn!("CycleVertices refers to a non-vertex entity: {e}"))
+					.ok()
+					.map(|visuals| (visuals.node, visuals.outline))
+			})
+			.chain(
+				ring_visuals
+					.into_iter()
+					.map(|visuals| (visuals.ring, visuals.outline)),
+			)
+			.for_each(|(body, outline)| {
+				let mesh_status = meshes_to_repaint.entry(body).or_default();
+				*mesh_status = (*mesh_status).max(cycle_status);
+				let mesh_status = outlines_to_repaint.entry(outline).or_default();
+				*mesh_status = (*mesh_status).max(cycle_status);
+			});
 	}
 
 	for (id, status) in sprites_to_repaint {
