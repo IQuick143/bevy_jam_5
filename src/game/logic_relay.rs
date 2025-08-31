@@ -129,20 +129,23 @@ fn cycle_group_rotation_system(
 }
 
 fn cycle_turnability_update_system(
-	mut cycles_q: Query<&mut ComputedCycleTurnability>,
+	mut cycles_q: Query<(&Cycle, &mut ComputedCycleTurnability)>,
 	level: PlayingLevelData,
 	game_state: Res<GameState>,
-	entity_index: Res<GameStateEcsIndex>,
-) -> Result<(), BevyError> {
-	let level = level.get()?;
-	for (cycle_index, cycle_id) in entity_index.cycles.iter().enumerate() {
-		if let Ok(mut computed_turnability) = cycles_q.get_mut(*cycle_id) {
-			if let Ok(is_turnable) = game_state.is_cycle_turnable(level, cycle_index) {
+) {
+	let Ok(level) = level.get() else {
+		error!("Current playing level data is not available");
+		return;
+	};
+
+	for (cycle, mut computed_turnability) in &mut cycles_q {
+		match game_state.is_cycle_turnable(level, cycle.id) {
+			Ok(is_turnable) => {
 				computed_turnability.set_if_neq(ComputedCycleTurnability(is_turnable));
 			}
+			Err(err) => warn!("Error when updating cycle turnability: {err}"),
 		}
 	}
-	Ok(())
 }
 
 fn button_trigger_check_system(
