@@ -4,6 +4,7 @@ mod camera;
 #[cfg(feature = "dev")]
 mod dev_tools;
 mod epilang;
+pub mod explorer;
 mod game;
 mod graphics;
 mod persistent;
