@@ -1,8 +1,6 @@
 //! ECS-independent gameplay logic
 
-use crate::game::level::CycleTurnability;
-
-use super::level::{DetectorOrGroup, GlyphData, LevelData, ObjectData};
+use super::level::{CycleTurnability, DetectorOrGroup, GlyphData, LevelData, ObjectData};
 use bevy::prelude::*;
 
 /// Contains an overview of conditions that are needed to complete the level
