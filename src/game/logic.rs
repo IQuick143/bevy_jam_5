@@ -67,7 +67,7 @@ impl GameState {
 		cycle_index: usize,
 		rotate_by: i64,
 	) -> Result<TurnCycleResult, GameStateActionError> {
-		let result = self.predict_turn_cycle_with_links(level, cycle_index, rotate_by)?;
+		let result = self.simulate_turn_cycle_with_links(level, cycle_index, rotate_by)?;
 		if !result.blocked() {
 			for (group_data, &rotation) in level.groups.iter().zip(&result.groups_turned_by) {
 				if rotation == 0 {
@@ -83,7 +83,7 @@ impl GameState {
 	}
 
 	/// Calculates the outcome of trying to turn a cycle and all cycles linked to it
-	pub fn predict_turn_cycle_with_links(
+	pub fn simulate_turn_cycle_with_links(
 		&self,
 		level: &LevelData,
 		cycle_index: usize,
