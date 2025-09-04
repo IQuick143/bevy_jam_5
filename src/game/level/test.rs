@@ -35,13 +35,16 @@ mod layout_tests {
 		)
 		.unwrap_ok();
 
-		/* TODO
-		load(r"
+		// TODO: Add test asserting this hint to be necessary
+		load(
+			r"
 		v = vertex();
 		circle(cycle(v _); -7, 0, 10);
 		circle(cycle(v); +7, 0, 10);
-		").unwrap_ok();
-		*/
+		hint_vertex(v; 0, 1);
+		",
+		)
+		.unwrap_ok();
 
 		load(
 			r"
@@ -51,6 +54,141 @@ mod layout_tests {
 		",
 		)
 		.unwrap_ok();
+	}
+
+	#[test]
+	fn basic_dicycles_double() {
+		// TODO: This should fail with an Err
+		// load(
+		// 	r"
+		// a = vertex();
+		// b = vertex();
+		// circle(cycle(a b _ _ _ _); -10, 0, 10);
+		// circle(cycle(b a _ _ _ _); +10, 0, 10);
+		// ",
+		// )
+
+		load(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _ _); -7, 0, 10);
+		circle(cycle(b a _ _ _ _); +7, 0, 10);
+		hint_vertex(a; 0, 2);
+		",
+		)
+		.unwrap_ok();
+
+		load(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _ _); -7, 0, 10);
+		circle(cycle(b a _ _ _ _); +7, 0, 10);
+		hint_vertex(b; 0, -2);
+		",
+		)
+		.unwrap_ok();
+
+		// TODO: Check that `a` was actually placed near `5,5`
+		load(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _); 0, 0, 10);
+		circle(cycle(a _ b _ _); 0, 0, 10);
+		hint_vertex(a; 5, 5);
+		",
+		)
+		.unwrap_ok();
+	}
+
+	#[test]
+	fn indirect_hints() {
+		load(
+			r"
+		a = vertex();
+		b = vertex();
+		rando_vertex = vertex();
+		circle(cycle(a b _ _ _ _); -7, 0, 10);
+		circle(cycle(b a _ _ rando_vertex _); +7, 0, 10);
+		# This hint is enough to decide the ambiguity
+		hint_vertex(rando_vertex; 0, +7);
+		",
+		)
+		.unwrap_ok();
+	}
+
+	#[test]
+	fn road_rage() {
+		// This level can be decided with no hints
+		load(
+			r"
+name = 'Car';
+hint = 'Fun fact: Originally this level was thought to be impossible!';
+
+box = box('lr');
+
+a = vertex(box);
+b = vertex(box);
+c = vertex(box);
+d = vertex(box);
+e = vertex(box);
+f = vertex(button() player());
+g = vertex();
+h = vertex(box button());
+i = vertex();
+j = vertex(box flag());
+k = vertex();
+l = vertex(button());
+m = vertex(button());
+n = vertex(button());
+o = vertex(button());
+p = vertex(button());
+
+circle(cycle('manual'; a b h m l f); 0 0 1);
+circle(cycle('manual'; i n m g b c); 1 0 1);
+circle(cycle('manual'; j o n h c d); 2 0 1);
+circle(cycle('manual'; k p o i d e); 3 0 1);",
+		)
+		.unwrap_ok();
+	}
+
+	#[test]
+	fn olympic() {
+		// A chain of cycles can also be automatically resolved
+		load(
+			r"
+name = 'Olympic';
+hint = 'Tip: In levels with a single player and manual cycles, it''s helpful to think about the player''s routes through the crossings.';
+
+box = box('desc_neg');
+
+dx = 4;
+dy = 3;
+r = 3;
+
+a = vertex(player() flag());
+b = vertex();
+c = vertex();
+d = vertex();
+e = vertex();
+f = vertex();
+g = vertex();
+h = vertex();
+i = vertex();
+circle(cycle('manual'; a box b c box _);          -2 * dx, dy, r);
+circle(cycle('manual'; _ _ c b d e);                  -dx,  0, r);
+circle(cycle('manual'; _ _ f g e d);                    0, dy, r);
+circle(cycle('manual'; _ _ g f h i);                   dx,  0, r);
+circle(cycle('manual'; _ button() button() _ i h); 2 * dx, dy, r);
+",
+		).unwrap_ok();
+	}
+
+	#[test]
+	fn olympic_polymorphic() {
+		// TODO: Stress test the pair-pair resolver
 	}
 
 	#[test]
@@ -69,6 +207,11 @@ bgo = vertex();
 circle(cycle('manual'; _ _ _ _ bgo bri bgi bro); -sep / 2, 0, r);
 circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
 circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# Hint that the central vertices go near the center
+hint_vertex(bri; 0, 0);
+hint_vertex(rgi; 0, 0);
+hint_vertex(bgi; 0, 0);
 ",
 		)
 		.unwrap_ok();

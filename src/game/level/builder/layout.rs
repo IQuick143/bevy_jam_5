@@ -2,7 +2,7 @@ use super::error::*;
 use super::*;
 
 use crate::graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH};
-use std::f32::consts::PI;
+use std::{cmp::Ordering, f32::consts::PI};
 
 use bevy::math::bounding::{Aabb2d, BoundingVolume};
 use itertools::Itertools as _;
@@ -58,29 +58,6 @@ impl LevelBuilder {
 		Ok(())
 	}
 
-	/// Assigns a fixed placement to a partially placed vertex
-	/// ## Parameters
-	/// - `target_vertex` - Index of the vertex to place
-	/// - `clock_angle` - Clock angle between the center of the owning
-	///   cycle and the vertex (zero is up, positive is clockwise)
-	pub fn place_vertex_at_angle(
-		&mut self,
-		target_vertex: usize,
-		clock_angle: f32,
-	) -> Result<(), LevelBuilderError> {
-		if target_vertex >= self.vertices.len() {
-			return Err(LevelBuilderError::VertexIndexOutOfRange(target_vertex));
-		}
-		match self.vertices[target_vertex].position {
-			IntermediateVertexPosition::Free => {
-				Err(LevelBuilderError::VertexNotPartiallyPlaced(target_vertex))
-			}
-			IntermediateVertexPosition::Fixed(_) => {
-				Err(LevelBuilderError::VertexAlreadyPlaced(target_vertex))
-			}
-		}
-	}
-
 	/// Assigns a fixed placement to a vertex
 	/// ## Parameters
 	/// - `target_vertex` - Index of the vertex to place
@@ -102,6 +79,32 @@ impl LevelBuilder {
 				Ok(())
 			}
 		}
+	}
+
+	/// Assigns a hint placement to a vertex, overriding any previous hint
+	/// ## Parameters
+	/// - `target_vertex` - Index of the vertex to add a hint for
+	/// - `position` - Actual position near which the vertex should be placed
+	///
+	/// ## Notes
+	/// Used during decisions in the layout solver.
+	/// If the vertex has a finite set of placements to choose from,
+	/// it will pick the closest one to the hint.
+	///
+	/// If the vertex is constrained to a cycle, it will use the closest point on the cycle
+	/// (if the cycle shape supports that, shapeless cycles do not)
+	///
+	/// If the vertex has a fixed placement by other means, the hint is ignored
+	pub fn add_vertex_hint(
+		&mut self,
+		target_vertex: usize,
+		position: Vec2,
+	) -> Result<(), LevelBuilderError> {
+		if target_vertex >= self.vertices.len() {
+			return Err(LevelBuilderError::VertexIndexOutOfRange(target_vertex));
+		}
+		self.vertices[target_vertex].hint_position = Some(position);
+		Ok(())
 	}
 
 	pub fn set_color_label_appearences_for_cycle(
@@ -495,40 +498,113 @@ impl LevelBuilder {
 						match intersection {
 							IntersectionPointSet::Unconstrained => todo!(), // Bad
 							IntersectionPointSet::Cycle(cycle) => {
-								IntersectionPointSet::Cycle(cycle)
+								// Use hints if possible
+								match self.vertices[vertex].hint_position {
+									Some(hint_position) => {
+										if let Some(CyclePlacement {
+											position: cycle_position,
+											shape,
+										}) = self.cycles[cycle].placement
+										{
+											match shape {
+												CycleShape::Circle(radius) => {
+													let distance_from_center =
+														cycle_position.distance(hint_position);
+													if distance_from_center
+														<= absolute_precision_limit
+													{
+														// TODO: Warning about ineffective hint
+														IntersectionPointSet::Cycle(cycle)
+													} else {
+														let offset = hint_position - cycle_position;
+														let point = cycle_position
+															+ (radius / distance_from_center)
+																* offset;
+														IntersectionPointSet::Single(
+															insert_point_if_needed(
+																&mut points,
+																&mut vertices_interested_in_point,
+																&points_on_cycle,
+																point,
+																vertex,
+																parent_cycle,
+															),
+														)
+													}
+												}
+											}
+										} else {
+											// Should not be happening
+											debug_assert!(false, "Unplaced cycle");
+											IntersectionPointSet::Cycle(cycle)
+										}
+									}
+									None => IntersectionPointSet::Cycle(cycle),
+								}
 							}
 							IntersectionPointSet::Pair(point_a, point_b) => {
-								// TODO: Use hints (if available) to decide here
-								let point_a = insert_point_if_needed(
-									&mut points,
-									&mut vertices_interested_in_point,
-									&points_on_cycle,
-									point_a,
-									vertex,
-									parent_cycle,
-								);
-								let point_b = insert_point_if_needed(
-									&mut points,
-									&mut vertices_interested_in_point,
-									&points_on_cycle,
-									point_b,
-									vertex,
-									parent_cycle,
-								);
-								if point_a != point_b {
-									for &cycle in cycles.iter() {
-										problematic_cycles.push(cycle);
-										points_on_cycle[cycle].push(point_a);
-										points_on_cycle[cycle].push(point_b);
+								match match match self.vertices[vertex].hint_position {
+									Some(position) => {
+										match Vec2::distance_squared(point_a, position)
+											.partial_cmp(&Vec2::distance_squared(point_b, position))
+										{
+											Some(Ordering::Greater) => One(point_b),
+											Some(Ordering::Less) => One(point_a),
+											// TODO: Emit a warning about an ineffective hint
+											Some(Ordering::Equal) => Two(point_a, point_b),
+											None => Two(point_a, point_b),
+										}
 									}
-									IntersectionPointSet::Pair(point_a, point_b)
-								} else {
-									// This is a stupid branch, but it's possible if you got a really degenerate thing going on.
-									for &cycle in cycles.iter() {
-										problematic_cycles.push(cycle);
-										points_on_cycle[cycle].push(point_a);
+									None => Two(point_a, point_b),
+								} {
+									Two(point_a, point_b) => {
+										let point_a = insert_point_if_needed(
+											&mut points,
+											&mut vertices_interested_in_point,
+											&points_on_cycle,
+											point_a,
+											vertex,
+											parent_cycle,
+										);
+										let point_b = insert_point_if_needed(
+											&mut points,
+											&mut vertices_interested_in_point,
+											&points_on_cycle,
+											point_b,
+											vertex,
+											parent_cycle,
+										);
+										if point_a == point_b {
+											// This is a stupid branch, but it's possible if you got a really degenerate thing going on.
+											One(point_a)
+										} else {
+											Two(point_a, point_b)
+										}
 									}
-									IntersectionPointSet::Single(point_a)
+									One(point) => One(insert_point_if_needed(
+										&mut points,
+										&mut vertices_interested_in_point,
+										&points_on_cycle,
+										point,
+										vertex,
+										parent_cycle,
+									)),
+								} {
+									Two(point_a, point_b) => {
+										for &cycle in cycles.iter() {
+											problematic_cycles.push(cycle);
+											points_on_cycle[cycle].push(point_a);
+											points_on_cycle[cycle].push(point_b);
+										}
+										IntersectionPointSet::Pair(point_a, point_b)
+									}
+									One(point) => {
+										for &cycle in cycles.iter() {
+											problematic_cycles.push(cycle);
+											points_on_cycle[cycle].push(point);
+										}
+										IntersectionPointSet::Single(point)
+									}
 								}
 							}
 							IntersectionPointSet::Single(point) => {
@@ -573,8 +649,11 @@ impl LevelBuilder {
 			)
 		};
 
-		// println!("{:?}", point_data.points);
-		// println!("{:?}", point_data.vertex_constraints);
+		#[cfg(all(test, debug_assertions))]
+		{
+			println!("{:?}", point_data.points);
+			println!("{:?}", point_data.vertex_constraints);
+		}
 
 		// Attempt to solve `Pair` vertices
 		// TODO: Optimise
@@ -782,7 +861,8 @@ impl LevelBuilder {
 			}
 		}
 
-		// println!("{:?}", point_data.vertex_constraints);
+		#[cfg(all(test, debug_assertions))]
+		println!("{:?}", point_data.vertex_constraints);
 
 		// Convert `Single` placements into `Fixed` values
 		for (vertex_id, vertex_placement) in self.vertices.iter_mut().enumerate() {

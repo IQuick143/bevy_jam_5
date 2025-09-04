@@ -84,6 +84,8 @@ pub struct PartialVec2 {
 struct IntermediateVertexData {
 	/// Position of the vertex, if it has been placed yet
 	pub position: IntermediateVertexPosition,
+	/// Position to use as a hint when placing the vertex, if any
+	pub hint_position: Option<Vec2>,
 	/// Object that lies on the vertex, if any
 	pub object: Option<ObjectData>,
 	/// Glyph that lies on the vertex, if any
@@ -161,16 +163,6 @@ impl IntermediateVertexPosition {
 	}
 }
 
-/// Placement of a vertex that belongs to a placed cycle,
-/// but does not yet have a definite placement
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct PartiallyBoundVertexPosition {
-	/// Index of the cycle that owns the vertex
-	owner_cycle: usize,
-	/// Index of the vertex within the owner cycle's vertex list
-	index_in_owner: usize,
-}
-
 /// Placeholder appearence for a button color label that will be
 /// styled with regard to the cycle it is placed on
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -192,21 +184,6 @@ enum OneTwo<T> {
 	Two(T, T),
 }
 use OneTwo::*;
-
-impl<T> OneTwo<T> {
-	fn add_to_one(self, x: T) -> Result<Self, (T, T, T)> {
-		match self {
-			One(a) => Ok(Two(a, x)),
-			Two(a, b) => Err((a, b, x)),
-		}
-	}
-
-	fn first(self) -> T {
-		match self {
-			One(x) | Two(x, _) => x,
-		}
-	}
-}
 
 impl<T> IntoIterator for OneTwo<T> {
 	type Item = T;

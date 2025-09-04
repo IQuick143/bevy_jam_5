@@ -57,6 +57,7 @@ impl LevelBuilder {
 	pub fn add_vertex(&mut self) -> Result<usize, LevelBuilderError> {
 		self.vertices.push(IntermediateVertexData {
 			position: IntermediateVertexPosition::Free,
+			hint_position: None,
 			object: None,
 			glyph: None,
 			color_label_appearence: None,
