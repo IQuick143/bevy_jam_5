@@ -231,7 +231,7 @@ pub enum GlyphType {
 	Flag,
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Reflect)]
 pub enum ObjectData {
 	Box(Option<LogicalColor>),
 	Player,
@@ -280,7 +280,7 @@ pub enum LinkedCycleDirection {
 
 /// Logical color of a box or a button.
 /// Colored buttons require a box of the same color
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Hash, Reflect)]
 pub struct LogicalColor {
 	/// Index of the color.
 	/// For pictogram colors, this is the ID of the pictogram.

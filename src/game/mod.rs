@@ -9,6 +9,7 @@ pub mod history;
 mod inputs;
 pub mod level;
 pub mod logic;
+pub mod logic_relay;
 pub mod spawn;
 mod synchronization;
 #[cfg(test)]
@@ -17,12 +18,11 @@ pub mod test;
 pub mod prelude {
 	#[allow(unused_imports)]
 	pub use super::{
+		components::{GameStateEcsIndex, LevelHandle, PlayingLevelData},
 		history::{MoveHistory, UndoMove},
 		level::LevelData,
-		logic::{
-			CycleTurningDirection, GameLayoutChanged, IsLevelCompleted, LevelCompletionConditions,
-			RotateCycle,
-		},
+		logic::{GameState, LevelCompletionConditions, TurnCycleResult},
+		logic_relay::{GameLayoutChanged, IsLevelCompleted, RotateCycle},
 		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
 		synchronization::IsLevelPersistentlyCompleted,
 	};
@@ -34,7 +34,7 @@ use bevy::prelude::*;
 pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((
 		spawn::plugin,
-		logic::plugin,
+		logic_relay::plugin,
 		animation::plugin,
 		drawing::plugin,
 		inputs::plugin,

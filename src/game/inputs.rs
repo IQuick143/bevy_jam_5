@@ -1,9 +1,9 @@
 use super::{
 	level::{CyclePlacement, CycleShape},
-	logic::*,
+	logic_relay::*,
 	prelude::*,
 };
-use crate::{camera::CameraHarness, ui::freeze::ui_not_frozen, AppSet};
+use crate::{camera::CameraHarness, game::components::Cycle, ui::freeze::ui_not_frozen, AppSet};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -94,20 +94,19 @@ fn cycle_inputs_system(
 }
 
 fn cycle_rotation_with_inputs_system(
-	query: Query<(Entity, &CycleInteraction), Changed<CycleInteraction>>,
+	query: Query<(&Cycle, &CycleInteraction), Changed<CycleInteraction>>,
 	mut rot_events: EventWriter<RotateCycleGroup>,
 	mut record_events: EventWriter<RecordCycleGroupRotation>,
 ) {
-	for (id, interaction) in &query {
-		let direction = match interaction {
-			CycleInteraction::LeftClick => CycleTurningDirection::Nominal,
-			CycleInteraction::RightClick => CycleTurningDirection::Reverse,
+	for (cycle, interaction) in &query {
+		let amount = match interaction {
+			CycleInteraction::LeftClick => 1,
+			CycleInteraction::RightClick => -1,
 			_ => return,
 		};
 		let rotation = RotateCycle {
-			target_cycle: id,
-			direction,
-			amount: 1,
+			target_cycle: cycle.id,
+			amount,
 		};
 		rot_events.write(RotateCycleGroup(rotation));
 		record_events.write(RecordCycleGroupRotation(rotation));

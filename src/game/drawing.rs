@@ -1,5 +1,5 @@
 use super::{
-	components::*, inputs::CycleInteraction, logic::*, prelude::*, spawn::LastLevelSessionId,
+	components::*, inputs::CycleInteraction, logic_relay::*, prelude::*, spawn::LastLevelSessionId,
 };
 use crate::{
 	assets::{HandleMap, ImageKey},
@@ -309,90 +309,73 @@ fn cycle_interaction_visuals_changed(
 }
 
 fn cycle_center_interaction_visuals_update_system(
-	cycles_q: Query<(&CycleInteraction, &Cycle)>,
-	all_cycles_q: Query<(
+	cycles_q: Query<(
+		&CycleInteraction,
+		&Cycle,
 		&ComputedCycleTurnability,
-		&CycleVertices,
 		Option<&CycleCenterVisualEntities>,
 		Option<&CycleRingVisualEntities>,
 	)>,
-	cycle_index: Res<CycleEntities>,
-	level_asset: Res<Assets<LevelData>>,
-	level_handle: Res<LevelHandle>,
+	entity_index: Res<GameStateEcsIndex>,
+	level: PlayingLevelData,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
 	mut meshes_q: Query<(&mut Transform, &mut MeshMaterial2d<ColorMaterial>)>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
+	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
 
-	let mut meshes_to_repaint = HashMap::<_, _>::default();
-	let mut outlines_to_repaint = HashMap::<_, _>::default();
-	let mut sprites_to_repaint = HashMap::<_, _>::default();
+	let selected_groups = cycles_q
+		.iter()
+		.filter(|(interaction, ..)| **interaction != CycleInteraction::None)
+		.map(|(_, cycle, ..)| cycle.group_id)
+		.collect::<HashSet<_>>();
 
-	for (interaction, cycle) in &cycles_q {
-		let is_selected = *interaction != CycleInteraction::None;
-		for cycle_id in level.groups[cycle.group_id]
-			.cycles
-			.iter()
-			.map(|(cycle_id, _)| cycle_index.0[*cycle_id])
-		{
-			let (is_turnable, vertices, center_visuals, ring_visuals) =
-				match all_cycles_q.get(cycle_id) {
-					Ok(x) => x,
-					Err(e) => {
-						log::warn!("LinkedCycles refers to a non-cycle entity: {e}");
-						continue;
-					}
-				};
+	let mut meshes_to_repaint = HashMap::<Entity, CycleStatus>::default();
+	let mut outlines_to_repaint = HashMap::<Entity, CycleStatus>::default();
+	let mut sprites_to_repaint = HashMap::<Entity, CycleStatus>::default();
 
-			let cycle_status = if is_selected {
-				CycleStatus::Selected
-			} else if is_turnable.0 {
-				CycleStatus::Ready
-			} else {
-				CycleStatus::Disabled
-			};
+	for (_, cycle, is_turnable, center_visuals, ring_visuals) in &cycles_q {
+		let is_selected = selected_groups.contains(&cycle.group_id);
 
-			if let Some(visuals) = center_visuals {
-				let sprite_status = sprites_to_repaint.entry(visuals.sprite).or_default();
-				if *sprite_status < cycle_status {
-					*sprite_status = cycle_status
-				}
-			}
+		let cycle_status = if is_selected {
+			CycleStatus::Selected
+		} else if is_turnable.0 {
+			CycleStatus::Ready
+		} else {
+			CycleStatus::Disabled
+		};
 
-			vertices
-				.0
-				.iter()
-				.filter_map(|id| {
-					vertices_q
-						.get(*id)
-						.inspect_err(|e| {
-							log::warn!("CycleVertices refers to a non-vertex entity: {e}")
-						})
-						.ok()
-						.map(|visuals| (visuals.node, visuals.outline))
-				})
-				.chain(
-					ring_visuals
-						.into_iter()
-						.map(|visuals| (visuals.ring, visuals.outline)),
-				)
-				.for_each(|(body, outline)| {
-					let mesh_status = meshes_to_repaint.entry(body).or_default();
-					if *mesh_status < cycle_status {
-						*mesh_status = cycle_status;
-					}
-					let mesh_status = outlines_to_repaint.entry(outline).or_default();
-					if *mesh_status < cycle_status {
-						*mesh_status = cycle_status;
-					}
-				});
+		if let Some(visuals) = center_visuals {
+			let sprite_status = sprites_to_repaint.entry(visuals.sprite).or_default();
+			*sprite_status = (*sprite_status).max(cycle_status);
 		}
+
+		level.cycles[cycle.id]
+			.vertex_indices
+			.iter()
+			.filter_map(|id| {
+				vertices_q
+					.get(entity_index.vertices[*id])
+					.inspect_err(|e| log::warn!("CycleVertices refers to a non-vertex entity: {e}"))
+					.ok()
+					.map(|visuals| (visuals.node, visuals.outline))
+			})
+			.chain(
+				ring_visuals
+					.into_iter()
+					.map(|visuals| (visuals.ring, visuals.outline)),
+			)
+			.for_each(|(body, outline)| {
+				let mesh_status = meshes_to_repaint.entry(body).or_default();
+				*mesh_status = (*mesh_status).max(cycle_status);
+				let mesh_status = outlines_to_repaint.entry(outline).or_default();
+				*mesh_status = (*mesh_status).max(cycle_status);
+			});
 	}
 
 	for (id, status) in sprites_to_repaint {
@@ -468,14 +451,13 @@ fn cycle_blocked_marker_system(
 	mut commands: Commands,
 	mut events: EventReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
-	vertex_index: Res<VertexEntities>,
-	level_asset: Res<Assets<LevelData>>,
-	level_handle: Res<LevelHandle>,
+	entity_index: Res<GameStateEcsIndex>,
+	level: PlayingLevelData,
 	images: Res<HandleMap<ImageKey>>,
 	session: Res<LastLevelSessionId>,
 	palette: Res<ThingPalette>,
 ) {
-	let Some(level) = level_asset.get(&level_handle.0) else {
+	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
@@ -492,8 +474,8 @@ fn cycle_blocked_marker_system(
 	}
 
 	for &vertex in marked_vertices.iter() {
-		let Some(vertex_transform) = vertex_index
-			.0
+		let Some(vertex_transform) = entity_index
+			.cycles
 			.get(vertex)
 			.and_then(|entity| vertices_q.get(*entity).ok())
 		else {
