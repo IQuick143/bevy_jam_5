@@ -79,30 +79,36 @@ impl GameState {
 		})
 	}
 
-	/// Iterates the level's vertices in order, checking whether each vertex has
-	/// both a glyph and a matching object
-	pub fn trigger_states<'a>(
-		&'a self,
-		level_data: &'a LevelData,
-	) -> impl Iterator<Item = bool> + 'a {
-		level_data
+	/// Checks whether a given vertex contains both a glyph and a matching object
+	pub fn is_vertex_triggered(
+		&self,
+		level: &LevelData,
+		vertex_index: usize,
+	) -> Result<bool, GameStateActionError> {
+		let object = *self
+			.objects
+			.get(vertex_index)
+			.ok_or(GameStateActionError::CycleIndexOutOfRange(vertex_index))?;
+		let glyph = level
 			.vertices
-			.iter()
-			.zip(&self.objects)
-			.map(|(vertex, object)| match (vertex.glyph, *object) {
-				(Some(GlyphData::Flag), Some(ObjectData::Player)) => true,
-				(Some(GlyphData::Button(button_color)), Some(ObjectData::Box(box_color))) => {
-					let button_color = button_color.map(|(c, _)| c);
-					button_color.is_none() || box_color.is_none() || button_color == box_color
-				}
-				_ => false,
-			})
+			.get(vertex_index)
+			.ok_or(GameStateActionError::MismatchedLevelData)?
+			.glyph;
+		Ok(match (glyph, object) {
+			(Some(GlyphData::Flag), Some(ObjectData::Player)) => true,
+			(Some(GlyphData::Button(button_color)), Some(ObjectData::Box(box_color))) => {
+				let button_color = button_color.map(|(c, _)| c);
+				button_color.is_none() || box_color.is_none() || button_color == box_color
+			}
+			_ => false,
+		})
 	}
 
 	/// Evaluate the level's completion conditions
 	pub fn get_completion(&self, level_data: &LevelData) -> LevelCompletionConditions {
 		let mut completion = LevelCompletionConditions::default();
-		for (is_triggered, vertex) in self.trigger_states(level_data).zip(&level_data.vertices) {
+		for (i, vertex) in level_data.vertices.iter().enumerate() {
+			let is_triggered = self.is_vertex_triggered(level_data, i).unwrap();
 			match &vertex.glyph {
 				Some(GlyphData::Flag) => {
 					completion.flags_present += 1;

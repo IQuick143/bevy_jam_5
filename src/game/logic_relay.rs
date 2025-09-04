@@ -157,20 +157,15 @@ fn button_trigger_check_system(
 	entity_index: Res<GameStateEcsIndex>,
 ) -> Result<(), BevyError> {
 	let level = level.get()?;
-	let vertices = game_state
-		.trigger_states(level)
-		.zip(&entity_index.objects)
-		.zip(&entity_index.glyphs);
-	for ((is_triggered, object_id), glyph_id) in vertices {
+	let vertices = entity_index
+		.objects
+		.iter()
+		.zip(&entity_index.glyphs)
+		.enumerate();
+	for (vertex_index, (object_id, glyph_id)) in vertices {
+		let is_triggered = game_state.is_vertex_triggered(level, vertex_index)?;
 		for id in [*object_id, *glyph_id].into_iter().flatten() {
-			match things_q.get_mut(id) {
-				Ok(mut is_entity_triggered) => {
-					is_entity_triggered.set_if_neq(IsTriggered(is_triggered));
-				}
-				Err(err) => {
-					warn!("Object or glyph referenced by entity index not found in ECS: {err}")
-				}
-			}
+			things_q.get_mut(id)?.set_if_neq(IsTriggered(is_triggered));
 		}
 	}
 	Ok(())
