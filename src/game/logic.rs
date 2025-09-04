@@ -31,31 +31,22 @@ impl LevelCompletionConditions {
 /// data, so most operations on it require borrowing the level data
 #[derive(Resource, Clone, PartialEq, Eq, Hash, Debug, Default)]
 pub struct GameState {
-	/// All objects present in the level
-	pub objects: Vec<ObjectData>,
-	/// Mapping between vertices and objects that lie on them,
-	/// as indices into [`Self::objects`]
-	pub objects_by_vertex: Vec<Option<usize>>,
+	/// Objects that lie on vertices of the level
+	///
+	/// Zippable with [`LevelData::vertices`]
+	pub objects: Vec<Option<ObjectData>>,
 }
 
 impl GameState {
 	/// Constructs a new game state object from a level description,
 	/// initialized to the position defined by the level
 	pub fn new(level_data: &LevelData) -> Self {
-		let mut objects = Vec::new();
-		let mut objects_by_vertex = Vec::new();
-		for vertex in &level_data.vertices {
-			if let Some(object) = vertex.object {
-				objects_by_vertex.push(Some(objects.len()));
-				objects.push(object);
-			} else {
-				objects_by_vertex.push(None);
-			}
-		}
-		Self {
-			objects,
-			objects_by_vertex,
-		}
+		let objects = level_data
+			.vertices
+			.iter()
+			.map(|vertex| vertex.object)
+			.collect();
+		Self { objects }
 	}
 
 	/// Turns a cycle and all cycles linked to it by any number of ticks
@@ -67,15 +58,7 @@ impl GameState {
 	) -> Result<TurnCycleResult, GameStateActionError> {
 		let result = self.simulate_turn_cycle_with_links(level, cycle_index, rotate_by)?;
 		if !result.blocked() {
-			for (group_data, &rotation) in level.groups.iter().zip(&result.groups_turned_by) {
-				if rotation == 0 {
-					continue;
-				}
-				for &(target_cycle, relative_direction) in &group_data.cycles {
-					let rotate_by = relative_direction * rotation;
-					self.turn_cycle_isolated(level, target_cycle, rotate_by)?;
-				}
-			}
+			result.reorder_sequence_by_all_cycle_turns(level, &mut self.objects)?;
 		}
 		Ok(result)
 	}
@@ -96,45 +79,6 @@ impl GameState {
 		})
 	}
 
-	pub fn turn_cycle_isolated(
-		&mut self,
-		level_data: &LevelData,
-		cycle_index: usize,
-		rotate_by: i64,
-	) -> Result<(), GameStateActionError> {
-		if rotate_by == 0 {
-			return Ok(());
-		}
-		let Some(cycle_data) = level_data.cycles.get(cycle_index) else {
-			return Err(GameStateActionError::CycleIndexOutOfRange(cycle_index));
-		};
-		let n_vertices = cycle_data.vertex_indices.len();
-		if n_vertices == 0 {
-			// No vertices, nothing to turn
-			return Ok(());
-		}
-		let amount = rotate_by.rem_euclid(n_vertices as i64) as usize;
-		if amount == 0 {
-			// NOOP, we are done
-			return Ok(());
-		}
-		let n_loops = gcd(amount, n_vertices);
-		let loop_len = n_vertices / n_loops;
-		for loop_id in 0..n_loops {
-			let mut cached_object = None;
-			for i in 0..loop_len + 1 {
-				let index = (loop_id + amount * i) % n_vertices;
-				let vertex_id = cycle_data.vertex_indices[index];
-				let Some(object_on_target_vertex) = self.objects_by_vertex.get_mut(vertex_id)
-				else {
-					return Err(GameStateActionError::MismatchedLevelData);
-				};
-				std::mem::swap(object_on_target_vertex, &mut cached_object);
-			}
-		}
-		Ok(())
-	}
-
 	/// Iterates the level's vertices in order, checking whether each vertex has
 	/// both a glyph and a matching object
 	pub fn trigger_states<'a>(
@@ -144,17 +88,14 @@ impl GameState {
 		level_data
 			.vertices
 			.iter()
-			.zip(&self.objects_by_vertex)
-			.map(|(vertex, object_index)| {
-				let object = object_index.map(|i| self.objects[i]);
-				match (vertex.glyph, object) {
-					(Some(GlyphData::Flag), Some(ObjectData::Player)) => true,
-					(Some(GlyphData::Button(button_color)), Some(ObjectData::Box(box_color))) => {
-						let button_color = button_color.map(|(c, _)| c);
-						button_color.is_none() || box_color.is_none() || button_color == box_color
-					}
-					_ => false,
+			.zip(&self.objects)
+			.map(|(vertex, object)| match (vertex.glyph, *object) {
+				(Some(GlyphData::Flag), Some(ObjectData::Player)) => true,
+				(Some(GlyphData::Button(button_color)), Some(ObjectData::Box(box_color))) => {
+					let button_color = button_color.map(|(c, _)| c);
+					button_color.is_none() || box_color.is_none() || button_color == box_color
 				}
+				_ => false,
 			})
 	}
 
@@ -194,10 +135,7 @@ impl GameState {
 			CycleTurnability::Always => true,
 			CycleTurnability::Never => false,
 			CycleTurnability::WithPlayer => cycle.vertex_indices.iter().copied().any(|vertex_id| {
-				self.objects_by_vertex
-					.get(vertex_id)
-					.and_then(|x| *x)
-					.is_some_and(|object_id| self.objects[object_id] == ObjectData::Player)
+				self.objects.get(vertex_id).copied().flatten() == Some(ObjectData::Player)
 			}),
 		})
 	}
@@ -253,9 +191,9 @@ impl GameState {
 							.iter()
 							.copied()
 							.map(|i| {
-								self.objects_by_vertex
+								self.objects
 									.get(i)
-									.map(|object| object.is_some())
+									.map(Option::is_some)
 									.ok_or(GameStateActionError::MismatchedLevelData)
 							})
 							.collect::<Result<Vec<_>, _>>()?;
@@ -403,6 +341,75 @@ impl TurnCycleResult {
 					.iter()
 					.map(|&(cycle, direction)| (cycle, direction * *amount))
 			})
+	}
+
+	/// Reorders in-place a sequence of values that correspond
+	/// to individual vertices to simulate the turn represented
+	/// by this object
+	///
+	/// ## Parameters
+	/// `target_sequence` - the sequence to reorder. Must be zippable
+	/// with [`LevelData::groups`]
+	pub fn reorder_sequence_by_all_cycle_turns<T: Default>(
+		&self,
+		level: &LevelData,
+		target_sequence: &mut [T],
+	) -> Result<(), GameStateActionError> {
+		for (group_data, &rotation) in level.groups.iter().zip(&self.groups_turned_by) {
+			if rotation == 0 {
+				continue;
+			}
+			for &(target_cycle, relative_direction) in &group_data.cycles {
+				let rotate_by = relative_direction * rotation;
+				Self::reorder_sequence_by_single_cycle_turn(
+					level,
+					target_cycle,
+					rotate_by,
+					target_sequence,
+				)?;
+			}
+		}
+		Ok(())
+	}
+
+	/// Reorders in-place a sequence of values that correspond
+	/// to individual vertices to simulate the turn of a single cycle
+	pub fn reorder_sequence_by_single_cycle_turn<T: Default>(
+		level_data: &LevelData,
+		cycle_index: usize,
+		rotate_by: i64,
+		target_sequence: &mut [T],
+	) -> Result<(), GameStateActionError> {
+		if rotate_by == 0 {
+			return Ok(());
+		}
+		let Some(cycle_data) = level_data.cycles.get(cycle_index) else {
+			return Err(GameStateActionError::CycleIndexOutOfRange(cycle_index));
+		};
+		let n_vertices = cycle_data.vertex_indices.len();
+		if n_vertices == 0 {
+			// No vertices, nothing to turn
+			return Ok(());
+		}
+		let amount = rotate_by.rem_euclid(n_vertices as i64) as usize;
+		if amount == 0 {
+			// NOOP, we are done
+			return Ok(());
+		}
+		let n_loops = gcd(amount, n_vertices);
+		let loop_len = n_vertices / n_loops;
+		for loop_id in 0..n_loops {
+			let mut cached_object = T::default();
+			for i in 0..loop_len + 1 {
+				let index = (loop_id + amount * i) % n_vertices;
+				let vertex_id = cycle_data.vertex_indices[index];
+				let Some(object_on_target_vertex) = target_sequence.get_mut(vertex_id) else {
+					return Err(GameStateActionError::MismatchedLevelData);
+				};
+				std::mem::swap(object_on_target_vertex, &mut cached_object);
+			}
+		}
+		Ok(())
 	}
 }
 

@@ -250,7 +250,6 @@ fn listen_for_moves(
 	mut rotation_events: EventReader<TurnCycleResult>,
 	mut objects: Query<(&mut Transform, Option<&mut PathAnimation>), With<Object>>,
 	active_level: PlayingLevelData,
-	game_state: Res<GameState>,
 	entity_index: Res<GameStateEcsIndex>,
 ) {
 	let level_data = match active_level.get() {
@@ -264,17 +263,13 @@ fn listen_for_moves(
 		// Maps vertices that have been affected to the path segments taken by the objects on them
 		let vertex_paths = event.get_vertex_paths(level_data);
 
-		let moved_objects = game_state
-			.objects_by_vertex
+		let moved_objects = entity_index
+			.objects
 			.iter()
 			.zip(vertex_paths)
 			.filter_map(|(i, p)| i.and_then(|i| p.map(|p| (i, p))));
-		for (object_index, path) in moved_objects {
-			let Some(object_id) = entity_index.objects.get(object_index) else {
-				warn!("Rotation target cycle is out of range");
-				continue;
-			};
-			let Ok((mut transform, animation)) = objects.get_mut(*object_id) else {
+		for (object_id, path) in moved_objects {
+			let Ok((mut transform, animation)) = objects.get_mut(object_id) else {
 				warn!("Object referenced by entity index not found in ECS");
 				continue;
 			};

@@ -350,9 +350,7 @@ fn spawn_thing_entities(
 				))
 				.id(),
 		});
-		if let Some(object_id) = object_id {
-			object_ids.push(object_id);
-		}
+		object_ids.push(object_id);
 		glyph_ids.push(glyph_id);
 	}
 	entity_index.objects = object_ids;
@@ -369,7 +367,6 @@ fn set_vertex_transforms(mut query: Query<(&VertexData, &mut Transform), Added<V
 fn set_thing_transforms(
 	mut things_q: Query<&mut Transform>,
 	level: PlayingLevelData,
-	game_state: Res<GameState>,
 	entity_index: Res<GameStateEcsIndex>,
 ) -> Result<(), BevyError> {
 	let level = level.get()?;
@@ -377,12 +374,9 @@ fn set_thing_transforms(
 		.vertices
 		.iter()
 		.zip(&entity_index.glyphs)
-		.zip(&game_state.objects_by_vertex);
-	for ((vertex_data, glyph_id), object_index) in vertices {
-		let object_id = object_index
-			.and_then(|i| entity_index.objects.get(i))
-			.copied();
-		for id in [object_id, *glyph_id].into_iter().flatten() {
+		.zip(&entity_index.objects);
+	for ((vertex_data, glyph_id), object_id) in vertices {
+		for id in [*object_id, *glyph_id].into_iter().flatten() {
 			if let Ok(mut transform) = things_q.get_mut(id) {
 				transform.translation.x = vertex_data.position.x;
 				transform.translation.y = vertex_data.position.y;

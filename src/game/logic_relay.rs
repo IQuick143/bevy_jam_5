@@ -100,6 +100,7 @@ fn cycle_group_rotation_system(
 	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
 	mut turn_events: EventWriter<TurnCycleResult>,
 	mut game_state: ResMut<GameState>,
+	mut entity_index: ResMut<GameStateEcsIndex>,
 	active_level: PlayingLevelData,
 ) -> Result<(), BevyError> {
 	let level = active_level.get()?;
@@ -120,6 +121,7 @@ fn cycle_group_rotation_system(
 							amount,
 						}));
 					}
+					result.reorder_sequence_by_all_cycle_turns(level, &mut entity_index.objects)?;
 				}
 				turn_events.write(result);
 			}
@@ -157,13 +159,10 @@ fn button_trigger_check_system(
 	let level = level.get()?;
 	let vertices = game_state
 		.trigger_states(level)
-		.zip(&game_state.objects_by_vertex)
+		.zip(&entity_index.objects)
 		.zip(&entity_index.glyphs);
-	for ((is_triggered, object_index), glyph_id) in vertices {
-		let object_id = object_index
-			.and_then(|i| entity_index.objects.get(i))
-			.copied();
-		for id in [object_id, *glyph_id].into_iter().flatten() {
+	for ((is_triggered, object_id), glyph_id) in vertices {
+		for id in [*object_id, *glyph_id].into_iter().flatten() {
 			match things_q.get_mut(id) {
 				Ok(mut is_entity_triggered) => {
 					is_entity_triggered.set_if_neq(IsTriggered(is_triggered));

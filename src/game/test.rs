@@ -106,15 +106,13 @@ mod utils {
 		let level = level.get().expect("Playing level is not available");
 		let n_vertices = vertices.iter().count();
 		let mut glyph_data = vec![None; n_vertices];
-		let mut object_data = vec![None; n_vertices];
 		for &VertexDebugID(i) in &vertices {
 			glyph_data[i] = level.vertices[i].glyph;
-			object_data[i] = game_state.objects_by_vertex[i].map(|i| game_state.objects[i]);
 		}
 
 		VertexDebugData {
 			n_vertices,
-			objects: object_data,
+			objects: game_state.objects.clone(),
 			glyphs: glyph_data,
 		}
 	}
