@@ -286,7 +286,7 @@ impl LevelBuilder {
 			None
 		};
 		args.read_end()?;
-		self.place_cycle(cycle_id, Vec2::new(x, y), r, &[])?;
+		self.place_circle(cycle_id, Vec2::new(x, y), r)?;
 		if let Some(position) = center_position {
 			self.place_cycle_center(cycle_id, position)?;
 		}

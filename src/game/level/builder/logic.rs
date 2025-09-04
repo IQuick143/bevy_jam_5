@@ -87,7 +87,7 @@ impl LevelBuilder {
 			.into_iter()
 			.map(|(detector, position)| (detector, i32::rem_euclid(position, n_vertices) as usize))
 			.collect::<Vec<_>>();
-		// If there are detecotrs but no vertices, this cycle is invalid.
+		// If there are detectors but no vertices, this cycle is invalid.
 		if vertex_indices.is_empty() && !detectors.is_empty() {
 			return Err(LevelBuilderError::DetectorOnEmptyCycle);
 		}
@@ -615,16 +615,7 @@ impl LevelBuilder {
 
 	/// Asserts that a vertex data object is complete and assembles it
 	fn build_vertex_data(intermediate: IntermediateVertexData) -> VertexData {
-		let position = match intermediate.position {
-			IntermediateVertexPosition::Fixed(pos) => pos,
-			// This is technically possible, since a vertex can belong to no cycle
-			IntermediateVertexPosition::Free => Vec2::ZERO,
-			// Prevented by [`materialize_all_partial_vertex_placements`]
-			IntermediateVertexPosition::Partial(_) => {
-				log::warn!("Partially placed vertex in build phase, should have been materialized");
-				Vec2::ONE
-			}
-		};
+		let position = intermediate.position.get_fixed().unwrap_or_default();
 		VertexData {
 			position,
 			object: intermediate.object,

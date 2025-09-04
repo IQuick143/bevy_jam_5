@@ -56,6 +56,7 @@ log = { version = "0.4", features = [
     "release_max_level_warn",
 ] }
 rand =  { version = "0.8", features = ["small_rng"] }
+smallvec = "1.13.2" # Use same version as bevy does
 regex = "1.10.5"
 logos = "0.15.0"
 pomelo = "0.2.1"

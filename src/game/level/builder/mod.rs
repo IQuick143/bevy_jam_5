@@ -150,9 +150,6 @@ enum IntermediateVertexPosition {
 	Free,
 	/// The vertex has a fixed position
 	Fixed(Vec2),
-	/// Exactly one cycle that owns the vertex has been placed
-	/// and the vertex may still be moved along it
-	Partial(PartiallyBoundVertexPosition),
 }
 
 impl IntermediateVertexPosition {
@@ -267,6 +264,20 @@ impl<T, E> ResultNonExclusive<T, E> {
 			ResultNonExclusive::Ok(value) => ResultNonExclusive::Ok(value),
 			ResultNonExclusive::Partial(value, err) => ResultNonExclusive::Partial(value, map(err)),
 			ResultNonExclusive::Err(err) => ResultNonExclusive::Err(map(err)),
+		}
+	}
+}
+
+#[allow(dead_code)]
+impl<T, E> ResultNonExclusive<T, E>
+where
+	E: std::fmt::Debug,
+{
+	pub fn unwrap_ok(self) -> T {
+		match self {
+			ResultNonExclusive::Ok(value) => value,
+			ResultNonExclusive::Partial(_value, err) => panic!("Unwrapped an Err: {err:?}"),
+			ResultNonExclusive::Err(err) => panic!("Unwrapped an Err: {err:?}"),
 		}
 	}
 }

@@ -6,24 +6,24 @@ use std::f32::consts::PI;
 
 use bevy::math::bounding::{Aabb2d, BoundingVolume};
 use itertools::Itertools as _;
+use smallvec::SmallVec;
 
 impl LevelBuilder {
 	/// Tolerance in validation of manual placements
-	const PLACEMENT_VALIDATION_TOLERANCE: f32 = 0.001;
+	pub const PLACEMENT_VALIDATION_TOLERANCE: f32 = 0.001;
 
 	pub(super) fn build_layout(&mut self) {
-		self.materialize_partial_vertex_placements();
+		self.solve_vertex_placements();
 		self.materialize_cycle_center_placements();
 		self.apply_color_label_appearences_to_buttons();
 		self.fit_to_viewport(Aabb2d::new(LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH / 2.0));
 	}
 
-	pub fn place_cycle(
+	pub fn place_circle(
 		&mut self,
 		target_cycle: usize,
 		center: Vec2,
 		radius: f32,
-		double_intersection_hints: &[usize],
 	) -> Result<(), LevelBuilderError> {
 		if target_cycle >= self.cycles.len() {
 			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
@@ -37,158 +37,10 @@ impl LevelBuilder {
 				radius,
 			));
 		}
-		let placement = CyclePlacement {
+		self.cycles[target_cycle].placement = Some(CyclePlacement {
 			position: center,
 			shape: CycleShape::Circle(radius),
-		};
-		// This will be filled with placements of all vertices after the cycle is placed
-		let mut placements_after = Vec::new();
-		// This will be filled with vertices that are already partially placed
-		let mut new_fixed_points = std::collections::BTreeMap::new();
-		let vertex_indices = &self.cycles[target_cycle].vertex_indices;
-		for (j, &i) in vertex_indices.iter().enumerate() {
-			match self.vertices[i].position {
-				IntermediateVertexPosition::Fixed(pos) => {
-					// Fixed vertex cannot be moved, we can only proceed if
-					// it already lies on the cycle being placed
-					if !approx_eq(center.distance_squared(pos), radius.powi(2)) {
-						return Err(LevelBuilderError::CycleDoesNotContainVertex(
-							CycleDoesNotContainVertexError {
-								placed_cycle: target_cycle,
-								requested_placement: placement,
-								failing_vertex: i,
-								vertex_position: pos,
-							},
-						));
-					}
-					placements_after.push(IntermediateVertexPosition::Fixed(pos));
-				}
-				IntermediateVertexPosition::Partial(p) => {
-					// Partially placed vertex will be fixed at an intersection of the two cycles
-					let owner_placement = self.cycles[p.owner_cycle]
-						.placement
-						.expect("Owner cycle of a partially placed vertex should also be placed");
-					match owner_placement.shape {
-						CycleShape::Circle(owner_radius) => {
-							// Find one intersection of the two cycles, if it exists
-							let intersection = intersect_circles(
-								owner_placement.position,
-								center,
-								owner_radius,
-								radius,
-							);
-							match intersection {
-								Some(One(new_pos)) => {
-									// Cycles intersect tangentially, there is one intersection
-									let replaced =
-										new_fixed_points.insert(p.owner_cycle, One((i, new_pos)));
-									// Fail if there is already a vertex there
-									if let Some(existing_vertices) = replaced {
-										return Err(LevelBuilderError::CyclesDoNotIntersectTwice(
-											CyclesDoNotIntersectTwiceError {
-												placed_cycle: target_cycle,
-												requested_placement: placement,
-												existing_cycle: p.owner_cycle,
-												existing_placement: owner_placement,
-												existing_vertex: existing_vertices.first().0,
-												vertex_position: new_pos,
-												failing_vertex: i,
-											},
-										));
-									}
-									placements_after
-										.push(IntermediateVertexPosition::Fixed(new_pos));
-								}
-								Some(Two(alt_pos, default_pos)) => {
-									// If there are two intersections, we must choose one of them
-									//
-									// Since the cycles are counterclockwise, the usual best choice
-									// for a vertex is the second intersection, then the first
-									// intersection for the potential second vertex shared with the same other cycle.
-									// If the opposite is desired (for example, on the off chance
-									// that the two shared vertices are split over the start/end of the
-									// vertex list as declared), `double_intersection_hints` can be used
-									// to express this intent
-									let new_pos = match new_fixed_points.entry(p.owner_cycle) {
-										std::collections::btree_map::Entry::Occupied(mut e) => {
-											let val = e.get_mut();
-											let new_pos = if double_intersection_hints
-												.contains(&val.first().0)
-											{
-												default_pos
-											} else {
-												alt_pos
-											};
-											*val = val.add_to_one((i, new_pos)).map_err(
-												|((a, _), (b, _), (c, _))| {
-													LevelBuilderError::TooManyVerticesInCycleIntersection(
-														TooManyVerticesInCycleIntersectionError {
-															placed_cycle: target_cycle,
-															existing_cycle: p.owner_cycle,
-															shared_vertices: [a, b, c],
-														},
-													)
-												},
-											)?;
-											new_pos
-										}
-										std::collections::btree_map::Entry::Vacant(e) => {
-											let new_pos = if double_intersection_hints.contains(&i)
-											{
-												alt_pos
-											} else {
-												default_pos
-											};
-											e.insert(One((i, new_pos)));
-											new_pos
-										}
-									};
-									placements_after
-										.push(IntermediateVertexPosition::Fixed(new_pos));
-								}
-								None => {
-									// Fail if the cycles do not intersect
-									return Err(LevelBuilderError::CyclesDoNotIntersect(
-										CyclesDoNotIntersectError {
-											placed_cycle: target_cycle,
-											requested_placement: placement,
-											existing_cycle: p.owner_cycle,
-											existing_placement: owner_placement,
-											failing_vertex: i,
-										},
-									));
-								}
-							}
-						}
-					}
-				}
-				IntermediateVertexPosition::Free => {
-					// Free vertex can be partially placed without further complication
-					placements_after.push(IntermediateVertexPosition::Partial(
-						PartiallyBoundVertexPosition {
-							owner_cycle: target_cycle,
-							index_in_owner: j,
-						},
-					));
-				}
-			}
-		}
-		// All fixed points on the cycle must be in cycle order
-		let fixed_points_after = placements_after.iter().filter_map(|p| p.get_fixed());
-		if !Self::are_points_in_cyclic_order(center, fixed_points_after) {
-			return Err(LevelBuilderError::VertexOrderViolationOnCycle(target_cycle));
-		}
-		// Newly fixed points on other cycles must also work with those cycles
-		for (cycle_index, placement) in new_fixed_points {
-			if !self.verify_materialization_against_cycle(cycle_index, placement.into_iter()) {
-				return Err(LevelBuilderError::VertexOrderViolationOnCycle(cycle_index));
-			}
-		}
-		// We are done verifying that the placement is valid, now we can commit to it
-		for (&i, new_pos) in vertex_indices.iter().zip_eq(placements_after) {
-			self.vertices[i].position = new_pos;
-		}
-		self.cycles[target_cycle].placement = Some(placement);
+		});
 		Ok(())
 	}
 
@@ -226,30 +78,6 @@ impl LevelBuilder {
 			IntermediateVertexPosition::Fixed(_) => {
 				Err(LevelBuilderError::VertexAlreadyPlaced(target_vertex))
 			}
-			IntermediateVertexPosition::Partial(p) => {
-				let owner_placement = self.cycles[p.owner_cycle]
-					.placement
-					.expect("Owner cycle of a partially placed vertex should also be placed");
-				match owner_placement.shape {
-					CycleShape::Circle(owner_radius) => {
-						// Recalculate from clock angle to angle of the actual vertor space
-						let real_angle = PI / 2.0 - clock_angle;
-						let new_pos =
-							owner_placement.position + owner_radius * Vec2::from_angle(real_angle);
-						if !self.verify_materialization_against_cycle(
-							p.owner_cycle,
-							std::iter::once((target_vertex, new_pos)),
-						) {
-							return Err(LevelBuilderError::VertexOrderViolationOnCycle(
-								p.owner_cycle,
-							));
-						}
-						self.vertices[target_vertex].position =
-							IntermediateVertexPosition::Fixed(new_pos);
-						Ok(())
-					}
-				}
-			}
 		}
 	}
 
@@ -272,42 +100,6 @@ impl LevelBuilder {
 			IntermediateVertexPosition::Free => {
 				self.vertices[target_vertex].position = IntermediateVertexPosition::Fixed(position);
 				Ok(())
-			}
-			IntermediateVertexPosition::Partial(p) => {
-				let owner_placement = self.cycles[p.owner_cycle]
-					.placement
-					.expect("Owner cycle of a partially placed vertex should also be placed");
-				match owner_placement.shape {
-					CycleShape::Circle(owner_radius) => {
-						// The vertex being placed must lie on its owner cycle
-						let distance_sq_from_center =
-							owner_placement.position.distance_squared(position);
-						if (distance_sq_from_center - owner_radius.powi(2)).abs()
-							> Self::PLACEMENT_VALIDATION_TOLERANCE
-						{
-							return Err(LevelBuilderError::CycleDoesNotContainVertex(
-								CycleDoesNotContainVertexError {
-									placed_cycle: p.owner_cycle,
-									requested_placement: owner_placement,
-									failing_vertex: target_vertex,
-									vertex_position: position,
-								},
-							));
-						}
-						// Check that the placement does not violate the cycle order, then proceed
-						if !self.verify_materialization_against_cycle(
-							p.owner_cycle,
-							std::iter::once((target_vertex, position)),
-						) {
-							return Err(LevelBuilderError::VertexOrderViolationOnCycle(
-								p.owner_cycle,
-							));
-						}
-						self.vertices[target_vertex].position =
-							IntermediateVertexPosition::Fixed(position);
-						Ok(())
-					}
-				}
 			}
 		}
 	}
@@ -414,13 +206,599 @@ impl LevelBuilder {
 		}
 	}
 
-	/// Iterates through all cycles and materializes all vertices
-	/// that are currently in [`Partial`](IntermediateVertexPosition::Partial) placement,
-	/// turning them into [`Fixed`](IntermediateVertexPosition::Fixed).
-	/// Vertices that are not a part of a placed cycle remain in
-	/// [`Free`](IntermediateVertexPosition::Free) placement.
-	fn materialize_partial_vertex_placements(&mut self) {
-		// Materialize all vertices, one placed cycle at a time
+	/// Computes the placements of unplaced vertices based on the geometric constraints or gives up.
+	fn solve_vertex_placements(&mut self) {
+		let (vertex_to_cycle, absolute_precision_limit) = {
+			let mut absolute_precision_limit = f32::EPSILON;
+			let mut vertex_to_cycle: Vec<SmallVec<[usize; 2]>> =
+				vec![SmallVec::new(); self.vertices.len()];
+			for (id, cycle) in self.cycles.iter().enumerate() {
+				for &vertex in cycle.vertex_indices.iter() {
+					debug_assert!(
+						vertex < self.vertices.len(),
+						"Cycle contains vertex that is out of range."
+					);
+					vertex_to_cycle[vertex].push(id);
+				}
+
+				match cycle.placement {
+					Some(CyclePlacement { position, shape }) => {
+						let size = match shape {
+							CycleShape::Circle(radius) => radius.abs(),
+						};
+						let distance = position.length();
+						absolute_precision_limit = absolute_precision_limit.max(distance + size);
+					}
+					None => {}
+				}
+			}
+			for (vertex_id, vert) in vertex_to_cycle.iter().enumerate() {
+				debug_assert!(!vert.is_empty(), "Vertex {vertex_id} has no cycles!");
+			}
+			(
+				vertex_to_cycle,
+				absolute_precision_limit * Self::PLACEMENT_VALIDATION_TOLERANCE,
+			)
+		};
+		// TODO: Verify that fixed vertices are placed on the cycles they belong to
+		// TODO: End early if all vertices are fixed
+
+		struct AdditionalCycleData {
+			problematic_cycles: Vec<usize>,
+			points_on_cycle: Vec<Vec<usize>>,
+		}
+
+		struct PointData {
+			points: Vec<Vec2>,
+			vertices_interested_in_point: Vec<SmallVec<[usize; 1]>>,
+			vertex_constraints: Vec<IntersectionPointSet<usize>>,
+		}
+
+		enum VertexSolverError {
+			VertexHasNoPointsAvailable { vertex: usize },
+			TwoVerticesCollide { vertex_a: usize, vertex_b: usize },
+		}
+
+		impl PointData {
+			/// Goes through vertices associated with the given point, if there is a vertex associated to it via `Single`
+			fn propagate_constraint(&mut self, point: usize) -> Result<(), VertexSolverError> {
+				let mut stack = vec![point];
+				while let Some(point) = stack.pop() {
+					let mut owner_vertex = None;
+					for &vertex in self.vertices_interested_in_point[point].iter() {
+						match self.vertex_constraints[vertex] {
+							IntersectionPointSet::Single(_) => match owner_vertex {
+								Some(vertex_b) => {
+									return Err(VertexSolverError::TwoVerticesCollide {
+										vertex_a: vertex,
+										vertex_b,
+									})
+								}
+								None => owner_vertex = Some(vertex),
+							},
+							_ => {
+								continue;
+							}
+						}
+					}
+					if let Some(owner_vertex) = owner_vertex {
+						for vertex in self.vertices_interested_in_point[point].clone() {
+							if vertex == owner_vertex {
+								continue;
+							}
+							match self.vertex_constraints[vertex] {
+								IntersectionPointSet::Pair(a, b) => {
+									let other_point = match (a == point, b == point) {
+										(true, true) => todo!(), // shouldn't happen
+										(true, false) => b,
+										(false, true) => a,
+										(false, false) => todo!(), // shouldn't happen either
+									};
+									self.place_vertex_internal(vertex, other_point);
+									stack.push(other_point);
+								}
+								_ => {
+									continue;
+								}
+							}
+						}
+					}
+				}
+				Ok(())
+			}
+
+			fn propagate_twin_constraint(
+				&mut self,
+				vertex_1: usize,
+				vertex_2: usize,
+			) -> Result<(), VertexSolverError> {
+				match (
+					self.vertex_constraints[vertex_1],
+					self.vertex_constraints[vertex_2],
+				) {
+					(IntersectionPointSet::Pair(a1, b1), IntersectionPointSet::Pair(a2, b2)) => {
+						if (a1 != b1) && ((a1 == a2 && b1 == b2) || (a1 == b2 && b1 == a2)) {
+							let mut evicted_vertices: Vec<usize> = self
+								.vertices_interested_in_point[a1]
+								.iter()
+								.chain(self.vertices_interested_in_point[b1].iter())
+								.copied()
+								.filter(|&vertex| vertex != vertex_1 && vertex != vertex_2)
+								.collect();
+							evicted_vertices.sort();
+							evicted_vertices.dedup();
+							for &vertex in evicted_vertices.iter() {
+								match self.vertex_constraints[vertex] {
+									IntersectionPointSet::Pair(option_a, option_b) => {
+										match (
+											option_a == a1 || option_a == b1,
+											option_b == a1 || option_b == b1,
+										) {
+											(true, true) => {
+												debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in a point ({a1} or {b1}) which it actually wasn't. Desired points: ({option_a}, {option_b}).");
+											}
+											(true, false) => {
+												self.place_vertex(vertex, option_b)?;
+											}
+											(false, true) => {
+												self.place_vertex(vertex, option_a)?;
+											}
+											(false, false) => {
+												todo!();
+											}
+										}
+									}
+									IntersectionPointSet::Single(option) => {
+										if option == a1 || option == b1 {
+											todo!();
+										}
+									}
+									_ => {
+										// Also shouldn't happen lol
+										debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in points which weren't actually constrained to points");
+									}
+								}
+							}
+						} else {
+							// shouldn't happen either
+							debug_assert!(false, "`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1} -> {a1},{b1}) v2:({vertex_2} -> {a2},{b2})");
+						}
+					}
+					_ => {
+						// this shouldn't really happen
+						debug_assert!(false, "`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1}) v2:({vertex_2})");
+					}
+				}
+				Ok(())
+			}
+
+			fn place_vertex(
+				&mut self,
+				vertex: usize,
+				point: usize,
+			) -> Result<(), VertexSolverError> {
+				self.place_vertex_internal(vertex, point);
+				self.propagate_constraint(point)
+			}
+
+			fn place_vertex_internal(&mut self, vertex: usize, point: usize) {
+				match self.vertex_constraints[vertex] {
+					IntersectionPointSet::Pair(a, b) => {
+						self.remove_interest(vertex, a);
+						self.remove_interest(vertex, b);
+					}
+					IntersectionPointSet::Single(a) => self.remove_interest(vertex, a),
+					_ => {}
+				}
+				self.vertex_constraints[vertex] = IntersectionPointSet::Single(point);
+				self.vertices_interested_in_point[point].push(vertex);
+			}
+
+			fn remove_interest(&mut self, vertex: usize, point: usize) {
+				if let Some(index) = self.vertices_interested_in_point[point]
+					.iter()
+					.position(|&x| x == vertex)
+				{
+					self.vertices_interested_in_point[point].remove(index);
+				}
+			}
+
+			/// Finds a "twin" vertex for a given `Pair` vertex, that is
+			/// a second `Pair` vertex which has the same target points
+			fn find_twin(&self, vertex: usize) -> Option<usize> {
+				match self.vertex_constraints[vertex] {
+					IntersectionPointSet::Pair(point_a, point_b) => {
+						for &potential_vertex in self.vertices_interested_in_point[point_a]
+							.iter()
+							.filter(|&&potential_vertex| {
+								potential_vertex != vertex
+									&& self.vertices_interested_in_point[point_b]
+										.contains(&potential_vertex)
+							}) {
+							match self.vertex_constraints[potential_vertex] {
+								IntersectionPointSet::Pair(point_a2, point_b2) => {
+									if (point_a == point_a2 && point_b == point_b2)
+										|| (point_a == point_b2 && point_b == point_a2)
+									{
+										return Some(potential_vertex);
+									}
+								}
+								_ => {}
+							}
+						}
+						None
+					}
+					_ => None,
+				}
+			}
+		}
+
+		// Determine geometric constraints and place uniquely determined points.
+		// Find cycles that have ambiguous points.
+		// Points are deduplicated and indexed, facilitating equality comparisons.
+		let (mut point_data, cycle_data): (PointData, AdditionalCycleData) = {
+			// Array holding all the cycles which require
+			let mut problematic_cycles: Vec<usize> = Vec::new();
+			// Array holding all the points under consideration. Only points from cycles in [`problematic_cycles`] are guaranteed to be present.
+			let mut points: Vec<Vec2> = Vec::new();
+			// Array of links from point to a list of vertices who point to this point.
+			let mut vertices_interested_in_point: Vec<SmallVec<[usize; 1]>> = Vec::new();
+			// Mapping from cycles to list of indices to [`points`] representing the points, only initialised for cycles in [`problematic_cycles`].
+			let mut points_on_cycle: Vec<Vec<usize>> = vec![Vec::new(); self.cycles.len()];
+			// Array storing the geometric constraints placed on a vertex.
+			let mut vertex_constraints: Vec<IntersectionPointSet<usize>> =
+				vec![IntersectionPointSet::Unconstrained; self.vertices.len()];
+
+			let insert_point_if_needed =
+				|points: &mut Vec<Vec2>,
+				 vertices_interested_in_point: &mut Vec<SmallVec<[usize; 1]>>,
+				 points_on_cycle: &Vec<Vec<usize>>,
+				 point: Vec2,
+				 vertex: usize,
+				 parent_cycle: usize|
+				 -> usize {
+					for &id in points_on_cycle[parent_cycle].iter() {
+						if approx_eq_points(point, points[id], absolute_precision_limit) {
+							vertices_interested_in_point[id].push(vertex);
+							return id;
+						}
+					}
+					vertices_interested_in_point.push(SmallVec::from_buf([vertex]));
+					points.push(point);
+					points.len() - 1
+				};
+
+			// TODO: Check that there is no [`IntermediateVertexPosition::Empty`], indicating an overconstrained vertex.
+			// TODO: Check that there is no [`IntermediateVertexPosition::Unconstrained`], indicating a vertex that requires being placed manually but wasn't.
+			for (vertex, cycles) in vertex_to_cycle.iter().enumerate() {
+				let parent_cycle = *cycles
+					.first()
+					.expect("Vertex needs at least one parent cycle");
+				vertex_constraints[vertex] = match self.vertices[vertex].position {
+					IntermediateVertexPosition::Fixed(position) => {
+						// TODO: come up with a way to avoid deduplicating these points maybe
+						let point = insert_point_if_needed(
+							&mut points,
+							&mut vertices_interested_in_point,
+							&points_on_cycle,
+							position,
+							vertex,
+							parent_cycle,
+						);
+						for &cycle in cycles.iter() {
+							points_on_cycle[cycle].push(point);
+						}
+						IntersectionPointSet::Single(point)
+					}
+					IntermediateVertexPosition::Free => {
+						let intersection = self.compute_intersection(&cycles);
+						match intersection {
+							IntersectionPointSet::Unconstrained => todo!(), // Bad
+							IntersectionPointSet::Cycle(cycle) => {
+								IntersectionPointSet::Cycle(cycle)
+							}
+							IntersectionPointSet::Pair(point_a, point_b) => {
+								// TODO: Use hints (if available) to decide here
+								let point_a = insert_point_if_needed(
+									&mut points,
+									&mut vertices_interested_in_point,
+									&points_on_cycle,
+									point_a,
+									vertex,
+									parent_cycle,
+								);
+								let point_b = insert_point_if_needed(
+									&mut points,
+									&mut vertices_interested_in_point,
+									&points_on_cycle,
+									point_b,
+									vertex,
+									parent_cycle,
+								);
+								if point_a != point_b {
+									for &cycle in cycles.iter() {
+										problematic_cycles.push(cycle);
+										points_on_cycle[cycle].push(point_a);
+										points_on_cycle[cycle].push(point_b);
+									}
+									IntersectionPointSet::Pair(point_a, point_b)
+								} else {
+									// This is a stupid branch, but it's possible if you got a really degenerate thing going on.
+									for &cycle in cycles.iter() {
+										problematic_cycles.push(cycle);
+										points_on_cycle[cycle].push(point_a);
+									}
+									IntersectionPointSet::Single(point_a)
+								}
+							}
+							IntersectionPointSet::Single(point) => {
+								let point = insert_point_if_needed(
+									&mut points,
+									&mut vertices_interested_in_point,
+									&points_on_cycle,
+									point,
+									vertex,
+									parent_cycle,
+								);
+								for &cycle in cycles.iter() {
+									points_on_cycle[cycle].push(point);
+								}
+								IntersectionPointSet::Single(point)
+							}
+							IntersectionPointSet::Empty => todo!(), // Bad
+						}
+					}
+				}
+			}
+			problematic_cycles.sort();
+			problematic_cycles.dedup();
+			for cycle_points in points_on_cycle.iter_mut() {
+				cycle_points.sort();
+				cycle_points.dedup();
+			}
+			for point_vertices in vertices_interested_in_point.iter_mut() {
+				point_vertices.sort();
+				point_vertices.dedup();
+			}
+			(
+				PointData {
+					points,
+					vertices_interested_in_point,
+					vertex_constraints,
+				},
+				AdditionalCycleData {
+					problematic_cycles,
+					points_on_cycle,
+				},
+			)
+		};
+
+		// println!("{:?}", point_data.points);
+		// println!("{:?}", point_data.vertex_constraints);
+
+		// Attempt to solve `Pair` vertices
+		// TODO: Optimise
+		{
+			// Propagate constraints caused by `Single` points already placed
+			for &cycle_id in cycle_data.problematic_cycles.iter() {
+				for &point in cycle_data.points_on_cycle[cycle_id].iter() {
+					point_data.propagate_constraint(point);
+				}
+			}
+			// Propagate constraints caused by two twin vertices occupying two points for themselves (even if it's unknown which is which)
+			for &cycle_id in cycle_data.problematic_cycles.iter() {
+				for &vertex in self.cycles[cycle_id].vertex_indices.iter() {
+					if let Some(twin_vertex) = point_data.find_twin(vertex) {
+						point_data.propagate_twin_constraint(vertex, twin_vertex);
+					}
+				}
+			}
+			// Two iterations to let constraints propagate along a cycle, but complete propagation along chains of cycles is not guaranteed
+			for _ in 0..2 {
+				// Use simple deductions to place remaining
+				for &cycle_id in cycle_data.problematic_cycles.iter() {
+					let cycle = &self.cycles[cycle_id];
+					match cycle.placement {
+						Some(CyclePlacement {
+							position: cycle_position,
+							shape: CycleShape::Circle(_),
+						}) => {
+							// The closest "previous" point that is known to be fixed and its order in cycle
+							let mut prev_point_index: (usize, usize) = {
+								let mut prev_point_index: Option<(usize, usize)> = None;
+								for (position_in_cycle, &vertex) in
+									cycle.vertex_indices.iter().enumerate().rev()
+								{
+									match point_data.vertex_constraints[vertex] {
+										IntersectionPointSet::Single(point) => {
+											prev_point_index = Some((point, position_in_cycle));
+											break;
+										}
+										_ => {}
+									}
+								}
+								if let Some(prev_point_index) = prev_point_index {
+									prev_point_index
+								} else {
+									// There are no `Single`s available, there's no reason to bother
+									continue;
+								}
+							};
+							// The closest "next" point that is known to be fixed and its order in cycle
+							let mut next_point_index: Option<(usize, usize)> = None;
+							// The first fixed point found
+							let mut first_point: Option<(usize, usize)> = None;
+							let mut end_reached_while_looking_for_next_point = false;
+							for (position_in_cycle, &vertex) in
+								cycle.vertex_indices.iter().enumerate()
+							{
+								match point_data.vertex_constraints[vertex] {
+									IntersectionPointSet::Pair(point_a, point_b) => {
+										if !end_reached_while_looking_for_next_point
+											&& !next_point_index.is_some_and(
+												|(_point, position)| position > position_in_cycle,
+											) {
+											next_point_index = None;
+											for (next_position_in_cycle, &next_vertex) in cycle
+												.vertex_indices
+												.iter()
+												.enumerate()
+												.skip(position_in_cycle)
+											{
+												match point_data.vertex_constraints[next_vertex] {
+													IntersectionPointSet::Single(point) => {
+														next_point_index =
+															Some((point, next_position_in_cycle));
+														break;
+													}
+													_ => {}
+												}
+											}
+
+											// If nothing is found, loop around and use the first point
+											if next_point_index.is_none() {
+												next_point_index = first_point;
+												// No sense in looking next time if the whole range was traversed already
+												end_reached_while_looking_for_next_point = true;
+											}
+										}
+										let (prev_point, prev_position_in_cycle) = prev_point_index;
+										// Two constraints are available
+										if !if let Some((next_point, next_position_in_cycle)) =
+											next_point_index.filter(
+												|&(point, next_position_in_cycle)| {
+													point != prev_point
+														&& next_position_in_cycle
+															!= prev_position_in_cycle
+												},
+											) {
+											let clockwiseness = test_index_clockwiseness(
+												prev_position_in_cycle,
+												position_in_cycle,
+												next_position_in_cycle,
+											);
+											let sign = if clockwiseness { 1.0 } else { -1.0 };
+
+											let score_a = test_point_clockwiseness(
+												point_data.points[prev_point],
+												point_data.points[point_a],
+												point_data.points[next_point],
+												Some(cycle_position),
+											) * sign;
+											let score_b = test_point_clockwiseness(
+												point_data.points[prev_point],
+												point_data.points[point_b],
+												point_data.points[next_point],
+												Some(cycle_position),
+											) * sign;
+											let mut point_a_valid = score_a > 0.0;
+											let mut point_b_valid = score_b > 0.0;
+											// if one of the results is weirdly small, but not the other one,
+											// use the non-tiny one
+											if point_a_valid && point_b_valid {
+												const THRESHOLD: f32 = 0.001;
+												if score_a < score_b * THRESHOLD {
+													point_a_valid = false;
+												} else if score_b < score_a * THRESHOLD {
+													point_b_valid = false;
+												}
+											}
+											match (point_a_valid, point_b_valid) {
+												(true, true) => {
+													/* Tough luck, nothing got done here */
+													false
+												}
+												(true, false) => {
+													point_data.place_vertex(vertex, point_a);
+													true
+												}
+												(false, true) => {
+													point_data.place_vertex(vertex, point_b);
+													true
+												}
+												(false, false) => {
+													todo!(
+														"Raise an error, vertex has nowhere to go"
+													);
+												}
+											}
+										} else {
+											false
+										} {
+											if let Some((
+												twin_vertex_position_in_cycle,
+												twin_vertex,
+											)) = point_data.find_twin(vertex).and_then(
+												|twin_vertex| {
+													cycle
+														.vertex_indices
+														.iter()
+														.copied()
+														.enumerate()
+														.skip(position_in_cycle)
+														.find(|&(_order_in_cycle, vertex)| {
+															vertex == twin_vertex
+														})
+												},
+											) {
+												let clockwiseness = test_index_clockwiseness(
+													prev_position_in_cycle,
+													position_in_cycle,
+													twin_vertex_position_in_cycle,
+												);
+												let point_clockwiseness = test_point_clockwiseness(
+													point_data.points[prev_point],
+													point_data.points[point_a],
+													point_data.points[point_b],
+													Some(cycle_position),
+												);
+												if clockwiseness == (point_clockwiseness > 0.0) {
+													point_data.place_vertex(vertex, point_a);
+													debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+												} else {
+													point_data.place_vertex(vertex, point_b);
+													debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+												}
+											}
+										}
+									}
+									_ => { /* dont care */ }
+								}
+
+								match point_data.vertex_constraints[vertex] {
+									IntersectionPointSet::Single(point) => {
+										prev_point_index = (point, position_in_cycle);
+										if first_point.is_none() {
+											first_point = Some((point, position_in_cycle));
+										}
+									}
+									_ => { /* dont care */ }
+								}
+							}
+						}
+						None => continue, // This shouldn't really happen
+					}
+				}
+			}
+		}
+
+		// println!("{:?}", point_data.vertex_constraints);
+
+		// Convert `Single` placements into `Fixed` values
+		for (vertex_id, vertex_placement) in self.vertices.iter_mut().enumerate() {
+			match point_data.vertex_constraints[vertex_id] {
+				IntersectionPointSet::Single(point) => {
+					vertex_placement.position =
+						IntermediateVertexPosition::Fixed(point_data.points[point])
+				}
+				IntersectionPointSet::Unconstrained => todo!(),
+				IntersectionPointSet::Cycle(_) => {}
+				IntersectionPointSet::Pair(_, _) => todo!(),
+				IntersectionPointSet::Empty => todo!(),
+			}
+		}
+
+		// Place all vertices that have a `Cycle` constraint
 		let cycles = self
 			.cycles
 			.iter()
@@ -432,7 +810,8 @@ impl LevelBuilder {
 					.as_ref()
 					.map(|placement| (i, placement, data))
 			});
-		for (cycle_index, cycle_placement, cycle_data) in cycles {
+
+		for (_cycle_index, cycle_placement, cycle_data) in cycles {
 			// Vertices that already have fixed placement split the cycle
 			// into segments. Each segment will be handled separately
 			let mut fixed_vertices = cycle_data
@@ -467,12 +846,8 @@ impl LevelBuilder {
 									+ current_relative_pos.rotate(Vec2::from_angle(
 										-segment_angle * (j + 1) as f32 / vertex_count as f32,
 									));
-								Self::checked_materialize(
-									&mut self.vertices[target_vertex].position,
-									new_pos,
-									cycle_index,
-									i,
-								);
+								self.vertices[target_vertex].position =
+									IntermediateVertexPosition::Fixed(new_pos);
 							}
 							// Move to the next segment
 							current_fixed_vertex = next_fixed_vertex;
@@ -500,12 +875,8 @@ impl LevelBuilder {
 								+ current_relative_pos.rotate(Vec2::from_angle(
 									-segment_angle * (j + 1) as f32 / vertex_count as f32,
 								));
-							Self::checked_materialize(
-								&mut self.vertices[target_vertex].position,
-								new_pos,
-								cycle_index,
-								i,
-							);
+							self.vertices[target_vertex].position =
+								IntermediateVertexPosition::Fixed(new_pos);
 						}
 					} else {
 						// If none of the vertices have fixed placement, distribute them uniformly in clock order
@@ -516,17 +887,166 @@ impl LevelBuilder {
 									* Vec2::from_angle(
 										PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32,
 									);
-							Self::checked_materialize(
-								&mut self.vertices[j].position,
-								new_pos,
-								cycle_index,
-								i,
-							);
+							self.vertices[j].position = IntermediateVertexPosition::Fixed(new_pos);
 						}
 					}
 				}
 			}
 		}
+
+		// Verify solution
+		for vertex in self.vertices.iter() {
+			debug_assert!(
+				matches!(vertex.position, IntermediateVertexPosition::Fixed(_)),
+				"Unplaced vertex!"
+			);
+		}
+
+		for cycle in self.cycles.iter() {
+			for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
+				.vertex_indices
+				.iter()
+				.copied()
+				.map(|vertex| self.vertices[vertex].position.get_fixed().unwrap())
+				.enumerate()
+				.array_combinations::<3>()
+			{
+				debug_assert!(
+					test_index_clockwiseness(pos_1, pos_2, pos_3)
+						== (test_point_clockwiseness(vert_1, vert_2, vert_3, None) > 0.0),
+					"Vertices out of order"
+				);
+			}
+		}
+
+		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
+			let position = cycle.placement.unwrap().position;
+			let CycleShape::Circle(radius) = cycle.placement.unwrap().shape;
+			for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
+				.vertex_indices
+				.iter()
+				.copied()
+				.map(|vertex| self.vertices[vertex].position.get_fixed().unwrap())
+				.enumerate()
+				.array_combinations::<3>()
+			{
+				debug_assert!(
+					test_index_clockwiseness(pos_1, pos_2, pos_3)
+						== (test_point_clockwiseness(vert_1, vert_2, vert_3, Some(position)) > 0.0),
+					"Vertices out of order"
+				);
+			}
+
+			for (vertex, point) in cycle
+				.vertex_indices
+				.iter()
+				.map(|&vertex| (vertex, self.vertices[vertex].position.get_fixed().unwrap()))
+			{
+				debug_assert!(
+					point_lies_on_circle(position, radius, point),
+					"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} with position {position} and radius {radius}"
+				);
+			}
+		}
+	}
+
+	/// Computes the intersection of a set of cycles, taking into account only cycles which are
+	/// 1) Circles
+	/// 2) Lines
+	/// skipping cycles that are other geometries, those should not be used in intersection tests.
+	///
+	/// # Panics
+	/// May panic or give wrong result if
+	/// 1) any of the cycle indices are not valid indices into [`LevelBuilder::cycles`]
+	/// 2) if any of the provided cycles are unplaced.
+	fn compute_intersection(&self, cycles: &[usize]) -> IntersectionPointSet<Vec2> {
+		let mut intersection = IntersectionPointSet::Unconstrained;
+		for &cycle in cycles.iter() {
+			intersection = match (self.cycles[cycle].placement, intersection) {
+				(_, IntersectionPointSet::Empty) => {
+					return IntersectionPointSet::Empty;
+				}
+				(_, IntersectionPointSet::Unconstrained) => IntersectionPointSet::Cycle(cycle),
+				(None, _) => {
+					debug_assert!(false, "Unplaced cycle in `compute_intersection`");
+					return IntersectionPointSet::Empty;
+				}
+				(
+					Some(CyclePlacement {
+						position,
+						shape: CycleShape::Circle(radius),
+					}),
+					IntersectionPointSet::Single(point),
+				) => {
+					if point_lies_on_circle(position, radius, point) {
+						IntersectionPointSet::Single(point)
+					} else {
+						return IntersectionPointSet::Empty;
+					}
+				}
+				(
+					Some(CyclePlacement {
+						position,
+						shape: CycleShape::Circle(radius),
+					}),
+					IntersectionPointSet::Pair(point_a, point_b),
+				) => {
+					match (
+						point_lies_on_circle(position, radius, point_a),
+						point_lies_on_circle(position, radius, point_b),
+					) {
+						(true, true) => IntersectionPointSet::Pair(point_a, point_b),
+						(true, false) => IntersectionPointSet::Single(point_a),
+						(false, true) => IntersectionPointSet::Single(point_b),
+						(false, false) => {
+							return IntersectionPointSet::Empty;
+						}
+					}
+				}
+				(Some(cycle_a_placement), IntersectionPointSet::Cycle(cycle_b)) => {
+					match self.cycles[cycle_b].placement {
+						None => {
+							debug_assert!(false, "Unplaced cycle in `compute_intersection`");
+							return IntersectionPointSet::Empty;
+						}
+						Some(cycle_b_placement) => {
+							let position_a = cycle_a_placement.position;
+							let position_b = cycle_b_placement.position;
+							match (cycle_a_placement.shape, cycle_b_placement.shape) {
+								(CycleShape::Circle(radius_a), CycleShape::Circle(radius_b)) => {
+									let tolerance = radius_a.max(radius_b).max(0.01)
+										* Self::PLACEMENT_VALIDATION_TOLERANCE;
+									let offset = position_a - position_b;
+									let offset_length = offset.length();
+									if offset_length <= tolerance {
+										if (radius_a - radius_b).abs() < tolerance {
+											IntersectionPointSet::Cycle(cycle)
+										} else {
+											return IntersectionPointSet::Empty;
+										}
+									} else {
+										match intersect_circles(
+											position_a, position_b, radius_a, radius_b,
+										) {
+											Some(OneTwo::One(point)) => {
+												IntersectionPointSet::Single(point)
+											}
+											Some(OneTwo::Two(point_a, point_b)) => {
+												IntersectionPointSet::Pair(point_a, point_b)
+											}
+											None => {
+												return IntersectionPointSet::Empty;
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		intersection
 	}
 
 	/// Iterates through all cycles and sets their center indicator placements
@@ -545,28 +1065,6 @@ impl LevelBuilder {
 				cycle_data.center_sprite_position = Some(Some(placement.position));
 			}
 		}
-	}
-
-	/// Sets a vertex to a fixed placement and checks that it belonged to a particular cycle
-	/// ## Panics
-	/// May panic if the vertex was not previously in [`Partial`](IntermediateVertexPosition::Partial)
-	/// placement owned by the specified cycle
-	fn checked_materialize(
-		pos: &mut IntermediateVertexPosition,
-		new_pos: Vec2,
-		owner_cycle: usize,
-		index_in_owner: usize,
-	) {
-		#[cfg(any(test, debug_assertions))]
-		assert_eq!(
-			*pos,
-			IntermediateVertexPosition::Partial(PartiallyBoundVertexPosition {
-				owner_cycle,
-				index_in_owner
-			}),
-			"Vertices that belong to a placed cycle must be partially placed and owned by that cycle"
-		);
-		*pos = IntermediateVertexPosition::Fixed(new_pos);
 	}
 
 	/// Checks whether a materialization can be done or if it breaks
@@ -783,10 +1281,141 @@ fn intersect_circles(c1: Vec2, c2: Vec2, r1: f32, r2: f32) -> Option<OneTwo<Vec2
 	}
 }
 
-fn approx_eq(a: f32, b: f32) -> bool {
-	// Threshold is intentionally chosen to be fairly large
-	// so as to make up for rounding errors in arithmetics
-	// and/or human inputs
-	const THRESHOLD: f32 = 0.001;
-	(a - b).abs() < THRESHOLD * a.max(b)
+fn point_lies_on_circle(center: Vec2, radius: f32, point: Vec2) -> bool {
+	approx_eq_rel(
+		center.distance(point),
+		radius,
+		LevelBuilder::PLACEMENT_VALIDATION_TOLERANCE,
+	)
+}
+
+/// Tests if a, b, c are an "increasing triplet" in circular ordering
+fn test_index_clockwiseness(a: usize, b: usize, c: usize) -> bool {
+	if a == b || b == c || c == a {
+		return false;
+	}
+	match (a < b, b < c) {
+		(true, true) => true,
+		(true, false) => c < a,
+		(false, true) => c < a,
+		(false, false) => false,
+	}
+}
+
+#[test]
+fn test_test_index_clockwiseness() {
+	assert!(test_index_clockwiseness(1, 2, 3));
+	assert!(test_index_clockwiseness(3, 1, 2));
+	assert!(test_index_clockwiseness(2, 3, 1));
+
+	assert!(!test_index_clockwiseness(2, 1, 3));
+	assert!(!test_index_clockwiseness(1, 3, 2));
+	assert!(!test_index_clockwiseness(3, 2, 1));
+
+	assert!(!test_index_clockwiseness(0, 0, 1));
+	assert!(!test_index_clockwiseness(0, 3, 0));
+	assert!(!test_index_clockwiseness(1, 0, 0));
+}
+
+/// Tests if a,b,c are oriented clockwise
+/// Returns a float describing the oriented area given by twice the triangle abc
+/// if it is positive, the points are oriented clockwise
+/// if it is negative, the points are oriented counterclockwise
+/// if it is close to zero... well good luck
+///
+/// Optionally a center point can be provided, the other points are projected onto a unit circle
+/// before computing their orientation, potentially improving numerics or fixing certain errors in the input
+///
+/// # Panics
+/// May panic or give incorrect results if `center` is Some and equals any of the other points
+fn test_point_clockwiseness(mut a: Vec2, mut b: Vec2, mut c: Vec2, center: Option<Vec2>) -> f32 {
+	if let Some(center) = center {
+		a = (a - center).normalize_or_zero();
+		b = (b - center).normalize_or_zero();
+		c = (c - center).normalize_or_zero();
+	}
+	-(a - b).perp_dot(a - c)
+}
+
+#[test]
+fn test_test_clockwiseness() {
+	assert!(
+		test_point_clockwiseness(
+			Vec2::new(0.0, 1.0),
+			Vec2::new(1.0, 0.0),
+			Vec2::new(0.0, -1.0),
+			None
+		) > 0.0
+	);
+	assert!(
+		test_point_clockwiseness(
+			Vec2::new(1.0, 0.0),
+			Vec2::new(0.0, 1.0),
+			Vec2::new(0.0, -1.0),
+			None
+		) < 0.0
+	);
+
+	// This should not affect the ordering
+	assert!(
+		test_point_clockwiseness(
+			Vec2::new(0.0, 1.0),
+			Vec2::new(1.0, 0.0),
+			Vec2::new(0.0, -1.0),
+			Some(Vec2::new(-2.0, 0.0))
+		) > 0.0
+	);
+	assert!(
+		test_point_clockwiseness(
+			Vec2::new(1.0, 0.0),
+			Vec2::new(0.0, 1.0),
+			Vec2::new(0.0, -1.0),
+			Some(Vec2::new(-2.0, 0.0))
+		) < 0.0
+	);
+
+	// This should though, the center is completely outside the intended circle
+	assert!(
+		test_point_clockwiseness(
+			Vec2::new(0.0, 1.0),
+			Vec2::new(1.0, 0.0),
+			Vec2::new(0.0, -1.0),
+			Some(Vec2::new(2.0, 0.0))
+		) < 0.0
+	);
+	assert!(
+		test_point_clockwiseness(
+			Vec2::new(1.0, 0.0),
+			Vec2::new(0.0, 1.0),
+			Vec2::new(0.0, -1.0),
+			Some(Vec2::new(2.0, 0.0))
+		) > 0.0
+	);
+}
+
+fn approx_eq_rel(a: f32, b: f32, threshold: f32) -> bool {
+	(a - b).abs() < threshold * a.abs().max(b.abs())
+}
+
+fn approx_eq_points(a: Vec2, b: Vec2, epsilon: f32) -> bool {
+	(a - b).abs().max_element() < epsilon
+}
+
+#[derive(Clone, Copy, Debug)]
+enum IntersectionPointSet<Point>
+where
+	Point: Clone + Copy,
+{
+	/// Any point lies in this intersection,
+	/// this probably means that the point should be placed differently.
+	Unconstrained,
+	/// There is an entire cycle of points that can be used,
+	/// the value is an index into [`LevelBuilder::cycles`].
+	Cycle(usize),
+	/// There are two points where the shapes intersect.
+	Pair(Point, Point),
+	/// There is a single point where the shapes intersect.
+	Single(Point),
+	/// The shapes do not intersect at all.
+	Empty,
 }
