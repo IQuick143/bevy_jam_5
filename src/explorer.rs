@@ -199,16 +199,8 @@ impl std::fmt::Display for StateGraph {
 
 fn group_index_to_color(group: usize) -> &'static str {
 	const GROUP_TO_COLOR: &[&str] = &[
-		"white",
-		"cyan",
-		"yellow",
-		"violet",
-		"lime",
-		"orange",
-		"red",
-		"goldenrod",
-		"seagreen",
-		"aquamarine",
+		"white", "#6bb1cf", "#ea9fd1", "#80FFE8", "#FF3A20", "#d7ef86", "#29339B", "#FF8552",
+		"#75ed8f", "#a57de1",
 	];
 	GROUP_TO_COLOR[group % GROUP_TO_COLOR.len()]
 }
