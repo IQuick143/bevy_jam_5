@@ -177,10 +177,10 @@ impl std::fmt::Display for StateGraph {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_str("{\n\t\"nodes\": [\n")?;
 		for (node, attrs) in &self.reachable_states {
+			let id = node.state_id();
 			writeln!(
 				f,
-				"\t\t{{\"id\": \"{}\", \"color\": \"{}\"}},",
-				node.state_id(),
+				"\t\t{{\"id\": \"{id}\", \"name\": \"{id}\", \"color\": \"{}\"}},",
 				state_attributes_to_color(attrs)
 			)?;
 		}
