@@ -3,7 +3,7 @@
 
 use bevy::ecs::error::{warn, GLOBAL_ERROR_HANDLER};
 use bevy::prelude::*;
-use bevy_cycle_permutation_puzzle::{explorer, AppPlugin};
+use bevy_cycle_permutation_puzzle::{explorer::run_state_explorer, AppPlugin};
 
 fn start_game() -> AppExit {
 	// Configure the ECS error handler to not explode, hopefully.
@@ -15,25 +15,16 @@ fn start_game() -> AppExit {
 }
 
 fn explore_state_space(level_file: &str) -> AppExit {
-	let level_source = match std::fs::read_to_string(level_file) {
-		Ok(source) => source,
+	let result = std::fs::read_to_string(level_file)
+		.map_err(|e| format!("Could not open {level_file}: {e}"))
+		.and_then(|source| run_state_explorer(&source, &mut std::io::stdout().lock()));
+	match result {
+		Ok(()) => AppExit::Success,
 		Err(err) => {
-			eprintln!("Could not open {level_file}: {err}");
-			return AppExit::error();
+			eprintln!("{err}");
+			AppExit::error()
 		}
-	};
-	let level = match explorer::compile_level(&level_source) {
-		Ok(level) => level,
-		Err(err) => {
-			eprintln!("Could not parse level: {err}");
-			return AppExit::error();
-		}
-	};
-	let graph = explorer::StateGraph::traverse_state_graph(&level, None);
-	graph
-		.wrap_in_html_page(&mut std::io::stdout().lock())
-		.unwrap();
-	AppExit::Success
+	}
 }
 
 fn main() -> AppExit {

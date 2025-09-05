@@ -1,22 +1,20 @@
 //! Tools for exploring the state space
 
 use crate::game::{
-	level::{
-		backend::builder::{self, parse_and_run},
-		builder::ResultNonExclusive,
-		LevelData, ObjectData,
-	},
+	level::{backend::builder::parse_and_run, LevelData, ObjectData},
 	logic::GameState,
 };
 use bevy::platform::collections::{hash_map::Entry, HashMap, HashSet};
-use std::{collections::VecDeque, io::Write as _};
+use std::{collections::VecDeque, io::Write};
 
-pub fn compile_level(source: &str) -> Result<LevelData, builder::Error> {
-	match parse_and_run(source, |_| {}) {
-		ResultNonExclusive::Ok(level) => Ok(level),
-		ResultNonExclusive::Err(err) => Err(err),
-		ResultNonExclusive::Partial(_, err) => Err(err),
-	}
+pub fn run_state_explorer(level_source: &str, output: &mut impl Write) -> Result<(), String> {
+	let level = parse_and_run(level_source, |_| {})
+		.relaxed()
+		.map_err(|e| format!("Could not build level: {e}"))?;
+	let graph = StateGraph::traverse_state_graph(&level, None);
+	graph
+		.wrap_in_html_page(output)
+		.map_err(|e| format!("Could not save explorer result: {e}"))
 }
 
 impl GameState {
@@ -43,7 +41,7 @@ impl GameState {
 
 /// Special attributes of game states
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
-pub struct GameStateAttributes {
+struct GameStateAttributes {
 	/// True if the state is the initial state
 	pub is_initial: bool,
 	/// True if the state is a solution to the level
@@ -55,7 +53,7 @@ pub struct GameStateAttributes {
 
 /// Graph of the state space of a level
 #[derive(Clone, Debug, Default)]
-pub struct StateGraph {
+struct StateGraph {
 	/// All states that can be created with valid moves
 	/// and special properties of the states
 	pub reachable_states: HashMap<GameState, GameStateAttributes>,
