@@ -27,62 +27,56 @@ impl GameState {
 }
 
 impl StateGraph {
-	pub fn wrap_in_html_page(&self, writer: &mut impl Write) -> std::io::Result<()> {
-		write!(
-			writer,
-			r#"<!doctype html>
+	const PAGE_HEADER: &str = r#"<!doctype html>
 <html>
     <head>
         <!-- https://github.com/vasturiano/3d-force-graph -->
         <script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
         <script>
-            addEventListener('load', () => {{
+            addEventListener('load', () => {
                 const main = document.getElementById('main')
                 const graph = new ForceGraph3D(main);
                 graph.linkOpacity(0.5);
-                graph.graphData({self});
-            }});
+                graph.graphData("#;
+
+	const PAGE_FOOTER: &str = r#");
+            });
         </script>
         <style>
-            body, html {{
+            body, html {
                 margin: 0;
-            }}
-            #main {{
+            }
+            #main {
                 height: 100%;
-            }}
+            }
         </style>
     </head>
     <body>
         <div id="main"></div>
     </body>
-</html>
-"#
-		)
-	}
-}
+</html>"#;
 
-impl std::fmt::Display for StateGraph {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str("{\n\t\"nodes\": [\n")?;
+	pub fn wrap_in_html_page(&self, writer: &mut impl Write) -> std::io::Result<()> {
+		writeln!(writer, "{}{{\n\tnodes: [", Self::PAGE_HEADER)?;
 		for (node, attrs) in &self.reachable_states {
 			let id = node.state_id();
 			writeln!(
-				f,
-				"\t\t{{\"id\": \"{id}\", \"name\": \"{id}\", \"color\": \"{}\"}},",
+				writer,
+				"\t\t{{ id: '{id}', name: '{id}', color: '{}' }},",
 				state_attributes_to_color(attrs)
 			)?;
 		}
-		f.write_str("\t],\n\t\"links\": [\n")?;
+		writeln!(writer, "\t],\n\tlinks: [")?;
 		for ([from, to], group) in &self.moves {
 			writeln!(
-				f,
-				"\t\t{{\"source\": \"{}\", \"target\": \"{}\", \"color\": \"{}\"}},",
+				writer,
+				"\t\t{{ source: '{}', target: '{}', color: '{}' }},",
 				from.state_id(),
 				to.state_id(),
 				group_index_to_color(*group)
 			)?;
 		}
-		f.write_str("\t]\n}\n")?;
+		writeln!(writer, "\t]\n}}{}", Self::PAGE_FOOTER)?;
 		Ok(())
 	}
 }
