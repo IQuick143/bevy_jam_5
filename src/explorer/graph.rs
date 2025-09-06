@@ -4,6 +4,21 @@ use crate::game::{level::LevelData, logic::GameState};
 use bevy::platform::collections::{hash_map::Entry, HashMap, HashSet};
 use std::collections::VecDeque;
 
+#[derive(Clone, Copy, Debug)]
+pub struct StateExplorerOptions {
+	pub max_node_count: Option<usize>,
+	pub max_depth: Option<usize>,
+}
+
+impl Default for StateExplorerOptions {
+	fn default() -> Self {
+		Self {
+			max_depth: None,
+			max_node_count: Some(10000),
+		}
+	}
+}
+
 /// Special attributes of game states
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub struct GameStateAttributes {
@@ -28,7 +43,7 @@ pub struct StateGraph {
 }
 
 impl StateGraph {
-	pub fn traverse_state_graph(level: &LevelData, max_iterations: Option<usize>) -> Self {
+	pub fn traverse_state_graph(level: &LevelData, options: StateExplorerOptions) -> Self {
 		let mut graph = Self::default();
 		let mut queue = VecDeque::new();
 
@@ -42,10 +57,10 @@ impl StateGraph {
 				is_closed: false,
 			},
 		);
-		queue.push_back(initial_state);
+		queue.push_back((initial_state, 0));
 
 		let mut iterations = 0;
-		while let Some(state) = queue.pop_front() {
+		while let Some((state, depth)) = queue.pop_front() {
 			let mut resolved_this_turn = HashSet::<GameState>::new();
 			for (cycle_index, cycle) in level.cycles.iter().enumerate() {
 				// Only legal moves are interesting
@@ -86,7 +101,9 @@ impl StateGraph {
 					// to prevent duplicate links
 					resolved_this_turn.insert(next_state.clone());
 					// Resolve the state later
-					queue.push_back(next_state);
+					if options.max_depth.is_none_or(|max_depth| depth < max_depth) {
+						queue.push_back((next_state, depth + 1));
+					}
 				}
 			}
 			// Close the state, all of its neighbors have been pushed now
@@ -94,7 +111,7 @@ impl StateGraph {
 
 			// Break early if the iteration limit has been reached
 			iterations += 1;
-			if max_iterations.is_some_and(|i| iterations > i) {
+			if options.max_node_count.is_some_and(|i| iterations > i) {
 				break;
 			}
 		}
