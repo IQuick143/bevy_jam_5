@@ -254,7 +254,7 @@ impl LevelBuilder {
 			points_on_cycle: Vec<Vec<usize>>,
 		}
 
-		#[derive(Clone)]
+		#[derive(Clone, Debug)]
 		struct CyclePoints {
 			first_undecided_vertex: Option<usize>,
 			first_decided_vertex: Option<usize>,
@@ -394,8 +394,9 @@ impl LevelBuilder {
 							LogicalVertexVariant::Single {
 								next_single: next_after_prev_single,
 							} => {
+								let previous_successor = *next_after_prev_single;
 								*next_after_prev_single = index;
-								*next_after_prev_single
+								previous_successor
 							}
 							LogicalVertexVariant::Pair { .. } => {
 								debug_assert!(false, "`prev_single` pointed to a Pair vertex");
@@ -506,6 +507,7 @@ impl LevelBuilder {
 			},
 		}
 
+		#[derive(Debug)]
 		struct PointData {
 			points: Vec<Vec2>,
 			vertices_interested_in_point: Vec<SmallVec<[usize; 1]>>,
