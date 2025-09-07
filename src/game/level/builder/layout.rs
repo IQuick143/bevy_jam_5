@@ -4,7 +4,10 @@ use super::*;
 use crate::graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH};
 use std::{cmp::Ordering, f32::consts::PI};
 
-use bevy::math::bounding::{Aabb2d, BoundingVolume};
+use bevy::{
+	math::bounding::{Aabb2d, BoundingVolume},
+	platform::collections::HashMap,
+};
 use itertools::Itertools as _;
 use smallvec::SmallVec;
 
@@ -251,10 +254,265 @@ impl LevelBuilder {
 			points_on_cycle: Vec<Vec<usize>>,
 		}
 
+		#[derive(Clone)]
+		struct CyclePoints {
+			first_undecided_vertex: Option<usize>,
+			first_decided_vertex: Option<usize>,
+			vertices: Vec<LogicalVertex>,
+		}
+
+		impl CyclePoints {
+			fn calculate_links(&mut self) {
+				let mut running_single_vertex = None;
+				let mut running_pair_vertex = None;
+
+				// Go backwards to create links to next_single
+				for (index, vert) in self.vertices.iter_mut().enumerate().rev() {
+					match &mut vert.inner {
+						LogicalVertexVariant::Single { next_single } => {
+							if let Some(single) = running_single_vertex {
+								*next_single = single;
+							}
+							running_single_vertex = Some(index);
+						}
+						LogicalVertexVariant::Pair {
+							next_pair,
+							prev_pair: _,
+							prev_single: _,
+						} => {
+							if let Some(pair) = running_pair_vertex {
+								*next_pair = pair;
+							}
+							running_pair_vertex = Some(index);
+						}
+					}
+				}
+				self.first_decided_vertex = running_single_vertex;
+				self.first_undecided_vertex = running_pair_vertex;
+				// TODO: This could be optimised to look only until it finds the first entry of either kind
+				for (index, vert) in self.vertices.iter_mut().enumerate().rev() {
+					match &mut vert.inner {
+						LogicalVertexVariant::Single { next_single } => {
+							if let Some(single) = running_single_vertex {
+								*next_single = single;
+							}
+							running_single_vertex = Some(index);
+						}
+						LogicalVertexVariant::Pair {
+							next_pair,
+							prev_pair: _,
+							prev_single: _,
+						} => {
+							if let Some(pair) = running_pair_vertex {
+								*next_pair = pair;
+							}
+							running_pair_vertex = Some(index);
+						}
+					}
+				}
+
+				// Go forward to create links to prev_single
+				let mut running_single_vertex = None;
+				let mut running_pair_vertex = None;
+				for _ in 0..2 {
+					for (index, vert) in self.vertices.iter_mut().enumerate() {
+						match &mut vert.inner {
+							LogicalVertexVariant::Single { next_single: _ } => {
+								running_single_vertex = Some(index);
+							}
+							LogicalVertexVariant::Pair {
+								next_pair: _,
+								prev_pair,
+								prev_single,
+							} => {
+								*prev_single = running_single_vertex;
+								if let Some(running_pair_vertex) = running_pair_vertex {
+									*prev_pair = running_pair_vertex;
+								}
+								running_pair_vertex = Some(index);
+							}
+						}
+					}
+				}
+				#[cfg(any(debug_assertions, test))]
+				self.assert_validity();
+			}
+
+			#[cfg(any(debug_assertions, test))]
+			fn assert_validity(&self) {
+				let assert_single = |index: usize| {
+					assert!(matches!(
+						self.vertices[index].inner,
+						LogicalVertexVariant::Single { .. }
+					));
+					assert!(self
+						.first_decided_vertex
+						.is_some_and(|first_single| { first_single <= index }));
+				};
+				let assert_pair = |index: usize| {
+					assert!(matches!(
+						self.vertices[index].inner,
+						LogicalVertexVariant::Pair { .. }
+					));
+					assert!(self
+						.first_undecided_vertex
+						.is_some_and(|first_single| { first_single <= index }));
+				};
+				for value in self.vertices.iter() {
+					match value.inner {
+						LogicalVertexVariant::Single { next_single } => assert_single(next_single),
+						LogicalVertexVariant::Pair {
+							next_pair,
+							prev_pair,
+							prev_single,
+						} => {
+							assert_pair(next_pair);
+							assert_pair(prev_pair);
+							if let Some(prev_single) = prev_single {
+								assert_single(prev_single);
+							}
+						}
+					}
+				}
+			}
+
+			fn convert_pair_to_single(&mut self, index: usize) {
+				let (next_pair, prev_pair, prev_single) = match self.vertices[index].inner {
+					LogicalVertexVariant::Single { next_single: _ } => {
+						debug_assert!(false, "`convert_pair_to_single` called on a Single vertex");
+						return;
+					}
+					LogicalVertexVariant::Pair {
+						next_pair,
+						prev_pair,
+						prev_single,
+					} => (next_pair, prev_pair, prev_single),
+				};
+				// Perform the update
+				if let Some(prev_single) = prev_single {
+					self.vertices[index].inner = LogicalVertexVariant::Single {
+						next_single: match &mut self.vertices[prev_single].inner {
+							LogicalVertexVariant::Single {
+								next_single: next_after_prev_single,
+							} => {
+								*next_after_prev_single = index;
+								*next_after_prev_single
+							}
+							LogicalVertexVariant::Pair { .. } => {
+								debug_assert!(false, "`prev_single` pointed to a Pair vertex");
+								index
+							}
+						},
+					}
+				} else {
+					// This ought to be the first Single vertex around
+					self.vertices[index].inner =
+						LogicalVertexVariant::Single { next_single: index };
+				}
+				// Fix pair references
+				{
+					if next_pair != index {
+						match &mut self.vertices[next_pair].inner {
+							LogicalVertexVariant::Single { .. } => {
+								debug_assert!(false, "`next_pair` pointed to a Single vertex");
+							}
+							LogicalVertexVariant::Pair {
+								prev_pair: next_prev_pair,
+								..
+							} => {
+								*next_prev_pair = prev_pair;
+							}
+						}
+					}
+					if prev_pair != index {
+						match &mut self.vertices[prev_pair].inner {
+							LogicalVertexVariant::Single { .. } => {
+								debug_assert!(false, "`prev_pair` pointed to a Single vertex");
+							}
+							LogicalVertexVariant::Pair {
+								next_pair: prev_next_pair,
+								..
+							} => {
+								*prev_next_pair = next_pair;
+							}
+						}
+					}
+				}
+
+				// Fix prev_single references
+				for offset in 1..self.vertices.len() {
+					let target = (index + offset) % self.vertices.len();
+					match &mut self.vertices[target].inner {
+						LogicalVertexVariant::Single { .. } => {
+							break;
+						}
+						LogicalVertexVariant::Pair { prev_single, .. } => {
+							*prev_single = Some(index)
+						}
+					}
+				}
+
+				// Update [`Self::first_decided_vertex`]
+				if let Some(first_single) = self.first_decided_vertex {
+					if index < first_single {
+						self.first_decided_vertex = Some(index);
+					}
+				} else {
+					self.first_decided_vertex = Some(index);
+				}
+				// Update [`Self::first_undecided_vertex`]
+				if let Some(first_pair) = self.first_undecided_vertex {
+					if first_pair >= index {
+						if next_pair > index {
+							self.first_undecided_vertex = Some(next_pair);
+						} else {
+							self.first_undecided_vertex = None;
+						}
+					}
+				}
+			}
+		}
+
+		/// A datastructure for a vertex on a cycle that requires logic to decide whether it's `Single` or `Pair`
+		#[derive(Clone, Debug)]
+		struct LogicalVertex {
+			/// The backing vertex
+			vertex: usize,
+			inner: LogicalVertexVariant,
+		}
+
+		#[derive(Clone, Debug)]
+		enum LogicalVertexVariant {
+			/// A `Single` vertex
+			Single {
+				/// Next `Single` logical vertex in cyclic order,
+				/// might loop back
+				/// might be itself (iff there is exactly one `Single`)
+				next_single: usize,
+			},
+			/// A `Pair` vertex
+			Pair {
+				/// Next `Pair` logical vertex in cyclic order,
+				/// might loop back
+				/// might be itself (iff there is exactly one `Pair`)
+				next_pair: usize,
+				/// Next `Pair` logical vertex in cyclic order,
+				/// might loop back
+				/// might be itself (iff there is exactly one `Pair`)
+				prev_pair: usize,
+				/// Nearest previous `Single` logical vertex in cyclic order,
+				/// might loop around
+				/// might be None if there is no such vertex
+				prev_single: Option<usize>,
+			},
+		}
+
 		struct PointData {
 			points: Vec<Vec2>,
 			vertices_interested_in_point: Vec<SmallVec<[usize; 1]>>,
 			vertex_constraints: Vec<IntersectionPointSet<usize>>,
+			cycle_data: Vec<CyclePoints>,
+			problematic_vertex_to_cycle: Vec<SmallVec<[(usize, usize); 2]>>,
 		}
 
 		enum VertexSolverError {
@@ -395,6 +653,13 @@ impl LevelBuilder {
 				}
 				self.vertex_constraints[vertex] = IntersectionPointSet::Single(point);
 				self.vertices_interested_in_point[point].push(vertex);
+				self.make_vertex_single_in_cycles_internal(vertex);
+			}
+
+			fn make_vertex_single_in_cycles_internal(&mut self, vertex: usize) {
+				for &(cycle, index) in self.problematic_vertex_to_cycle[vertex].iter() {
+					self.cycle_data[cycle].convert_pair_to_single(index);
+				}
 			}
 
 			fn remove_interest(&mut self, vertex: usize, point: usize) {
@@ -636,11 +901,50 @@ impl LevelBuilder {
 				point_vertices.sort();
 				point_vertices.dedup();
 			}
+			let mut cycle_data = vec![
+				CyclePoints {
+					first_undecided_vertex: None,
+					first_decided_vertex: None,
+					vertices: Vec::new()
+				};
+				self.cycles.len()
+			];
+			let mut problematic_vertex_to_cycle = vec![SmallVec::new(); self.vertices.len()];
+			for &cycle_index in problematic_cycles.iter() {
+				for &vertex in self.cycles[cycle_index].vertex_indices.iter() {
+					match vertex_constraints[vertex] {
+						IntersectionPointSet::Pair(_, _) => {
+							cycle_data[cycle_index].vertices.push(LogicalVertex {
+								vertex,
+								inner: LogicalVertexVariant::Pair {
+									next_pair: 0,
+									prev_pair: 0,
+									prev_single: None,
+								},
+							});
+							problematic_vertex_to_cycle[vertex]
+								.push((cycle_index, cycle_data[cycle_index].vertices.len() - 1));
+						}
+						IntersectionPointSet::Single(_) => {
+							cycle_data[cycle_index].vertices.push(LogicalVertex {
+								vertex,
+								inner: LogicalVertexVariant::Single { next_single: 0 },
+							});
+							problematic_vertex_to_cycle[vertex]
+								.push((cycle_index, cycle_data[cycle_index].vertices.len() - 1));
+						}
+						_ => {}
+					}
+				}
+				cycle_data[cycle_index].calculate_links();
+			}
 			(
 				PointData {
 					points,
 					vertices_interested_in_point,
 					vertex_constraints,
+					cycle_data,
+					problematic_vertex_to_cycle,
 				},
 				AdditionalCycleData {
 					problematic_cycles,
@@ -682,176 +986,179 @@ impl LevelBuilder {
 							position: cycle_position,
 							shape: CycleShape::Circle(_),
 						}) => {
-							// The closest "previous" point that is known to be fixed and its order in cycle
-							let mut prev_point_index: (usize, usize) = {
-								let mut prev_point_index: Option<(usize, usize)> = None;
-								for (position_in_cycle, &vertex) in
-									cycle.vertex_indices.iter().enumerate().rev()
-								{
-									match point_data.vertex_constraints[vertex] {
-										IntersectionPointSet::Single(point) => {
-											prev_point_index = Some((point, position_in_cycle));
-											break;
-										}
-										_ => {}
-									}
-								}
-								if let Some(prev_point_index) = prev_point_index {
-									prev_point_index
-								} else {
-									// There are no `Single`s available, there's no reason to bother
-									continue;
-								}
-							};
-							// The closest "next" point that is known to be fixed and its order in cycle
-							let mut next_point_index: Option<(usize, usize)> = None;
-							// The first fixed point found
-							let mut first_point: Option<(usize, usize)> = None;
-							let mut end_reached_while_looking_for_next_point = false;
-							for (position_in_cycle, &vertex) in
-								cycle.vertex_indices.iter().enumerate()
+							if let Some(first_pair_index) =
+								point_data.cycle_data[cycle_id].first_undecided_vertex
 							{
-								match point_data.vertex_constraints[vertex] {
-									IntersectionPointSet::Pair(point_a, point_b) => {
-										if !end_reached_while_looking_for_next_point
-											&& !next_point_index.is_some_and(
-												|(_point, position)| position > position_in_cycle,
-											) {
-											next_point_index = None;
-											for (next_position_in_cycle, &next_vertex) in cycle
-												.vertex_indices
-												.iter()
-												.enumerate()
-												.skip(position_in_cycle)
-											{
-												match point_data.vertex_constraints[next_vertex] {
-													IntersectionPointSet::Single(point) => {
-														next_point_index =
-															Some((point, next_position_in_cycle));
-														break;
-													}
-													_ => {}
-												}
-											}
-
-											// If nothing is found, loop around and use the first point
-											if next_point_index.is_none() {
-												next_point_index = first_point;
-												// No sense in looking next time if the whole range was traversed already
-												end_reached_while_looking_for_next_point = true;
-											}
-										}
-										let (prev_point, prev_position_in_cycle) = prev_point_index;
-										// Two constraints are available
-										if !if let Some((next_point, next_position_in_cycle)) =
-											next_point_index.filter(
-												|&(point, next_position_in_cycle)| {
-													point != prev_point
-														&& next_position_in_cycle
-															!= prev_position_in_cycle
+								if point_data.cycle_data[cycle_id]
+									.first_decided_vertex
+									.is_some()
+								{
+									for pair_vertex_index in first_pair_index
+										..point_data.cycle_data[cycle_id].vertices.len()
+									{
+										let LogicalVertex {
+											vertex: pair_vertex,
+											inner:
+												LogicalVertexVariant::Pair {
+													next_pair: _,
+													prev_pair: _,
+													prev_single: Some(prev_single_index),
 												},
-											) {
-											let clockwiseness = test_index_clockwiseness(
-												prev_position_in_cycle,
-												position_in_cycle,
-												next_position_in_cycle,
+										} = point_data.cycle_data[cycle_id].vertices
+											[pair_vertex_index]
+										else {
+											continue;
+										};
+										let LogicalVertex {
+											vertex: prev_single_vertex,
+											inner:
+												LogicalVertexVariant::Single {
+													next_single: next_single_index,
+												},
+										} = point_data.cycle_data[cycle_id].vertices
+											[prev_single_index]
+										else {
+											debug_assert!(
+												false,
+												"Invariants broken, the truth goes unspoken."
 											);
-											let sign = if clockwiseness { 1.0 } else { -1.0 };
+											break;
+										};
+										let next_single_vertex = point_data.cycle_data[cycle_id]
+											.vertices[next_single_index]
+											.vertex;
 
-											let score_a = test_point_clockwiseness(
-												point_data.points[prev_point],
-												point_data.points[point_a],
-												point_data.points[next_point],
-												Some(cycle_position),
-											) * sign;
-											let score_b = test_point_clockwiseness(
-												point_data.points[prev_point],
-												point_data.points[point_b],
-												point_data.points[next_point],
-												Some(cycle_position),
-											) * sign;
-											let mut point_a_valid = score_a > 0.0;
-											let mut point_b_valid = score_b > 0.0;
-											// if one of the results is weirdly small, but not the other one,
-											// use the non-tiny one
-											if point_a_valid && point_b_valid {
-												const THRESHOLD: f32 = 0.001;
-												if score_a < score_b * THRESHOLD {
-													point_a_valid = false;
-												} else if score_b < score_a * THRESHOLD {
-													point_b_valid = false;
-												}
-											}
-											match (point_a_valid, point_b_valid) {
-												(true, true) => {
-													/* Tough luck, nothing got done here */
-													false
-												}
-												(true, false) => {
-													point_data.place_vertex(vertex, point_a);
-													true
-												}
-												(false, true) => {
-													point_data.place_vertex(vertex, point_b);
-													true
-												}
-												(false, false) => {
-													todo!(
+										match (
+											point_data.vertex_constraints[pair_vertex],
+											point_data.vertex_constraints[prev_single_vertex],
+											point_data.vertex_constraints[next_single_vertex],
+										) {
+											(
+												IntersectionPointSet::Pair(point_a, point_b),
+												IntersectionPointSet::Single(prev_point),
+												IntersectionPointSet::Single(next_point),
+											) => {
+												if !if prev_single_vertex != next_single_vertex {
+													// Two constraints are available
+													let clockwiseness = test_index_clockwiseness(
+														prev_single_index,
+														pair_vertex_index,
+														next_single_index,
+													);
+													let sign =
+														if clockwiseness { 1.0 } else { -1.0 };
+
+													let score_a = test_point_clockwiseness(
+														point_data.points[prev_point],
+														point_data.points[point_a],
+														point_data.points[next_point],
+														Some(cycle_position),
+													) * sign;
+													let score_b = test_point_clockwiseness(
+														point_data.points[prev_point],
+														point_data.points[point_b],
+														point_data.points[next_point],
+														Some(cycle_position),
+													) * sign;
+													let mut point_a_valid = score_a > 0.0;
+													let mut point_b_valid = score_b > 0.0;
+													// if one of the results is weirdly small, but not the other one,
+													// use the non-tiny one
+													if point_a_valid && point_b_valid {
+														const THRESHOLD: f32 = 0.001;
+														if score_a < score_b * THRESHOLD {
+															point_a_valid = false;
+														} else if score_b < score_a * THRESHOLD {
+															point_b_valid = false;
+														}
+													}
+													match (point_a_valid, point_b_valid) {
+														(true, true) => {
+															/* Tough luck, nothing got done here */
+															false
+														}
+														(true, false) => {
+															point_data
+																.place_vertex(pair_vertex, point_a);
+															true
+														}
+														(false, true) => {
+															point_data
+																.place_vertex(pair_vertex, point_b);
+															true
+														}
+														(false, false) => {
+															todo!(
 														"Raise an error, vertex has nowhere to go"
 													);
-												}
-											}
-										} else {
-											false
-										} {
-											if let Some((
-												twin_vertex_position_in_cycle,
-												twin_vertex,
-											)) = point_data.find_twin(vertex).and_then(
-												|twin_vertex| {
-													cycle
-														.vertex_indices
-														.iter()
-														.copied()
-														.enumerate()
-														.skip(position_in_cycle)
-														.find(|&(_order_in_cycle, vertex)| {
-															vertex == twin_vertex
-														})
-												},
-											) {
-												let clockwiseness = test_index_clockwiseness(
-													prev_position_in_cycle,
-													position_in_cycle,
-													twin_vertex_position_in_cycle,
-												);
-												let point_clockwiseness = test_point_clockwiseness(
-													point_data.points[prev_point],
-													point_data.points[point_a],
-													point_data.points[point_b],
-													Some(cycle_position),
-												);
-												if clockwiseness == (point_clockwiseness > 0.0) {
-													point_data.place_vertex(vertex, point_a);
-													debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+														}
+													}
 												} else {
-													point_data.place_vertex(vertex, point_b);
-													debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+													false
+												} {
+													// Only one constraint is guaranteed, but twin vertices can still be decided this way
+													if let Some((twin_vertex, twin_vertex_index)) =
+														point_data.find_twin(pair_vertex).and_then(
+															|twin_vertex| {
+																point_data
+																	.problematic_vertex_to_cycle[twin_vertex]
+																	.iter()
+																	.find(
+																		|&&(
+																			twin_cycle_id,
+																			_twin_position_in_cycle,
+																		)| {
+																			twin_cycle_id
+																				== cycle_id
+																		},
+																	)
+																	.map(
+																		|&(
+																			_,
+																			twin_position_in_cycle,
+																		)| {
+																			(twin_vertex, twin_position_in_cycle)
+																		},
+																	)
+															},
+														) {
+														let clockwiseness =
+															test_index_clockwiseness(
+																prev_single_index,
+																pair_vertex_index,
+																twin_vertex_index,
+															);
+														let point_clockwiseness =
+															test_point_clockwiseness(
+																point_data.points[prev_point],
+																point_data.points[point_a],
+																point_data.points[point_b],
+																Some(cycle_position),
+															);
+														if clockwiseness
+															== (point_clockwiseness > 0.0)
+														{
+															point_data
+																.place_vertex(pair_vertex, point_a);
+															debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+														} else {
+															point_data
+																.place_vertex(pair_vertex, point_b);
+															debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+														}
+													}
 												}
 											}
+											_ => { /* dont care */ }
 										}
-									}
-									_ => { /* dont care */ }
-								}
 
-								match point_data.vertex_constraints[vertex] {
-									IntersectionPointSet::Single(point) => {
-										prev_point_index = (point, position_in_cycle);
-										if first_point.is_none() {
-											first_point = Some((point, position_in_cycle));
-										}
+										#[cfg(any(debug_assertions, test))]
+										point_data.cycle_data[cycle_id].assert_validity();
 									}
-									_ => { /* dont care */ }
+								} else {
+									// There are no `Single`s available,
+									// so we go after `Pair` therapy
+									let pair_vertices = continue;
 								}
 							}
 						}
