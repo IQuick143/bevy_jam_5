@@ -88,7 +88,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 					));
 					children.text("Background", JustifyContent::End, font.0.clone_weak());
 					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.tool_button("", font.0.clone_weak()).insert((
+						children.inline_button("", font.0.clone_weak()).insert((
 							MultiStateButton::new(
 								3,
 								background_mode_to_option_index(settings.background_mode),
@@ -99,7 +99,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 					});
 					children.text("Parallax", JustifyContent::End, font.0.clone_weak());
 					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.tool_button("", font.0.clone_weak()).insert((
+						children.inline_button("", font.0.clone_weak()).insert((
 							MultiStateButton::new(2, settings.enable_parallax as u32),
 							MultiStateButtonLabels::new(["Off", "On"]),
 							SettingsCheckboxControl::Parallax,

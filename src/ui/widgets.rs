@@ -19,6 +19,9 @@ pub trait Widgets {
 	/// Spawn a very compact toolbar button. Smaller than [`Widgets::small_button`]
 	fn tool_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
+	/// Spawn a very compact button. Its size matches that of [`Widgets::text`]
+	fn inline_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
+
 	/// Spawn a simple header label. Bigger than [`Widgets::label`].
 	fn header(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_>;
 
@@ -123,6 +126,37 @@ impl<T: Spawn> Widgets for T {
 				Text::new(text),
 				TextFont {
 					font_size: 30.0,
+					font,
+					..default()
+				},
+				TextColor(BUTTON_TEXT),
+			));
+		});
+		entity
+	}
+
+	fn inline_button(&mut self, text: impl Into<String>, font: Handle<Font>) -> EntityCommands<'_> {
+		let mut entity = self.spawn_internal((
+			Name::new("Button"),
+			Button,
+			Node {
+				padding: UiRect::axes(Px(10.0), Px(5.0)),
+				align_items: AlignItems::Center,
+				..default()
+			},
+			BackgroundColor(NODE_BACKGROUND),
+			InteractionPalette {
+				none: NODE_BACKGROUND,
+				hovered: BUTTON_HOVERED_BACKGROUND,
+				pressed: BUTTON_PRESSED_BACKGROUND,
+			},
+		));
+		entity.with_children(|children| {
+			children.spawn((
+				Name::new("Button Text"),
+				Text::new(text),
+				TextFont {
+					font_size: 24.0,
 					font,
 					..default()
 				},
