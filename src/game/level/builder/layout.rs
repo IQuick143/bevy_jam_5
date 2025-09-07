@@ -378,8 +378,7 @@ impl LevelBuilder {
 
 			fn convert_pair_to_single(&mut self, index: usize) {
 				let (next_pair, prev_pair, prev_single) = match self.vertices[index].inner {
-					LogicalVertexVariant::Single { next_single: _ } => {
-						debug_assert!(false, "`convert_pair_to_single` called on a Single vertex");
+					LogicalVertexVariant::Single { .. } => {
 						return;
 					}
 					LogicalVertexVariant::Pair {
@@ -978,7 +977,7 @@ impl LevelBuilder {
 			}
 			// Two iterations to let constraints propagate along a cycle, but complete propagation along chains of cycles is not guaranteed
 			for _ in 0..2 {
-				// Use simple deductions to place remaining
+				// Use simple deductions to place remaining undecided vertices
 				for &cycle_id in cycle_data.problematic_cycles.iter() {
 					let cycle = &self.cycles[cycle_id];
 					match cycle.placement {
@@ -989,6 +988,121 @@ impl LevelBuilder {
 							if let Some(first_pair_index) =
 								point_data.cycle_data[cycle_id].first_undecided_vertex
 							{
+								if point_data.cycle_data[cycle_id]
+									.first_decided_vertex
+									.is_none()
+								{
+									// There are no `Single`s available,
+									// so we go after `Pair` therapy
+									'pair_therapy: for pair_vertex_index in
+										0..point_data.cycle_data[cycle_id].vertices.len()
+									{
+										let LogicalVertex {
+											vertex: pair_vertex,
+											inner:
+												LogicalVertexVariant::Pair {
+													next_pair: _,
+													prev_pair: _,
+													prev_single: None,
+												},
+										} = point_data.cycle_data[cycle_id].vertices
+											[pair_vertex_index]
+										else {
+											debug_assert!(
+												false,
+												"Invariants broken, the truth goes unspoken."
+											);
+											break;
+										};
+										let Some((twin_vertex, twin_vertex_index)) = point_data
+											.find_twin(pair_vertex)
+											.and_then(|twin_vertex| {
+												point_data.problematic_vertex_to_cycle[twin_vertex]
+													.iter()
+													.find(
+														|&&(
+															twin_cycle_id,
+															_twin_position_in_cycle,
+														)| {
+															twin_cycle_id == cycle_id
+														},
+													)
+													.map(|&(_, twin_position_in_cycle)| {
+														(twin_vertex, twin_position_in_cycle)
+													})
+											})
+										else {
+											continue;
+										};
+										// Avoid doing the work twice
+										if twin_vertex < pair_vertex {
+											continue;
+										}
+										for constraint_vertex_index in
+											0..point_data.cycle_data[cycle_id].vertices.len()
+										{
+											// We need a separate vertex, not one already present
+											if constraint_vertex_index == pair_vertex_index
+												|| constraint_vertex_index == twin_vertex_index
+											{
+												continue;
+											}
+											let constraint_vertex = point_data.cycle_data[cycle_id]
+												.vertices[constraint_vertex_index]
+												.vertex;
+											if let (
+												IntersectionPointSet::Pair(point_a, point_b),
+												IntersectionPointSet::Pair(option_1, option_2),
+											) = (
+												point_data.vertex_constraints[pair_vertex],
+												point_data.vertex_constraints[constraint_vertex],
+											) {
+												let clockwiseness = test_index_clockwiseness(
+													pair_vertex_index,
+													twin_vertex_index,
+													constraint_vertex_index,
+												);
+												let sign = if clockwiseness { 1.0 } else { -1.0 };
+
+												let score_1 = test_point_clockwiseness(
+													point_data.points[point_a],
+													point_data.points[point_b],
+													point_data.points[option_1],
+													Some(cycle_position),
+												) * sign;
+												let score_2 = test_point_clockwiseness(
+													point_data.points[point_a],
+													point_data.points[point_b],
+													point_data.points[option_2],
+													Some(cycle_position),
+												) * sign;
+
+												// If both situations agree
+												if score_1.signum() == score_2.signum() {
+													// Whether point_a, point_b is correct order or they should be flipped
+													if score_1.is_sign_positive() {
+														point_data
+															.place_vertex(pair_vertex, point_a);
+														point_data
+															.place_vertex(twin_vertex, point_b);
+													} else {
+														point_data
+															.place_vertex(pair_vertex, point_b);
+														point_data
+															.place_vertex(twin_vertex, point_a);
+													}
+													// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
+													break 'pair_therapy;
+												}
+											} else {
+												debug_assert!(
+													false,
+													"THERE SHOULD BE ONLY PAIR VERTICES"
+												);
+											}
+										}
+									}
+								}
 								if point_data.cycle_data[cycle_id]
 									.first_decided_vertex
 									.is_some()
@@ -1155,10 +1269,6 @@ impl LevelBuilder {
 										#[cfg(any(debug_assertions, test))]
 										point_data.cycle_data[cycle_id].assert_validity();
 									}
-								} else {
-									// There are no `Single`s available,
-									// so we go after `Pair` therapy
-									let pair_vertices = continue;
 								}
 							}
 						}

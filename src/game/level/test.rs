@@ -11,6 +11,7 @@ fn load(level: &str) -> ResultNonExclusive<LevelData, Error> {
 mod layout_tests {
 	use bevy::math::Vec2;
 	use itertools::Itertools;
+	use rand::{seq::SliceRandom, SeedableRng};
 
 	use super::load;
 
@@ -188,7 +189,73 @@ circle(cycle('manual'; _ button() button() _ i h); 2 * dx, dy, r);
 
 	#[test]
 	fn olympic_polymorphic() {
-		// TODO: Stress test the pair-pair resolver
+		let header = "R=12;o=10;\n";
+
+		for n_cycles in 3..10 {
+			let mut vertices = Vec::new();
+			for i in 0..n_cycles - 1 {
+				vertices.push(format!("v{i}a=vertex();\n"));
+				vertices.push(format!("v{i}b=vertex();\n"));
+			}
+			let mut cycles = Vec::new();
+			for i in 0..n_cycles {
+				let extra_vertices = (0..i).map(|_| "_").join(" ");
+				let start_vertices = if i > 0 {
+					format!("v{}a v{}b ", i - 1, i - 1)
+				} else {
+					"".to_owned()
+				};
+				let end_vertices = if i < n_cycles - 1 {
+					format!("v{}b v{}a ", i, i)
+				} else {
+					"".to_owned()
+				};
+				cycles.push(format!("circle(cycle({start_vertices} {extra_vertices} {end_vertices}); {i}*o, 0, R);\n"));
+			}
+			let mut rng = rand::rngs::SmallRng::seed_from_u64(101);
+			for _ in 0..60 {
+				load(&(header.to_owned() + &vertices.join("") + &cycles.join(""))).unwrap_ok();
+				vertices.shuffle(&mut rng);
+				cycles.shuffle(&mut rng);
+			}
+		}
+	}
+
+	#[test]
+	fn pair_surrounded_by_singles() {
+		load(
+			r"
+undecided = vertex();
+single_1 = vertex();
+single_2 = vertex();
+
+circle(cycle(undecided, single_1, single_2); 0, 0, 10);
+circle(cycle(undecided); 0, +10, 10);
+hint_vertex(single_1; 0,+1);
+hint_vertex(single_2; 0,-1);",
+		)
+		.unwrap_ok();
+	}
+
+	#[test]
+	fn twin_partial_interaction() {
+		// A single Pair vertex should be enough to resolve a twin pair
+		load(
+			r"
+undecided = vertex();
+twins_a1 = vertex();
+twins_b1 = vertex();
+twins_a2 = vertex();
+twins_b2 = vertex();
+
+circle(cycle(undecided, twins_a1, twins_b1, twins_a2, twins_b2); 0, 0, 10);
+# Interleaving twin vertices should not be resolvable
+circle(cycle(twins_a1, twins_a2); 0, -10, 10);
+circle(cycle(twins_b1, twins_b2); +10, 0, 10);
+# This vertex should resolve twins_a which should resolve twins_b which should resolve undecided
+circle(cycle(undecided); 0, +10, 10);",
+		)
+		.unwrap_ok();
 	}
 
 	#[test]
