@@ -907,6 +907,8 @@ blue = cycle(_ button(0) _ bgo bri bgi bro);
 red = cycle(_ button(1) _ bro rgi bri rgo);
 green = cycle(_ button(2) _ rgo bgi rgi bgo);
 
+hint_vertex(bgi; 0,0);
+
 circle(blue; -87, 50 130);
 circle(red; 0, -100, 130);
 circle(green; 87 50 130);
@@ -1033,6 +1035,7 @@ fn stress_test_random_levels() {
 		include_str!("../../assets/levels/linked_sort.txt"),
 	];
 	for level in levels {
+		println!("{level}");
 		let mut app = app_with_level(level);
 		move_fuzz(&mut app, 4096, 1337133713371337);
 	}

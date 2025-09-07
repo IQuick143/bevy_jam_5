@@ -1288,7 +1288,7 @@ impl LevelBuilder {
 			match point_data.vertex_constraints[vertex_id] {
 				IntersectionPointSet::Single(point) => {
 					vertex_placement.position =
-						IntermediateVertexPosition::Fixed(point_data.points[point])
+						IntermediateVertexPosition::Fixed(point_data.points[point]);
 				}
 				IntersectionPointSet::Unconstrained => todo!(),
 				IntersectionPointSet::Cycle(_) => {}

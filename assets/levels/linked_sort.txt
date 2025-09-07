@@ -23,6 +23,6 @@ circle(main; 0 0 100);
 circle(sideA; 110 20 40);
 circle(sideB; -110, 20 40);
 circle(player; 180, -60, 35);
-set_vertex_angle(v; 40);
+hint_vertex(v; 180, -60 + 35);
 
 cycle_color_labels(main; 'tb' 'in' 'arrow');
