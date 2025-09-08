@@ -1323,7 +1323,7 @@ impl LevelBuilder {
 						}
 						if free {
 							// A measure of how squished a given choice of point placements is.
-							// High positive pressure means it's a bad idea to place pair -> point_a and twin -> point_b
+							// High positive pressure means it's a bad idea to place pair -> point_b and twin -> point_a
 							let mut pressure = 0.0;
 							/// A positive value added to the denominator to avoid divisions by 0,
 							/// represents how tolerable it is to shove a vertex into a 0-length cycle segment
@@ -1395,7 +1395,7 @@ impl LevelBuilder {
 							}
 
 							// The twin vertex should now get itself set to `Single` and should be caught by a later iteration of the main loop
-							if pressure > 0.0 {
+							if pressure < 0.0 {
 								point_data.place_vertex(pair_vertex, point_b);
 								vertex_placement.position =
 									IntermediateVertexPosition::Fixed(point_data.points[point_b]);
