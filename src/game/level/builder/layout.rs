@@ -509,6 +509,7 @@ impl LevelBuilder {
 
 		#[derive(Debug)]
 		struct PointData {
+			progress: bool,
 			points: Vec<Vec2>,
 			vertices_interested_in_point: Vec<SmallVec<[usize; 1]>>,
 			vertex_constraints: Vec<IntersectionPointSet<usize>>,
@@ -648,6 +649,7 @@ impl LevelBuilder {
 					IntersectionPointSet::Pair(a, b) => {
 						self.remove_interest(vertex, a);
 						self.remove_interest(vertex, b);
+						self.progress = true;
 					}
 					IntersectionPointSet::Single(a) => self.remove_interest(vertex, a),
 					_ => {}
@@ -941,6 +943,7 @@ impl LevelBuilder {
 			}
 			(
 				PointData {
+					progress: true,
 					points,
 					vertices_interested_in_point,
 					vertex_constraints,
@@ -977,8 +980,10 @@ impl LevelBuilder {
 					}
 				}
 			}
-			// Two iterations to let constraints propagate along a cycle, but complete propagation along chains of cycles is not guaranteed
-			for _ in 0..2 {
+
+			point_data.progress = true;
+			while point_data.progress {
+				point_data.progress = false;
 				// Use simple deductions to place remaining undecided vertices
 				for &cycle_id in cycle_data.problematic_cycles.iter() {
 					let cycle = &self.cycles[cycle_id];
@@ -1284,6 +1289,7 @@ impl LevelBuilder {
 		println!("{:?}", point_data.vertex_constraints);
 
 		// Convert `Single` placements into `Fixed` values
+		// Decide if remaining `Pair` placements can be guessed without breaking anything
 		for (vertex_id, vertex_placement) in self.vertices.iter_mut().enumerate() {
 			match point_data.vertex_constraints[vertex_id] {
 				IntersectionPointSet::Single(point) => {
@@ -1292,7 +1298,171 @@ impl LevelBuilder {
 				}
 				IntersectionPointSet::Unconstrained => todo!(),
 				IntersectionPointSet::Cycle(_) => {}
-				IntersectionPointSet::Pair(_, _) => todo!(),
+				IntersectionPointSet::Pair(point_a, point_b) => {
+					// TODO: Emit warning
+					let pair_vertex = vertex_id;
+					if let Some(twin_vertex) = point_data.find_twin(vertex_id) {
+						let mut cycles_to_check: Vec<usize> = point_data
+							.problematic_vertex_to_cycle[pair_vertex]
+							.iter()
+							.chain(point_data.problematic_vertex_to_cycle[twin_vertex].iter())
+							.map(|(cycle, _)| *cycle)
+							.collect();
+						cycles_to_check.sort();
+						cycles_to_check.dedup();
+						let mut free = true;
+						'freeness_check: for &cycle in cycles_to_check.iter() {
+							for logical_vertex in point_data.cycle_data[cycle].vertices.iter() {
+								if logical_vertex.vertex != pair_vertex
+									&& logical_vertex.vertex != twin_vertex
+								{
+									free = false;
+									break 'freeness_check;
+								}
+							}
+						}
+						if free {
+							// A measure of how squished a given choice of point placements is.
+							// High positive pressure means it's a bad idea to place pair -> point_a and twin -> point_b
+							let mut pressure = 0.0;
+							/// A positive value added to the denominator to avoid divisions by 0,
+							/// represents how tolerable it is to shove a vertex into a 0-length cycle segment
+							/// At 0 it would be unthinkable to allow that
+							/// At +inf it would not matter at all to place vertices very tightly together
+							const REGULARISATION: f32 = 0.2_f32;
+							for &cycle in cycles_to_check.iter() {
+								match self.cycles[cycle].placement {
+									Some(CyclePlacement {
+										position,
+										shape: CycleShape::Circle(_),
+									}) => {
+										// Calculate disparity between inner and outer areas
+										let dir_a =
+											Dir2::new(point_data.points[point_a] - position)
+												.unwrap_or(Dir2::X);
+										let dir_b =
+											Dir2::new(point_data.points[point_b] - position)
+												.unwrap_or(Dir2::Y);
+										let inner_fraction = {
+											let mut fraction =
+												dir_a.rotation_to(dir_b).as_turn_fraction();
+											if fraction < 0.0 {
+												fraction += 1.0;
+											}
+											fraction.min(1.0).max(0.0)
+										};
+										let outer_fraction = 1.0 - inner_fraction;
+
+										// Calculate disparity between inner and outer free vertex counts
+										let mut inverted = false;
+										let mut inner_vertices: i32 = 0;
+										let mut outer_vertices: i32 = 0;
+										let mut seen_first = false;
+										let mut seen_second = false;
+
+										for &vertex in self.cycles[cycle].vertex_indices.iter() {
+											if vertex == pair_vertex {
+												if seen_second && !seen_first {
+													inverted = true;
+												}
+												seen_first = true;
+											}
+											if vertex == twin_vertex {
+												seen_second = true;
+											}
+											if vertex != pair_vertex && vertex != twin_vertex {
+												if seen_first != seen_second {
+													inner_vertices += 1;
+												} else {
+													outer_vertices += 1;
+												}
+											}
+										}
+
+										if inverted {
+											(inner_vertices, outer_vertices) =
+												(outer_vertices, inner_vertices);
+										}
+
+										pressure += (inner_vertices - outer_vertices) as f32
+											* (1.0 / (inner_fraction + REGULARISATION)
+												- 1.0 / (outer_fraction + REGULARISATION));
+									}
+									None => {
+										// uhhh
+									}
+								}
+							}
+
+							// The twin vertex should now get itself set to `Single` and should be caught by a later iteration of the main loop
+							if pressure > 0.0 {
+								point_data.place_vertex(pair_vertex, point_b);
+								vertex_placement.position =
+									IntermediateVertexPosition::Fixed(point_data.points[point_b]);
+							} else {
+								point_data.place_vertex(pair_vertex, point_a);
+								vertex_placement.position =
+									IntermediateVertexPosition::Fixed(point_data.points[point_a]);
+							}
+						} else {
+							// TODO: Error / warning, this vertex pair remains unplaced
+							todo!();
+						}
+					} else {
+						let mut cycles_to_check: Vec<usize> = point_data
+							.problematic_vertex_to_cycle[pair_vertex]
+							.iter()
+							.map(|(cycle, _)| *cycle)
+							.collect();
+						cycles_to_check.sort();
+						cycles_to_check.dedup();
+						let mut free = true;
+						'freeness_check: for &cycle in cycles_to_check.iter() {
+							match self.cycles[cycle].placement {
+								Some(CyclePlacement {
+									position,
+									shape: CycleShape::Circle(_),
+								}) => {
+									let mut constrained_inside = false;
+									let mut constrained_outside = false;
+
+									for &point in cycle_data.points_on_cycle[cycle].iter() {
+										let score = test_point_clockwiseness(
+											point_data.points[point_a],
+											point_data.points[point],
+											point_data.points[point_b],
+											Some(position),
+										);
+										if score.abs() > 0.001 {
+											if score > 0.0 {
+												constrained_inside = true;
+											} else {
+												constrained_outside = true;
+											}
+											if constrained_inside && constrained_outside {
+												free = false;
+												break 'freeness_check;
+											}
+										}
+									}
+								}
+								None => {
+									free = false;
+									break 'freeness_check;
+								}
+							}
+						}
+						if free {
+							// Place it in the first spot idk who cares lmao.
+							point_data.place_vertex(pair_vertex, point_a);
+							vertex_placement.position =
+								IntermediateVertexPosition::Fixed(point_data.points[point_a]);
+						} else {
+							// TODO: Error / warning, this vertex pair remains unplaced
+							todo!();
+						}
+					}
+				}
 				IntersectionPointSet::Empty => todo!(),
 			}
 		}

@@ -13,4 +13,3 @@ link(spin side);
 circle(main; 0 0 100);
 circle(spin; 110 0 40);
 circle(side; 240 0 60);
-hint_vertex(g; 0, 100);

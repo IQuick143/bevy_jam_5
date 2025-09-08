@@ -19,7 +19,5 @@ main = cycle(
 circle(main; 0 0 100);
 circle(cycle(y x); 120 0 40);
 circle(cycle(v = vertex(player()), flag()); 220 30 35);
-# x should be "above"
-hint_vertex(x; 0 100);
 
 cycle_color_labels(main; 'tb' 'in' 'arrow');

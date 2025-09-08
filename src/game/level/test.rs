@@ -36,13 +36,11 @@ mod layout_tests {
 		)
 		.unwrap_ok();
 
-		// TODO: Add test asserting this hint to be necessary
 		load(
 			r"
 		v = vertex();
 		circle(cycle(v _); -7, 0, 10);
 		circle(cycle(v); +7, 0, 10);
-		hint_vertex(v; 0, 1);
 		",
 		)
 		.unwrap_ok();
@@ -75,7 +73,6 @@ mod layout_tests {
 		b = vertex();
 		circle(cycle(a b _ _ _ _); -7, 0, 10);
 		circle(cycle(b a _ _ _ _); +7, 0, 10);
-		hint_vertex(a; 0, 2);
 		",
 		)
 		.unwrap_ok();
@@ -86,19 +83,16 @@ mod layout_tests {
 		b = vertex();
 		circle(cycle(a b _ _ _ _); -7, 0, 10);
 		circle(cycle(b a _ _ _ _); +7, 0, 10);
-		hint_vertex(b; 0, -2);
 		",
 		)
 		.unwrap_ok();
 
-		// TODO: Check that `a` was actually placed near `5,5`
 		load(
 			r"
 		a = vertex();
 		b = vertex();
 		circle(cycle(a b _ _ _); 0, 0, 10);
 		circle(cycle(a _ b _ _); 0, 0, 10);
-		hint_vertex(a; 5, 5);
 		",
 		)
 		.unwrap_ok();
@@ -123,68 +117,13 @@ mod layout_tests {
 	#[test]
 	fn road_rage() {
 		// This level can be decided with no hints
-		load(
-			r"
-name = 'Car';
-hint = 'Fun fact: Originally this level was thought to be impossible!';
-
-box = box('lr');
-
-a = vertex(box);
-b = vertex(box);
-c = vertex(box);
-d = vertex(box);
-e = vertex(box);
-f = vertex(button() player());
-g = vertex();
-h = vertex(box button());
-i = vertex();
-j = vertex(box flag());
-k = vertex();
-l = vertex(button());
-m = vertex(button());
-n = vertex(button());
-o = vertex(button());
-p = vertex(button());
-
-circle(cycle('manual'; a b h m l f); 0 0 1);
-circle(cycle('manual'; i n m g b c); 1 0 1);
-circle(cycle('manual'; j o n h c d); 2 0 1);
-circle(cycle('manual'; k p o i d e); 3 0 1);",
-		)
-		.unwrap_ok();
+		load(include_str!("../../.././assets/levels/car.txt")).unwrap_ok();
 	}
 
 	#[test]
 	fn olympic() {
 		// A chain of cycles can also be automatically resolved
-		load(
-			r"
-name = 'Olympic';
-hint = 'Tip: In levels with a single player and manual cycles, it''s helpful to think about the player''s routes through the crossings.';
-
-box = box('desc_neg');
-
-dx = 4;
-dy = 3;
-r = 3;
-
-a = vertex(player() flag());
-b = vertex();
-c = vertex();
-d = vertex();
-e = vertex();
-f = vertex();
-g = vertex();
-h = vertex();
-i = vertex();
-circle(cycle('manual'; a box b c box _);          -2 * dx, dy, r);
-circle(cycle('manual'; _ _ c b d e);                  -dx,  0, r);
-circle(cycle('manual'; _ _ f g e d);                    0, dy, r);
-circle(cycle('manual'; _ _ g f h i);                   dx,  0, r);
-circle(cycle('manual'; _ button() button() _ i h); 2 * dx, dy, r);
-",
-		).unwrap_ok();
+		load(include_str!("../../.././assets/levels/olympic.txt")).unwrap_ok();
 	}
 
 	#[test]
@@ -219,6 +158,35 @@ circle(cycle('manual'; _ button() button() _ i h); 2 * dx, dy, r);
 				cycles.shuffle(&mut rng);
 			}
 		}
+	}
+
+	#[test]
+	fn olympic_with_holes() {
+		// Like olympic, but some cycles have only one shared vertex
+		// This can still be laid out by deducing the pairs and then choosing arbitrarily for the singles
+		load(
+			r"
+a1 = vertex();
+a2 = vertex();
+a3 = vertex();
+a4 = vertex();
+a5 = vertex();
+
+b1 = vertex();
+b2 = vertex();
+# b3 = vertex();
+# b4 = vertex();
+b5 = vertex();
+
+circle(cycle(a1 b1); 0,0,1.4);
+circle(cycle(a2 b2 b1 a1); 0,1,1.4);
+circle(cycle(a3 b2 a2); 0,2,1.4);
+circle(cycle(a4 a3); 0,3,1.4);
+circle(cycle(a5 b5 a4); 0,4,1.4);
+circle(cycle(a5 b5); 0,5,1.4);
+",
+		)
+		.unwrap_ok();
 	}
 
 	#[test]
