@@ -256,8 +256,13 @@ impl LevelBuilder {
 
 		#[derive(Clone, Debug)]
 		struct CyclePoints {
+			/// Index of the earliest entry in [`CyclePoints::vertices`] that is a `Pair`
 			first_undecided_vertex: Option<usize>,
+			/// Index of the earliest entry in [`CyclePoints::vertices`] that is a `Single`
 			first_decided_vertex: Option<usize>,
+			/// A datastructure containing links to the `Pair` and `Single` vertices on this cycle.
+			/// Single vertices are linked together into a linked cycle
+			/// Pair vertices are linked into a doubly-linked cycle and to single vertices
 			vertices: Vec<LogicalVertex>,
 		}
 
@@ -477,7 +482,9 @@ impl LevelBuilder {
 		#[derive(Clone, Debug)]
 		struct LogicalVertex {
 			/// The backing vertex
+			/// [`PointData::vertex_constraints`] of this vertex should agree with the data in [`LogicalVertex::inner`]
 			vertex: usize,
+			/// Associated type data
 			inner: LogicalVertexVariant,
 		}
 
@@ -488,6 +495,8 @@ impl LevelBuilder {
 				/// Next `Single` logical vertex in cyclic order,
 				/// might loop back
 				/// might be itself (iff there is exactly one `Single`)
+				///
+				/// Indexes into [`CyclePoints::vertices`]
 				next_single: usize,
 			},
 			/// A `Pair` vertex
@@ -495,25 +504,49 @@ impl LevelBuilder {
 				/// Next `Pair` logical vertex in cyclic order,
 				/// might loop back
 				/// might be itself (iff there is exactly one `Pair`)
+				///
+				/// Indexes into [`CyclePoints::vertices`]
 				next_pair: usize,
 				/// Next `Pair` logical vertex in cyclic order,
 				/// might loop back
 				/// might be itself (iff there is exactly one `Pair`)
+				///
+				/// Indexes into [`CyclePoints::vertices`]
 				prev_pair: usize,
 				/// Nearest previous `Single` logical vertex in cyclic order,
 				/// might loop around
 				/// might be None if there is no such vertex
+				///
+				/// Indexes into [`CyclePoints::vertices`]
 				prev_single: Option<usize>,
 			},
 		}
 
 		#[derive(Debug)]
 		struct PointData {
+			/// Whether there has been progress in the solution
+			/// Set to true every time a `Pair` is converted into a `Single`
 			progress: bool,
+			/// List of registered positions
 			points: Vec<Vec2>,
+			/// Mapping from point indices to a list of indices of vertices which could be placed at the point
 			vertices_interested_in_point: Vec<SmallVec<[usize; 1]>>,
+			/// A constraint detailing where a given vertex can be placed, one per vertex
+			/// Due to relevant invariants in [`PointData::cycle_data`] and [`PointData::vertices_interested_in_point`]
+			/// this array should not be, after creation, changed directly.
+			/// Changing a `Pair` vertex into a `Single` vertex is supported via [`PointData::place_vertex`]
 			vertex_constraints: Vec<IntersectionPointSet<usize>>,
+			/// Additional datastructures, contains invariants related to [`PointData::vertex_constraints`]
 			cycle_data: Vec<CyclePoints>,
+			/// Mapping from vertex indices to a list of tuples `(cycle_id, logical_order_in_cycle)`,
+			/// Used to index into [`PointData::cycle_data`] and the resulting [`CyclePoints::vertices`] arrays respectively.
+			/// Guaranteed to be accurate only for vertices that are `Single` or `Pair`
+			///
+			/// ## Example:
+			/// ```
+			/// let (cycle_id, position) = self.problematic_vertex_to_cycle[VERTEX][i];
+			/// VERTEX == self.cycle_data[cycle_id].vertices[position].vertex
+			/// ```
 			problematic_vertex_to_cycle: Vec<SmallVec<[(usize, usize); 2]>>,
 		}
 
@@ -523,7 +556,12 @@ impl LevelBuilder {
 		}
 
 		impl PointData {
-			/// Goes through vertices associated with the given point, if there is a vertex associated to it via `Single`
+			/// Enforces the constraint that if there is a vertex is placed on a point,
+			/// then no other vertex can occupy said point.
+			/// Vertices may be placed (converted into `Single`) as a result of this call
+			///
+			/// May return an error if multiple vertices are placed on a single point or
+			/// there are no options remaining for a vertex.
 			fn propagate_constraint(&mut self, point: usize) -> Result<(), VertexSolverError> {
 				let mut stack = vec![point];
 				while let Some(point) = stack.pop() {
@@ -570,6 +608,16 @@ impl LevelBuilder {
 				Ok(())
 			}
 
+			/// Enforces the constraint that if two twin vertices occupy two points,
+			/// then no other vertex can occupy said points (even if it is unknown which twin is which point)
+			/// Vertices may be placed (converted into `Single`) as a result of this call
+			///
+			/// May return an error if multiple vertices are placed on a single point or
+			/// there are no options remaining for a vertex.
+			///
+			/// # Panics
+			/// May panic if `vertex_1` and `vertex_2` aren't valid vertex indices
+			/// which are `Pair` vertices and are twins
 			fn propagate_twin_constraint(
 				&mut self,
 				vertex_1: usize,
@@ -635,6 +683,14 @@ impl LevelBuilder {
 				Ok(())
 			}
 
+			/// Turns a vertex into a `Single` vertex placed at the given point
+			/// `vertex` should be a valid vertex index
+			/// `point` should be a valid point index (into [`PointData::points`])
+			///
+			/// This placement also propagates constraints caused by the `point` becoming occupied,
+			/// displacing other vertices from it.
+			///
+			/// May return an error if a contradiction was reached during propagation of the constraints.
 			fn place_vertex(
 				&mut self,
 				vertex: usize,
@@ -644,6 +700,12 @@ impl LevelBuilder {
 				self.propagate_constraint(point)
 			}
 
+			/// Turns a vertex into a `Single` vertex placed at the given point
+			/// `vertex` should be a valid vertex index
+			/// `point` should be a valid point index (into [`PointData::points`])
+			///
+			/// This placement ignores geometrical constraints caused by the `point` becoming occupied,
+			/// but still maintains internal datastructure invariants.
 			fn place_vertex_internal(&mut self, vertex: usize, point: usize) {
 				match self.vertex_constraints[vertex] {
 					IntersectionPointSet::Pair(a, b) => {
@@ -674,8 +736,8 @@ impl LevelBuilder {
 				}
 			}
 
-			/// Finds a "twin" vertex for a given `Pair` vertex, that is
-			/// a second `Pair` vertex which has the same target points
+			/// Finds a "twin" vertex for a given `Pair` vertex.
+			/// A twin vertex is a second `Pair` vertex which has the same desired points
 			fn find_twin(&self, vertex: usize) -> Option<usize> {
 				match self.vertex_constraints[vertex] {
 					IntersectionPointSet::Pair(point_a, point_b) => {
@@ -707,7 +769,7 @@ impl LevelBuilder {
 		// Determine geometric constraints and place uniquely determined points.
 		// Find cycles that have ambiguous points.
 		// Points are deduplicated and indexed, facilitating equality comparisons.
-		let (mut point_data, cycle_data): (PointData, AdditionalCycleData) = {
+		let (mut point_data, mut cycle_data): (PointData, AdditionalCycleData) = {
 			// Array holding all the cycles which require
 			let mut problematic_cycles: Vec<usize> = Vec::new();
 			// Array holding all the points under consideration. Only points from cycles in [`problematic_cycles`] are guaranteed to be present.
@@ -992,6 +1054,7 @@ impl LevelBuilder {
 							position: cycle_position,
 							shape: CycleShape::Circle(_),
 						}) => {
+							// Only go through the logic if there is an undecided vertex available.
 							if let Some(first_pair_index) =
 								point_data.cycle_data[cycle_id].first_undecided_vertex
 							{
@@ -1001,9 +1064,12 @@ impl LevelBuilder {
 								{
 									// There are no `Single`s available,
 									// so we go after `Pair` therapy
+
 									'pair_therapy: for pair_vertex_index in
 										0..point_data.cycle_data[cycle_id].vertices.len()
 									{
+										// Each vertex should be a `Pair` given that there was no `Single` when we reached this code
+										// If a vertex was placed, `'pair_therapy` should be stopped, as faster and more powerful algorithms apply.
 										let LogicalVertex {
 											vertex: pair_vertex,
 											inner:
@@ -1021,6 +1087,7 @@ impl LevelBuilder {
 											);
 											break;
 										};
+										// To make a deduction, we need a twin vertex
 										let Some((twin_vertex, twin_vertex_index)) = point_data
 											.find_twin(pair_vertex)
 											.and_then(|twin_vertex| {
@@ -1045,6 +1112,8 @@ impl LevelBuilder {
 										if twin_vertex < pair_vertex {
 											continue;
 										}
+										// Go through every other pair, if both points of that pair lie on a given side
+										// of the twin pair, then we can deduce the twin pair orientation and place them
 										for constraint_vertex_index in
 											0..point_data.cycle_data[cycle_id].vertices.len()
 										{
@@ -1110,6 +1179,8 @@ impl LevelBuilder {
 										}
 									}
 								}
+								// If there is a `Single` vertex available (as an anchor)
+								// The check is done again, because pair_therapy might have created a new one
 								if point_data.cycle_data[cycle_id]
 									.first_decided_vertex
 									.is_some()
@@ -1130,6 +1201,7 @@ impl LevelBuilder {
 										else {
 											continue;
 										};
+										// There ought to exist a `Single` vertex, `first_decided_vertex` points to one dammit! (or does it...)
 										let LogicalVertex {
 											vertex: prev_single_vertex,
 											inner:
@@ -1159,7 +1231,18 @@ impl LevelBuilder {
 												IntersectionPointSet::Single(prev_point),
 												IntersectionPointSet::Single(next_point),
 											) => {
+												// If there is only one `Single` vertex, then it will point to itself and
+												// `prev_single_vertex` might equal `next_single_vertex`
+
+												// Inner if checks whether we have two different vertices, and if so,
+												// Executes code that might resolve the `Pair`
+												// Outer if checks if the previous code failed, and if so,
+												// Tries running a special branch that applies to twin vertices.
 												if !if prev_single_vertex != next_single_vertex {
+													// The two `Single` make a "sandwich" constraining the range of
+													// Allowed positions for the `Pair` vertex.
+													// This might be enough to eliminate one of the options
+
 													// Two constraints are available
 													let clockwiseness = test_index_clockwiseness(
 														prev_single_index,
@@ -1219,30 +1302,32 @@ impl LevelBuilder {
 												} {
 													// Only one constraint is guaranteed, but twin vertices can still be decided this way
 													if let Some((twin_vertex, twin_vertex_index)) =
-														point_data.find_twin(pair_vertex).and_then(
-															|twin_vertex| {
-																point_data
-																	.problematic_vertex_to_cycle[twin_vertex]
-																	.iter()
-																	.find(
-																		|&&(
-																			twin_cycle_id,
-																			_twin_position_in_cycle,
-																		)| {
-																			twin_cycle_id
-																				== cycle_id
-																		},
-																	)
-																	.map(
-																		|&(
-																			_,
-																			twin_position_in_cycle,
-																		)| {
-																			(twin_vertex, twin_position_in_cycle)
-																		},
-																	)
-															},
-														) {
+														// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
+														// But in the case of a `Single` it can always be decided which order is correct.
+														point_data
+																.find_twin(pair_vertex)
+																.and_then(|twin_vertex| {
+																	point_data
+																		.problematic_vertex_to_cycle[twin_vertex]
+																		.iter()
+																		.find(
+																			|&&(
+																				twin_cycle_id,
+																				_twin_position_in_cycle,
+																			)| {
+																				twin_cycle_id
+																					== cycle_id
+																			},
+																		)
+																		.map(
+																			|&(
+																				_,
+																				twin_position_in_cycle,
+																			)| {
+																				(twin_vertex, twin_position_in_cycle)
+																			},
+																		)
+																}) {
 														let clockwiseness =
 															test_index_clockwiseness(
 																prev_single_index,
@@ -1282,6 +1367,11 @@ impl LevelBuilder {
 						None => continue, // This shouldn't really happen
 					}
 				}
+				cycle_data.problematic_cycles.retain(|&cycle| {
+					point_data.cycle_data[cycle]
+						.first_undecided_vertex
+						.is_some()
+				});
 			}
 		}
 
