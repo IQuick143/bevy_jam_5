@@ -4,10 +4,7 @@ use super::*;
 use crate::graphics::{LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH};
 use std::{cmp::Ordering, f32::consts::PI};
 
-use bevy::{
-	math::bounding::{Aabb2d, BoundingVolume},
-	platform::collections::HashMap,
-};
+use bevy::math::bounding::{Aabb2d, BoundingVolume};
 use itertools::Itertools as _;
 use smallvec::SmallVec;
 
@@ -1826,67 +1823,6 @@ impl LevelBuilder {
 		}
 	}
 
-	/// Checks whether a materialization can be done or if it breaks
-	/// cycle order of a particular cycle
-	/// ## Notes
-	/// - If the cycle is not placed, it will default to an invalid placement
-	/// - Materialized points are intentionally passed as an iterator.
-	///   The list is searched linearly for every vertex of the cycle,
-	///   as the list is expected to be very small.
-	///   Use a fast implementation of iterator
-	/// - Only the cycle order is verified, radius of the cycle is not checked
-	fn verify_materialization_against_cycle(
-		&self,
-		cycle_index: usize,
-		points_to_materialize: impl Iterator<Item = (usize, Vec2)> + Clone,
-	) -> bool {
-		let Some(cycle_placement) = self.cycles[cycle_index].placement else {
-			log::warn!("Partial materialization checks can only be run on placed cycles");
-			return false;
-		};
-		// Positions of all checked vertices, in cyclic order
-		// Vertices that were already fixed-placed are included
-		// Vertices that are in points_to_materialize are also included
-		// Other vertices are ignored
-		let fixed_points = self.cycles[cycle_index]
-			.vertex_indices
-			.iter()
-			.filter_map(|&i| {
-				points_to_materialize
-					.clone()
-					.find_map(|(j, p)| if i == j { Some(p) } else { None })
-					.or_else(|| self.vertices[i].position.get_fixed())
-			});
-		// What constitues cycle order depends on the shape of the cycle
-		match cycle_placement.shape {
-			CycleShape::Circle(_) => {
-				Self::are_points_in_cyclic_order(cycle_placement.position, fixed_points)
-			}
-		}
-	}
-
-	/// Checks whether a sequence of points is ordered in order of
-	/// clockwise navigation around a center point
-	fn are_points_in_cyclic_order(center: Vec2, points: impl Iterator<Item = Vec2>) -> bool {
-		let mut points = points.map(|p| p - center);
-		let mut total_angle = 0.0;
-		if let Some(mut current) = points.next() {
-			for next in points {
-				let mut angle = next.angle_to(current);
-				if angle < 0.0 {
-					// Recalculate angles to [0, 2 * pi]
-					// so that we stay in clockwise movement
-					angle += 2.0 * PI;
-				}
-				total_angle += angle;
-				current = next;
-			}
-			total_angle < 2.0 * PI
-		} else {
-			true
-		}
-	}
-
 	/// Calculates the bounding box of all currently placed cycles and their center sprites
 	fn get_content_bounding_box(&self) -> Aabb2d {
 		let min = self
@@ -2087,6 +2023,7 @@ fn test_test_index_clockwiseness() {
 ///
 /// # Panics
 /// May panic or give incorrect results if `center` is Some and equals any of the other points
+/// or if any of the inputs are infinity or NaN
 fn test_point_clockwiseness(mut a: Vec2, mut b: Vec2, mut c: Vec2, center: Option<Vec2>) -> f32 {
 	if let Some(center) = center {
 		a = (a - center).normalize_or_zero();
