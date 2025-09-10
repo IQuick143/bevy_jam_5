@@ -198,7 +198,7 @@ fn debug_detectors(mut gizmos: Gizmos, level: PlayingLevelData) {
 			// Get the path-based [0, 1] position of both neighboring vertices
 			let prev_vertex_position = cycle.vertex_positions[vertex_offset];
 			let mut next_vertex_position = cycle.vertex_positions[(vertex_offset + 1) % n_vertices];
-			if vertex_offset + 1 == n_vertices {
+			if prev_vertex_position < next_vertex_position {
 				// Wrap the position around the zeroth vertex
 				next_vertex_position += 1.0;
 			}
