@@ -124,7 +124,7 @@ impl std::fmt::Display for BinaryOperator {
 }
 
 impl ConditionStatement {
-	pub fn as_view(&self) -> ConditionStatementView {
+	pub fn as_view(&self) -> ConditionStatementView<'_> {
 		ConditionStatementView {
 			cases: &self.cases,
 			tail: &self.tail,

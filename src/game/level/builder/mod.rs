@@ -243,6 +243,14 @@ impl<T, E> ResultNonExclusive<T, E> {
 			ResultNonExclusive::Err(err) => ResultNonExclusive::Err(map(err)),
 		}
 	}
+
+	pub fn relaxed(self) -> Result<T, E> {
+		match self {
+			ResultNonExclusive::Ok(ok) => Ok(ok),
+			ResultNonExclusive::Partial(ok, _) => Ok(ok),
+			ResultNonExclusive::Err(err) => Err(err),
+		}
+	}
 }
 
 #[allow(dead_code)]

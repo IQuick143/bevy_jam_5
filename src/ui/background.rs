@@ -3,7 +3,7 @@
 use crate::{
 	assets::{HandleMap, ImageKey},
 	camera::parallax::Parallax,
-	game::logic::IsLevelCompleted,
+	game::logic_relay::IsLevelCompleted,
 	graphics::*,
 	screen::Screen,
 };

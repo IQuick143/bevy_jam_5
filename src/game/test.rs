@@ -1,18 +1,22 @@
 mod utils {
 	use crate::game::{
-		components::{Cycle, CycleEntities, PlacedGlyph, PlacedObject, Vertex},
-		level::{backend::builder as parser, GlyphData, LevelData, ObjectData, ThingData},
-		logic::{CycleTurningDirection, RotateCycle, RotateCycleGroup},
-		spawn::{EnterLevel, LevelInitialization, LevelInitializationSet},
+		components::{Cycle, GameStateEcsIndex, Vertex},
+		level::{backend::builder as parser, GlyphData, ObjectData},
+		logic_relay::RotateCycleGroup,
+		prelude::*,
 	};
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
 
 	pub fn setup_app() -> App {
 		let mut app = App::new();
 		app.add_plugins((
-			AssetPlugin::default(),
+			AssetPlugin {
+				// Turn this of because it suddenly turned into a performance bottleneck
+				watch_for_changes_override: Some(false),
+				..default()
+			},
 			super::super::level::asset::plugin,
-			super::super::logic::plugin,
+			super::super::logic_relay::plugin,
 			super::super::history::plugin,
 			super::super::spawn::plugin,
 		))
@@ -95,56 +99,28 @@ mod utils {
 	}
 
 	fn read_system(
-		vertices: Query<(&VertexDebugID, &PlacedObject, &PlacedGlyph)>,
-		things: Query<&ThingData>,
+		vertices: Query<&VertexDebugID>,
+		game_state: Res<GameState>,
+		level: PlayingLevelData,
 	) -> VertexDebugData {
+		let level = level.get().expect("Playing level is not available");
 		let n_vertices = vertices.iter().count();
 		let mut glyph_data = vec![None; n_vertices];
-		let mut object_data = vec![None; n_vertices];
-		for (vertex, object, glyph) in vertices.iter() {
-			let i = vertex.0;
-
-			// Extract glyph information
-			glyph_data[i] = glyph
-				.0
-				.map(|e| {
-					things
-						.get(e)
-						.expect("Vertex points to a non-existent entity")
-				})
-				.map(|thing| match thing {
-					ThingData::Object(_object_data) => {
-						panic!("Glyph data points to an object, not a glyph")
-					}
-					ThingData::Glyph(glyph_data) => *glyph_data,
-				});
-			// Extract glyph information
-			object_data[i] = object
-				.0
-				.map(|e| {
-					things
-						.get(e)
-						.expect("Vertex points to a non-existent entity")
-				})
-				.map(|thing| match thing {
-					ThingData::Object(object_data) => *object_data,
-					ThingData::Glyph(_glyph_data) => {
-						panic!("Glyph data points to an object, not a glyph")
-					}
-				});
+		for &VertexDebugID(i) in &vertices {
+			glyph_data[i] = level.vertices[i].glyph;
 		}
 
 		VertexDebugData {
 			n_vertices,
-			objects: object_data,
+			objects: game_state.objects.clone(),
 			glyphs: glyph_data,
 		}
 	}
 
 	/// System that counts how many cycles there are.
-	fn count_cycles_system(cycles: Query<&Cycle>, cycle_master: Res<CycleEntities>) -> usize {
+	fn count_cycles_system(cycles: Query<&Cycle>, entity_index: Res<GameStateEcsIndex>) -> usize {
 		let cycle_count = cycles.iter().count();
-		let declared_count = cycle_master.0.len();
+		let declared_count = entity_index.cycles.len();
 		assert_eq!(
 			cycle_count, declared_count,
 			"Number of Cycle entities should match the number of entities in CycleEntities"
@@ -152,19 +128,10 @@ mod utils {
 		cycle_count
 	}
 
-	fn turn_system(
-		In((id, amount)): In<(usize, i32)>,
-		mut events: EventWriter<RotateCycleGroup>,
-		cycle_list: Res<CycleEntities>,
-	) {
+	fn turn_system(In((id, amount)): In<(usize, i32)>, mut events: EventWriter<RotateCycleGroup>) {
 		events.write(RotateCycleGroup(RotateCycle {
-			target_cycle: cycle_list.0[id],
-			direction: if amount >= 0 {
-				CycleTurningDirection::Nominal
-			} else {
-				CycleTurningDirection::Reverse
-			},
-			amount: amount.unsigned_abs() as usize,
+			target_cycle: id,
+			amount: amount as i64,
 		}));
 	}
 
@@ -208,7 +175,7 @@ use crate::game::level::ObjectData;
 /// Metatest for asserting that running the headless game works.
 #[test]
 fn test_app() {
-	let mut app = setup_app();
+	let mut app = app_with_level("");
 	for _ in 0..5 {
 		app.update();
 		let vertex_data = app.read_vertices();
@@ -779,6 +746,42 @@ fn test_divisibilitor() {
 			let final_state = app.read_vertices();
 			assert_eq!(final_state, initial_vertex_state);
 		}
+	}
+}
+
+/// Tests the edge case of a cycle without vertices
+#[test]
+fn turning_empty_cycle() {
+	let mut app = app_with_level(
+		r"
+name = 'EmptyCycleTurning';
+hint = 'A player should not be reading this message!';
+
+a = circle(cycle(); 0 0 100);
+b = circle(cycle(box() _); 0 200 100);
+c = circle(cycle(box() _); 0, -200, 100);
+link(b a);
+oneway(c a);
+	",
+	);
+
+	// Indices of the cycles
+	let tested_cycle = 0;
+	let hard_linked_cycle = 1;
+	let oneway_linked_cycle = 2;
+
+	// Turn the cycles one or more times
+	// This should not cause a zero division error
+	for i in -4..=4 {
+		// Turn the cycle directly
+		app.turn_cycle(tested_cycle, i);
+		app.update();
+		// Turn a hard-linked cycle
+		app.turn_cycle(hard_linked_cycle, i);
+		app.update();
+		// Turn a one-way-linked cycle
+		app.turn_cycle(oneway_linked_cycle, i);
+		app.update();
 	}
 }
 

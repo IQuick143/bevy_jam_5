@@ -1,7 +1,7 @@
 //! Recording and rewinding of moves
 
 use super::{
-	logic::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup},
+	logic_relay::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup},
 	spawn::LevelInitialization,
 };
 use crate::AppSet;
@@ -50,7 +50,7 @@ fn undo_moves(
 ) {
 	for _ in events.read() {
 		if let Some(mut rotation) = history.pop() {
-			rotation.direction = -rotation.direction;
+			rotation.amount *= -1;
 			rotations.write(RotateCycleGroup(rotation));
 		} else {
 			log::warn!("Undo command received, but no moves have been recorded");

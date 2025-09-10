@@ -5,7 +5,7 @@ use super::{
 	drawing::*,
 	inputs::CycleInteraction,
 	level::*,
-	logic::{ComputedCycleTurnability, IsTriggered},
+	logic_relay::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
 };
 use crate::{assets::*, graphics::*, AppSet};
@@ -16,6 +16,7 @@ pub(super) fn plugin(app: &mut App) {
 	use LevelInitializationSet::*;
 	app.init_resource::<LastLevelSessionId>()
 		.init_resource::<ExpiringLevelSessionId>()
+		.init_resource::<LevelHandle>()
 		.add_event::<EnterLevel>()
 		.add_event::<SpawnLevel>()
 		.configure_sets(
@@ -51,7 +52,8 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					create_vertex_visuals,
 					create_cycle_visuals,
-					create_link_visuals,
+					create_hard_link_visuals,
+					create_one_way_link_visuals,
 					create_thing_sprites,
 					create_box_color_markers,
 					create_button_color_markers,
@@ -111,12 +113,28 @@ fn handle_enter_level(
 	mut spawn_events: EventWriter<SpawnLevel>,
 	mut last_session_id: ResMut<LastLevelSessionId>,
 	mut expiring_session_id: ResMut<ExpiringLevelSessionId>,
+	mut active_level: ResMut<LevelHandle>,
+	mut game_state: ResMut<GameState>,
+	level_assets: Res<Assets<LevelData>>,
 ) {
 	if let Some(event) = enter_events.read().last() {
 		expiring_session_id.0 = last_session_id.0;
 		if let Some(level_handle) = &event.0 {
-			last_session_id.0 .0 += 1;
-			spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+			if let Some(level) = level_assets.get(level_handle) {
+				active_level.0 = if level.is_valid {
+					Some(level_handle.clone())
+				} else {
+					None
+				};
+				*game_state = GameState::new(level);
+				last_session_id.0 .0 += 1;
+				spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+			} else {
+				log::warn!("Got an invalid level handle");
+				active_level.0 = None;
+			}
+		} else {
+			active_level.0 = None;
 		}
 	}
 }
@@ -136,7 +154,7 @@ fn despawn_expired_level_entities(
 fn spawn_primary_level_entities(
 	mut commands: Commands,
 	mut events: EventReader<SpawnLevel>,
-	mut levels: ResMut<Assets<LevelData>>,
+	levels: Res<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {
 		// Get the level data
@@ -181,7 +199,6 @@ fn spawn_primary_level_entities(
 						},
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
-						CycleVertices(cycle.vertex_indices.iter().map(|i| vertices[*i]).collect()),
 						Transform::default(),
 						Visibility::default(),
 					))
@@ -191,11 +208,7 @@ fn spawn_primary_level_entities(
 
 		// Spawn links
 		// Links are children of their source cycle
-		for link in &level.declared_links {
-			let target_cycle = commands
-				.get_entity(cycles[link.dest_cycle])
-				.expect("The entity has just been spawned")
-				.id();
+		for (index, link) in level.declared_links.iter().enumerate() {
 			let source_center_pos = level.cycles[link.source_cycle]
 				.center_sprite_appearence
 				.0
@@ -205,18 +218,14 @@ fn spawn_primary_level_entities(
 				.expect("The entity has just been spawned")
 				.with_children(|children| {
 					children.spawn((
-						LinkTargetCycle(target_cycle),
+						DeclaredLink(index),
 						link.direction,
 						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
 				});
 		}
-		for link in &level.declared_one_way_links {
-			let target_cycle = commands
-				.get_entity(cycles[link.dest_cycle])
-				.expect("The entity has just been spawned")
-				.id();
+		for (index, link) in level.declared_one_way_links.iter().enumerate() {
 			let source_center_pos = level.cycles[link.source]
 				.center_sprite_appearence
 				.0
@@ -226,9 +235,8 @@ fn spawn_primary_level_entities(
 				.expect("The entity has just been spawned")
 				.with_children(|children| {
 					children.spawn((
-						LinkTargetCycle(target_cycle),
+						DeclaredOneWayLink(index),
 						link.direction,
-						LinkMultiplicity(link.multiplicity),
 						Transform::from_translation(source_center_pos.extend(0.0)),
 						Visibility::default(),
 					));
@@ -237,28 +245,33 @@ fn spawn_primary_level_entities(
 
 		// Spawn cycle list
 		if level.is_valid {
-			commands.insert_resource(CycleEntities(cycles));
-			commands.insert_resource(VertexEntities(vertices));
-			commands.insert_resource(LevelHandle(
-				levels
-					.get_strong_handle(level_handle.id())
-					.expect("I expect you to work."),
-			));
+			let entity_index = GameStateEcsIndex {
+				cycles,
+				vertices,
+				..default()
+			};
+			commands.insert_resource(entity_index);
 		} else {
-			// Ensure the [`LevelHandle`] is not around for an invalid level.
-			commands.remove_resource::<LevelHandle>();
 			// Just to be sure, remove these resources as well.
-			commands.remove_resource::<CycleEntities>();
-			commands.remove_resource::<VertexEntities>();
+			commands.remove_resource::<GameStateEcsIndex>();
 		}
 	}
 }
 
 fn spawn_thing_entities(
 	mut commands: Commands,
-	query: Query<(Entity, &VertexData, &LevelSessionId), Added<VertexData>>,
+	mut entity_index: ResMut<GameStateEcsIndex>,
+	session_id: Res<LastLevelSessionId>,
+	active_level: PlayingLevelData,
 ) {
-	for (id, data, session) in &query {
+	let Ok(level) = active_level.get() else {
+		warn!("Current playing level is not available");
+		return;
+	};
+	let session = session_id.0;
+	let mut object_ids = Vec::new();
+	let mut glyph_ids = Vec::new();
+	for data in &level.vertices {
 		let object_id = data.object.map(|object| match object {
 			ObjectData::Player => commands
 				.spawn((
@@ -266,8 +279,7 @@ fn spawn_thing_entities(
 					Player,
 					object,
 					ThingData::Object(object),
-					*session,
-					VertexPosition(id),
+					session,
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -279,8 +291,7 @@ fn spawn_thing_entities(
 					SokoBox,
 					object,
 					ThingData::Object(object),
-					*session,
-					VertexPosition(id),
+					session,
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -293,8 +304,7 @@ fn spawn_thing_entities(
 					color,
 					object,
 					ThingData::Object(object),
-					*session,
-					VertexPosition(id),
+					session,
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -308,8 +318,7 @@ fn spawn_thing_entities(
 					Goal,
 					glyph,
 					ThingData::Glyph(glyph),
-					*session,
-					VertexPosition(id),
+					session,
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -321,8 +330,7 @@ fn spawn_thing_entities(
 					SokoButton,
 					glyph,
 					ThingData::Glyph(glyph),
-					*session,
-					VertexPosition(id),
+					session,
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
@@ -335,18 +343,18 @@ fn spawn_thing_entities(
 					glyph,
 					color_data,
 					ThingData::Glyph(glyph),
-					*session,
-					VertexPosition(id),
+					session,
 					IsTriggered::default(),
 					Transform::default(),
 					Visibility::default(),
 				))
 				.id(),
 		});
-		commands
-			.entity(id)
-			.insert((PlacedObject(object_id), PlacedGlyph(glyph_id)));
+		object_ids.push(object_id);
+		glyph_ids.push(glyph_id);
 	}
+	entity_index.objects = object_ids;
+	entity_index.glyphs = glyph_ids;
 }
 
 fn set_vertex_transforms(mut query: Query<(&VertexData, &mut Transform), Added<VertexData>>) {
@@ -357,16 +365,27 @@ fn set_vertex_transforms(mut query: Query<(&VertexData, &mut Transform), Added<V
 }
 
 fn set_thing_transforms(
-	mut things_q: Query<(&VertexPosition, &mut Transform), Added<VertexPosition>>,
-	vertices_q: Query<&VertexData>,
-) {
-	for (vertex, mut transform) in &mut things_q {
-		let vertex_data = vertices_q
-			.get(vertex.0)
-			.expect("Parent of ThingData does not have VertexData component");
-		transform.translation.x = vertex_data.position.x;
-		transform.translation.y = vertex_data.position.y;
+	mut things_q: Query<&mut Transform>,
+	level: PlayingLevelData,
+	entity_index: Res<GameStateEcsIndex>,
+) -> Result<(), BevyError> {
+	let level = level.get()?;
+	let vertices = level
+		.vertices
+		.iter()
+		.zip(&entity_index.glyphs)
+		.zip(&entity_index.objects);
+	for ((vertex_data, glyph_id), object_id) in vertices {
+		for id in [*object_id, *glyph_id].into_iter().flatten() {
+			if let Ok(mut transform) = things_q.get_mut(id) {
+				transform.translation.x = vertex_data.position.x;
+				transform.translation.y = vertex_data.position.y;
+			} else {
+				warn!("Entity referenced by the index not found in ECS");
+			}
+		}
 	}
+	Ok(())
 }
 
 fn set_cycle_transforms(
@@ -492,77 +511,95 @@ fn create_cycle_visuals(
 	}
 }
 
-fn create_link_visuals(
+fn create_hard_link_visuals(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	materials: Res<GameObjectMaterials>,
-	standard_meshes: Res<GameObjectMeshes>,
-	digit_atlas: Res<DigitAtlas>,
-	palette: Res<ThingPalette>,
-	links_q: Query<
-		(
-			Entity,
-			&ChildOf,
-			&LinkTargetCycle,
-			&LinkedCycleDirection,
-			Option<&LinkMultiplicity>,
-		),
-		Added<LinkTargetCycle>,
-	>,
-	mut cycles_q: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
+	links_q: Query<(Entity, &DeclaredLink), Added<DeclaredLink>>,
+	level: PlayingLevelData,
 ) {
-	for (id, source, dest, direction, multiplicity) in &links_q {
+	let Ok(level) = level.get() else {
+		error!("Playing level data is not available");
+		return;
+	};
+
+	for (id, &DeclaredLink(index)) in &links_q {
 		// Fetch endpoints
-		let a = get_link_endpoint(source.parent(), cycles_q.reborrow());
-		let b = get_link_endpoint(dest.0, cycles_q.reborrow());
+		let declared_link = &level.declared_links[index];
+		let a = get_link_endpoint(declared_link.source_cycle, level);
+		let b = get_link_endpoint(declared_link.dest_cycle, level);
 		let (Some(a), Some(b)) = (a, b) else {
 			continue;
 		};
 
 		// Spawn the visuals under the link entity
 		commands.entity(id).with_children(|children| {
-			if let Some(multiplicity) = multiplicity {
-				create_one_way_link_visual(
-					children,
-					a,
-					b,
-					*direction,
-					**multiplicity,
-					&mut meshes,
-					materials.link_lines.clone_weak(),
-					standard_meshes.one_way_link_tips.clone_weak(),
-					standard_meshes.one_way_link_backheads.clone_weak(),
-					&digit_atlas,
-					palette.link_multiplicity_label,
-					palette.inverted_link_multiplicity_label,
-				);
-			} else {
-				create_hard_link_visual(
-					children,
-					a,
-					b,
-					*direction,
-					&mut meshes,
-					materials.link_lines.clone_weak(),
-				);
-			}
+			create_hard_link_visual(
+				children,
+				a,
+				b,
+				declared_link.direction,
+				&mut meshes,
+				materials.link_lines.clone_weak(),
+			);
 		});
 	}
 }
 
-fn get_link_endpoint(
-	cycle_id: Entity,
-	query: Query<(&CyclePlacement, &CycleCenterSpriteAppearence)>,
-) -> Option<Vec2> {
-	let Ok((placement, center_sprite)) = query.get(cycle_id) else {
+fn create_one_way_link_visuals(
+	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
+	materials: Res<GameObjectMaterials>,
+	standard_meshes: Res<GameObjectMeshes>,
+	digit_atlas: Res<DigitAtlas>,
+	palette: Res<ThingPalette>,
+	links_q: Query<(Entity, &DeclaredOneWayLink), Added<DeclaredOneWayLink>>,
+	level: PlayingLevelData,
+) {
+	let Ok(level) = level.get() else {
+		error!("Playing level data is not available");
+		return;
+	};
+
+	for (id, &DeclaredOneWayLink(index)) in &links_q {
+		// Fetch endpoints
+		let declared_link = &level.declared_one_way_links[index];
+		let a = get_link_endpoint(declared_link.source, level);
+		let b = get_link_endpoint(declared_link.dest_cycle, level);
+		let (Some(a), Some(b)) = (a, b) else {
+			continue;
+		};
+
+		// Spawn the visuals under the link entity
+		commands.entity(id).with_children(|children| {
+			create_one_way_link_visual(
+				children,
+				a,
+				b,
+				declared_link.direction,
+				declared_link.multiplicity,
+				&mut meshes,
+				materials.link_lines.clone_weak(),
+				standard_meshes.one_way_link_tips.clone_weak(),
+				standard_meshes.one_way_link_backheads.clone_weak(),
+				&digit_atlas,
+				palette.link_multiplicity_label,
+				palette.inverted_link_multiplicity_label,
+			);
+		});
+	}
+}
+
+fn get_link_endpoint(cycle_index: usize, level: &LevelData) -> Option<Vec2> {
+	let Some(cycle) = level.cycles.get(cycle_index) else {
 		// Skip drawing link if its endpoints are not cycles
-		log::warn!("Link endpoint entity does not have CyclePlacement or CycleCenterSpriteAppearence component");
+		log::warn!("Link endpoint is out of range");
 		return None;
 	};
 
-	if let Some(center_offset) = center_sprite.0 {
+	if let Some(center_offset) = cycle.center_sprite_appearence.0 {
 		// Links are anchored at cycle center sprites
-		Some(placement.position + center_offset)
+		Some(cycle.placement.position + center_offset)
 	} else {
 		// Links cannot be drawn if a cycle does not have center sprite
 		log::warn!("Visible link to a cycle with invisible center sprite");

@@ -1,4 +1,5 @@
 use bevy::{math::bounding::Aabb2d, platform::collections::HashSet, prelude::*};
+use std::f32::consts::TAU;
 
 pub mod asset;
 pub mod backend;
@@ -73,6 +74,12 @@ pub struct CycleData {
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
+	/// Distance to each vertex from the cycle's zero point
+	///
+	/// Values are in range [0, 1)
+	///
+	/// Position and interpretation of the cycle's zero point depends on its shape
+	pub vertex_positions: Vec<f32>,
 	/// Indices into [`LevelData::detectors`]
 	/// that identify the detectors that lie on the cycle, and numerical offsets,
 	/// that identify which vertex this detector comes after
@@ -190,11 +197,28 @@ pub struct CyclePlacement {
 	pub shape: CycleShape,
 }
 
+impl CyclePlacement {
+	pub fn sample(&self, t: f32) -> Vec2 {
+		match self.shape {
+			CycleShape::Circle(radius) => self.position + radius * Vec2::from_angle(t * TAU),
+		}
+	}
+}
+
 /// Description of the shape of a cycle's perimeter
 #[derive(Clone, Copy, PartialEq, Debug, Reflect)]
 pub enum CycleShape {
 	/// Circle defined by a radius, centered in the cycle's position
 	Circle(f32),
+}
+
+impl CycleShape {
+	/// Length of the cycle's perimeter, in world units
+	pub fn length(&self) -> f32 {
+		match self {
+			Self::Circle(radius) => TAU * radius,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
@@ -209,7 +233,7 @@ pub enum GlyphType {
 	Flag,
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Debug, Reflect)]
 pub enum ObjectData {
 	Box(Option<LogicalColor>),
 	Player,
@@ -258,7 +282,7 @@ pub enum LinkedCycleDirection {
 
 /// Logical color of a box or a button.
 /// Colored buttons require a box of the same color
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Hash, Reflect)]
 pub struct LogicalColor {
 	/// Index of the color.
 	/// For pictogram colors, this is the ID of the pictogram.

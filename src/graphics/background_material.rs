@@ -1,5 +1,7 @@
 //! Material used for the background image
 
+#![expect(unused, reason = "https://github.com/bevyengine/bevy/issues/20400")]
+
 use bevy::{
 	prelude::*,
 	render::render_resource::{AsBindGroup, ShaderRef, ShaderType},

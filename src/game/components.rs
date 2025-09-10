@@ -1,13 +1,8 @@
 //! Structural components for gameplay objects.
 //! Components with a more specialized puspose belong to their respective modules
 
-use bevy::prelude::*;
-
 use super::level::{LevelData, LinkedCycleDirection};
-
-/// Marker component for entities that belong to a single level
-#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
-pub struct LevelScoped;
+use bevy::{ecs::system::SystemParam, prelude::*};
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -33,21 +28,9 @@ pub struct Object;
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Glyph;
 
-/// Link to a vertex this object is occupying
-#[derive(Component, Debug, Clone, Reflect)]
-pub struct VertexPosition(pub Entity);
-
 /// A vertex (node) on the circle
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
-
-/// Component of the Vertex representing a link to an object occupying this place
-#[derive(Component, Debug, Clone, Copy, Reflect)]
-pub struct PlacedObject(pub Option<Entity>);
-
-/// Component of the Vertex representing a link to a glyph occupying this place
-#[derive(Component, Debug, Clone, Reflect)]
-pub struct PlacedGlyph(pub Option<Entity>);
 
 /// A component describing a cycle
 #[derive(Component, Debug, Clone, Reflect)]
@@ -60,31 +43,59 @@ pub struct Cycle {
 	pub orientation_within_group: LinkedCycleDirection,
 }
 
-/// A list of [`Vertex`] entities that are part of a single cycle
-#[derive(Component, Debug, Clone, Reflect)]
-pub struct CycleVertices(pub Vec<Entity>);
-
 /// A component holding a strong handle to the current level, making sure it stays alive and providing access to it.
 /// Is only present if the level is correct and logical systems can run on it.
-#[derive(Resource, Debug, Clone, Reflect)]
-pub struct LevelHandle(pub Handle<LevelData>);
+#[derive(Resource, Clone, Debug, Default, Deref, DerefMut, Reflect)]
+pub struct LevelHandle(pub Option<Handle<LevelData>>);
 
-/// Component carrying the data mapping level indices to cycle entities.
+/// Shorthand [`SystemParam`] that accesses the data of the current level
+#[derive(SystemParam)]
+pub struct PlayingLevelData<'w> {
+	handle: Res<'w, LevelHandle>,
+	assets: Res<'w, Assets<LevelData>>,
+}
+
+impl PlayingLevelData<'_> {
+	pub fn get(&self) -> Result<&LevelData, BevyError> {
+		let handle = self
+			.handle
+			.0
+			.as_ref()
+			.ok_or_else(|| "No level is currently being played".to_owned())?;
+		self.assets
+			.get(handle)
+			.ok_or_else(|| "No data found for active level".to_owned().into())
+	}
+}
+
+/// Maps entity IDs to all game entities
 #[derive(Resource, Clone, Debug, Default, Reflect)]
-pub struct CycleEntities(pub Vec<Entity>);
+pub struct GameStateEcsIndex {
+	/// Entities that represent cycles, in the same order they appear
+	/// in [`LevelData::cycles`]
+	pub cycles: Vec<Entity>,
+	/// Entities that represent vertices, in the same order they appear
+	/// in [`LevelData::vertices`]
+	pub vertices: Vec<Entity>,
+	/// Entities that represent objects, in the same order their
+	/// current owner vertices appear in [`LevelData::vertices`]
+	pub objects: Vec<Option<Entity>>,
+	/// Entities that represent glyphs, in the same order their
+	/// owner vertices appear in [`LevelData::vertices`]
+	pub glyphs: Vec<Option<Entity>>,
+}
 
-/// Component carrying the data mapping level indices to vertex entities.
-#[derive(Resource, Clone, Debug, Default, Reflect)]
-pub struct VertexEntities(pub Vec<Entity>);
+/// Component that identifies an entity that represents a declared hard link
+///
+/// Parametrized by the index of the link in [`LevelData::declared_links`]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, Deref, DerefMut)]
+pub struct DeclaredLink(pub usize);
 
-/// Reference to the target cycle of a link entity.
-/// The source cycle is its [`ChildOf`].
-#[derive(Component, Debug, Clone, Copy, Reflect)]
-pub struct LinkTargetCycle(pub Entity);
-
-/// Multiplicity of a one-way link
-#[derive(Component, Clone, Copy, Deref, DerefMut, Debug, Reflect)]
-pub struct LinkMultiplicity(pub u64);
+/// Component that identifies an entity that represents a declared one-way link
+///
+/// Parametrized by the index of the link in [`LevelData::declared_one_way_links`]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, Deref, DerefMut)]
+pub struct DeclaredOneWayLink(pub usize);
 
 /// A temporary marker object used for showing something to the player
 /// Gets invalidated (all these entities despawn)
