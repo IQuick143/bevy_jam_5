@@ -36,6 +36,7 @@ hub(
 		at_single = level('levels/at_single_vertices.txt'),
 		at_corner = level('levels/at_corner.txt'),
 		at_companion = level('levels/at_corner_boxes.txt'),
+		at_blocked = level('levels/at_blocked.txt'),
 	)
 );
 
@@ -71,4 +72,5 @@ next(
 	at_single
 	at_corner
 	at_companion
+	at_blocked
 );

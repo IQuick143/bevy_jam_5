@@ -475,7 +475,7 @@ fn cycle_blocked_marker_system(
 
 	for &vertex in marked_vertices.iter() {
 		let Some(vertex_transform) = entity_index
-			.cycles
+			.vertices
 			.get(vertex)
 			.and_then(|entity| vertices_q.get(*entity).ok())
 		else {

@@ -1,0 +1,15 @@
+name = 'AT: Blocked';
+hint = 'Animation testing: Detector at the far side should jam the cycles';
+
+d = detector();
+main = cycle(p = vertex(player()), _ _ d _ _);
+a = cycle('still'; v = vertex());
+b = cycle('still'; v);
+
+circle(main; 0 0 10);
+circle(a; 14 2 2);
+circle(b; 14, -2, 2);
+set_vertex_angle(p; -90);
+
+oneway(1; d a);
+oneway(-1; d b);

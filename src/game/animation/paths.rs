@@ -260,6 +260,10 @@ fn listen_for_moves(
 		}
 	};
 	for event in rotation_events.read() {
+		if event.blocked() {
+			continue;
+		}
+
 		// Maps vertices that have been affected to the path segments taken by the objects on them
 		let vertex_paths = event.get_vertex_paths(level_data);
 
