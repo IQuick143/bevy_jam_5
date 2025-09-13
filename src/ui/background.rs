@@ -98,7 +98,7 @@ fn spawn_background(
 }
 
 fn set_background_mode(
-	mode: Trigger<BackgroundMode>,
+	mode: On<BackgroundMode>,
 	material: Res<BackgroundMaterialHandle>,
 	mut materials: ResMut<Assets<BackgroundMaterial>>,
 	mut query: Query<&mut Visibility, With<IsBackground>>,

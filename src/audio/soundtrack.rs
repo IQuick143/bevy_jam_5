@@ -17,7 +17,7 @@ pub(super) fn plugin(app: &mut App) {
 const MAX_VOLUME: f32 = 4.0;
 
 fn play_soundtrack(
-	trigger: Trigger<PlaySoundtrack>,
+	trigger: On<PlaySoundtrack>,
 	mut commands: Commands,
 	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
 	soundtrack_query: Query<Entity, With<IsSoundtrack>>,
