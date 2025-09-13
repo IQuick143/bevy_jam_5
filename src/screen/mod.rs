@@ -16,7 +16,6 @@ pub use playing::{LoadLevel, PlayingLevel, PlayingLevelListEntry};
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<Screen>();
 	app.add_fade_message::<DoScreenTransition>();
-	app.enable_state_scoped_entities::<Screen>();
 
 	app.add_plugins((
 		splash::plugin,
