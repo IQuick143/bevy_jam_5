@@ -109,7 +109,7 @@ enum AppSet {
 	UpdateVisuals,
 }
 
-/// System that sends an message every time it runs.
+/// System that sends a message every time it runs.
 /// Use together with input-based run conditions to send input messages
 fn send_message<E: Message + Clone>(message: E) -> impl Fn(MessageWriter<E>) {
 	move |mut messages| {

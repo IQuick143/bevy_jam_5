@@ -79,12 +79,12 @@ pub enum LevelInitializationSet {
 	SpawnVisuals,
 }
 
-/// An message that is sent to switch the game to a level
+/// A message that is sent to switch the game to a level
 /// or to exit a level entirely
 #[derive(Message, Clone, Debug)]
 pub struct EnterLevel(pub Option<Handle<LevelData>>);
 
-/// An message that is sent to spawn entities for a particular level.
+/// A message that is sent to spawn entities for a particular level.
 /// These will replace any older entities
 #[derive(Message, Clone, Debug)]
 pub struct SpawnLevel(pub Handle<LevelData>, pub LevelSessionId);
