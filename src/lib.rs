@@ -16,6 +16,7 @@ mod ui;
 use bevy::{
 	asset::AssetMetaCheck,
 	audio::{AudioPlugin, Volume},
+	ecs::error::warn,
 	prelude::*,
 };
 
@@ -23,6 +24,9 @@ pub struct AppPlugin;
 
 impl Plugin for AppPlugin {
 	fn build(&self, app: &mut App) {
+		// Configure the ECS error handler to not explode, hopefully.
+		app.set_error_handler(warn);
+
 		// Order new `AppStep` variants by adding them here:
 		app.configure_sets(
 			Update,
