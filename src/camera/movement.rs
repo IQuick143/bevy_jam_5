@@ -6,9 +6,9 @@ use super::{
 };
 use crate::{graphics::*, AppSet};
 use bevy::{
+	camera::ScalingMode,
 	math::bounding::{Aabb2d, BoundingVolume as _},
 	prelude::*,
-	render::camera::ScalingMode,
 };
 
 pub(super) fn plugin(app: &mut App) {

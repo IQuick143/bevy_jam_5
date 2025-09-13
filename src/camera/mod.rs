@@ -10,8 +10,8 @@ use crate::{
 	screen::{DoScreenTransition, Screen},
 };
 use bevy::{
+	camera::ScalingMode,
 	math::bounding::{Aabb2d, BoundingVolume as _},
-	render::camera::ScalingMode,
 };
 use movement::CameraInertia;
 

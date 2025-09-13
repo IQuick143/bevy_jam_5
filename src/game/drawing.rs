@@ -491,7 +491,7 @@ fn cycle_blocked_marker_system(
 				color: palette.warning_sign,
 				..default()
 			},
-			Anchor(Anchor::BOTTOM_CENTER), // TODO: Check if this is correct behaviour mimicking
+			Anchor::BOTTOM_CENTER, // TODO: Check if this is correct behaviour mimicking
 			Transform::from_translation(
 				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
 			),

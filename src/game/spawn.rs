@@ -834,7 +834,7 @@ fn create_thing_sprites(
 		let (color, anchor, z_depth) = match thing {
 			ThingData::Object(ObjectData::Player) => (
 				palette.player,
-				Anchor::Custom(PLAYER_FLAG_SPRITE_ANCHOR),
+				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::OBJECT_SPRITES,
 			),
 			ThingData::Object(ObjectData::Box(_)) => {
@@ -842,7 +842,7 @@ fn create_thing_sprites(
 			}
 			ThingData::Glyph(GlyphData::Flag) => (
 				palette.goal_closed,
-				Anchor::Custom(PLAYER_FLAG_SPRITE_ANCHOR),
+				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::GLYPH_SPRITES,
 			),
 			ThingData::Glyph(GlyphData::Button(_)) => {
@@ -857,7 +857,7 @@ fn create_thing_sprites(
 					color,
 					..default()
 				},
-				Anchor(anchor),
+				anchor,
 				Transform::from_translation(Vec3::Z * z_depth),
 			));
 		});
