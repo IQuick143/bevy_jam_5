@@ -9,7 +9,7 @@ use crate::{
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
 	},
-	send_event,
+	send_message,
 	ui::{hover::HoverText, prelude::*},
 	AppSet,
 };
@@ -18,23 +18,23 @@ use super::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<PlayingLevel>()
-		.add_event::<GameUiAction>()
-		.add_fade_event::<LoadLevel>()
+		.add_message::<GameUiAction>()
+		.add_fade_message::<LoadLevel>()
 		.add_systems(
 			OnEnter(Screen::Playing),
-			(spawn_game_ui, send_event(LoadLevel)),
+			(spawn_game_ui, send_message(LoadLevel)),
 		)
-		.add_systems(OnExit(Screen::Playing), send_event(EnterLevel(None)))
+		.add_systems(OnExit(Screen::Playing), send_message(EnterLevel(None)))
 		.add_systems(
 			Update,
 			(
 				(
-					send_event(GameUiAction::Reset).run_if(char_input_pressed('r')),
-					send_event(GameUiAction::NextLevel).run_if(
+					send_message(GameUiAction::Reset).run_if(char_input_pressed('r')),
+					send_message(GameUiAction::NextLevel).run_if(
 						char_input_pressed('n')
 							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
 					),
-					send_event(GameUiAction::Undo).run_if(
+					send_message(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
 							.and(|history: Res<MoveHistory>| !history.is_empty()),
 					),
@@ -45,7 +45,7 @@ pub(super) fn plugin(app: &mut App) {
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
 				(load_level, update_level_name_display)
 					.chain()
-					.run_if(on_event::<LoadLevel>),
+					.run_if(on_message::<LoadLevel>),
 				(
 					update_next_level_button_display,
 					update_checkmark_display.before(update_checkmark_margin),
@@ -94,7 +94,7 @@ struct LevelCompletionCheckmarkGlow {
 	progress: f32,
 }
 
-#[derive(Event, Component, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Message, Component, Clone, Copy, PartialEq, Eq, Debug)]
 enum GameUiAction {
 	Back,
 	Reset,
@@ -102,8 +102,8 @@ enum GameUiAction {
 	Undo,
 }
 
-/// Event that is sent to signal that the currently selected level should be (re)loaded
-#[derive(Event, Component, Clone, Copy, Debug, Default)]
+/// Message that is sent to signal that the currently selected level should be (re)loaded
+#[derive(Message, Component, Clone, Copy, Debug, Default)]
 pub struct LoadLevel;
 
 /// [`SystemParam`] that provides a reference to the entry
@@ -262,7 +262,7 @@ fn spawn_game_ui(
 
 fn game_ui_input_recording_system(
 	query: InteractionQuery<&GameUiAction>,
-	mut events: EventWriter<GameUiAction>,
+	mut events: MessageWriter<GameUiAction>,
 ) {
 	for (interaction, action) in &query {
 		if *interaction == Interaction::Pressed {
@@ -272,11 +272,11 @@ fn game_ui_input_recording_system(
 }
 
 fn game_ui_input_processing_system(
-	mut events: EventReader<GameUiAction>,
+	mut events: MessageReader<GameUiAction>,
 	playing_level: PlayingLevelListEntry,
 	mut commands: Commands,
 	mut next_level: ResMut<NextState<PlayingLevel>>,
-	mut undo_commands: EventWriter<UndoMove>,
+	mut undo_commands: MessageWriter<UndoMove>,
 ) {
 	if let Some(action) = events.read().last() {
 		match action {
@@ -446,7 +446,7 @@ fn update_undo_button_display(
 }
 
 fn update_level_name_display(
-	mut events: EventReader<EnterLevel>,
+	mut events: MessageReader<EnterLevel>,
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 	level_assets: Res<Assets<LevelData>>,
 ) {
@@ -462,7 +462,7 @@ fn update_level_name_display(
 	}
 }
 
-fn load_level(playing_level: PlayingLevelListEntry, mut events: EventWriter<EnterLevel>) {
+fn load_level(playing_level: PlayingLevelListEntry, mut events: MessageWriter<EnterLevel>) {
 	let level_handle = playing_level
 		.get()
 		.expect("load_level called but current level could not be loaded")

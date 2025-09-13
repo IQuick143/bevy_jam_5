@@ -113,7 +113,7 @@ fn enter_title(
 fn handle_title_action(
 	mut commands: Commands,
 	mut button_query: InteractionQuery<&TitleAction>,
-	#[cfg(not(target_family = "wasm"))] mut app_exit: EventWriter<AppExit>,
+	#[cfg(not(target_family = "wasm"))] mut app_exit: MessageWriter<AppExit>,
 ) {
 	for (interaction, action) in &mut button_query {
 		if matches!(interaction, Interaction::Pressed) {

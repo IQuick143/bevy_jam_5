@@ -30,10 +30,10 @@ pub(super) fn plugin(app: &mut App) {
 					cycle_center_turnability_visuals_update_system
 						.before(cycle_center_interaction_visuals_update_system),
 				)
-					.run_if(on_event::<GameLayoutChanged>),
+					.run_if(on_message::<GameLayoutChanged>),
 				(
-					marker_despawn_system.run_if(on_event::<RotateCycleGroup>),
-					cycle_blocked_marker_system.run_if(on_event::<TurnBlockedByGroupConflict>),
+					marker_despawn_system.run_if(on_message::<RotateCycleGroup>),
+					cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
 				)
 					.chain(),
 				cycle_center_interaction_visuals_update_system
@@ -449,7 +449,7 @@ fn marker_despawn_system(
 
 fn cycle_blocked_marker_system(
 	mut commands: Commands,
-	mut events: EventReader<TurnBlockedByGroupConflict>,
+	mut events: MessageReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,

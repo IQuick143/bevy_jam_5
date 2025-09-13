@@ -145,7 +145,7 @@ fn debug_camera_bounds(camera: Single<&CameraHarness>, mut gizmos: Gizmos) {
 }
 
 fn automatic_reloading(
-	mut changed_events: EventReader<AssetEvent<LevelData>>,
+	mut changed_events: MessageReader<AssetEvent<LevelData>>,
 	asset_server: Res<AssetServer>,
 	mut commands: Commands,
 ) {

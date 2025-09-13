@@ -21,8 +21,8 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				set_camera_on_screen_transition.run_if(on_event::<DoScreenTransition>),
-				set_camera_level_view.run_if(on_event::<SpawnLevel>),
+				set_camera_on_screen_transition.run_if(on_message::<DoScreenTransition>),
+				set_camera_level_view.run_if(on_message::<SpawnLevel>),
 			)
 				.chain(),
 		);
@@ -78,7 +78,7 @@ fn spawn_camera(mut commands: Commands) {
 
 fn set_camera_on_screen_transition(
 	mut camera: Single<&mut CameraHarness>,
-	mut events: EventReader<DoScreenTransition>,
+	mut events: MessageReader<DoScreenTransition>,
 ) {
 	// Reset the camera when switching to a screen other than Playing
 	// Playing screen will set its own camera bounds with SpawnLevel
@@ -89,7 +89,7 @@ fn set_camera_on_screen_transition(
 
 fn set_camera_level_view(
 	mut camera: Single<&mut CameraHarness>,
-	mut events: EventReader<SpawnLevel>,
+	mut events: MessageReader<SpawnLevel>,
 	levels: Res<Assets<LevelData>>,
 ) {
 	if let Some(level) = events

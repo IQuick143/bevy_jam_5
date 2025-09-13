@@ -17,8 +17,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<LastLevelSessionId>()
 		.init_resource::<ExpiringLevelSessionId>()
 		.init_resource::<LevelHandle>()
-		.add_event::<EnterLevel>()
-		.add_event::<SpawnLevel>()
+		.add_message::<EnterLevel>()
+		.add_message::<SpawnLevel>()
 		.configure_sets(
 			LevelInitialization,
 			(SpawnPrimaryEntities, SpawnVisuals).chain(),
@@ -29,7 +29,7 @@ pub(super) fn plugin(app: &mut App) {
 				handle_enter_level.after(AppSet::ExecuteInput),
 				(
 					(|w: &mut World| w.run_schedule(LevelInitialization))
-						.run_if(on_event::<SpawnLevel>),
+						.run_if(on_message::<SpawnLevel>),
 					despawn_expired_level_entities
 						.run_if(resource_changed::<ExpiringLevelSessionId>),
 				)
@@ -79,14 +79,14 @@ pub enum LevelInitializationSet {
 	SpawnVisuals,
 }
 
-/// An event that is sent to switch the game to a level
+/// An message that is sent to switch the game to a level
 /// or to exit a level entirely
-#[derive(Event, Clone, Debug)]
+#[derive(Message, Clone, Debug)]
 pub struct EnterLevel(pub Option<Handle<LevelData>>);
 
-/// An event that is sent to spawn entities for a particular level.
+/// An message that is sent to spawn entities for a particular level.
 /// These will replace any older entities
-#[derive(Event, Clone, Debug)]
+#[derive(Message, Clone, Debug)]
 pub struct SpawnLevel(pub Handle<LevelData>, pub LevelSessionId);
 
 /// Identifier of a level session.
@@ -109,8 +109,8 @@ impl LastLevelSessionId {
 struct ExpiringLevelSessionId(LevelSessionId);
 
 fn handle_enter_level(
-	mut enter_events: EventReader<EnterLevel>,
-	mut spawn_events: EventWriter<SpawnLevel>,
+	mut enter_events: MessageReader<EnterLevel>,
+	mut spawn_events: MessageWriter<SpawnLevel>,
 	mut last_session_id: ResMut<LastLevelSessionId>,
 	mut expiring_session_id: ResMut<ExpiringLevelSessionId>,
 	mut active_level: ResMut<LevelHandle>,
@@ -153,7 +153,7 @@ fn despawn_expired_level_entities(
 
 fn spawn_primary_level_entities(
 	mut commands: Commands,
-	mut events: EventReader<SpawnLevel>,
+	mut events: MessageReader<SpawnLevel>,
 	levels: Res<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {

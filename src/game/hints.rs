@@ -19,7 +19,7 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn apply_level_hint_text(
-	mut events: EventReader<SpawnLevel>,
+	mut events: MessageReader<SpawnLevel>,
 	mut hint: ResMut<HintText>,
 	levels: Res<Assets<LevelData>>,
 ) {
