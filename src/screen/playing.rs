@@ -254,7 +254,7 @@ fn spawn_game_ui(
 						font_size: 20.0,
 						..default()
 					},
-					TextLayout::new_with_justify(JustifyText::Center),
+					TextLayout::new_with_justify(Justify::Center),
 					TextColor(ui_palette::LABEL_TEXT),
 				));
 		});

@@ -855,9 +855,9 @@ fn create_thing_sprites(
 					image: sprites[&ImageKey::Object(ThingType::from(*thing))].clone_weak(),
 					custom_size: Some(SPRITE_SIZE),
 					color,
-					anchor,
 					..default()
 				},
+				Anchor(anchor),
 				Transform::from_translation(Vec3::Z * z_depth),
 			));
 		});

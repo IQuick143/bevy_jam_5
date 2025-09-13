@@ -14,6 +14,7 @@ use bevy::{
 	color::palettes,
 	math::bounding::Aabb2d,
 	platform::collections::{HashMap, HashSet},
+	sprite::Anchor,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -485,12 +486,12 @@ fn cycle_blocked_marker_system(
 		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
 		commands.spawn((
 			Sprite {
-				anchor: bevy::sprite::Anchor::BottomCenter,
 				image: images[&ImageKey::InGameWarning].clone_weak(),
 				custom_size: Some(size),
 				color: palette.warning_sign,
 				..default()
 			},
+			Anchor(Anchor::BOTTOM_CENTER), // TODO: Check if this is correct behaviour mimicking
 			Transform::from_translation(
 				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
 			),

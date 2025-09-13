@@ -94,7 +94,7 @@ fn init_viewport_box(mut commands: Commands) {
 				border: UiRect::all(Val::Px(1.0)),
 				..default()
 			},
-			BorderColor(palettes::basic::NAVY.into()),
+			BorderColor::all(palettes::basic::NAVY.into()),
 		));
 }
 
