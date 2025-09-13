@@ -146,7 +146,7 @@ fn spawn_game_ui(
 ) {
 	commands
 		.ui_root_justified(JustifyContent::Start)
-		.insert(StateScoped(Screen::Playing))
+		.insert(DespawnOnExit(Screen::Playing))
 		.with_children(|parent| {
 			parent
 				.spawn(Node {
@@ -235,7 +235,7 @@ fn spawn_game_ui(
 
 	commands
 		.ui_root_justified(JustifyContent::End)
-		.insert(StateScoped(Screen::Playing))
+		.insert(DespawnOnExit(Screen::Playing))
 		.with_children(|parent| {
 			parent
 				.spawn(Node {

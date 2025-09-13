@@ -34,7 +34,7 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 	};
 	commands
 		.ui_root()
-		.insert(StateScoped(Screen::Credits))
+		.insert(DespawnOnExit(Screen::Credits))
 		.with_children(|children| {
 			children.header("Made by", font.0.clone_weak());
 			children.spawn(table_node.clone())

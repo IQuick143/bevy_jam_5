@@ -70,7 +70,7 @@ fn enter_title(
 ) {
 	commands
 		.ui_root()
-		.insert(StateScoped(Screen::Title))
+		.insert(DespawnOnExit(Screen::Title))
 		.with_children(|children| {
 			// Invisible spacer node to bring the menu lower
 			children.spawn(Node {
@@ -93,7 +93,7 @@ fn enter_title(
 				.insert(TitleAction::Exit);
 		});
 	commands.spawn((
-		StateScoped(Screen::Title),
+		DespawnOnExit(Screen::Title),
 		Sprite {
 			custom_size: Some(graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
 			image: image_handles[&ImageKey::Title].clone_weak(),
@@ -102,7 +102,7 @@ fn enter_title(
 		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_IMAGE),
 	));
 	commands.spawn((
-		StateScoped(Screen::Title),
+		DespawnOnExit(Screen::Title),
 		Mesh2d(meshes.add(Rectangle::from_size(ANIMATED_BACKGROUND_MESH_SIZE))),
 		MeshMaterial2d(background_material.clone_weak()),
 		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_BACKDROP),

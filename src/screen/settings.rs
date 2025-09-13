@@ -54,7 +54,7 @@ const SLIDER_STEP_COUNT: u32 = 8;
 fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<Settings>) {
 	commands
 		.ui_root()
-		.insert(StateScoped(Screen::Settings))
+		.insert(DespawnOnExit(Screen::Settings))
 		.with_children(|children| {
 			children.header("Settings", font.0.clone_weak());
 			children

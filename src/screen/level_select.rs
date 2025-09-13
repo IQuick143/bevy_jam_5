@@ -41,7 +41,7 @@ fn spawn_screen(
 		.expect("The LevelList asset should be valid");
 	commands
 		.ui_root()
-		.insert(StateScoped(Screen::LevelSelect))
+		.insert(DespawnOnExit(Screen::LevelSelect))
 		.with_children(|parent| {
 			parent.header("Level Select", font.0.clone_weak());
 			parent
