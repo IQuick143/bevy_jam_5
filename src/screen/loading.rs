@@ -23,7 +23,7 @@ fn enter_loading(mut commands: Commands, font: Res<GlobalFont>) {
 		.ui_root()
 		.insert(DespawnOnExit(Screen::Loading))
 		.with_children(|children| {
-			children.label("Loading...", font.0.clone_weak());
+			children.label("Loading...", font.0.clone());
 		});
 }
 

@@ -401,15 +401,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RINGS;
-				material.0 = materials.cycle_rings_disabled.clone_weak();
+				material.0 = materials.cycle_rings_disabled.clone();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RINGS;
-				material.0 = materials.cycle_rings_ready.clone_weak();
+				material.0 = materials.cycle_rings_ready.clone();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RINGS;
-				material.0 = materials.cycle_rings_select.clone_weak();
+				material.0 = materials.cycle_rings_select.clone();
 			}
 		}
 	}
@@ -424,15 +424,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RING_OUTLINES;
-				material.0 = materials.cycle_ring_outlines_disabled.clone_weak();
+				material.0 = materials.cycle_ring_outlines_disabled.clone();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RING_OUTLINES;
-				material.0 = materials.cycle_ring_outlines.clone_weak();
+				material.0 = materials.cycle_ring_outlines.clone();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RING_OUTLINES;
-				material.0 = materials.cycle_ring_outlines.clone_weak();
+				material.0 = materials.cycle_ring_outlines.clone();
 			}
 		}
 	}
@@ -486,7 +486,7 @@ fn cycle_blocked_marker_system(
 		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
 		commands.spawn((
 			Sprite {
-				image: images[&ImageKey::InGameWarning].clone_weak(),
+				image: images[&ImageKey::InGameWarning].clone(),
 				custom_size: Some(size),
 				color: palette.warning_sign,
 				..default()

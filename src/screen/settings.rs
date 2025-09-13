@@ -56,7 +56,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 		.ui_root()
 		.insert(DespawnOnExit(Screen::Settings))
 		.with_children(|children| {
-			children.header("Settings", font.0.clone_weak());
+			children.header("Settings", font.0.clone());
 			children
 				.spawn(Node {
 					display: Display::Grid,
@@ -68,7 +68,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 					..default()
 				})
 				.with_children(|children| {
-					children.text("Music volume", JustifyContent::End, font.0.clone_weak());
+					children.text("Music volume", JustifyContent::End, font.0.clone());
 					children.spawn((
 						Node {
 							width: Val::Px(SLIDER_WIDTH),
@@ -77,7 +77,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 						Slider::new_fraction(SLIDER_STEP_COUNT, settings.soundtrack_volume),
 						SettingsSliderControl::MusicVolume,
 					));
-					children.text("Sfx volume", JustifyContent::End, font.0.clone_weak());
+					children.text("Sfx volume", JustifyContent::End, font.0.clone());
 					children.spawn((
 						Node {
 							width: Val::Px(SLIDER_WIDTH),
@@ -86,9 +86,9 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 						Slider::new_fraction(SLIDER_STEP_COUNT, settings.sfx_volume),
 						SettingsSliderControl::SfxVolume,
 					));
-					children.text("Background", JustifyContent::End, font.0.clone_weak());
+					children.text("Background", JustifyContent::End, font.0.clone());
 					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.inline_button("", font.0.clone_weak()).insert((
+						children.inline_button("", font.0.clone()).insert((
 							MultiStateButton::new(
 								3,
 								background_mode_to_option_index(settings.background_mode),
@@ -97,9 +97,9 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 							SettingsCheckboxControl::Background,
 						));
 					});
-					children.text("Parallax", JustifyContent::End, font.0.clone_weak());
+					children.text("Parallax", JustifyContent::End, font.0.clone());
 					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.inline_button("", font.0.clone_weak()).insert((
+						children.inline_button("", font.0.clone()).insert((
 							MultiStateButton::new(2, settings.enable_parallax as u32),
 							MultiStateButtonLabels::new(["Off", "On"]),
 							SettingsCheckboxControl::Parallax,
@@ -107,7 +107,7 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 					});
 				});
 			children
-				.button("Back", font.0.clone_weak())
+				.button("Back", font.0.clone())
 				.insert(SettingsAction::Back);
 		});
 }

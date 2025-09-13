@@ -160,13 +160,13 @@ fn spawn_game_ui(
 				})
 				.with_children(|parent| {
 					parent
-						.tool_button("Back", font.0.clone_weak())
+						.tool_button("Back", font.0.clone())
 						.insert(GameUiAction::Back);
 					parent
-						.tool_button("Reset", font.0.clone_weak())
+						.tool_button("Reset", font.0.clone())
 						.insert(GameUiAction::Reset);
 					parent
-						.tool_button("Undo", font.0.clone_weak())
+						.tool_button("Undo", font.0.clone())
 						.insert((GameUiAction::Undo, UndoButton));
 				});
 			parent
@@ -181,18 +181,16 @@ fn spawn_game_ui(
 					..default()
 				})
 				.with_children(|parent| {
-					parent
-						.tool_button("Next Level", font.0.clone_weak())
-						.insert((
-							GameUiAction::NextLevel,
-							NextLevelButton,
-							BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
-							InteractionPalette {
-								none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
-								hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
-								pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
-							},
-						));
+					parent.tool_button("Next Level", font.0.clone()).insert((
+						GameUiAction::NextLevel,
+						NextLevelButton,
+						BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
+						InteractionPalette {
+							none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
+							hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
+							pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
+						},
+					));
 				});
 			parent
 				.spawn(Node {
@@ -210,7 +208,7 @@ fn spawn_game_ui(
 						LevelNameBox,
 						Text::default(),
 						TextFont {
-							font: font.0.clone_weak(),
+							font: font.0.clone(),
 							font_size: LEVEL_TITLE_SIZE,
 							..default()
 						},
@@ -224,7 +222,7 @@ fn spawn_game_ui(
 							..default()
 						},
 						ImageNode {
-							image: images[&ImageKey::Checkmark].clone_weak(),
+							image: images[&ImageKey::Checkmark].clone(),
 							color: colors.checkmark,
 							image_mode: NodeImageMode::Stretch,
 							..default()
@@ -250,7 +248,7 @@ fn spawn_game_ui(
 					HoverText,
 					Text::default(),
 					TextFont {
-						font: font.0.clone_weak(),
+						font: font.0.clone(),
 						font_size: 20.0,
 						..default()
 					},
@@ -392,7 +390,7 @@ fn start_completion_cue_animation(
 				..default()
 			},
 			ImageNode {
-				image: images[&ImageKey::CheckmarkSolid].clone_weak(),
+				image: images[&ImageKey::CheckmarkSolid].clone(),
 				color: colors.checkmark,
 				image_mode: NodeImageMode::Stretch,
 				..default()
@@ -467,6 +465,6 @@ fn load_level(playing_level: PlayingLevelListEntry, mut events: MessageWriter<En
 		.get()
 		.expect("load_level called but current level could not be loaded")
 		.data_handle
-		.clone_weak();
+		.clone();
 	events.write(EnterLevel(Some(level_handle)));
 }

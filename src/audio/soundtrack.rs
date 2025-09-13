@@ -32,7 +32,7 @@ fn play_soundtrack(
 		PlaySoundtrack::Disable => return,
 	};
 	commands.spawn((
-		AudioPlayer(soundtrack_handles[&soundtrack_key].clone_weak()),
+		AudioPlayer(soundtrack_handles[&soundtrack_key].clone()),
 		PlaybackSettings {
 			mode: PlaybackMode::Loop,
 			volume: Volume::Linear(settings.soundtrack_volume * MAX_VOLUME),

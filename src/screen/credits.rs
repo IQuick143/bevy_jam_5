@@ -36,30 +36,30 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 		.ui_root()
 		.insert(DespawnOnExit(Screen::Credits))
 		.with_children(|children| {
-			children.header("Made by", font.0.clone_weak());
+			children.header("Made by", font.0.clone());
 			children.spawn(table_node.clone())
 				.with_children(|children| {
-					children.text("IQuick 143", JustifyContent::End, font.0.clone_weak());
-					children.text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone_weak());
-					children.text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone_weak());
-					children.text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone_weak());
-					children.text("SoysCodingCafe", JustifyContent::End, font.0.clone_weak());
-					children.text("Level Design", JustifyContent::Start, font.0.clone_weak());
-					children.text("spilledcereals", JustifyContent::End, font.0.clone_weak());
-					children.text("Music, SFX", JustifyContent::Start, font.0.clone_weak());
+					children.text("IQuick 143", JustifyContent::End, font.0.clone());
+					children.text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone());
+					children.text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone());
+					children.text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone());
+					children.text("SoysCodingCafe", JustifyContent::End, font.0.clone());
+					children.text("Level Design", JustifyContent::Start, font.0.clone());
+					children.text("spilledcereals", JustifyContent::End, font.0.clone());
+					children.text("Music, SFX", JustifyContent::Start, font.0.clone());
 				});
 
-			children.header("Assets", font.0.clone_weak());
+			children.header("Assets", font.0.clone());
 			table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
 			children.spawn(table_node)
 				.with_children(|children| {
-					children.text("Bevy logo", JustifyContent::End, font.0.clone_weak());
-					children.text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone_weak());
-					children.text("Comfortaa font", JustifyContent::End, font.0.clone_weak());
-					children.text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone_weak());
+					children.text("Bevy logo", JustifyContent::End, font.0.clone());
+					children.text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone());
+					children.text("Comfortaa font", JustifyContent::End, font.0.clone());
+					children.text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone());
 				});
 
-			children.button("Back", font.0.clone_weak()).insert(CreditsAction::Back);
+			children.button("Back", font.0.clone()).insert(CreditsAction::Back);
 		});
 }
 

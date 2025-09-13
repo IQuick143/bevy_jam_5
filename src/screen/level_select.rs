@@ -43,7 +43,7 @@ fn spawn_screen(
 		.ui_root()
 		.insert(DespawnOnExit(Screen::LevelSelect))
 		.with_children(|parent| {
-			parent.header("Level Select", font.0.clone_weak());
+			parent.header("Level Select", font.0.clone());
 			parent
 				.spawn(Node {
 					display: Display::Grid,
@@ -58,7 +58,7 @@ fn spawn_screen(
 					for (level_id, level_meta) in levels.levels.iter().enumerate() {
 						if let Some(level) = level_assets.get(&level_meta.data_handle) {
 							let mut button =
-								parent.small_button(level.name.clone(), font.0.clone_weak());
+								parent.small_button(level.name.clone(), font.0.clone());
 							button.insert(LevelSelectAction::PlayLevel(level_id));
 							if save.is_level_completed(&level_meta.identifier) {
 								button.with_child((
@@ -72,7 +72,7 @@ fn spawn_screen(
 										..default()
 									},
 									ImageNode {
-										image: images[&ImageKey::Checkmark].clone_weak(),
+										image: images[&ImageKey::Checkmark].clone(),
 										color: colors.checkmark,
 										image_mode: NodeImageMode::Stretch,
 										..default()
@@ -85,7 +85,7 @@ fn spawn_screen(
 					}
 				});
 			parent
-				.button("Back", font.0.clone_weak())
+				.button("Back", font.0.clone())
 				.insert(LevelSelectAction::Back);
 		});
 }

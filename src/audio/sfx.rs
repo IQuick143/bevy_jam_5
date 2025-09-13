@@ -23,7 +23,7 @@ fn play_sfx(
 		PlaySfx::Effect(key) => *key,
 	};
 	commands.spawn((
-		AudioPlayer(sfx_handles[&sfx_key].clone_weak()),
+		AudioPlayer(sfx_handles[&sfx_key].clone()),
 		PlaybackSettings {
 			mode: PlaybackMode::Despawn,
 			volume: Volume::Linear(
