@@ -4,8 +4,9 @@
 
 use bevy::{
 	prelude::*,
-	render::render_resource::{AsBindGroup, ShaderRef, ShaderType},
-	sprite::{Material2d, Material2dPlugin},
+	render::render_resource::{AsBindGroup, ShaderType},
+	shader::ShaderRef,
+	sprite_render::{Material2d, Material2dPlugin},
 };
 
 pub(super) fn plugin(app: &mut App) {
