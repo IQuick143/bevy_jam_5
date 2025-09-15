@@ -247,7 +247,7 @@ impl AnimationPathSegmentMeasurements {
 }
 
 fn listen_for_moves(
-	mut rotation_events: EventReader<TurnCycleResult>,
+	mut rotation_events: MessageReader<TurnCycleResult>,
 	mut objects: Query<(&mut Transform, Option<&mut PathAnimation>), With<Object>>,
 	active_level: PlayingLevelData,
 	entity_index: Res<GameStateEcsIndex>,
