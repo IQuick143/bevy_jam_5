@@ -97,7 +97,7 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 					box_sizing: BoxSizing::ContentBox,
 					..default()
 				},
-				BorderColor(SLIDER_OUTLINE),
+				BorderColor::all(SLIDER_OUTLINE),
 				BackgroundColor(SLIDER_FILL),
 				BorderRadius::all(Px(NODE_RADIUS + RING_OUTLINE_WIDTH)),
 				ChildOf(bar_wrapper_id),

@@ -1,14 +1,14 @@
 //! Camera movement on user input
 
 use super::{
-	inputs::{MoveCameraEvent, ZoomCameraEvent},
+	inputs::{MoveCameraMessage, ZoomCameraMessage},
 	CameraHarness,
 };
 use crate::{graphics::*, AppSet};
 use bevy::{
+	camera::ScalingMode,
 	math::bounding::{Aabb2d, BoundingVolume as _},
 	prelude::*,
-	render::camera::ScalingMode,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -40,18 +40,18 @@ const ZOOM_FRICTION: f32 = PAN_FRICTION;
 /// Orders of magnitude of zoom covered per second
 const ZOOM_SPEED: f32 = 1.0;
 
-fn zoom_movement_input(mut events: EventReader<ZoomCameraEvent>) -> f32 {
+fn zoom_movement_input(mut events: MessageReader<ZoomCameraMessage>) -> f32 {
 	events
 		.read()
 		.map(|event| match event {
-			ZoomCameraEvent::In => 1.0,
-			ZoomCameraEvent::Out => -1.0,
+			ZoomCameraMessage::In => 1.0,
+			ZoomCameraMessage::Out => -1.0,
 		})
 		.sum::<f32>()
 		* ZOOM_SPEED
 }
 
-fn pan_movement_input(mut events: EventReader<MoveCameraEvent>, current_scale: f32) -> Vec2 {
+fn pan_movement_input(mut events: MessageReader<MoveCameraMessage>, current_scale: f32) -> Vec2 {
 	events.read().map(|event| event.0).sum::<Vec2>() * PAN_SPEED / current_scale
 }
 
@@ -158,8 +158,8 @@ fn update_camera(
 		&mut CameraInertia,
 	)>,
 	window: Single<&Window>,
-	move_events: EventReader<MoveCameraEvent>,
-	zoom_events: EventReader<ZoomCameraEvent>,
+	move_events: MessageReader<MoveCameraMessage>,
+	zoom_events: MessageReader<ZoomCameraMessage>,
 	time: Res<Time<Real>>,
 ) {
 	let (mut harness, mut projection, mut camera_transform, mut inertia) = camera.into_inner();

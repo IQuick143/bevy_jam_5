@@ -19,7 +19,7 @@ fn play_level_complete_audio(mut commands: Commands, is_completed: Res<IsLevelCo
 	}
 }
 
-fn play_enter_level_audio(mut events: EventReader<EnterLevel>, mut commands: Commands) {
+fn play_enter_level_audio(mut events: MessageReader<EnterLevel>, mut commands: Commands) {
 	if events.read().any(|event| event.0.is_some()) {
 		commands.trigger(audio::sfx::PlaySfx::Effect(assets::SfxKey::EnterLevel));
 	}

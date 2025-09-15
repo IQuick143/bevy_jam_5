@@ -16,6 +16,7 @@ mod ui;
 use bevy::{
 	asset::AssetMetaCheck,
 	audio::{AudioPlugin, Volume},
+	ecs::error::warn,
 	prelude::*,
 };
 
@@ -23,6 +24,9 @@ pub struct AppPlugin;
 
 impl Plugin for AppPlugin {
 	fn build(&self, app: &mut App) {
+		// Configure the ECS error handler to not explode, hopefully.
+		app.set_error_handler(warn);
+
 		// Order new `AppStep` variants by adding them here:
 		app.configure_sets(
 			Update,
@@ -105,10 +109,10 @@ enum AppSet {
 	UpdateVisuals,
 }
 
-/// System that sends an event every time it runs.
-/// Use together with input-based run conditions to send input events
-fn send_event<E: Event + Clone>(event: E) -> impl Fn(EventWriter<E>) {
-	move |mut events| {
-		events.write(event.clone());
+/// System that sends a message every time it runs.
+/// Use together with input-based run conditions to send input messages
+fn send_message<E: Message + Clone>(message: E) -> impl Fn(MessageWriter<E>) {
+	move |mut messages| {
+		messages.write(message.clone());
 	}
 }

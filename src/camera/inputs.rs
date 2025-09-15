@@ -4,8 +4,8 @@ use crate::AppSet;
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_event::<MoveCameraEvent>()
-		.add_event::<ZoomCameraEvent>()
+	app.add_message::<MoveCameraMessage>()
+		.add_message::<ZoomCameraMessage>()
 		.init_resource::<EnableCursorPanning>()
 		.init_resource::<LastCursorPosition>()
 		.add_systems(Update, camera_movement_inputs.in_set(AppSet::RecordInput));
@@ -21,18 +21,18 @@ impl Default for EnableCursorPanning {
 	}
 }
 
-/// An event sent to move the camera
+/// A message sent to move the camera
 ///
 /// Units are fraction of the camera top speed, [-1, 1]
 /// Sent during [`AppSet::RecordInput`]
-#[derive(Event)]
-pub struct MoveCameraEvent(pub Vec2);
+#[derive(Message)]
+pub struct MoveCameraMessage(pub Vec2);
 
-/// An event describing a camera zoom input
+/// A message describing a camera zoom input
 ///
 /// Sent during [`AppSet::RecordInput`]
-#[derive(Event)]
-pub enum ZoomCameraEvent {
+#[derive(Message)]
+pub enum ZoomCameraMessage {
 	In,
 	Out,
 }
@@ -48,8 +48,8 @@ fn camera_movement_inputs(
 	enable_cursor_panning: Res<EnableCursorPanning>,
 	input_key: Res<ButtonInput<KeyCode>>,
 	mut last_cursor_position: ResMut<LastCursorPosition>,
-	mut camera_move: EventWriter<MoveCameraEvent>,
-	mut camera_zoom: EventWriter<ZoomCameraEvent>,
+	mut camera_move: MessageWriter<MoveCameraMessage>,
+	mut camera_zoom: MessageWriter<ZoomCameraMessage>,
 ) {
 	let cursor_pos = window.cursor_position();
 	let camera_direction = camera_pan_from_keys(&input_key);
@@ -59,20 +59,20 @@ fn camera_movement_inputs(
 			**last_cursor_position = None;
 			if let Some(cursor_pos) = cursor_pos {
 				let camera_direction = camera_pan_from_cursor(cursor_pos, window.size());
-				camera_move.write(MoveCameraEvent(camera_direction));
+				camera_move.write(MoveCameraMessage(camera_direction));
 			}
 		}
 	} else {
 		// A key was touched, so we freeze panning by the cursor until it moves
 		**last_cursor_position = cursor_pos;
-		camera_move.write(MoveCameraEvent(camera_direction));
+		camera_move.write(MoveCameraMessage(camera_direction));
 	}
 
 	if input_key.pressed(KeyCode::NumpadAdd) {
-		camera_zoom.write(ZoomCameraEvent::In);
+		camera_zoom.write(ZoomCameraMessage::In);
 	}
 	if input_key.pressed(KeyCode::NumpadSubtract) {
-		camera_zoom.write(ZoomCameraEvent::Out);
+		camera_zoom.write(ZoomCameraMessage::Out);
 	}
 }
 

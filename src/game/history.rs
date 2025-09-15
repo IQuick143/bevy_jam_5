@@ -9,7 +9,7 @@ use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<MoveHistory>()
-		.add_event::<UndoMove>()
+		.add_message::<UndoMove>()
 		.add_systems(LevelInitialization, |mut history: ResMut<MoveHistory>| {
 			history.clear()
 		})
@@ -30,13 +30,13 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Resource, Deref, DerefMut, Clone, Debug, Default)]
 pub struct MoveHistory(pub Vec<RotateCycle>);
 
-/// Event that is sent to signal that a move should be rewound
-#[derive(Event, Debug)]
+/// Message that is sent to signal that a move should be rewound
+#[derive(Message, Debug)]
 pub struct UndoMove;
 
 fn record_moves(
 	mut history: ResMut<MoveHistory>,
-	mut events: EventReader<RecordCycleGroupRotation>,
+	mut events: MessageReader<RecordCycleGroupRotation>,
 ) {
 	for RecordCycleGroupRotation(rotation) in events.read() {
 		history.push(*rotation);
@@ -44,9 +44,9 @@ fn record_moves(
 }
 
 fn undo_moves(
-	mut events: EventReader<UndoMove>,
+	mut events: MessageReader<UndoMove>,
 	mut history: ResMut<MoveHistory>,
-	mut rotations: EventWriter<RotateCycleGroup>,
+	mut rotations: MessageWriter<RotateCycleGroup>,
 ) {
 	for _ in events.read() {
 		if let Some(mut rotation) = history.pop() {

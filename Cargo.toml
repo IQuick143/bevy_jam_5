@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.16.0", default-features=false, features = [
+bevy = { version = "0.17.0-rc", default-features=false, features = [
 #    "animation",
 #    "async_executor",
 #    "bevy_animation",
@@ -23,12 +23,13 @@ bevy = { version = "0.16.0", default-features=false, features = [
 #    "bevy_picking",
     "bevy_render",
 #    "bevy_scene",
+    "bevy_sprite_render",
     "bevy_sprite",
 #    "bevy_sprite_picking_backend",
     "bevy_state",
     "bevy_text",
     "bevy_ui",
-    "bevy_ui_debug",
+    "bevy_ui_render",
 #    "bevy_ui_picking_backend",
     "bevy_window",   
     "bevy_winit",
@@ -46,7 +47,6 @@ bevy = { version = "0.16.0", default-features=false, features = [
     "webgl2",
     "x11",
 #    "zstd",
-    "configurable_error_handler",
 ] }
 
 itertools = "0.14.0"
@@ -56,7 +56,7 @@ log = { version = "0.4", features = [
     "release_max_level_warn",
 ] }
 rand =  { version = "0.8", features = ["small_rng"] }
-smallvec = "1.13.2" # Use same version as bevy does
+smallvec = "1.15.1" # Use same version as bevy does
 regex = "1.10.5"
 logos = "0.15.0"
 pomelo = "0.2.1"
@@ -73,6 +73,7 @@ dev = [
     # Improve compile times for dev builds by linking Bevy as a dynamic library.
     "bevy/dynamic_linking",
     "bevy/bevy_dev_tools",
+    "bevy/bevy_ui_debug",
 ]
 dev_native = [
     "dev",
