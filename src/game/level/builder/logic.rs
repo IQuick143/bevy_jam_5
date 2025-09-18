@@ -69,6 +69,7 @@ impl LevelBuilder {
 		turnability: CycleTurnability,
 		vertex_indices: impl IntoIterator<Item = usize>,
 		detectors: impl IntoIterator<Item = (usize, i32)>,
+		walls: impl IntoIterator<Item = i32>,
 	) -> Result<usize, LevelBuilderError> {
 		let vertex_indices = vertex_indices.into_iter().collect::<Vec<_>>();
 		if let Some(i) = vertex_indices.iter().duplicates().next() {
@@ -87,9 +88,17 @@ impl LevelBuilder {
 			.into_iter()
 			.map(|(detector, position)| (detector, i32::rem_euclid(position, n_vertices) as usize))
 			.collect::<Vec<_>>();
-		// If there are detecotrs but no vertices, this cycle is invalid.
+		let walls = walls
+			.into_iter()
+			.map(|position| i32::rem_euclid(position, n_vertices) as usize)
+			.collect::<Vec<_>>();
+		// If there are detectors but no vertices, this cycle is invalid.
 		if vertex_indices.is_empty() && !detectors.is_empty() {
 			return Err(LevelBuilderError::DetectorOnEmptyCycle);
+		}
+		// If there are walls but no vertices, this cycle is invalid.
+		if vertex_indices.is_empty() && !detectors.is_empty() {
+			return Err(LevelBuilderError::WallOnEmptyCycle);
 		}
 		if let Some((index, _)) = detectors
 			.iter()
@@ -106,6 +115,7 @@ impl LevelBuilder {
 			linked_cycle: IntermediateLinkStatus::None,
 			outgoing_one_way_links: Vec::new(),
 			placed_detectors: detectors,
+			walls,
 		});
 		Ok(self.cycles.len() - 1)
 	}
@@ -398,7 +408,7 @@ impl LevelBuilder {
 		};
 		// Place detectors into groups
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
-			if !cycle.placed_detectors.is_empty() {
+			if !cycle.placed_detectors.is_empty() || !cycle.walls.is_empty() {
 				let IntermediateLinkStatus::Group(group, _) = cycle.linked_cycle else {
 					unreachable!("Cycles should have groups by now");
 				};
@@ -674,6 +684,7 @@ impl LevelBuilder {
 			vertex_indices: intermediate.vertex_indices,
 			vertex_positions,
 			detector_indices: intermediate.placed_detectors,
+			wall_indices: intermediate.walls,
 			turnability: intermediate.turnability,
 			group,
 			orientation_within_group: relative_direction,

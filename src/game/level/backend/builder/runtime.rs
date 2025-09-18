@@ -51,6 +51,7 @@ impl InterpreterBackend for LevelBuilder {
 			"button" => Self::call_button(args),
 			"vertex" => self.call_vertex(args),
 			"detector" => self.call_detector(args),
+			"wall" => self.call_wall(args),
 			"set_thing" => self.call_set_thing(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
@@ -202,6 +203,11 @@ impl LevelBuilder {
 		Ok(ReturnValue::pure(DetectorId(self.add_detector()?).into()))
 	}
 
+	fn call_wall(&mut self, args: ArgumentStream<DomainValue>) -> CallResult {
+		args.read_end()?;
+		Ok(ReturnValue::pure(DomainValue::Wall.into()))
+	}
+
 	fn call_set_thing(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
 		let mut target_vertices = Vec::new();
 		while let Some(VertexId(vertex_id)) = args.read_as_until_end_or_separator()? {
@@ -247,6 +253,7 @@ impl LevelBuilder {
 
 		let mut vertices = Vec::new();
 		let mut detectors = Vec::new();
+		let mut walls = Vec::new();
 		// TODO: Better handling of overlapping detectors.
 		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {
@@ -265,12 +272,15 @@ impl LevelBuilder {
 				Domain(Detector(DetectorId(id))) => {
 					detectors.push((*id, (vertices.len() as i32) - 1))
 				}
+				Domain(Wall) => {
+					walls.push((vertices.len() as i32) - 1);
+				}
 				other => return Err(TypeError(other.get_type()).into()),
 			}
 		}
 
 		args.read_end()?;
-		let cycle_id = self.add_cycle(turnability, vertices, detectors)?;
+		let cycle_id = self.add_cycle(turnability, vertices, detectors, walls)?;
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 

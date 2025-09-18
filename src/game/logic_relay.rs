@@ -113,6 +113,7 @@ fn cycle_group_rotation_system(
 				for clash in &result.clashes {
 					blocked_event.write(TurnBlockedByGroupConflict(*clash));
 				}
+				// TODO: Events?
 				if !result.blocked() && result.layout_changed() {
 					update_event.write(GameLayoutChanged);
 					for (target_cycle, amount) in result.cycles_turned_by(level) {
