@@ -82,6 +82,8 @@ pub struct CycleData {
 	/// that identify the detectors that lie on the cycle, and numerical offsets,
 	/// that identify which vertex this detector comes after
 	pub detector_indices: Vec<(usize, usize)>,
+	/// Numerical offsets, that identify which vertex a wall comes after
+	pub wall_indices: Vec<usize>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
 	/// Group this cycle belongs to
@@ -105,7 +107,7 @@ pub struct GroupData {
 	pub cycles: Vec<(usize, LinkedCycleDirection)>,
 	/// One Way Links to other groups that should get triggered by this one.
 	pub linked_groups: Vec<OneWayLinkData>,
-	/// List of cycle indices this group contains that have detectors on them.
+	/// List of cycle indices this group contains that have detectors or walls on them.
 	pub outgoing_detector_cycles: Vec<usize>,
 }
 

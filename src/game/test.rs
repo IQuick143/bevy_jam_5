@@ -788,6 +788,66 @@ oneway(c a);
 	}
 }
 
+/// Tests walls
+#[test]
+fn test_walls_basic() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls_1';
+hint = 'A player should not be reading this message!';
+
+circle(a = cycle(wall() box() _ _); 0 0 100);
+circle(b = cycle(wall() box() detector() _ _ _); 0 0 100);
+circle(c = cycle(_ _ _ wall() box() _); 0 0 100);
+",
+	);
+
+	let state_1 = app.read_vertices();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	let state_1_a = app.read_vertices();
+
+	app.turn_cycle(1, -1);
+	app.update();
+
+	let state_1_b = app.read_vertices();
+
+	app.turn_cycle(2, -1);
+	app.update();
+
+	let state_1_c = app.read_vertices();
+
+	app.turn_cycle(0, 3);
+	app.update();
+
+	let state_1_d = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+
+	let state_2 = app.read_vertices();
+
+	app.turn_cycle(1, 1);
+	app.update();
+
+	let state_3 = app.read_vertices();
+
+	app.turn_cycle(2, 1);
+	app.update();
+
+	let state_4 = app.read_vertices();
+
+	assert_eq!(state_1, state_1_a);
+	assert_eq!(state_1, state_1_b);
+	assert_eq!(state_1, state_1_c);
+	assert_eq!(state_1, state_1_d);
+	assert_ne!(state_1, state_2);
+	assert_ne!(state_2, state_3);
+	assert_ne!(state_3, state_4);
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk(
 	n_cycles: usize,
@@ -821,10 +881,14 @@ fn generate_random_returning_cycle_walk(
 }
 
 /// Perform a large amount of random moves and then undoes them.
+///
 /// ## ASSERTS:
 /// That the amount of objects is invariant.
 ///
 /// That after doing all moves in reverse the state has returned to the starting position.
+///
+/// ## Notes:
+/// Does not take into account blocked moves and will not work correctly with them.
 fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
 	let n_cycles = app.conut_cycles();
 	let intial_state = app.read_vertices();
