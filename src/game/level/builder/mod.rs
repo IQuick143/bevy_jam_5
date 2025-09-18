@@ -84,6 +84,8 @@ pub struct PartialVec2 {
 struct IntermediateVertexData {
 	/// Position of the vertex, if it has been placed yet
 	pub position: IntermediateVertexPosition,
+	/// Position to use as a hint when placing the vertex, if any
+	pub hint_position: Option<Vec2>,
 	/// Object that lies on the vertex, if any
 	pub object: Option<ObjectData>,
 	/// Glyph that lies on the vertex, if any
@@ -150,9 +152,6 @@ enum IntermediateVertexPosition {
 	Free,
 	/// The vertex has a fixed position
 	Fixed(Vec2),
-	/// Exactly one cycle that owns the vertex has been placed
-	/// and the vertex may still be moved along it
-	Partial(PartiallyBoundVertexPosition),
 }
 
 impl IntermediateVertexPosition {
@@ -162,16 +161,6 @@ impl IntermediateVertexPosition {
 			_ => None,
 		}
 	}
-}
-
-/// Placement of a vertex that belongs to a placed cycle,
-/// but does not yet have a definite placement
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct PartiallyBoundVertexPosition {
-	/// Index of the cycle that owns the vertex
-	owner_cycle: usize,
-	/// Index of the vertex within the owner cycle's vertex list
-	index_in_owner: usize,
 }
 
 /// Placeholder appearence for a button color label that will be
@@ -195,21 +184,6 @@ enum OneTwo<T> {
 	Two(T, T),
 }
 use OneTwo::*;
-
-impl<T> OneTwo<T> {
-	fn add_to_one(self, x: T) -> Result<Self, (T, T, T)> {
-		match self {
-			One(a) => Ok(Two(a, x)),
-			Two(a, b) => Err((a, b, x)),
-		}
-	}
-
-	fn first(self) -> T {
-		match self {
-			One(x) | Two(x, _) => x,
-		}
-	}
-}
 
 impl<T> IntoIterator for OneTwo<T> {
 	type Item = T;
@@ -275,6 +249,20 @@ impl<T, E> ResultNonExclusive<T, E> {
 			ResultNonExclusive::Ok(ok) => Ok(ok),
 			ResultNonExclusive::Partial(ok, _) => Ok(ok),
 			ResultNonExclusive::Err(err) => Err(err),
+		}
+	}
+}
+
+#[allow(dead_code)]
+impl<T, E> ResultNonExclusive<T, E>
+where
+	E: std::fmt::Debug,
+{
+	pub fn unwrap_ok(self) -> T {
+		match self {
+			ResultNonExclusive::Ok(value) => value,
+			ResultNonExclusive::Partial(_value, err) => panic!("Unwrapped an Err: {err:?}"),
+			ResultNonExclusive::Err(err) => panic!("Unwrapped an Err: {err:?}"),
 		}
 	}
 }

@@ -17,9 +17,9 @@ pub(super) fn plugin(app: &mut App) {
 ///
 /// Do not spawn this directly, use [`FadeAnimationBundle`] instead.
 ///
-/// Any event components on the entity that had been previously registered
-/// with [`add_fade_event`](AddFadeEvent::add_fade_event) will be sent
-/// via [`EventWriter`]s when the animation reaches maximum fade-in.
+/// Any message components on the entity that had been previously registered
+/// with [`add_fade_message`](AddFadeMessage::add_fade_message) will be sent
+/// via [`MessageWriter`]s when the animation reaches maximum fade-in.
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct FadeAnimation {
 	/// Time taken by the full fade-in and -out, in seconds
@@ -27,7 +27,7 @@ pub struct FadeAnimation {
 	/// Current progress of the animation, in seconds
 	time_elapsed: f32,
 	/// Progress of the animation on previous frame, in seconds.
-	/// Used to figure out when we need to send out delayed events.
+	/// Used to figure out when we need to send out delayed messages.
 	prev_time_elapsed: f32,
 }
 
@@ -110,18 +110,18 @@ impl Default for FadeAnimationBundle {
 }
 
 /// Extension trait for [`App`] to allow simple registration
-/// of [`Event`]s that can be used with [`FadeAnimation`].
-pub trait AddFadeEvent {
-	/// Registers an [`Event`] type and enables forwarding
+/// of [`Message`]s that can be used with [`FadeAnimation`].
+pub trait AddFadeMessage {
+	/// Registers an [`Message`] type and enables forwarding
 	/// of components of this type from [`FadeAnimation`] entities.
-	fn add_fade_event<E: Event + Component + Clone>(&mut self) -> &mut Self;
+	fn add_fade_message<E: Message + Component + Clone>(&mut self) -> &mut Self;
 }
 
-impl AddFadeEvent for App {
-	fn add_fade_event<E: Event + Component + Clone>(&mut self) -> &mut Self {
-		self.add_event::<E>().add_systems(
+impl AddFadeMessage for App {
+	fn add_fade_message<E: Message + Component + Clone>(&mut self) -> &mut Self {
+		self.add_message::<E>().add_systems(
 			Update,
-			send_delayed_fade_events::<E>
+			send_delayed_fade_messages::<E>
 				.after(update_fade_animations)
 				.before(despawn_expired_fade_animations),
 		)
@@ -147,13 +147,13 @@ fn despawn_expired_fade_animations(mut commands: Commands, query: Query<(Entity,
 	}
 }
 
-fn send_delayed_fade_events<E: Event + Component + Clone>(
-	mut events: EventWriter<E>,
+fn send_delayed_fade_messages<E: Message + Component + Clone>(
+	mut messages: MessageWriter<E>,
 	query: Query<(&FadeAnimation, &E)>,
 ) {
-	for (animation, event) in &query {
+	for (animation, message) in &query {
 		if animation.prev_progress() < PEAK_OFFSET && animation.progress() >= PEAK_OFFSET {
-			events.write(event.clone());
+			messages.write(message.clone());
 		}
 	}
 }

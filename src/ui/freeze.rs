@@ -6,7 +6,7 @@ use super::*;
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct FreezeUi;
 
-/// [`Condition`] that succeeds when the UI is not frozen
+/// [`SystemCondition`] that succeeds when the UI is not frozen
 /// by any [`FreezeUi`] entities.
 pub fn ui_not_frozen(query: Query<(), With<FreezeUi>>) -> bool {
 	query.is_empty()
