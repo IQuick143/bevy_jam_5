@@ -32,6 +32,26 @@ pub struct Glyph;
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
 
+/// A visual detector on the circle
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct Detector {
+	/// Index into [`LevelData::cycles`]
+	pub cycle: usize,
+	/// Index into [`CycleData::vertex_positions`](crate::game::level::CycleData::vertex_positions) on the cycle given by [`Self::cycle`]
+	pub offset: usize,
+	/// Index into [`LevelData::detectors`]
+	pub detector_id: usize,
+}
+
+/// A visual wall on the circle
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct Wall {
+	/// Index into [`LevelData::cycles`]
+	pub cycle: usize,
+	/// Index into [`CycleData::vertex_positions`](crate::game::level::CycleData::vertex_positions) on the cycle given by [`Self::cycle`]
+	pub offset: usize,
+}
+
 /// A component describing a cycle
 #[derive(Component, Debug, Clone, Reflect)]
 pub struct Cycle {

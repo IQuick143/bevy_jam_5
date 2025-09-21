@@ -52,6 +52,7 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					create_vertex_visuals,
 					create_cycle_visuals,
+					create_detector_and_wall_visuals,
 					create_hard_link_visuals,
 					create_one_way_link_visuals,
 					create_thing_sprites,
@@ -151,6 +152,46 @@ fn despawn_expired_level_entities(
 	}
 }
 
+fn get_position_and_normal_for_detector(
+	level: &LevelData,
+	cycle_id: usize,
+	before_vertex_id: usize,
+) -> Option<(Vec2, Dir2)> {
+	let cycle = level.cycles.get(cycle_id)?;
+	let n_vertices = cycle.vertex_positions.len();
+	if n_vertices == 0 {
+		return None;
+	}
+	let index_before = before_vertex_id % n_vertices;
+	let index_after = (before_vertex_id + 1) % n_vertices;
+
+	let detector_position = if index_before == index_after {
+		let prev_vertex_position = cycle.vertex_positions[index_before];
+		prev_vertex_position + 0.5
+	} else {
+		// Get the path-based [0, 1] position of both neighboring vertices
+		let prev_vertex_position = cycle.vertex_positions[index_before];
+		let mut next_vertex_position = cycle.vertex_positions[index_after];
+		if prev_vertex_position < next_vertex_position {
+			// Wrap the position around the zeroth vertex
+			next_vertex_position += 1.0;
+		}
+		// Draw the detector halfway between the vertices
+		(prev_vertex_position + next_vertex_position) / 2.0
+	} % 1.0;
+	let detector_placement = cycle.placement.sample(detector_position);
+
+	match cycle.placement {
+		CyclePlacement {
+			position,
+			shape: CycleShape::Circle(_radius),
+		} => Some((
+			detector_placement,
+			Dir2::new(detector_placement - position).unwrap_or(Dir2::NEG_X),
+		)),
+	}
+}
+
 fn spawn_primary_level_entities(
 	mut commands: Commands,
 	mut events: MessageReader<SpawnLevel>,
@@ -200,6 +241,71 @@ fn spawn_primary_level_entities(
 						ComputedCycleTurnability(false),
 						CycleInteraction::default(),
 						Transform::default(),
+						Visibility::default(),
+					))
+					.id()
+			})
+			.collect::<Vec<_>>();
+
+		// Spawn detectors
+		let _detectors = level
+			.cycles
+			.iter()
+			.enumerate()
+			.flat_map(|(cycle_id, cycle_data)| {
+				cycle_data
+					.detector_indices
+					.iter()
+					.map(move |&(detector, offset)| (cycle_id, detector, offset))
+			})
+			.map(|(cycle_id, detector, offset)| {
+				let (position, normal_direction) =
+					get_position_and_normal_for_detector(level, cycle_id, offset)
+						.unwrap_or((Vec2::ZERO, Dir2::NORTH_EAST));
+				commands
+					.spawn((
+						*session_id,
+						Detector {
+							cycle: cycle_id,
+							offset,
+							detector_id: detector,
+						},
+						Transform::from_translation(position.extend(0.0)).looking_to(
+							Dir3::NEG_Z,
+							Dir3::new_unchecked(normal_direction.extend(0.0)),
+						),
+						Visibility::default(),
+					))
+					.id()
+			})
+			.collect::<Vec<_>>();
+
+		// Spawn walls
+		let _walls = level
+			.cycles
+			.iter()
+			.enumerate()
+			.flat_map(|(cycle_id, cycle_data)| {
+				cycle_data
+					.wall_indices
+					.iter()
+					.map(move |&offset| (cycle_id, offset))
+			})
+			.map(|(cycle_id, offset)| {
+				let (position, normal_direction) =
+					get_position_and_normal_for_detector(level, cycle_id, offset)
+						.unwrap_or((Vec2::ZERO, Dir2::NORTH_EAST));
+				commands
+					.spawn((
+						*session_id,
+						Wall {
+							cycle: cycle_id,
+							offset,
+						},
+						Transform::from_translation(position.extend(0.0)).looking_to(
+							Dir3::NEG_Z,
+							Dir3::new_unchecked(normal_direction.extend(0.0)),
+						),
 						Visibility::default(),
 					))
 					.id()
@@ -422,6 +528,27 @@ fn create_vertex_visuals(
 			.entity(id)
 			.insert(VertexVisualEntities { node, outline })
 			.add_children(&[node, outline]);
+	}
+}
+
+fn create_detector_and_wall_visuals(
+	mut commands: Commands,
+	detector_query: Query<Entity, Added<Detector>>,
+	wall_query: Query<Entity, Added<Wall>>,
+	materials: Res<GameObjectMaterials>,
+	meshes: Res<GameObjectMeshes>,
+) {
+	for id in &detector_query {
+		commands.entity(id).insert((
+			Mesh2d(meshes.detector_rectangle.clone()),
+			MeshMaterial2d(materials.detector.clone()),
+		));
+	}
+	for id in &wall_query {
+		commands.entity(id).insert((
+			Mesh2d(meshes.detector_rectangle.clone()),
+			MeshMaterial2d(materials.wall.clone()),
+		));
 	}
 }
 
