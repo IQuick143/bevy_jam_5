@@ -444,20 +444,26 @@ fn create_cycle_visuals(
 	for (id, placement, turnability, center_sprite) in &query {
 		let mesh;
 		let outline_mesh;
+		let hitbox_mesh;
 
 		match placement.shape {
 			CycleShape::Circle(radius) => {
+				let resolution = cycle_ring_mesh_resolution(radius);
 				mesh = Annulus::new(radius - RING_HALF_WIDTH, radius + RING_HALF_WIDTH)
 					.mesh()
-					.resolution(cycle_ring_mesh_resolution(radius))
+					.resolution(resolution)
 					.build();
 				outline_mesh = Annulus::new(
 					radius - RING_HALF_WIDTH - RING_OUTLINE_WIDTH,
 					radius + RING_HALF_WIDTH + RING_OUTLINE_WIDTH,
 				)
 				.mesh()
-				.resolution(cycle_ring_mesh_resolution(radius))
+				.resolution(resolution)
 				.build();
+				hitbox_mesh = Circle::new(radius + RING_SHADOW_BLEED)
+					.mesh()
+					.resolution(resolution)
+					.build();
 			}
 		}
 
@@ -479,6 +485,21 @@ fn create_cycle_visuals(
 			.entity(id)
 			.insert(CycleRingVisualEntities { ring, outline })
 			.add_children(&[ring, outline]);
+
+		if *turnability != CycleTurnability::Never {
+			let hitbox = commands
+				.spawn((
+					Mesh2d(meshes.add(hitbox_mesh)),
+					MeshMaterial2d(materials.cycle_hitboxes.clone_weak()),
+					Transform::from_translation(Vec3::Z * layers::CYCLE_SHADOWS),
+					Visibility::Hidden,
+				))
+				.id();
+			commands
+				.entity(id)
+				.insert(CycleHitboxVisualEntity(hitbox))
+				.add_child(hitbox);
+		}
 
 		if let Some(offset) = center_sprite.0 {
 			let sprite = commands
