@@ -559,9 +559,9 @@ impl LevelBuilder {
 			/// Guaranteed to be accurate only for vertices that are `Single` or `Pair`
 			///
 			/// ## Example:
-			/// ```
+			/// ```ignore
 			/// let (cycle_id, position) = self.problematic_vertex_to_cycle[VERTEX][i];
-			/// VERTEX == self.cycle_data[cycle_id].vertices[position].vertex
+			/// assert_eq!(VERTEX, self.cycle_data[cycle_id].vertices[position].vertex);
 			/// ```
 			problematic_vertex_to_cycle: Vec<SmallVec<[(usize, usize); 2]>>,
 		}

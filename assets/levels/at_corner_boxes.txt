@@ -12,4 +12,4 @@ circle(a; -1, 0, 1);
 circle(b; 1, 0, 1);
 circle(gear; 0, 1, 0.1);
 circle(gear2; 0, -1, 0.1);
-set_vertex_angle(u; 180);
+hint_vertex(u; -1, -1);

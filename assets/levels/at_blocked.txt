@@ -9,7 +9,7 @@ b = cycle('still'; v);
 circle(main; 0 0 10);
 circle(a; 14 2 2);
 circle(b; 14, -2, 2);
-set_vertex_angle(p; -90);
+hint_vertex(p; -10, 0);
 
 oneway(1; d a);
 oneway(-1; d b);
