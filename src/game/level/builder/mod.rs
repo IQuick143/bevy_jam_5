@@ -7,6 +7,7 @@ pub mod error;
 mod layout;
 /// Contains the logic for assembling and verifying level datastructures inside a [`LevelBuilder`] impl.
 mod logic;
+mod vertex_solver;
 
 use super::*;
 use bevy::math::bounding::Aabb2d;
