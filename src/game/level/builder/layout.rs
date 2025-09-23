@@ -210,7 +210,21 @@ impl LevelBuilder {
 	}
 
 	/// Computes the placements of unplaced vertices based on the geometric constraints or gives up.
-	fn solve_vertex_placements(&mut self) {
+	fn solve_vertex_placements(&mut self) -> Result<()> {
+		let mut error_log: Vec<VertexSolverError> = Vec::new();
+
+		trait ErrorLogExt<E> {
+			fn log_if_error(&mut self, result: Result<(), E>);
+		}
+
+		impl ErrorLogExt<VertexSolverError> for Vec<VertexSolverError> {
+			fn log_if_error(&mut self, result: Result<(), VertexSolverError>) {
+				if let Err(e) = result {
+					self.push(e);
+				}
+			}
+		}
+
 		let (vertex_to_cycle, absolute_precision_limit) = {
 			let mut absolute_precision_limit = f32::EPSILON;
 			let mut vertex_to_cycle: Vec<SmallVec<[usize; 2]>> =
@@ -258,12 +272,13 @@ impl LevelBuilder {
 			/// Index of the earliest entry in [`CyclePoints::vertices`] that is a `Single`
 			first_decided_vertex: Option<usize>,
 			/// A datastructure containing links to the `Pair` and `Single` vertices on this cycle.
-			/// Single vertices are linked together into a linked cycle
-			/// Pair vertices are linked into a doubly-linked cycle and to single vertices
+			/// `Single` vertices are linked together into a linked cycle
+			/// `Pair` vertices are linked into a doubly-linked cycle and to single vertices
 			vertices: Vec<LogicalVertex>,
 		}
 
 		impl CyclePoints {
+			/// Calculates the inner links and invariants from scratch
 			fn calculate_links(&mut self) {
 				let mut running_single_vertex = None;
 				let mut running_pair_vertex = None;
@@ -313,7 +328,7 @@ impl LevelBuilder {
 					}
 				}
 
-				// Go forward to create links to prev_single
+				// Go forward to create links to `prev_single`
 				let mut running_single_vertex = None;
 				let mut running_pair_vertex = None;
 				for _ in 0..2 {
@@ -378,6 +393,10 @@ impl LevelBuilder {
 				}
 			}
 
+			/// Takes an index of a problematic vertex on a given cycle (index into [`Self::vertices`])
+			/// and converts the vertex to a `Single` vertex
+			///
+			/// Updates internal links and their invariants accordingly
 			fn convert_pair_to_single(&mut self, index: usize) {
 				let (next_pair, prev_pair, prev_single) = match self.vertices[index].inner {
 					LogicalVertexVariant::Single { .. } => {
@@ -550,6 +569,8 @@ impl LevelBuilder {
 		enum VertexSolverError {
 			VertexHasNoPointsAvailable { vertex: usize },
 			TwoVerticesCollide { vertex_a: usize, vertex_b: usize },
+			VertexIsUnconstrained { vertex: usize },
+			VertexRemainsUndecided { vertex: usize },
 		}
 
 		impl PointData {
@@ -620,6 +641,7 @@ impl LevelBuilder {
 				vertex_1: usize,
 				vertex_2: usize,
 			) -> Result<(), VertexSolverError> {
+				let mut status = Ok(());
 				match (
 					self.vertex_constraints[vertex_1],
 					self.vertex_constraints[vertex_2],
@@ -643,27 +665,39 @@ impl LevelBuilder {
 											option_b == a1 || option_b == b1,
 										) {
 											(true, true) => {
-												debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in a point ({a1} or {b1}) which it actually wasn't. Desired points: ({option_a}, {option_b}).");
+												status = Err(
+													VertexSolverError::VertexHasNoPointsAvailable {
+														vertex,
+													},
+												);
 											}
 											(true, false) => {
-												self.place_vertex(vertex, option_b)?;
+												let _ = self
+													.place_vertex(vertex, option_b)
+													.map_err(|err| status = Err(err));
 											}
 											(false, true) => {
-												self.place_vertex(vertex, option_a)?;
+												let _ = self
+													.place_vertex(vertex, option_a)
+													.map_err(|err| status = Err(err));
 											}
 											(false, false) => {
-												todo!();
+												debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in a point ({a1} or {b1}) which it actually wasn't. Desired points: ({option_a}, {option_b}).");
 											}
 										}
 									}
 									IntersectionPointSet::Single(option) => {
 										if option == a1 || option == b1 {
-											todo!();
+											status = Err(
+												VertexSolverError::VertexHasNoPointsAvailable {
+													vertex,
+												},
+											);
 										}
 									}
 									_ => {
 										// Also shouldn't happen lol
-										debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in points which weren't actually constrained to points");
+										// debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in points which weren't actually constrained to points");
 									}
 								}
 							}
@@ -677,7 +711,7 @@ impl LevelBuilder {
 						debug_assert!(false, "`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1}) v2:({vertex_2})");
 					}
 				}
-				Ok(())
+				status
 			}
 
 			/// Turns a vertex into a `Single` vertex placed at the given point
@@ -1028,20 +1062,22 @@ impl LevelBuilder {
 			// Propagate constraints caused by `Single` points already placed
 			for &cycle_id in cycle_data.problematic_cycles.iter() {
 				for &point in cycle_data.points_on_cycle[cycle_id].iter() {
-					point_data.propagate_constraint(point);
+					error_log.log_if_error(point_data.propagate_constraint(point));
 				}
 			}
 			// Propagate constraints caused by two twin vertices occupying two points for themselves (even if it's unknown which is which)
 			for &cycle_id in cycle_data.problematic_cycles.iter() {
 				for &vertex in self.cycles[cycle_id].vertex_indices.iter() {
 					if let Some(twin_vertex) = point_data.find_twin(vertex) {
-						point_data.propagate_twin_constraint(vertex, twin_vertex);
+						error_log.log_if_error(
+							point_data.propagate_twin_constraint(vertex, twin_vertex),
+						);
 					}
 				}
 			}
 
 			point_data.progress = true;
-			while point_data.progress {
+			while point_data.progress && error_log.is_empty() {
 				point_data.progress = false;
 				// Use simple deductions to place remaining undecided vertices
 				for &cycle_id in cycle_data.problematic_cycles.iter() {
@@ -1154,15 +1190,23 @@ impl LevelBuilder {
 												if score_1.signum() == score_2.signum() {
 													// Whether point_a, point_b is correct order or they should be flipped
 													if score_1.is_sign_positive() {
-														point_data
-															.place_vertex(pair_vertex, point_a);
-														point_data
-															.place_vertex(twin_vertex, point_b);
+														error_log.log_if_error(
+															point_data
+																.place_vertex(pair_vertex, point_a),
+														);
+														error_log.log_if_error(
+															point_data
+																.place_vertex(twin_vertex, point_b),
+														);
 													} else {
-														point_data
-															.place_vertex(pair_vertex, point_b);
-														point_data
-															.place_vertex(twin_vertex, point_a);
+														error_log.log_if_error(
+															point_data
+																.place_vertex(pair_vertex, point_b),
+														);
+														error_log.log_if_error(
+															point_data
+																.place_vertex(twin_vertex, point_a),
+														);
 													}
 													// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
 													break 'pair_therapy;
@@ -1279,19 +1323,28 @@ impl LevelBuilder {
 															false
 														}
 														(true, false) => {
-															point_data
-																.place_vertex(pair_vertex, point_a);
+															error_log.log_if_error(
+																point_data.place_vertex(
+																	pair_vertex,
+																	point_a,
+																),
+															);
 															true
 														}
 														(false, true) => {
-															point_data
-																.place_vertex(pair_vertex, point_b);
+															error_log.log_if_error(
+																point_data.place_vertex(
+																	pair_vertex,
+																	point_b,
+																),
+															);
 															true
 														}
 														(false, false) => {
-															todo!(
-														"Raise an error, vertex has nowhere to go"
-													);
+															error_log.push(VertexSolverError::VertexHasNoPointsAvailable { vertex: pair_vertex });
+															// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
+															// so there's no need for more attempts at solving
+															true
 														}
 													}
 												} else {
@@ -1341,13 +1394,21 @@ impl LevelBuilder {
 														if clockwiseness
 															== (point_clockwiseness > 0.0)
 														{
-															point_data
-																.place_vertex(pair_vertex, point_a);
-															debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+															error_log.log_if_error(
+																point_data.place_vertex(
+																	pair_vertex,
+																	point_a,
+																),
+															);
+															debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
 														} else {
-															point_data
-																.place_vertex(pair_vertex, point_b);
-															debug_assert!(matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
+															error_log.log_if_error(
+																point_data.place_vertex(
+																	pair_vertex,
+																	point_b,
+																),
+															);
+															debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
 														}
 													}
 												}
@@ -1483,11 +1544,13 @@ impl LevelBuilder {
 
 							// The twin vertex should now get itself set to `Single` and should be caught by a later iteration of the main loop
 							if pressure < 0.0 {
-								point_data.place_vertex(pair_vertex, point_b);
+								error_log
+									.log_if_error(point_data.place_vertex(pair_vertex, point_b));
 								vertex_placement.position =
 									IntermediateVertexPosition::Fixed(point_data.points[point_b]);
 							} else {
-								point_data.place_vertex(pair_vertex, point_a);
+								error_log
+									.log_if_error(point_data.place_vertex(pair_vertex, point_a));
 								vertex_placement.position =
 									IntermediateVertexPosition::Fixed(point_data.points[point_a]);
 							}
@@ -1541,7 +1604,7 @@ impl LevelBuilder {
 						}
 						if free {
 							// Place it in the first spot idk who cares lmao.
-							point_data.place_vertex(pair_vertex, point_a);
+							error_log.log_if_error(point_data.place_vertex(pair_vertex, point_a));
 							vertex_placement.position =
 								IntermediateVertexPosition::Fixed(point_data.points[point_a]);
 						} else {
@@ -1550,7 +1613,10 @@ impl LevelBuilder {
 						}
 					}
 				}
-				IntersectionPointSet::Empty => todo!(),
+				IntersectionPointSet::Empty => {
+					error_log
+						.push(VertexSolverError::VertexHasNoPointsAvailable { vertex: vertex_id });
+				}
 			}
 		}
 
@@ -1667,6 +1733,7 @@ impl LevelBuilder {
 				.enumerate()
 				.array_combinations::<3>()
 			{
+				// TODO: Error handling
 				debug_assert!(
 					test_index_clockwiseness(pos_1, pos_2, pos_3)
 						== (test_point_clockwiseness(vert_1, vert_2, vert_3, None) > 0.0),
@@ -1703,6 +1770,12 @@ impl LevelBuilder {
 					"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} with position {position} and radius {radius}"
 				);
 			}
+		}
+
+		if error_log.is_empty() {
+			Ok(())
+		} else {
+			todo!()
 		}
 	}
 
