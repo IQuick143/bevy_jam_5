@@ -555,683 +555,694 @@ impl LevelBuilder {
 	/// Computes the placements of unplaced vertices based on the geometric constraints or gives up.
 	pub(super) fn solve_vertex_placements(&mut self) -> Result<()> {
 		let mut error_log: Vec<VertexSolverError> = Vec::new();
-
-		let (vertex_to_cycle, absolute_precision_limit) = {
-			let mut absolute_precision_limit = f32::EPSILON;
-			let mut vertex_to_cycle: Vec<SmallVec<[usize; 2]>> =
-				vec![SmallVec::new(); self.vertices.len()];
-			for (id, cycle) in self.cycles.iter().enumerate() {
-				for &vertex in cycle.vertex_indices.iter() {
-					debug_assert!(
-						vertex < self.vertices.len(),
-						"Cycle contains vertex that is out of range."
-					);
-					vertex_to_cycle[vertex].push(id);
-				}
-
-				match cycle.placement {
-					Some(CyclePlacement { position, shape }) => {
-						let size = match shape {
-							CycleShape::Circle(radius) => radius.abs(),
-						};
-						let distance = position.length();
-						absolute_precision_limit = absolute_precision_limit.max(distance + size);
-					}
-					None => {}
-				}
-			}
-			for (vertex_id, vert) in vertex_to_cycle.iter().enumerate() {
-				debug_assert!(!vert.is_empty(), "Vertex {vertex_id} has no cycles!");
-			}
-			(
-				vertex_to_cycle,
-				absolute_precision_limit * Self::PLACEMENT_VALIDATION_TOLERANCE,
-			)
-		};
+		let (vertex_to_cycle, absolute_precision_limit) = self.initial_characterize_layout();
 		// TODO: Verify that fixed vertices are placed on the cycles they belong to
 		// TODO: End early if all vertices are fixed
+		let (mut point_data, mut cycle_data) =
+			self.compute_initial_geometry(&vertex_to_cycle, absolute_precision_limit);
+		self.first_pass_pair_placements(&mut point_data, &mut cycle_data, &mut error_log);
+		self.pin_single_placements(&mut point_data, &mut cycle_data, &mut error_log);
+		self.pin_cycle_placements();
+		#[cfg(debug_assertions)]
+		self.debug_assert_valid_solution();
+		if error_log.is_empty() {
+			Ok(())
+		} else {
+			todo!()
+		}
+	}
 
-		// Determine geometric constraints and place uniquely determined points.
-		// Find cycles that have ambiguous points.
-		// Points are deduplicated and indexed, facilitating equality comparisons.
-		let (mut point_data, mut cycle_data): (PointData, AdditionalCycleData) = {
-			// Array holding all the cycles which require
-			let mut problematic_cycles: Vec<usize> = Vec::new();
-			// Array holding all the points under consideration. Only points from cycles in [`problematic_cycles`] are guaranteed to be present.
-			let mut points: Vec<Vec2> = Vec::new();
-			// Array of links from point to a list of vertices who point to this point.
-			let mut vertices_interested_in_point: Vec<SmallVec<[usize; 1]>> = Vec::new();
-			// Mapping from cycles to list of indices to [`points`] representing the points, only initialised for cycles in [`problematic_cycles`].
-			let mut points_on_cycle: Vec<Vec<usize>> = vec![Vec::new(); self.cycles.len()];
-			// Array storing the geometric constraints placed on a vertex.
-			let mut vertex_constraints: Vec<IntersectionPointSet<usize>> =
-				vec![IntersectionPointSet::Unconstrained; self.vertices.len()];
+	/// Computes initial parameters that can be directly extracted from the level builder
+	///
+	/// ## Return Value
+	/// - For each vertex, list of all cycles it lies on, with the index
+	///   of the position of the vertex within the cycle
+	/// - Numeric tolerance based on the scale of the level
+	fn initial_characterize_layout(&self) -> (Vec<SmallVec<[usize; 2]>>, f32) {
+		let mut absolute_precision_limit = f32::EPSILON;
+		let mut vertex_to_cycle: Vec<SmallVec<[usize; 2]>> =
+			vec![SmallVec::new(); self.vertices.len()];
+		for (id, cycle) in self.cycles.iter().enumerate() {
+			for &vertex in cycle.vertex_indices.iter() {
+				debug_assert!(
+					vertex < self.vertices.len(),
+					"Cycle contains vertex that is out of range."
+				);
+				vertex_to_cycle[vertex].push(id);
+			}
 
-			let insert_point_if_needed =
-				|points: &mut Vec<Vec2>,
-				 vertices_interested_in_point: &mut Vec<SmallVec<[usize; 1]>>,
-				 points_on_cycle: &Vec<Vec<usize>>,
-				 point: Vec2,
-				 vertex: usize,
-				 parent_cycle: usize|
-				 -> usize {
-					for &id in points_on_cycle[parent_cycle].iter() {
-						if approx_eq_points(point, points[id], absolute_precision_limit) {
-							vertices_interested_in_point[id].push(vertex);
-							return id;
-						}
+			match cycle.placement {
+				Some(CyclePlacement { position, shape }) => {
+					let size = match shape {
+						CycleShape::Circle(radius) => radius.abs(),
+					};
+					let distance = position.length();
+					absolute_precision_limit = absolute_precision_limit.max(distance + size);
+				}
+				None => {}
+			}
+		}
+		for (vertex_id, vert) in vertex_to_cycle.iter().enumerate() {
+			debug_assert!(!vert.is_empty(), "Vertex {vertex_id} has no cycles!");
+		}
+		(
+			vertex_to_cycle,
+			absolute_precision_limit * Self::PLACEMENT_VALIDATION_TOLERANCE,
+		)
+	}
+
+	/// Expresses the geometrical constraints inherent to the level
+	///
+	/// Determines geometric constraints and places uniquely determined points.
+	/// Finds cycles that have ambiguous points.
+	/// Points are deduplicated and indexed, facilitating equality comparisons.
+	fn compute_initial_geometry(
+		&self,
+		vertex_to_cycle: &[SmallVec<[usize; 2]>],
+		absolute_precision_limit: f32,
+	) -> (PointData, AdditionalCycleData) {
+		// Array holding all the cycles which require
+		let mut problematic_cycles: Vec<usize> = Vec::new();
+		// Array holding all the points under consideration. Only points from cycles in [`problematic_cycles`] are guaranteed to be present.
+		let mut points: Vec<Vec2> = Vec::new();
+		// Array of links from point to a list of vertices who point to this point.
+		let mut vertices_interested_in_point: Vec<SmallVec<[usize; 1]>> = Vec::new();
+		// Mapping from cycles to list of indices to [`points`] representing the points, only initialised for cycles in [`problematic_cycles`].
+		let mut points_on_cycle: Vec<Vec<usize>> = vec![Vec::new(); self.cycles.len()];
+		// Array storing the geometric constraints placed on a vertex.
+		let mut vertex_constraints: Vec<IntersectionPointSet<usize>> =
+			vec![IntersectionPointSet::Unconstrained; self.vertices.len()];
+
+		let insert_point_if_needed =
+			|points: &mut Vec<Vec2>,
+			 vertices_interested_in_point: &mut Vec<SmallVec<[usize; 1]>>,
+			 points_on_cycle: &Vec<Vec<usize>>,
+			 point: Vec2,
+			 vertex: usize,
+			 parent_cycle: usize|
+			 -> usize {
+				for &id in points_on_cycle[parent_cycle].iter() {
+					if approx_eq_points(point, points[id], absolute_precision_limit) {
+						vertices_interested_in_point[id].push(vertex);
+						return id;
 					}
-					vertices_interested_in_point.push(SmallVec::from_buf([vertex]));
-					points.push(point);
-					points.len() - 1
-				};
+				}
+				vertices_interested_in_point.push(SmallVec::from_buf([vertex]));
+				points.push(point);
+				points.len() - 1
+			};
 
-			// TODO: Check that there is no [`IntermediateVertexPosition::Empty`], indicating an overconstrained vertex.
-			// TODO: Check that there is no [`IntermediateVertexPosition::Unconstrained`], indicating a vertex that requires being placed manually but wasn't.
-			for (vertex, cycles) in vertex_to_cycle.iter().enumerate() {
-				let parent_cycle = *cycles
-					.first()
-					.expect("Vertex needs at least one parent cycle");
-				vertex_constraints[vertex] = match self.vertices[vertex].position {
-					IntermediateVertexPosition::Fixed(position) => {
-						// TODO: come up with a way to avoid deduplicating these points maybe
-						let point = insert_point_if_needed(
-							&mut points,
-							&mut vertices_interested_in_point,
-							&points_on_cycle,
-							position,
-							vertex,
-							parent_cycle,
-						);
-						for &cycle in cycles.iter() {
-							points_on_cycle[cycle].push(point);
-						}
-						IntersectionPointSet::Single(point)
+		// TODO: Check that there is no [`IntermediateVertexPosition::Empty`], indicating an overconstrained vertex.
+		// TODO: Check that there is no [`IntermediateVertexPosition::Unconstrained`], indicating a vertex that requires being placed manually but wasn't.
+		for (vertex, cycles) in vertex_to_cycle.iter().enumerate() {
+			let parent_cycle = *cycles
+				.first()
+				.expect("Vertex needs at least one parent cycle");
+			vertex_constraints[vertex] = match self.vertices[vertex].position {
+				IntermediateVertexPosition::Fixed(position) => {
+					// TODO: come up with a way to avoid deduplicating these points maybe
+					let point = insert_point_if_needed(
+						&mut points,
+						&mut vertices_interested_in_point,
+						&points_on_cycle,
+						position,
+						vertex,
+						parent_cycle,
+					);
+					for &cycle in cycles.iter() {
+						points_on_cycle[cycle].push(point);
 					}
-					IntermediateVertexPosition::Free => {
-						let intersection = self.compute_intersection(&cycles);
-						match intersection {
-							IntersectionPointSet::Unconstrained => todo!(), // Bad
-							IntersectionPointSet::Cycle(cycle) => {
-								// Use hints if possible
-								match self.vertices[vertex].hint_position {
-									Some(hint_position) => {
-										if let Some(CyclePlacement {
-											position: cycle_position,
-											shape,
-										}) = self.cycles[cycle].placement
-										{
-											match shape {
-												CycleShape::Circle(radius) => {
-													let distance_from_center =
-														cycle_position.distance(hint_position);
-													if distance_from_center
-														<= absolute_precision_limit
-													{
-														// TODO: Warning about ineffective hint
-														IntersectionPointSet::Cycle(cycle)
-													} else {
-														let offset = hint_position - cycle_position;
-														let point = cycle_position
-															+ (radius / distance_from_center)
-																* offset;
-														IntersectionPointSet::Single(
-															insert_point_if_needed(
-																&mut points,
-																&mut vertices_interested_in_point,
-																&points_on_cycle,
-																point,
-																vertex,
-																parent_cycle,
-															),
-														)
-													}
+					IntersectionPointSet::Single(point)
+				}
+				IntermediateVertexPosition::Free => {
+					let intersection = self.compute_intersection(&cycles);
+					match intersection {
+						IntersectionPointSet::Unconstrained => todo!(), // Bad
+						IntersectionPointSet::Cycle(cycle) => {
+							// Use hints if possible
+							match self.vertices[vertex].hint_position {
+								Some(hint_position) => {
+									if let Some(CyclePlacement {
+										position: cycle_position,
+										shape,
+									}) = self.cycles[cycle].placement
+									{
+										match shape {
+											CycleShape::Circle(radius) => {
+												let distance_from_center =
+													cycle_position.distance(hint_position);
+												if distance_from_center <= absolute_precision_limit
+												{
+													// TODO: Warning about ineffective hint
+													IntersectionPointSet::Cycle(cycle)
+												} else {
+													let offset = hint_position - cycle_position;
+													let point = cycle_position
+														+ (radius / distance_from_center) * offset;
+													IntersectionPointSet::Single(
+														insert_point_if_needed(
+															&mut points,
+															&mut vertices_interested_in_point,
+															&points_on_cycle,
+															point,
+															vertex,
+															parent_cycle,
+														),
+													)
 												}
 											}
-										} else {
-											// Should not be happening
-											debug_assert!(false, "Unplaced cycle");
-											IntersectionPointSet::Cycle(cycle)
 										}
+									} else {
+										// Should not be happening
+										debug_assert!(false, "Unplaced cycle");
+										IntersectionPointSet::Cycle(cycle)
 									}
-									None => IntersectionPointSet::Cycle(cycle),
 								}
+								None => IntersectionPointSet::Cycle(cycle),
 							}
-							IntersectionPointSet::Pair(point_a, point_b) => {
-								match match match self.vertices[vertex].hint_position {
-									Some(position) => {
-										match Vec2::distance_squared(point_a, position)
-											.partial_cmp(&Vec2::distance_squared(point_b, position))
-										{
-											Some(Ordering::Greater) => One(point_b),
-											Some(Ordering::Less) => One(point_a),
-											// TODO: Emit a warning about an ineffective hint
-											Some(Ordering::Equal) => Two(point_a, point_b),
-											None => Two(point_a, point_b),
-										}
+						}
+						IntersectionPointSet::Pair(point_a, point_b) => {
+							match match match self.vertices[vertex].hint_position {
+								Some(position) => {
+									match Vec2::distance_squared(point_a, position)
+										.partial_cmp(&Vec2::distance_squared(point_b, position))
+									{
+										Some(Ordering::Greater) => One(point_b),
+										Some(Ordering::Less) => One(point_a),
+										// TODO: Emit a warning about an ineffective hint
+										Some(Ordering::Equal) => Two(point_a, point_b),
+										None => Two(point_a, point_b),
 									}
-									None => Two(point_a, point_b),
-								} {
-									Two(point_a, point_b) => {
-										let point_a = insert_point_if_needed(
-											&mut points,
-											&mut vertices_interested_in_point,
-											&points_on_cycle,
-											point_a,
-											vertex,
-											parent_cycle,
-										);
-										let point_b = insert_point_if_needed(
-											&mut points,
-											&mut vertices_interested_in_point,
-											&points_on_cycle,
-											point_b,
-											vertex,
-											parent_cycle,
-										);
-										if point_a == point_b {
-											// This is a stupid branch, but it's possible if you got a really degenerate thing going on.
-											One(point_a)
-										} else {
-											Two(point_a, point_b)
-										}
-									}
-									One(point) => One(insert_point_if_needed(
+								}
+								None => Two(point_a, point_b),
+							} {
+								Two(point_a, point_b) => {
+									let point_a = insert_point_if_needed(
 										&mut points,
 										&mut vertices_interested_in_point,
 										&points_on_cycle,
-										point,
+										point_a,
 										vertex,
 										parent_cycle,
-									)),
-								} {
-									Two(point_a, point_b) => {
-										for &cycle in cycles.iter() {
-											problematic_cycles.push(cycle);
-											points_on_cycle[cycle].push(point_a);
-											points_on_cycle[cycle].push(point_b);
-										}
-										IntersectionPointSet::Pair(point_a, point_b)
-									}
-									One(point) => {
-										for &cycle in cycles.iter() {
-											problematic_cycles.push(cycle);
-											points_on_cycle[cycle].push(point);
-										}
-										IntersectionPointSet::Single(point)
+									);
+									let point_b = insert_point_if_needed(
+										&mut points,
+										&mut vertices_interested_in_point,
+										&points_on_cycle,
+										point_b,
+										vertex,
+										parent_cycle,
+									);
+									if point_a == point_b {
+										// This is a stupid branch, but it's possible if you got a really degenerate thing going on.
+										One(point_a)
+									} else {
+										Two(point_a, point_b)
 									}
 								}
-							}
-							IntersectionPointSet::Single(point) => {
-								let point = insert_point_if_needed(
+								One(point) => One(insert_point_if_needed(
 									&mut points,
 									&mut vertices_interested_in_point,
 									&points_on_cycle,
 									point,
 									vertex,
 									parent_cycle,
-								);
-								for &cycle in cycles.iter() {
-									points_on_cycle[cycle].push(point);
+								)),
+							} {
+								Two(point_a, point_b) => {
+									for &cycle in cycles.iter() {
+										problematic_cycles.push(cycle);
+										points_on_cycle[cycle].push(point_a);
+										points_on_cycle[cycle].push(point_b);
+									}
+									IntersectionPointSet::Pair(point_a, point_b)
 								}
-								IntersectionPointSet::Single(point)
+								One(point) => {
+									for &cycle in cycles.iter() {
+										problematic_cycles.push(cycle);
+										points_on_cycle[cycle].push(point);
+									}
+									IntersectionPointSet::Single(point)
+								}
 							}
-							IntersectionPointSet::Empty => todo!(), // Bad
 						}
+						IntersectionPointSet::Single(point) => {
+							let point = insert_point_if_needed(
+								&mut points,
+								&mut vertices_interested_in_point,
+								&points_on_cycle,
+								point,
+								vertex,
+								parent_cycle,
+							);
+							for &cycle in cycles.iter() {
+								points_on_cycle[cycle].push(point);
+							}
+							IntersectionPointSet::Single(point)
+						}
+						IntersectionPointSet::Empty => todo!(), // Bad
 					}
 				}
 			}
-			problematic_cycles.sort();
-			problematic_cycles.dedup();
-			for cycle_points in points_on_cycle.iter_mut() {
-				cycle_points.sort();
-				cycle_points.dedup();
-			}
-			for point_vertices in vertices_interested_in_point.iter_mut() {
-				point_vertices.sort();
-				point_vertices.dedup();
-			}
-			let mut cycle_data = vec![
-				CyclePoints {
-					first_undecided_vertex: None,
-					first_decided_vertex: None,
-					vertices: Vec::new()
-				};
-				self.cycles.len()
-			];
-			let mut problematic_vertex_to_cycle = vec![SmallVec::new(); self.vertices.len()];
-			for &cycle_index in problematic_cycles.iter() {
-				for &vertex in self.cycles[cycle_index].vertex_indices.iter() {
-					match vertex_constraints[vertex] {
-						IntersectionPointSet::Pair(_, _) => {
-							cycle_data[cycle_index].vertices.push(LogicalVertex {
-								vertex,
-								inner: LogicalVertexVariant::Pair {
-									next_pair: 0,
-									prev_pair: 0,
-									prev_single: None,
-								},
-							});
-							problematic_vertex_to_cycle[vertex]
-								.push((cycle_index, cycle_data[cycle_index].vertices.len() - 1));
-						}
-						IntersectionPointSet::Single(_) => {
-							cycle_data[cycle_index].vertices.push(LogicalVertex {
-								vertex,
-								inner: LogicalVertexVariant::Single { next_single: 0 },
-							});
-							problematic_vertex_to_cycle[vertex]
-								.push((cycle_index, cycle_data[cycle_index].vertices.len() - 1));
-						}
-						_ => {}
+		}
+		problematic_cycles.sort();
+		problematic_cycles.dedup();
+		for cycle_points in points_on_cycle.iter_mut() {
+			cycle_points.sort();
+			cycle_points.dedup();
+		}
+		for point_vertices in vertices_interested_in_point.iter_mut() {
+			point_vertices.sort();
+			point_vertices.dedup();
+		}
+		let mut cycle_data = vec![
+			CyclePoints {
+				first_undecided_vertex: None,
+				first_decided_vertex: None,
+				vertices: Vec::new()
+			};
+			self.cycles.len()
+		];
+		let mut problematic_vertex_to_cycle = vec![SmallVec::new(); self.vertices.len()];
+		for &cycle_index in problematic_cycles.iter() {
+			for &vertex in self.cycles[cycle_index].vertex_indices.iter() {
+				match vertex_constraints[vertex] {
+					IntersectionPointSet::Pair(_, _) => {
+						cycle_data[cycle_index].vertices.push(LogicalVertex {
+							vertex,
+							inner: LogicalVertexVariant::Pair {
+								next_pair: 0,
+								prev_pair: 0,
+								prev_single: None,
+							},
+						});
+						problematic_vertex_to_cycle[vertex]
+							.push((cycle_index, cycle_data[cycle_index].vertices.len() - 1));
 					}
+					IntersectionPointSet::Single(_) => {
+						cycle_data[cycle_index].vertices.push(LogicalVertex {
+							vertex,
+							inner: LogicalVertexVariant::Single { next_single: 0 },
+						});
+						problematic_vertex_to_cycle[vertex]
+							.push((cycle_index, cycle_data[cycle_index].vertices.len() - 1));
+					}
+					_ => {}
 				}
-				cycle_data[cycle_index].calculate_links();
 			}
-			(
-				PointData {
-					progress: true,
-					points,
-					vertices_interested_in_point,
-					vertex_constraints,
-					cycle_data,
-					problematic_vertex_to_cycle,
-				},
-				AdditionalCycleData {
-					problematic_cycles,
-					points_on_cycle,
-				},
-			)
-		};
+			cycle_data[cycle_index].calculate_links();
+		}
+		(
+			PointData {
+				progress: true,
+				points,
+				vertices_interested_in_point,
+				vertex_constraints,
+				cycle_data,
+				problematic_vertex_to_cycle,
+			},
+			AdditionalCycleData {
+				problematic_cycles,
+				points_on_cycle,
+			},
+		)
+	}
 
-		#[cfg(all(test, debug_assertions))]
-		{
-			println!("{:?}", point_data.points);
-			println!("{:?}", point_data.vertex_constraints);
+	/// First attempt to solve [`IntersectionPointSet::Pair`] placements
+	///
+	/// TODO: Optimise
+	fn first_pass_pair_placements(
+		&self,
+		point_data: &mut PointData,
+		cycle_data: &mut AdditionalCycleData,
+		error_log: &mut Vec<VertexSolverError>,
+	) {
+		// Propagate constraints caused by `Single` points already placed
+		for &cycle_id in cycle_data.problematic_cycles.iter() {
+			for &point in cycle_data.points_on_cycle[cycle_id].iter() {
+				error_log.log_if_error(point_data.propagate_constraint(point));
+			}
+		}
+		// Propagate constraints caused by two twin vertices occupying two points for themselves (even if it's unknown which is which)
+		for &cycle_id in cycle_data.problematic_cycles.iter() {
+			for &vertex in self.cycles[cycle_id].vertex_indices.iter() {
+				if let Some(twin_vertex) = point_data.find_twin(vertex) {
+					error_log
+						.log_if_error(point_data.propagate_twin_constraint(vertex, twin_vertex));
+				}
+			}
 		}
 
-		// Attempt to solve `Pair` vertices
-		// TODO: Optimise
-		{
-			// Propagate constraints caused by `Single` points already placed
+		point_data.progress = true;
+		while point_data.progress && error_log.is_empty() {
+			point_data.progress = false;
+			// Use simple deductions to place remaining undecided vertices
 			for &cycle_id in cycle_data.problematic_cycles.iter() {
-				for &point in cycle_data.points_on_cycle[cycle_id].iter() {
-					error_log.log_if_error(point_data.propagate_constraint(point));
-				}
-			}
-			// Propagate constraints caused by two twin vertices occupying two points for themselves (even if it's unknown which is which)
-			for &cycle_id in cycle_data.problematic_cycles.iter() {
-				for &vertex in self.cycles[cycle_id].vertex_indices.iter() {
-					if let Some(twin_vertex) = point_data.find_twin(vertex) {
-						error_log.log_if_error(
-							point_data.propagate_twin_constraint(vertex, twin_vertex),
-						);
-					}
-				}
-			}
-
-			point_data.progress = true;
-			while point_data.progress && error_log.is_empty() {
-				point_data.progress = false;
-				// Use simple deductions to place remaining undecided vertices
-				for &cycle_id in cycle_data.problematic_cycles.iter() {
-					let cycle = &self.cycles[cycle_id];
-					match cycle.placement {
-						Some(CyclePlacement {
-							position: cycle_position,
-							shape: CycleShape::Circle(_),
-						}) => {
-							// Only go through the logic if there is an undecided vertex available.
-							if let Some(first_pair_index) =
-								point_data.cycle_data[cycle_id].first_undecided_vertex
+				let cycle = &self.cycles[cycle_id];
+				match cycle.placement {
+					Some(CyclePlacement {
+						position: cycle_position,
+						shape: CycleShape::Circle(_),
+					}) => {
+						// Only go through the logic if there is an undecided vertex available.
+						if let Some(first_pair_index) =
+							point_data.cycle_data[cycle_id].first_undecided_vertex
+						{
+							if point_data.cycle_data[cycle_id]
+								.first_decided_vertex
+								.is_none()
 							{
-								if point_data.cycle_data[cycle_id]
-									.first_decided_vertex
-									.is_none()
-								{
-									// There are no `Single`s available,
-									// so we go after `Pair` therapy
+								// There are no `Single`s available,
+								// so we go after `Pair` therapy
 
-									'pair_therapy: for pair_vertex_index in
+								'pair_therapy: for pair_vertex_index in
+									0..point_data.cycle_data[cycle_id].vertices.len()
+								{
+									// Each vertex should be a `Pair` given that there was no `Single` when we reached this code
+									// If a vertex was placed, `'pair_therapy` should be stopped, as faster and more powerful algorithms apply.
+									let LogicalVertex {
+										vertex: pair_vertex,
+										inner:
+											LogicalVertexVariant::Pair {
+												next_pair: _,
+												prev_pair: _,
+												prev_single: None,
+											},
+									} = point_data.cycle_data[cycle_id].vertices[pair_vertex_index]
+									else {
+										debug_assert!(
+											false,
+											"Invariants broken, the truth goes unspoken."
+										);
+										break;
+									};
+									// To make a deduction, we need a twin vertex
+									let Some((twin_vertex, twin_vertex_index)) =
+										point_data.find_twin(pair_vertex).and_then(|twin_vertex| {
+											point_data.problematic_vertex_to_cycle[twin_vertex]
+												.iter()
+												.find(
+													|&&(twin_cycle_id, _twin_position_in_cycle)| {
+														twin_cycle_id == cycle_id
+													},
+												)
+												.map(|&(_, twin_position_in_cycle)| {
+													(twin_vertex, twin_position_in_cycle)
+												})
+										})
+									else {
+										continue;
+									};
+									// Avoid doing the work twice
+									if twin_vertex < pair_vertex {
+										continue;
+									}
+									// Go through every other pair, if both points of that pair lie on a given side
+									// of the twin pair, then we can deduce the twin pair orientation and place them
+									for constraint_vertex_index in
 										0..point_data.cycle_data[cycle_id].vertices.len()
 									{
-										// Each vertex should be a `Pair` given that there was no `Single` when we reached this code
-										// If a vertex was placed, `'pair_therapy` should be stopped, as faster and more powerful algorithms apply.
-										let LogicalVertex {
-											vertex: pair_vertex,
-											inner:
-												LogicalVertexVariant::Pair {
-													next_pair: _,
-													prev_pair: _,
-													prev_single: None,
-												},
-										} = point_data.cycle_data[cycle_id].vertices
-											[pair_vertex_index]
-										else {
-											debug_assert!(
-												false,
-												"Invariants broken, the truth goes unspoken."
-											);
-											break;
-										};
-										// To make a deduction, we need a twin vertex
-										let Some((twin_vertex, twin_vertex_index)) = point_data
-											.find_twin(pair_vertex)
-											.and_then(|twin_vertex| {
-												point_data.problematic_vertex_to_cycle[twin_vertex]
-													.iter()
-													.find(
-														|&&(
-															twin_cycle_id,
-															_twin_position_in_cycle,
-														)| {
-															twin_cycle_id == cycle_id
-														},
-													)
-													.map(|&(_, twin_position_in_cycle)| {
-														(twin_vertex, twin_position_in_cycle)
-													})
-											})
-										else {
-											continue;
-										};
-										// Avoid doing the work twice
-										if twin_vertex < pair_vertex {
+										// We need a separate vertex, not one already present
+										if constraint_vertex_index == pair_vertex_index
+											|| constraint_vertex_index == twin_vertex_index
+										{
 											continue;
 										}
-										// Go through every other pair, if both points of that pair lie on a given side
-										// of the twin pair, then we can deduce the twin pair orientation and place them
-										for constraint_vertex_index in
-											0..point_data.cycle_data[cycle_id].vertices.len()
-										{
-											// We need a separate vertex, not one already present
-											if constraint_vertex_index == pair_vertex_index
-												|| constraint_vertex_index == twin_vertex_index
-											{
-												continue;
+										let constraint_vertex = point_data.cycle_data[cycle_id]
+											.vertices[constraint_vertex_index]
+											.vertex;
+										if let (
+											IntersectionPointSet::Pair(point_a, point_b),
+											IntersectionPointSet::Pair(option_1, option_2),
+										) = (
+											point_data.vertex_constraints[pair_vertex],
+											point_data.vertex_constraints[constraint_vertex],
+										) {
+											let clockwiseness = test_index_clockwiseness(
+												pair_vertex_index,
+												twin_vertex_index,
+												constraint_vertex_index,
+											);
+											let sign = if clockwiseness { 1.0 } else { -1.0 };
+
+											let score_1 = test_point_clockwiseness(
+												point_data.points[point_a],
+												point_data.points[point_b],
+												point_data.points[option_1],
+												Some(cycle_position),
+											) * sign;
+											let score_2 = test_point_clockwiseness(
+												point_data.points[point_a],
+												point_data.points[point_b],
+												point_data.points[option_2],
+												Some(cycle_position),
+											) * sign;
+
+											// If both situations agree
+											if score_1.signum() == score_2.signum() {
+												// Whether point_a, point_b is correct order or they should be flipped
+												if score_1.is_sign_positive() {
+													error_log.log_if_error(
+														point_data
+															.place_vertex(pair_vertex, point_a),
+													);
+													error_log.log_if_error(
+														point_data
+															.place_vertex(twin_vertex, point_b),
+													);
+												} else {
+													error_log.log_if_error(
+														point_data
+															.place_vertex(pair_vertex, point_b),
+													);
+													error_log.log_if_error(
+														point_data
+															.place_vertex(twin_vertex, point_a),
+													);
+												}
+												// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
+												break 'pair_therapy;
 											}
-											let constraint_vertex = point_data.cycle_data[cycle_id]
-												.vertices[constraint_vertex_index]
-												.vertex;
-											if let (
-												IntersectionPointSet::Pair(point_a, point_b),
-												IntersectionPointSet::Pair(option_1, option_2),
-											) = (
-												point_data.vertex_constraints[pair_vertex],
-												point_data.vertex_constraints[constraint_vertex],
-											) {
+										} else {
+											debug_assert!(
+												false,
+												"THERE SHOULD BE ONLY PAIR VERTICES"
+											);
+										}
+									}
+								}
+							}
+							// If there is a `Single` vertex available (as an anchor)
+							// The check is done again, because pair_therapy might have created a new one
+							if point_data.cycle_data[cycle_id]
+								.first_decided_vertex
+								.is_some()
+							{
+								for pair_vertex_index in
+									first_pair_index..point_data.cycle_data[cycle_id].vertices.len()
+								{
+									let LogicalVertex {
+										vertex: pair_vertex,
+										inner:
+											LogicalVertexVariant::Pair {
+												next_pair: _,
+												prev_pair: _,
+												prev_single: Some(prev_single_index),
+											},
+									} = point_data.cycle_data[cycle_id].vertices[pair_vertex_index]
+									else {
+										continue;
+									};
+									// There ought to exist a `Single` vertex, `first_decided_vertex` points to one dammit! (or does it...)
+									let LogicalVertex {
+										vertex: prev_single_vertex,
+										inner:
+											LogicalVertexVariant::Single {
+												next_single: next_single_index,
+											},
+									} = point_data.cycle_data[cycle_id].vertices[prev_single_index]
+									else {
+										debug_assert!(
+											false,
+											"Invariants broken, the truth goes unspoken."
+										);
+										break;
+									};
+									let next_single_vertex = point_data.cycle_data[cycle_id]
+										.vertices[next_single_index]
+										.vertex;
+
+									match (
+										point_data.vertex_constraints[pair_vertex],
+										point_data.vertex_constraints[prev_single_vertex],
+										point_data.vertex_constraints[next_single_vertex],
+									) {
+										(
+											IntersectionPointSet::Pair(point_a, point_b),
+											IntersectionPointSet::Single(prev_point),
+											IntersectionPointSet::Single(next_point),
+										) => {
+											// If there is only one `Single` vertex, then it will point to itself and
+											// `prev_single_vertex` might equal `next_single_vertex`
+
+											// Inner if checks whether we have two different vertices, and if so,
+											// Executes code that might resolve the `Pair`
+											// Outer if checks if the previous code failed, and if so,
+											// Tries running a special branch that applies to twin vertices.
+											if !if prev_single_vertex != next_single_vertex {
+												// The two `Single` make a "sandwich" constraining the range of
+												// Allowed positions for the `Pair` vertex.
+												// This might be enough to eliminate one of the options
+
+												// Two constraints are available
 												let clockwiseness = test_index_clockwiseness(
+													prev_single_index,
 													pair_vertex_index,
-													twin_vertex_index,
-													constraint_vertex_index,
+													next_single_index,
 												);
 												let sign = if clockwiseness { 1.0 } else { -1.0 };
 
-												let score_1 = test_point_clockwiseness(
+												let score_a = test_point_clockwiseness(
+													point_data.points[prev_point],
 													point_data.points[point_a],
-													point_data.points[point_b],
-													point_data.points[option_1],
+													point_data.points[next_point],
 													Some(cycle_position),
 												) * sign;
-												let score_2 = test_point_clockwiseness(
-													point_data.points[point_a],
+												let score_b = test_point_clockwiseness(
+													point_data.points[prev_point],
 													point_data.points[point_b],
-													point_data.points[option_2],
+													point_data.points[next_point],
 													Some(cycle_position),
 												) * sign;
-
-												// If both situations agree
-												if score_1.signum() == score_2.signum() {
-													// Whether point_a, point_b is correct order or they should be flipped
-													if score_1.is_sign_positive() {
+												let mut point_a_valid = score_a > 0.0;
+												let mut point_b_valid = score_b > 0.0;
+												// if one of the results is weirdly small, but not the other one,
+												// use the non-tiny one
+												if point_a_valid && point_b_valid {
+													const THRESHOLD: f32 = 0.001;
+													if score_a < score_b * THRESHOLD {
+														point_a_valid = false;
+													} else if score_b < score_a * THRESHOLD {
+														point_b_valid = false;
+													}
+												}
+												match (point_a_valid, point_b_valid) {
+													(true, true) => {
+														/* Tough luck, nothing got done here */
+														false
+													}
+													(true, false) => {
 														error_log.log_if_error(
 															point_data
 																.place_vertex(pair_vertex, point_a),
 														);
+														true
+													}
+													(false, true) => {
 														error_log.log_if_error(
 															point_data
-																.place_vertex(twin_vertex, point_b),
+																.place_vertex(pair_vertex, point_b),
 														);
+														true
+													}
+													(false, false) => {
+														error_log.push(VertexSolverError::VertexHasNoPointsAvailable { vertex: pair_vertex });
+														// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
+														// so there's no need for more attempts at solving
+														true
+													}
+												}
+											} else {
+												false
+											} {
+												// Only one constraint is guaranteed, but twin vertices can still be decided this way
+												if let Some((twin_vertex, twin_vertex_index)) =
+													// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
+													// But in the case of a `Single` it can always be decided which order is correct.
+													point_data
+															.find_twin(pair_vertex)
+															.and_then(|twin_vertex| {
+																point_data
+																	.problematic_vertex_to_cycle[twin_vertex]
+																	.iter()
+																	.find(
+																		|&&(
+																			twin_cycle_id,
+																			_twin_position_in_cycle,
+																		)| {
+																			twin_cycle_id
+																				== cycle_id
+																		},
+																	)
+																	.map(
+																		|&(
+																			_,
+																			twin_position_in_cycle,
+																		)| {
+																			(twin_vertex, twin_position_in_cycle)
+																		},
+																	)
+															}) {
+													let clockwiseness = test_index_clockwiseness(
+														prev_single_index,
+														pair_vertex_index,
+														twin_vertex_index,
+													);
+													let point_clockwiseness =
+														test_point_clockwiseness(
+															point_data.points[prev_point],
+															point_data.points[point_a],
+															point_data.points[point_b],
+															Some(cycle_position),
+														);
+													if clockwiseness == (point_clockwiseness > 0.0)
+													{
+														error_log.log_if_error(
+															point_data
+																.place_vertex(pair_vertex, point_a),
+														);
+														debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
 													} else {
 														error_log.log_if_error(
 															point_data
 																.place_vertex(pair_vertex, point_b),
 														);
-														error_log.log_if_error(
-															point_data
-																.place_vertex(twin_vertex, point_a),
-														);
-													}
-													// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
-													break 'pair_therapy;
-												}
-											} else {
-												debug_assert!(
-													false,
-													"THERE SHOULD BE ONLY PAIR VERTICES"
-												);
-											}
-										}
-									}
-								}
-								// If there is a `Single` vertex available (as an anchor)
-								// The check is done again, because pair_therapy might have created a new one
-								if point_data.cycle_data[cycle_id]
-									.first_decided_vertex
-									.is_some()
-								{
-									for pair_vertex_index in first_pair_index
-										..point_data.cycle_data[cycle_id].vertices.len()
-									{
-										let LogicalVertex {
-											vertex: pair_vertex,
-											inner:
-												LogicalVertexVariant::Pair {
-													next_pair: _,
-													prev_pair: _,
-													prev_single: Some(prev_single_index),
-												},
-										} = point_data.cycle_data[cycle_id].vertices
-											[pair_vertex_index]
-										else {
-											continue;
-										};
-										// There ought to exist a `Single` vertex, `first_decided_vertex` points to one dammit! (or does it...)
-										let LogicalVertex {
-											vertex: prev_single_vertex,
-											inner:
-												LogicalVertexVariant::Single {
-													next_single: next_single_index,
-												},
-										} = point_data.cycle_data[cycle_id].vertices
-											[prev_single_index]
-										else {
-											debug_assert!(
-												false,
-												"Invariants broken, the truth goes unspoken."
-											);
-											break;
-										};
-										let next_single_vertex = point_data.cycle_data[cycle_id]
-											.vertices[next_single_index]
-											.vertex;
-
-										match (
-											point_data.vertex_constraints[pair_vertex],
-											point_data.vertex_constraints[prev_single_vertex],
-											point_data.vertex_constraints[next_single_vertex],
-										) {
-											(
-												IntersectionPointSet::Pair(point_a, point_b),
-												IntersectionPointSet::Single(prev_point),
-												IntersectionPointSet::Single(next_point),
-											) => {
-												// If there is only one `Single` vertex, then it will point to itself and
-												// `prev_single_vertex` might equal `next_single_vertex`
-
-												// Inner if checks whether we have two different vertices, and if so,
-												// Executes code that might resolve the `Pair`
-												// Outer if checks if the previous code failed, and if so,
-												// Tries running a special branch that applies to twin vertices.
-												if !if prev_single_vertex != next_single_vertex {
-													// The two `Single` make a "sandwich" constraining the range of
-													// Allowed positions for the `Pair` vertex.
-													// This might be enough to eliminate one of the options
-
-													// Two constraints are available
-													let clockwiseness = test_index_clockwiseness(
-														prev_single_index,
-														pair_vertex_index,
-														next_single_index,
-													);
-													let sign =
-														if clockwiseness { 1.0 } else { -1.0 };
-
-													let score_a = test_point_clockwiseness(
-														point_data.points[prev_point],
-														point_data.points[point_a],
-														point_data.points[next_point],
-														Some(cycle_position),
-													) * sign;
-													let score_b = test_point_clockwiseness(
-														point_data.points[prev_point],
-														point_data.points[point_b],
-														point_data.points[next_point],
-														Some(cycle_position),
-													) * sign;
-													let mut point_a_valid = score_a > 0.0;
-													let mut point_b_valid = score_b > 0.0;
-													// if one of the results is weirdly small, but not the other one,
-													// use the non-tiny one
-													if point_a_valid && point_b_valid {
-														const THRESHOLD: f32 = 0.001;
-														if score_a < score_b * THRESHOLD {
-															point_a_valid = false;
-														} else if score_b < score_a * THRESHOLD {
-															point_b_valid = false;
-														}
-													}
-													match (point_a_valid, point_b_valid) {
-														(true, true) => {
-															/* Tough luck, nothing got done here */
-															false
-														}
-														(true, false) => {
-															error_log.log_if_error(
-																point_data.place_vertex(
-																	pair_vertex,
-																	point_a,
-																),
-															);
-															true
-														}
-														(false, true) => {
-															error_log.log_if_error(
-																point_data.place_vertex(
-																	pair_vertex,
-																	point_b,
-																),
-															);
-															true
-														}
-														(false, false) => {
-															error_log.push(VertexSolverError::VertexHasNoPointsAvailable { vertex: pair_vertex });
-															// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
-															// so there's no need for more attempts at solving
-															true
-														}
-													}
-												} else {
-													false
-												} {
-													// Only one constraint is guaranteed, but twin vertices can still be decided this way
-													if let Some((twin_vertex, twin_vertex_index)) =
-														// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
-														// But in the case of a `Single` it can always be decided which order is correct.
-														point_data
-																.find_twin(pair_vertex)
-																.and_then(|twin_vertex| {
-																	point_data
-																		.problematic_vertex_to_cycle[twin_vertex]
-																		.iter()
-																		.find(
-																			|&&(
-																				twin_cycle_id,
-																				_twin_position_in_cycle,
-																			)| {
-																				twin_cycle_id
-																					== cycle_id
-																			},
-																		)
-																		.map(
-																			|&(
-																				_,
-																				twin_position_in_cycle,
-																			)| {
-																				(twin_vertex, twin_position_in_cycle)
-																			},
-																		)
-																}) {
-														let clockwiseness =
-															test_index_clockwiseness(
-																prev_single_index,
-																pair_vertex_index,
-																twin_vertex_index,
-															);
-														let point_clockwiseness =
-															test_point_clockwiseness(
-																point_data.points[prev_point],
-																point_data.points[point_a],
-																point_data.points[point_b],
-																Some(cycle_position),
-															);
-														if clockwiseness
-															== (point_clockwiseness > 0.0)
-														{
-															error_log.log_if_error(
-																point_data.place_vertex(
-																	pair_vertex,
-																	point_a,
-																),
-															);
-															debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
-														} else {
-															error_log.log_if_error(
-																point_data.place_vertex(
-																	pair_vertex,
-																	point_b,
-																),
-															);
-															debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
-														}
+														debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
 													}
 												}
 											}
-											_ => { /* dont care */ }
 										}
-
-										#[cfg(any(debug_assertions, test))]
-										point_data.cycle_data[cycle_id].assert_validity();
+										_ => { /* dont care */ }
 									}
+
+									#[cfg(any(debug_assertions, test))]
+									point_data.cycle_data[cycle_id].assert_validity();
 								}
 							}
 						}
-						None => continue, // This shouldn't really happen
 					}
+					None => continue, // This shouldn't really happen
 				}
-				cycle_data.problematic_cycles.retain(|&cycle| {
-					point_data.cycle_data[cycle]
-						.first_undecided_vertex
-						.is_some()
-				});
 			}
+			cycle_data.problematic_cycles.retain(|&cycle| {
+				point_data.cycle_data[cycle]
+					.first_undecided_vertex
+					.is_some()
+			});
 		}
+	}
 
-		#[cfg(all(test, debug_assertions))]
-		println!("{:?}", point_data.vertex_constraints);
-
-		// Convert `Single` placements into `Fixed` values
-		// Decide if remaining `Pair` placements can be guessed without breaking anything
+	/// Converts [`IntersectionPointSet::Single`] placements into
+	/// [`IntermediateVertexPosition::Fixed`] values
+	///
+	/// Decides if remaining [`IntersectionPointSet::Pair`] placements
+	/// can be guessed without breaking anything
+	fn pin_single_placements(
+		&mut self,
+		point_data: &mut PointData,
+		cycle_data: &AdditionalCycleData,
+		error_log: &mut Vec<VertexSolverError>,
+	) {
 		for (vertex_id, vertex_placement) in self.vertices.iter_mut().enumerate() {
 			match point_data.vertex_constraints[vertex_id] {
 				IntersectionPointSet::Single(point) => {
@@ -1413,21 +1424,14 @@ impl LevelBuilder {
 				}
 			}
 		}
+	}
 
-		// Place all vertices that have a `Cycle` constraint
-		let cycles = self
-			.cycles
-			.iter()
-			.enumerate()
-			.zip_eq(&self.cycles)
-			.filter_map(|((i, cycle), data)| {
-				cycle
-					.placement
-					.as_ref()
-					.map(|placement| (i, placement, data))
-			});
-
-		for (_cycle_index, cycle_placement, cycle_data) in cycles {
+	/// Place all vertices that have a [`IntersectionPointSet::Cycle`] constraint
+	fn pin_cycle_placements(&mut self) {
+		for cycle_data in &self.cycles {
+			let Some(cycle_placement) = cycle_data.placement else {
+				continue;
+			};
 			// Vertices that already have fixed placement split the cycle
 			// into segments. Each segment will be handled separately
 			let mut fixed_vertices = cycle_data
@@ -1509,8 +1513,10 @@ impl LevelBuilder {
 				}
 			}
 		}
+	}
 
-		// Verify solution
+	#[cfg(debug_assertions)]
+	fn debug_assert_valid_solution(&self) {
 		for vertex in self.vertices.iter() {
 			debug_assert!(
 				matches!(vertex.position, IntermediateVertexPosition::Fixed(_)),
@@ -1564,12 +1570,6 @@ impl LevelBuilder {
 					"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} with position {position} and radius {radius}"
 				);
 			}
-		}
-
-		if error_log.is_empty() {
-			Ok(())
-		} else {
-			todo!()
 		}
 	}
 
