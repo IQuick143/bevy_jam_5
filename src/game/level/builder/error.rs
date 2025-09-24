@@ -53,18 +53,6 @@ pub struct CyclesDoNotIntersectTwiceError {
 	pub failing_vertex: usize,
 }
 
-/// Error data for [`LevelBuilderError::TooManyVerticesInCycleIntersection`]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct TooManyVerticesInCycleIntersectionError {
-	/// Index of the cycle whose attempted placement failed
-	pub placed_cycle: usize,
-	/// Index of the already-placed cycle that shared
-	/// several vertices with the one being placed
-	pub existing_cycle: usize,
-	/// Indices of three of the vertices that are shared by the cycles
-	pub shared_vertices: [usize; 3],
-}
-
 /// Error data for [`LevelBuilderError::OverlappedLinkedCycles`]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct OverlappedLinkedCyclesError {
@@ -99,13 +87,13 @@ pub enum LevelBuilderError {
 	/// [`build`](LevelBuilder::build) was called
 	/// while a cycle had not been placed yet
 	UnplacedCycle(usize),
-	/// [`place_cycle`](LevelBuilder::place_cycle) was called
+	/// [`place_circle`](LevelBuilder::place_circle) was called
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
 	/// A vertex or cycle positioning operation was called
 	/// in a way that would cause a vertex to not lie on its cycle.
 	/// ## Causes
-	/// - [`place_cycle`](LevelBuilder::place_cycle) called on a cycle
+	/// - [`place_circle`](LevelBuilder::place_circle) called on a cycle
 	///   that contains a vertex that already has fixed placement
 	///   and it would not lie on the vertex
 	/// - [`place_vertex`](LevelBuilder::place_vertex) called on a vertex
@@ -120,9 +108,7 @@ pub enum LevelBuilderError {
 	/// A vertex positioning operation was called on a vertex that
 	/// already has a placement too specific to perform the operation
 	/// ## Causes
-	/// - [`place_vertex`](LevelBuilder::place_vertex) or
-	///   [`place_vertex_at_angle`](LevelBuilder::place_vertex_at_angle)
-	///   called on a fully placed vertex
+	/// - [`place_vertex`](LevelBuilder::place_vertex)
 	VertexAlreadyPlaced(usize),
 	/// Two cycles are linked, but they share a vertex
 	OverlappedLinkedCycles(OverlappedLinkedCyclesError),
