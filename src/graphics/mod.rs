@@ -31,6 +31,9 @@ pub const SPRITE_LENGTH: f32 = 100.0;
 /// Half of the width of a cycle perimeter ring in world units
 pub const RING_HALF_WIDTH: f32 = 0.15 / 4.0 * SPRITE_LENGTH;
 
+/// How far outside a cycle its hitbox/shadow reaches
+pub const RING_SHADOW_BLEED: f32 = RING_HALF_WIDTH * 7.0;
+
 /// Number of vertices necessary for the meshes for cycle perimeter rings
 /// ## Parameters
 /// - `radius` - Radius of the cycle ring in world units
@@ -202,6 +205,8 @@ pub mod layers {
 	pub const CYCLE_CENTER_SPRITES: f32 = -300.0;
 	/// Z depth of meshes for cycle linkages
 	pub const CYCLE_LINKS: f32 = -400.0;
+	/// Z depth of meshes for hitboxes/fills of cycles
+	pub const CYCLE_SHADOWS: f32 = -450.0;
 	/// Z depth of the animated background
 	pub const BACKGROUND: f32 = -550.0;
 }
