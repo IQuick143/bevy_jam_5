@@ -178,25 +178,6 @@ struct CycleBoundButtonColorLabelAppearence {
 	positions: CycleBoundColorLabelPositionSet,
 }
 
-/// Container that holds one or two of something
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum OneTwo<T> {
-	One(T),
-	Two(T, T),
-}
-use OneTwo::*;
-
-impl<T> IntoIterator for OneTwo<T> {
-	type Item = T;
-	type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
-	fn into_iter(self) -> Self::IntoIter {
-		match self {
-			One(a) => vec![a].into_iter(),
-			Two(a, b) => vec![a, b].into_iter(),
-		}
-	}
-}
-
 /// Result type that allows both a value and an error.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ResultNonExclusive<T, E> {
