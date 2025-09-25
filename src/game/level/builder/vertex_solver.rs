@@ -555,11 +555,7 @@ impl LevelBuilder {
 	/// Computes the placements of unplaced vertices based on the geometric constraints or gives up.
 	pub(super) fn solve_vertex_placements(&mut self) -> Result<()> {
 		let mut error_log: Vec<VertexSolverError> = Vec::new();
-		let (vertex_to_cycle, absolute_precision_limit) = self.initial_characterize_layout();
-		// TODO: Verify that fixed vertices are placed on the cycles they belong to
-		// TODO: End early if all vertices are fixed
-		let (mut point_data, mut cycle_data) =
-			self.compute_initial_geometry(&vertex_to_cycle, absolute_precision_limit);
+		let (mut point_data, mut cycle_data) = self.compute_initial_geometry();
 		self.first_pass_pair_placements(&mut point_data, &mut cycle_data, &mut error_log);
 		self.pin_single_placements(&mut point_data, &mut cycle_data, &mut error_log);
 		self.pin_cycle_placements();
@@ -616,11 +612,11 @@ impl LevelBuilder {
 	/// Determines geometric constraints and places uniquely determined points.
 	/// Finds cycles that have ambiguous points.
 	/// Points are deduplicated and indexed, facilitating equality comparisons.
-	fn compute_initial_geometry(
-		&self,
-		vertex_to_cycle: &[SmallVec<[usize; 2]>],
-		absolute_precision_limit: f32,
-	) -> (PointData, AdditionalCycleData) {
+	fn compute_initial_geometry(&self) -> (PointData, AdditionalCycleData) {
+		let (vertex_to_cycle, absolute_precision_limit) = self.initial_characterize_layout();
+		// TODO: Verify that fixed vertices are placed on the cycles they belong to
+		// TODO: End early if all vertices are fixed
+
 		// Array holding all the cycles which require
 		let mut problematic_cycles: Vec<usize> = Vec::new();
 		// Array holding all the points under consideration. Only points from cycles in [`problematic_cycles`] are guaranteed to be present.
