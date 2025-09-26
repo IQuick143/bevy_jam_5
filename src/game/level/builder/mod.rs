@@ -101,14 +101,7 @@ struct IntermediateCycleData {
 	/// Placement of the cycle, if it has been placed yet
 	pub placement: Option<CyclePlacement>,
 	/// Position of the cycle's center indicator, if it has been placed yet
-	///
-	/// Unlike in the level description structures,
-	/// **this is the absolute position in global coordinates**
-	///
-	/// Value of `None` indicates the center has not been placed
-	/// (default position will be used). Value of `Some(None)` indicates
-	/// the center indicator has been explicitly toggled off.
-	pub center_sprite_position: Option<Option<Vec2>>,
+	pub center_sprite_position: IntermediateCycleCenterSpritePosition,
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
@@ -120,6 +113,31 @@ struct IntermediateCycleData {
 	pub outgoing_one_way_links: Vec<OneWayIntermediateData>,
 	/// Detectors, pairs of detector ID's and their offsets on this cycle. (The second, positional, index is the index of the vertex this detector comes *after*)
 	pub placed_detectors: Vec<(usize, usize)>,
+}
+
+/// Position of a cycle's center indicator specified by the user
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+enum IntermediateCycleCenterSpritePosition {
+	/// User has not yet chosen a position for the center indicator
+	#[default]
+	Unspecified,
+	/// User has requested that the center indicator not be drawn
+	Disabled,
+	/// User has placed the center indicator at a specific position
+	///
+	/// Unlike in the level description structures,
+	/// **this is the absolute position in global coordinates**
+	Placed(Vec2),
+}
+
+impl IntermediateCycleCenterSpritePosition {
+	pub fn placed(self) -> Option<Vec2> {
+		if let Self::Placed(p) = self {
+			Some(p)
+		} else {
+			None
+		}
+	}
 }
 
 #[derive(Clone, Debug)]

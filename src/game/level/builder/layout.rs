@@ -47,7 +47,13 @@ impl LevelBuilder {
 		if target_cycle >= self.cycles.len() {
 			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
 		}
-		self.cycles[target_cycle].center_sprite_position = Some(position);
+		if let Some(position) = position {
+			self.cycles[target_cycle].center_sprite_position =
+				IntermediateCycleCenterSpritePosition::Placed(position);
+		} else {
+			self.cycles[target_cycle].center_sprite_position =
+				IntermediateCycleCenterSpritePosition::Disabled;
+		}
 		Ok(())
 	}
 
@@ -212,10 +218,13 @@ impl LevelBuilder {
 			let Some(placement) = cycle_data.placement else {
 				continue;
 			};
-			if cycle_data.center_sprite_position.is_none() {
+			if cycle_data.center_sprite_position
+				== IntermediateCycleCenterSpritePosition::Unspecified
+			{
 				// If center sprite has not been explicitly positioned
 				// or disabled, put it in the cycle center
-				cycle_data.center_sprite_position = Some(Some(placement.position));
+				cycle_data.center_sprite_position =
+					IntermediateCycleCenterSpritePosition::Placed(placement.position);
 			}
 		}
 	}
@@ -233,7 +242,7 @@ impl LevelBuilder {
 					.min(
 						cycle
 							.center_sprite_position
-							.and_then(|x| x)
+							.placed()
 							.unwrap_or(Vec2::INFINITY),
 					)
 			})
@@ -249,7 +258,7 @@ impl LevelBuilder {
 					.max(
 						cycle
 							.center_sprite_position
-							.and_then(|x| x)
+							.placed()
 							.unwrap_or(Vec2::NEG_INFINITY),
 					)
 			})
@@ -325,7 +334,9 @@ impl LevelBuilder {
 					CycleShape::Circle(radius) => *radius *= scale,
 				}
 			}
-			if let Some(Some(p)) = &mut cycle.center_sprite_position {
+			if let IntermediateCycleCenterSpritePosition::Placed(p) =
+				&mut cycle.center_sprite_position
+			{
 				*p = (*p - bounds_center) * scale + viewport_center;
 			}
 		}

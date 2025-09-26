@@ -101,7 +101,7 @@ impl LevelBuilder {
 		// Add the cycle entry
 		self.cycles.push(IntermediateCycleData {
 			placement: None,
-			center_sprite_position: None,
+			center_sprite_position: IntermediateCycleCenterSpritePosition::Unspecified,
 			vertex_indices,
 			turnability,
 			linked_cycle: IntermediateLinkStatus::None,
@@ -667,10 +667,14 @@ impl LevelBuilder {
 				log::warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
 				CyclePlacement { position: Vec2::ZERO, shape: CycleShape::Circle(1.0) }
 			});
-		let center_sprite_position = intermediate.center_sprite_position.unwrap_or_else(|| {
-			log::warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
-			None
-		});
+		let center_sprite_position = match intermediate.center_sprite_position {
+			IntermediateCycleCenterSpritePosition::Placed(pos) => Some(pos),
+			IntermediateCycleCenterSpritePosition::Disabled => None,
+			IntermediateCycleCenterSpritePosition::Unspecified => {
+				log::warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
+				None
+			}
+		};
 		let center_sprite_appearence =
 			CycleCenterSpriteAppearence(center_sprite_position.map(|p| p - placement.position));
 		let (group, relative_direction) = match intermediate.linked_cycle {
