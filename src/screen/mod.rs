@@ -15,8 +15,7 @@ pub use playing::{LoadLevel, PlayingLevel, PlayingLevelListEntry};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<Screen>();
-	app.add_fade_event::<DoScreenTransition>();
-	app.enable_state_scoped_entities::<Screen>();
+	app.add_fade_message::<DoScreenTransition>();
 
 	app.add_plugins((
 		splash::plugin,
@@ -37,9 +36,9 @@ pub(super) fn plugin(app: &mut App) {
 	);
 }
 
-/// Event that instantly causes a screen transition when sent.
+/// Message that instantly causes a screen transition when sent.
 /// Use with [`FadeAnimation`].
-#[derive(Event, Component, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug)]
+#[derive(Message, Component, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug)]
 pub struct DoScreenTransition(pub Screen);
 
 /// Extension trait for [`Commands`] that adds a method
@@ -59,7 +58,7 @@ impl DoScreenTransitionCommands for Commands<'_, '_> {
 }
 
 fn do_screen_transitions(
-	mut events: EventReader<DoScreenTransition>,
+	mut events: MessageReader<DoScreenTransition>,
 	mut next_screen: ResMut<NextState<Screen>>,
 ) {
 	if let Some(screen) = events.read().last() {

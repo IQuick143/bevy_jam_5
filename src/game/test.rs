@@ -75,7 +75,7 @@ mod utils {
 	fn load_level(
 		In(level): In<LevelData>,
 		mut asset_server: ResMut<Assets<LevelData>>,
-		mut spawn_trigger: EventWriter<EnterLevel>,
+		mut spawn_trigger: MessageWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
 		let handle = asset_server.add(level);
 		spawn_trigger.write(EnterLevel(Some(handle)));
@@ -128,7 +128,10 @@ mod utils {
 		cycle_count
 	}
 
-	fn turn_system(In((id, amount)): In<(usize, i32)>, mut events: EventWriter<RotateCycleGroup>) {
+	fn turn_system(
+		In((id, amount)): In<(usize, i32)>,
+		mut events: MessageWriter<RotateCycleGroup>,
+	) {
 		events.write(RotateCycleGroup(RotateCycle {
 			target_cycle: id,
 			amount: amount as i64,

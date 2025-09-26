@@ -14,7 +14,7 @@ pub(super) fn plugin(app: &mut App) {
 const MAX_VOLUME_MULTIPLIER: f32 = 4.0;
 
 fn play_sfx(
-	trigger: Trigger<PlaySfx>,
+	trigger: On<PlaySfx>,
 	mut commands: Commands,
 	sfx_handles: Res<HandleMap<SfxKey>>,
 	settings: Res<Settings>,
@@ -23,7 +23,7 @@ fn play_sfx(
 		PlaySfx::Effect(key) => *key,
 	};
 	commands.spawn((
-		AudioPlayer(sfx_handles[&sfx_key].clone_weak()),
+		AudioPlayer(sfx_handles[&sfx_key].clone()),
 		PlaybackSettings {
 			mode: PlaybackMode::Despawn,
 			volume: Volume::Linear(
