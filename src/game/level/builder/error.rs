@@ -116,6 +116,57 @@ pub enum LevelBuilderError {
 	CycleLinkageConflict(usize, usize),
 	/// There is a loop in one-way cycle links
 	OneWayLinkLoop,
+	/// Vertices could not be assigned positions
+	VertexSolverError(VertexSolverError),
+}
+
+/// Errors specific to vertex position solver
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum VertexSolverError {
+	/// There are no valid positions for a vertex
+	VertexHasNoPointsAvailable { vertex: usize },
+	/// Two vertices would need to be placed at the same position
+	TwoVerticesCollide { vertex_a: usize, vertex_b: usize },
+	/// Position of a vertex is not bounded
+	VertexIsUnconstrained { vertex: usize },
+	/// Vertex has multiple available placements
+	VertexRemainsUndecided { vertex: usize },
+	/// A vertex was not assigned to any parent cycle
+	VertexHasNoCycle(usize),
+	/// Pinning pair vertices based on heuristic
+	/// failed because there is another unpinned pair
+	/// on the same cycles
+	/// 
+	/// Contains the pair whose pinning was attempted
+	/// and one of the other vertices that blocked it
+	CannotPinTwinPair([usize; 3]),
+	/// Pinning an unsaturated pair vertex failed because another
+	/// cycle is intersecting it between the possible positions
+	CannotPinUnsaturatedPair(usize),
+}
+
+impl std::error::Error for VertexSolverError {}
+
+impl std::fmt::Display for VertexSolverError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::VertexHasNoPointsAvailable { vertex } => {
+				write!(f, "there is no valid position to place vertex {vertex}")
+			}
+			Self::TwoVerticesCollide { vertex_a, vertex_b } => {
+				write!(f, "vertices {vertex_a} and {vertex_b} require placement at the same position")
+			}
+			Self::VertexIsUnconstrained { vertex } => {
+				write!(f, "position of vertex {vertex} has not been set")
+			}
+			Self::VertexRemainsUndecided { vertex } => {
+				write!(f, "position of vertex {vertex} is ambiguous")
+			}
+			Self::VertexHasNoCycle(i) => write!(f, "vertex {i} does not lie on any cycle"),
+			Self::CannotPinTwinPair([a, b, c]) => write!(f, "vertices {a}, {b}, and {c} could not be pinned heuristically because they lie on the same cycle"),
+			Self::CannotPinUnsaturatedPair(i) => write!(f, "vertex {i} could not be pinned heuristically because its owner cycle is intersected between its possible positions"),
+		}
+	}
 }
 
 impl std::error::Error for LevelBuilderError {}
@@ -164,7 +215,8 @@ impl std::fmt::Display for LevelBuilderError {
 			),
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
-			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle.")
+			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle."),
+			Self::VertexSolverError(e) => e.fmt(f),
 		}
 	}
 }
