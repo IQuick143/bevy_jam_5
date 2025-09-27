@@ -86,17 +86,22 @@ fn test_structural_validation() {
 # Linking a cycle to itself is already weird, but legal.
 # The link, however, cannot be inverted.
 a = cycle(_ _);
+circle(a; 0 0 1);
 link('invert'; a a);
 
 # Intersecting cycles cannot be linked.
 a = cycle(x = vertex(), _);
 b = cycle(x _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
 link(a b);
 
 # Two (declared) links between the same two cycles may exist as well,
 # but they cannot be conflicting like this.
 a = cycle(_ _);
 b = cycle(_ _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
 link(a b);
 link('invert'; b a);
 
@@ -105,6 +110,9 @@ link('invert'; b a);
 a = cycle(_ _);
 b = cycle(_ _);
 c = cycle(_ _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
+circle(c; 0 0 1);
 link(a b c);
 link('invert'; a c);
 
@@ -113,6 +121,10 @@ a = cycle(_ _);
 b = cycle(_ _);
 c = cycle(_ _);
 d = cycle(_ _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
+circle(c; 0 0 1);
+circle(d; 0 0 1);
 link(a b c d);
 link('invert'; a d);
 
@@ -121,6 +133,9 @@ link('invert'; a d);
 a = cycle(x = vertex(), _);
 b = cycle(_ _);
 c = cycle(_ x);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
+circle(c; 0 0 1);
 link(a b c);
 ";
 
@@ -150,19 +165,22 @@ link(a b c);
 fn logical_colors_test() {
 	let data = r"
 # Default, with no call_color
-vertex(box());
+a = vertex(box());
 
 # Numeric colors are specified with numbers
-vertex(box(42));
+b = vertex(box(42));
 
 # Pictogram colors are specified by name
-vertex(box('star'));
+c = vertex(box('star'));
 
 # Pictogram colors may also be specified by their id
-vertex(box(pict(16)));
+d = vertex(box(pict(16)));
 
 # Colorless object can be forced by explicit blank color value
-vertex(box(_));
+e = vertex(box(_));
+
+z = cycle(a b c d e);
+circle(z; 0 0 100);
 ";
 
 	let expected_colors = [
@@ -212,6 +230,10 @@ j = vertex(button(col; 'rot' 60));
 k = vertex(button(col; 'above' 'square'));
 l = vertex(button(col; _ 'arrow'));
 
+# Put them all on a cycle so the level builder passes
+z = cycle(a b c d g h i j k l);
+circle(z; 0 0 100);
+
 m = vertex(button(col));
 n = vertex(button(col));
 o = vertex(button(col));
@@ -226,8 +248,8 @@ y = cycle(q, r, s, t);
 circle(x; 0, 0, 100);
 circle(y; 0, 0, 100);
 
-set_vertex_angle(m; 0.5);
-set_vertex_angle(q; 0.5);
+hint_vertex(m; 1 100);
+hint_vertex(q; 1 100);
 
 # Labels can be positioned symmetrically around a cycle,
 # with respect to where they are relative to the cycle center

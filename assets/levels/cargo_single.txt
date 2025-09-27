@@ -14,3 +14,8 @@ bgo = vertex();
 circle(cycle('manual'; button() flag()   _ _ bgo bri bgi bro); -sep / 2, 0, r);
 circle(cycle('manual'; button()        _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
 circle(cycle('manual'; button() player() _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# These vertices should be inside, so near 0,0
+hint_vertex(bgi; 0,0);
+hint_vertex(rgi; 0,0);
+hint_vertex(bri; 0,0);

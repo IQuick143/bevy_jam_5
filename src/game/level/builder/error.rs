@@ -53,18 +53,6 @@ pub struct CyclesDoNotIntersectTwiceError {
 	pub failing_vertex: usize,
 }
 
-/// Error data for [`LevelBuilderError::TooManyVerticesInCycleIntersection`]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct TooManyVerticesInCycleIntersectionError {
-	/// Index of the cycle whose attempted placement failed
-	pub placed_cycle: usize,
-	/// Index of the already-placed cycle that shared
-	/// several vertices with the one being placed
-	pub existing_cycle: usize,
-	/// Indices of three of the vertices that are shared by the cycles
-	pub shared_vertices: [usize; 3],
-}
-
 /// Error data for [`LevelBuilderError::OverlappedLinkedCycles`]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct OverlappedLinkedCyclesError {
@@ -99,13 +87,13 @@ pub enum LevelBuilderError {
 	/// [`build`](LevelBuilder::build) was called
 	/// while a cycle had not been placed yet
 	UnplacedCycle(usize),
-	/// [`place_cycle`](LevelBuilder::place_cycle) was called
+	/// [`place_circle`](LevelBuilder::place_circle) was called
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
 	/// A vertex or cycle positioning operation was called
 	/// in a way that would cause a vertex to not lie on its cycle.
 	/// ## Causes
-	/// - [`place_cycle`](LevelBuilder::place_cycle) called on a cycle
+	/// - [`place_circle`](LevelBuilder::place_circle) called on a cycle
 	///   that contains a vertex that already has fixed placement
 	///   and it would not lie on the vertex
 	/// - [`place_vertex`](LevelBuilder::place_vertex) called on a vertex
@@ -117,36 +105,68 @@ pub enum LevelBuilderError {
 	/// Cycles that share two vertices have been placed in a way that they
 	/// only intersect tangentially (only enough space for one shared vertex)
 	CyclesDoNotIntersectTwice(CyclesDoNotIntersectTwiceError),
-	/// Two cycles share more than two vertices
-	TooManyVerticesInCycleIntersection(TooManyVerticesInCycleIntersectionError),
 	/// A vertex positioning operation was called on a vertex that
 	/// already has a placement too specific to perform the operation
 	/// ## Causes
-	/// - [`place_vertex`](LevelBuilder::place_vertex) or
-	///   [`place_vertex_at_angle`](LevelBuilder::place_vertex_at_angle)
-	///   called on a fully placed vertex
+	/// - [`place_vertex`](LevelBuilder::place_vertex)
 	VertexAlreadyPlaced(usize),
-	/// [`place_vertex_at_angle`](LevelBuilder::place_vertex) was called
-	/// on a vertex that already has not yet been partially placed
-	VertexNotPartiallyPlaced(usize),
-	/// A placement operation was called in a way that would place vertices
-	/// around a cycle out of their rotation order
-	/// ## Causes
-	/// - [`place_cycle`](LevelBuilder::place_cycle) called on a cycle that
-	///   shares vertices with a cycle that is already placed, and their
-	///   shared vertices (which would gain fixed placement by this operation)
-	///   would be out-of-order on one of them
-	/// - [`place_vertex`](LevelBuilder::place_vertex) or
-	///   [`place_vertex_at_angle`](LevelBuilder::place_vertex_at_angle)
-	///   called on a vertex on a placed cycle in a way that would place
-	///   the target vertex out of the correct order
-	VertexOrderViolationOnCycle(usize),
 	/// Two cycles are linked, but they share a vertex
 	OverlappedLinkedCycles(OverlappedLinkedCyclesError),
 	/// There is a loop in cycle links, and their directions are contradicting
 	CycleLinkageConflict(usize, usize),
 	/// There is a loop in one-way cycle links
 	OneWayLinkLoop,
+	/// Vertices could not be assigned positions
+	VertexSolverError(VertexSolverError),
+}
+
+/// Errors specific to vertex position solver
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum VertexSolverError {
+	/// There are no valid positions for a vertex
+	VertexHasNoPointsAvailable { vertex: usize },
+	/// Two vertices would need to be placed at the same position
+	TwoVerticesCollide { vertex_a: usize, vertex_b: usize },
+	/// Position of a vertex is not bounded
+	VertexIsUnconstrained { vertex: usize },
+	/// Vertex has multiple available placements
+	VertexRemainsUndecided { vertex: usize },
+	/// A vertex was not assigned to any parent cycle
+	VertexHasNoCycle(usize),
+	/// Pinning pair vertices based on heuristic
+	/// failed because there is another unpinned pair
+	/// on the same cycles
+	/// 
+	/// Contains the pair whose pinning was attempted
+	/// and one of the other vertices that blocked it
+	CannotPinTwinPair([usize; 3]),
+	/// Pinning an unsaturated pair vertex failed because another
+	/// cycle is intersecting it between the possible positions
+	CannotPinUnsaturatedPair(usize),
+}
+
+impl std::error::Error for VertexSolverError {}
+
+impl std::fmt::Display for VertexSolverError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::VertexHasNoPointsAvailable { vertex } => {
+				write!(f, "there is no valid position to place vertex {vertex}")
+			}
+			Self::TwoVerticesCollide { vertex_a, vertex_b } => {
+				write!(f, "vertices {vertex_a} and {vertex_b} require placement at the same position")
+			}
+			Self::VertexIsUnconstrained { vertex } => {
+				write!(f, "position of vertex {vertex} has not been set")
+			}
+			Self::VertexRemainsUndecided { vertex } => {
+				write!(f, "position of vertex {vertex} is ambiguous")
+			}
+			Self::VertexHasNoCycle(i) => write!(f, "vertex {i} does not lie on any cycle"),
+			Self::CannotPinTwinPair([a, b, c]) => write!(f, "vertices {a}, {b}, and {c} could not be pinned heuristically because they lie on the same cycle"),
+			Self::CannotPinUnsaturatedPair(i) => write!(f, "vertex {i} could not be pinned heuristically because its owner cycle is intersected between its possible positions"),
+		}
+	}
 }
 
 impl std::error::Error for LevelBuilderError {}
@@ -165,7 +185,6 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
 			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
 			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
-			Self::VertexNotPartiallyPlaced(i) => write!(f, "Cannot place vertex {i} because it does not lie on any placed cycle."),
 			Self::CycleDoesNotContainVertex(e) => write!(
 				f,
 				"Placement is not valid because cycle {} placed at {} would not contain vertex {} placed at {}.",
@@ -194,19 +213,10 @@ impl std::fmt::Display for LevelBuilderError {
 				e.existing_placement,
 				e.vertex_position
 			),
-			Self::TooManyVerticesInCycleIntersection(e) => write!(
-				f,
-				"Cycles {} and {} cannot be placed because they sharemore than two vertices: {}, {}, {}.",
-				e.placed_cycle,
-				e.existing_cycle,
-				e.shared_vertices[0],
-				e.shared_vertices[1],
-				e.shared_vertices[2],
-			),
-			Self::VertexOrderViolationOnCycle(i) => write!(f, "Placement is not valid because vertices around cycle {i} would be out of order."),
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
-			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle.")
+			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle."),
+			Self::VertexSolverError(e) => e.fmt(f),
 		}
 	}
 }

@@ -75,7 +75,7 @@ mod utils {
 	fn load_level(
 		In(level): In<LevelData>,
 		mut asset_server: ResMut<Assets<LevelData>>,
-		mut spawn_trigger: EventWriter<EnterLevel>,
+		mut spawn_trigger: MessageWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
 		let handle = asset_server.add(level);
 		spawn_trigger.write(EnterLevel(Some(handle)));
@@ -128,7 +128,10 @@ mod utils {
 		cycle_count
 	}
 
-	fn turn_system(In((id, amount)): In<(usize, i32)>, mut events: EventWriter<RotateCycleGroup>) {
+	fn turn_system(
+		In((id, amount)): In<(usize, i32)>,
+		mut events: MessageWriter<RotateCycleGroup>,
+	) {
 		events.write(RotateCycleGroup(RotateCycle {
 			target_cycle: id,
 			amount: amount as i64,
@@ -910,6 +913,8 @@ blue = cycle(_ button(0) _ bgo bri bgi bro);
 red = cycle(_ button(1) _ bro rgi bri rgo);
 green = cycle(_ button(2) _ rgo bgi rgi bgo);
 
+hint_vertex(bgi; 0,0);
+
 circle(blue; -87, 50 130);
 circle(red; 0, -100, 130);
 circle(green; 87 50 130);
@@ -1036,6 +1041,7 @@ fn stress_test_random_levels() {
 		include_str!("../../assets/levels/linked_sort.txt"),
 	];
 	for level in levels {
+		println!("{level}");
 		let mut app = app_with_level(level);
 		move_fuzz(&mut app, 4096, 1337133713371337);
 	}

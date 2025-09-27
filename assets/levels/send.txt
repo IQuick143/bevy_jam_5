@@ -16,3 +16,6 @@ circle(main; 0 0 100);
 circle(connect; 140 0 40);
 circle(side; 210.7, -70.7, 60);
 circle(spin; 50 120 50);
+
+# Decide between the two very close intersections arbitrarily
+hint_vertex(h; 0,0);

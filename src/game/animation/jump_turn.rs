@@ -22,7 +22,7 @@ pub(super) fn plugin(app: &mut App) {
 		(
 			jump_turn_animation_system,
 			cycle_turning_animation_system
-				.run_if(on_event::<RotateSingleCycle>)
+				.run_if(on_message::<RotateSingleCycle>)
 				.in_set(AppSet::UpdateVisuals),
 		),
 	);
@@ -89,7 +89,7 @@ const CYCLE_CENTER_ANIMATION_ANGLE: f32 = std::f32::consts::PI / 2.0;
 fn cycle_turning_animation_system(
 	cycles_q: Query<&CycleCenterVisualEntities>,
 	mut jump_q: Query<&mut JumpTurnAnimation>,
-	mut events: EventReader<RotateSingleCycle>,
+	mut events: MessageReader<RotateSingleCycle>,
 	animation_time: Res<TurnAnimationLength>,
 	entity_index: Res<GameStateEcsIndex>,
 ) {
