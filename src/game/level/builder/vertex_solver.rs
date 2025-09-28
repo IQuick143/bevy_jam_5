@@ -541,7 +541,9 @@ impl LevelBuilder {
 		self.pin_single_placements(&mut point_data, &mut cycle_data, &mut error_log);
 		self.pin_cycle_placements();
 		#[cfg(debug_assertions)]
-		self.debug_assert_valid_solution();
+		if error_log.is_empty() {
+			self.debug_assert_valid_solution();
+		}
 		error_log
 	}
 
@@ -1584,7 +1586,7 @@ impl LevelBuilder {
 				debug_assert!(
 					test_index_clockwiseness(pos_1, pos_2, pos_3)
 						== (test_point_clockwiseness(vert_1, vert_2, vert_3, Some(position)) > 0.0),
-					"Vertices out of order"
+					"Vertices out of order: [{pos_1} -> {vert_1}, {pos_2} -> {vert_2}, {pos_3} -> {vert_3}]"
 				);
 			}
 

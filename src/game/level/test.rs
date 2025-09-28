@@ -25,11 +25,11 @@ macro_rules! expect_fully_ok {
 }
 
 mod layout_tests {
+	use super::super::builder::error::{LevelBuilderError, VertexSolverError};
+	use super::load;
 	use bevy::math::Vec2;
 	use itertools::Itertools;
 	use rand::{seq::SliceRandom, SeedableRng};
-
-	use super::load;
 
 	#[test]
 	fn basic_metatest() {
@@ -70,15 +70,21 @@ mod layout_tests {
 
 	#[test]
 	fn basic_dicycles_double() {
-		// TODO: This should fail with an Err
-		// load(
-		// 	r"
-		// a = vertex();
-		// b = vertex();
-		// circle(cycle(a b _ _ _ _); -10, 0, 10);
-		// circle(cycle(b a _ _ _ _); +10, 0, 10);
-		// ",
-		// )
+		let result = load(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _ _); -10, 0, 10);
+		circle(cycle(b a _ _ _ _); +10, 0, 10);
+		",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(
+				VertexSolverError::VertexHasNoPointsAvailable { .. }
+			)
+		)));
 
 		expect_fully_ok!(load(
 			r"
