@@ -193,88 +193,14 @@ struct CycleBoundButtonColorLabelAppearence {
 	positions: CycleBoundColorLabelPositionSet,
 }
 
-/// Result type that allows both a value and an error.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ResultNonExclusive<T, E> {
-	Ok(T),
-	Partial(T, E),
-	Err(E),
-}
-
-#[allow(dead_code)]
-impl<T, E> ResultNonExclusive<T, E> {
-	pub fn value(self) -> Option<T> {
-		match self {
-			ResultNonExclusive::Ok(value) => Some(value),
-			ResultNonExclusive::Partial(value, _) => Some(value),
-			ResultNonExclusive::Err(_) => None,
-		}
-	}
-
-	pub fn error(self) -> Option<E> {
-		match self {
-			ResultNonExclusive::Ok(_) => None,
-			ResultNonExclusive::Partial(_, err) => Some(err),
-			ResultNonExclusive::Err(err) => Some(err),
-		}
-	}
-
-	pub fn into<A, B>(self) -> ResultNonExclusive<A, B>
-	where
-		A: From<T>,
-		B: From<E>,
-	{
-		match self {
-			ResultNonExclusive::Ok(value) => ResultNonExclusive::Ok(value.into()),
-			ResultNonExclusive::Partial(value, err) => {
-				ResultNonExclusive::Partial(value.into(), err.into())
-			}
-			ResultNonExclusive::Err(err) => ResultNonExclusive::Err(err.into()),
-		}
-	}
-
-	pub fn map_err<E2>(self, map: impl FnOnce(E) -> E2) -> ResultNonExclusive<T, E2> {
-		match self {
-			ResultNonExclusive::Ok(value) => ResultNonExclusive::Ok(value),
-			ResultNonExclusive::Partial(value, err) => ResultNonExclusive::Partial(value, map(err)),
-			ResultNonExclusive::Err(err) => ResultNonExclusive::Err(map(err)),
-		}
-	}
-
-	pub fn relaxed(self) -> Result<T, E> {
-		match self {
-			ResultNonExclusive::Ok(ok) => Ok(ok),
-			ResultNonExclusive::Partial(ok, _) => Ok(ok),
-			ResultNonExclusive::Err(err) => Err(err),
-		}
-	}
-}
-
-#[allow(dead_code)]
-impl<T, E> ResultNonExclusive<T, E>
-where
-	E: std::fmt::Debug,
-{
-	pub fn unwrap_ok(self) -> T {
-		match self {
-			ResultNonExclusive::Ok(value) => value,
-			ResultNonExclusive::Partial(_value, err) => panic!("Unwrapped an Err: {err:?}"),
-			ResultNonExclusive::Err(err) => panic!("Unwrapped an Err: {err:?}"),
-		}
-	}
-}
-
-impl<T, E> From<(T, Option<E>)> for ResultNonExclusive<T, E> {
-	fn from(value: (T, Option<E>)) -> Self {
-		match value {
-			(value, None) => ResultNonExclusive::Ok(value),
-			(value, Some(err)) => ResultNonExclusive::Partial(value, err),
-		}
-	}
-}
-
-impl<T, E> From<E> for ResultNonExclusive<T, E> {
-	fn from(err: E) -> Self {
-		ResultNonExclusive::Err(err)
-	}
+/// The result of building a level
+#[derive(Clone, Debug)]
+pub struct LevelBuildResult {
+	/// The level data
+	///
+	/// If hard errors are present, this will contain a best-effort
+	/// subset of the level as described, with [`LevelData::is_valid`] set to false
+	pub level: LevelData,
+	/// Errors and warnings emited by the builder
+	pub errors: error::LevelBuilderErrorLog,
 }

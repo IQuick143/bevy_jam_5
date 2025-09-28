@@ -254,4 +254,15 @@ impl LevelBuilderErrorLog {
 	pub fn is_ok(&self) -> bool {
 		self.iter().all(LevelBuilderError::is_warning)
 	}
+
+	/// Logs all errors at appropriate log levels using the Bevy logging facilities
+	pub fn log_with_bevy(&self) {
+		for err in self.iter() {
+			if err.is_warning() {
+				warn!("{err}");
+			} else {
+				error!("{err}");
+			}
+		}
+	}
 }

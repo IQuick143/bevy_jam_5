@@ -1,7 +1,10 @@
 use itertools::Itertools;
 
 use super::{
-	super::super::{builder::error::*, *},
+	super::super::{
+		builder::{error::*, LevelBuildResult},
+		*,
+	},
 	finalize::FinalizeError,
 	runtime::RuntimeError,
 	Error,
@@ -9,35 +12,54 @@ use super::{
 use crate::epilang::interpreter::{FunctionCallError, InterpreterError, LogicError};
 use std::f32::consts::PI;
 
-fn parse(level_file: &str) -> Result<LevelData, Error> {
-	match super::parse_and_run(level_file, |_| {}) {
-		builder::ResultNonExclusive::Ok(level) => {
-			assert!(level.is_valid);
-			Ok(level)
-		}
-		builder::ResultNonExclusive::Partial(_, err) => Err(err),
-		builder::ResultNonExclusive::Err(err) => Err(err),
-	}
+fn parse(level_file: &str) -> Result<LevelBuildResult, Error> {
+	super::parse_and_run(level_file, |_| {})
 }
 
 macro_rules! assert_err_eq {
 	($left:expr, $right:expr) => {
-		let left = $left;
 		let right = $right;
-		let err = left.expect_err("Negative test sample parrsed without error!");
-		let builder_error = match err {
-			Error::Runtime(InterpreterError::LogicError(err, _)) => match *err {
-				LogicError::FunctionCall(
-					FunctionCallError::Domain(RuntimeError::BuilderError(err)),
-					_,
-				) => err,
-				_ => panic!("Negative test sample returned incorrect error!\n{err}"),
-			},
-			Error::Finalize(FinalizeError::BuilderError(err)) => err,
-			_ => panic!("Negative test sample returned incorrect error!\n{err}"),
-		};
-		assert_eq!(builder_error, right);
+		match $left {
+			Ok(result) => {
+				assert!(
+					result.errors.iter().any(|err| *err == right),
+					"Negative test sample did not report the expected error (expected: {right}, got: {:?})",
+					result.errors.0,
+				);
+			}
+			Err(err) => {
+				let builder_error = match err {
+					Error::Runtime(InterpreterError::LogicError(err, _)) => match *err {
+						LogicError::FunctionCall(
+							FunctionCallError::Domain(RuntimeError::BuilderError(err)),
+							_,
+						) => err,
+						_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+					},
+					Error::Finalize(FinalizeError::BuilderError(err)) => err,
+					_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+				};
+				assert_eq!(builder_error, right);
+			}
+		}
 	};
+}
+
+macro_rules! expect_fully_ok {
+	($result:expr) => {{
+		let result = ($result).expect("Level failed to parse and did not return a partial build");
+		let no_errors_reported = result.errors.is_ok();
+		assert!(
+			no_errors_reported,
+			"Level builder emited errors: {:?}",
+			result.errors.0
+		);
+		assert!(
+			result.level.is_valid,
+			"Level builder emited no errors, but level is marked as invalid"
+		);
+		result.level
+	}};
 }
 
 #[test]
@@ -76,7 +98,7 @@ circle(cycle_a; -100, 0.0, 100);
 circle(cycle_b; +100, 0, 100);
 circle(cycle_extra; -100, 100, sqrt(41));
 ";
-	let level = parse(data).expect("Test sample did not parse correctly!");
+	let level = expect_fully_ok!(parse(data));
 	assert_eq!(level.name, "?!#_AAA 648");
 }
 
@@ -197,7 +219,7 @@ circle(z; 0 0 100);
 		None,
 	];
 
-	let level = parse(data).expect("Test sample did not parse correctly!");
+	let level = expect_fully_ok!(parse(data));
 	for (vertex, expected_color) in level.vertices.iter().zip(expected_colors) {
 		let Some(ObjectData::Box(call_color)) = vertex.object else {
 			panic!("Vertex does not contain a box.");
@@ -340,7 +362,7 @@ cycle_color_labels(y; 'lr' 'in' 'arrow');
 		},
 	];
 
-	let level = parse(data).expect("Test sample did not parse correctly!");
+	let level = expect_fully_ok!(parse(data));
 	for (vertex, expected_appearence) in level.vertices.iter().zip(expected_appearences) {
 		let Some(GlyphData::Button(Some((_, appearence)))) = vertex.glyph else {
 			panic!("Vertex does not contain a colored button.");
@@ -506,8 +528,7 @@ oneway(c1 c5);
 
 	for data in linkages {
 		let level = format!("{level_header}\n{data}");
-		let output = parse(&level);
-		assert!(output.is_ok(), "{output:?}");
+		expect_fully_ok!(parse(&level));
 	}
 }
 
@@ -600,9 +621,7 @@ circle(C; 0, 0, 1);
 oneway(A, B);
 oneway(B, C);
 oneway(A, C);";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
-	let output = output.unwrap();
+	let output = expect_fully_ok!(parse(level));
 	let ordering: Vec<usize> = output
 		.execution_order
 		.iter()
@@ -648,9 +667,7 @@ circle(B; 0, 0, 1);
 circle(C; 0, 0, 1);
 
 oneway(A, B, C);";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
-	let output = output.unwrap();
+	let output = expect_fully_ok!(parse(level));
 	let ordering: Vec<usize> = output
 		.execution_order
 		.iter()
@@ -695,8 +712,7 @@ circle(c1; 0,0,1);
 circle(c2; 0,0,1);
 circle(target; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -729,8 +745,7 @@ circle(target1; 0,0,1);
 circle(target2; 0,0,1);
 circle(target3; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -764,8 +779,7 @@ circle(source1; 0,0,1);
 circle(source2; 0,0,1);
 circle(target; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -858,8 +872,7 @@ oneway(unplaced, c1);
 
 circle(c1; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]

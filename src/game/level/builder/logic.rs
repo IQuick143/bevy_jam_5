@@ -229,7 +229,7 @@ impl LevelBuilder {
 	}
 
 	/// Checks that the level data is complete and assembles it
-	pub fn build(mut self) -> ResultNonExclusive<LevelData, LevelBuilderError> {
+	pub fn build(mut self) -> LevelBuildResult {
 		let mut errors = LevelBuilderErrorLog::default();
 
 		let (groups, detectors, execution_order) = self.compute_groups_and_detectors(&mut errors);
@@ -262,27 +262,25 @@ impl LevelBuilder {
 			.into_iter()
 			.map(|c| Self::build_cycle_data(c, &vertices))
 			.collect();
-		ResultNonExclusive::from((
-			LevelData {
-				is_valid: errors.is_ok(),
-				name: self
-					.name
-					.unwrap_or_else(|| Self::PLACEHOLDER_LEVEL_NAME.to_owned()),
-				hint: self.hint,
-				vertices,
-				cycles,
-				groups,
-				detectors,
-				declared_links: self.declared_links,
-				declared_one_way_links: self.declared_one_way_cycle_links,
-				forbidden_group_pairs,
-				execution_order,
-				bounding_box,
-				initial_zoom: self.initial_zoom.unwrap_or(1.0),
-				initial_camera_pos,
-			},
-			errors.first().cloned(),
-		))
+		let level = LevelData {
+			is_valid: errors.is_ok(),
+			name: self
+				.name
+				.unwrap_or_else(|| Self::PLACEHOLDER_LEVEL_NAME.to_owned()),
+			hint: self.hint,
+			vertices,
+			cycles,
+			groups,
+			detectors,
+			declared_links: self.declared_links,
+			declared_one_way_links: self.declared_one_way_cycle_links,
+			forbidden_group_pairs,
+			execution_order,
+			bounding_box,
+			initial_zoom: self.initial_zoom.unwrap_or(1.0),
+			initial_camera_pos,
+		};
+		LevelBuildResult { level, errors }
 	}
 
 	/// Computes and creates the [`GroupData`] objects

@@ -85,8 +85,8 @@ mod utils {
 	pub fn app_with_level(level: &str) -> App {
 		let mut app = setup_app();
 		let level = parser::parse_and_run(level, |_| {})
-			.value()
-			.expect("Level data should compile correctly!");
+			.expect("Level data should compile correctly!")
+			.level;
 		assert!(level.is_valid);
 
 		app.world_mut()

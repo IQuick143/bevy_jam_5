@@ -1,11 +1,27 @@
 use super::{
 	backend::builder::{parse_and_run, Error},
-	builder::ResultNonExclusive,
-	LevelData,
+	builder::LevelBuildResult,
 };
 
-fn load(level: &str) -> ResultNonExclusive<LevelData, Error> {
+fn load(level: &str) -> Result<LevelBuildResult, Error> {
 	parse_and_run(level, |w| println!("Warning: {}", w))
+}
+
+macro_rules! expect_fully_ok {
+	($result:expr) => {{
+		let result = ($result).expect("Level failed to parse and did not return a partial build");
+		let no_errors_reported = result.errors.is_ok();
+		assert!(
+			no_errors_reported,
+			"Level builder emited errors: {:?}",
+			result.errors.0
+		);
+		assert!(
+			result.level.is_valid,
+			"Level builder emited no errors, but level is marked as invalid"
+		);
+		result.level
+	}};
 }
 
 mod layout_tests {
@@ -17,42 +33,39 @@ mod layout_tests {
 
 	#[test]
 	fn basic_metatest() {
-		load(r"").unwrap_ok();
+		expect_fully_ok!(load(r""));
 	}
 
 	#[test]
 	fn basic_unicycle() {
-		load(r"circle(cycle(_ _ _ _ _); 3, 5, 20);").unwrap_ok();
+		expect_fully_ok!(load(r"circle(cycle(_ _ _ _ _); 3, 5, 20);"));
 	}
 
 	#[test]
 	fn basic_dicycles_single() {
-		load(
+		expect_fully_ok!(load(
 			r"
 		v = vertex();
 		circle(cycle(v _ _ _ _); -10, 0, 10);
 		circle(cycle(v _ _ _ _); +10, 0, 10);
 		",
-		)
-		.unwrap_ok();
+		));
 
-		load(
+		expect_fully_ok!(load(
 			r"
 		v = vertex();
 		circle(cycle(v _); -7, 0, 10);
 		circle(cycle(v); +7, 0, 10);
 		",
-		)
-		.unwrap_ok();
+		));
 
-		load(
+		expect_fully_ok!(load(
 			r"
 		v = vertex();
 		circle(cycle(v _ _ _ _); 0, 0, 10);
 		circle(cycle(v _ _ _ _); 0, 0, 10);
 		",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	#[test]
@@ -67,40 +80,37 @@ mod layout_tests {
 		// ",
 		// )
 
-		load(
+		expect_fully_ok!(load(
 			r"
 		a = vertex();
 		b = vertex();
 		circle(cycle(a b _ _ _ _); -7, 0, 10);
 		circle(cycle(b a _ _ _ _); +7, 0, 10);
 		",
-		)
-		.unwrap_ok();
+		));
 
-		load(
+		expect_fully_ok!(load(
 			r"
 		a = vertex();
 		b = vertex();
 		circle(cycle(a b _ _ _ _); -7, 0, 10);
 		circle(cycle(b a _ _ _ _); +7, 0, 10);
 		",
-		)
-		.unwrap_ok();
+		));
 
-		load(
+		expect_fully_ok!(load(
 			r"
 		a = vertex();
 		b = vertex();
 		circle(cycle(a b _ _ _); 0, 0, 10);
 		circle(cycle(a _ b _ _); 0, 0, 10);
 		",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	#[test]
 	fn indirect_hints() {
-		load(
+		expect_fully_ok!(load(
 			r"
 		a = vertex();
 		b = vertex();
@@ -110,20 +120,19 @@ mod layout_tests {
 		# This hint is enough to decide the ambiguity
 		hint_vertex(rando_vertex; 0, +7);
 		",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	#[test]
 	fn road_rage() {
 		// This level can be decided with no hints
-		load(include_str!("../../.././assets/levels/car.txt")).unwrap_ok();
+		expect_fully_ok!(load(include_str!("../../.././assets/levels/car.txt")));
 	}
 
 	#[test]
 	fn olympic() {
 		// A chain of cycles can also be automatically resolved
-		load(include_str!("../../.././assets/levels/olympic.txt")).unwrap_ok();
+		expect_fully_ok!(load(include_str!("../../.././assets/levels/olympic.txt")));
 	}
 
 	#[test]
@@ -153,7 +162,9 @@ mod layout_tests {
 			}
 			let mut rng = rand::rngs::SmallRng::seed_from_u64(101);
 			for _ in 0..60 {
-				load(&(header.to_owned() + &vertices.join("") + &cycles.join(""))).unwrap_ok();
+				expect_fully_ok!(load(
+					&(header.to_owned() + &vertices.join("") + &cycles.join(""))
+				));
 				vertices.shuffle(&mut rng);
 				cycles.shuffle(&mut rng);
 			}
@@ -164,7 +175,7 @@ mod layout_tests {
 	fn olympic_with_holes() {
 		// Like olympic, but some cycles have only one shared vertex
 		// This can still be laid out by deducing the pairs and then choosing arbitrarily for the singles
-		load(
+		expect_fully_ok!(load(
 			r"
 a1 = vertex();
 a2 = vertex();
@@ -185,13 +196,12 @@ circle(cycle(a4 a3); 0,3,1.4);
 circle(cycle(a5 b5 a4); 0,4,1.4);
 circle(cycle(a5 b5); 0,5,1.4);
 ",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	#[test]
 	fn pair_surrounded_by_singles() {
-		load(
+		expect_fully_ok!(load(
 			r"
 undecided = vertex();
 single_1 = vertex();
@@ -201,14 +211,13 @@ circle(cycle(undecided, single_1, single_2); 0, 0, 10);
 circle(cycle(undecided); 0, +10, 10);
 hint_vertex(single_1; 0,+1);
 hint_vertex(single_2; 0,-1);",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	#[test]
 	fn twin_partial_interaction() {
 		// A single Pair vertex should be enough to resolve a twin pair
-		load(
+		expect_fully_ok!(load(
 			r"
 undecided = vertex();
 twins_a1 = vertex();
@@ -222,13 +231,12 @@ circle(cycle(twins_a1, twins_a2); 0, -10, 10);
 circle(cycle(twins_b1, twins_b2); +10, 0, 10);
 # This vertex should resolve twins_a which should resolve twins_b which should resolve undecided
 circle(cycle(undecided); 0, +10, 10);",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	#[test]
 	fn tricycle_interleaved() {
-		load(
+		expect_fully_ok!(load(
 			r"
 r = 1;
 sep = 1.3;
@@ -248,8 +256,7 @@ hint_vertex(bri; 0, 0);
 hint_vertex(rgi; 0, 0);
 hint_vertex(bgi; 0, 0);
 ",
-		)
-		.unwrap_ok();
+		));
 	}
 
 	fn get_flower(
@@ -283,8 +290,8 @@ hint_vertex(bgi; 0, 0);
 			})
 			.collect();
 		for flower in flowers.iter() {
-			load(flower).unwrap_ok();
+			expect_fully_ok!(load(flower));
 		}
-		load(&flowers.iter().join("")).unwrap_ok();
+		expect_fully_ok!(load(&flowers.iter().join("")));
 	}
 }
