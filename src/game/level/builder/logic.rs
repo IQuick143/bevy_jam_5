@@ -19,7 +19,6 @@ impl LevelBuilder {
 			declared_one_way_cycle_links: Vec::new(),
 			declared_one_way_detector_links: Vec::new(),
 			explicit_bounding_box: default(),
-			bounding_box: None,
 			scale_override: None,
 			initial_zoom: None,
 			initial_camera_pos: default(),
@@ -241,10 +240,14 @@ impl LevelBuilder {
 		if let Err(err) = self.validate_before_build() {
 			errors.push(err);
 		}
-		self.build_layout();
-		let bounding_box = self
-			.bounding_box
-			.expect("Bounding box should have been set by build_layout");
+		errors.extend(
+			self.solve_vertex_placements()
+				.into_iter()
+				.map(LevelBuilderError::VertexSolverError),
+		);
+		self.materialize_cycle_center_placements();
+		self.apply_color_label_appearences_to_buttons();
+		let bounding_box = self.fit_to_default_viewport();
 		let initial_camera_pos = Vec2::new(
 			self.initial_camera_pos.x.unwrap_or(bounding_box.center().x),
 			self.initial_camera_pos.y.unwrap_or(bounding_box.center().y),

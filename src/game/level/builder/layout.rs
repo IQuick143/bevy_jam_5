@@ -5,13 +5,6 @@ use bevy::math::bounding::{Aabb2d, BoundingVolume};
 use std::f32::consts::PI;
 
 impl LevelBuilder {
-	pub(super) fn build_layout(&mut self) {
-		self.solve_vertex_placements();
-		self.materialize_cycle_center_placements();
-		self.apply_color_label_appearences_to_buttons();
-		self.fit_to_viewport(Aabb2d::new(LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH / 2.0));
-	}
-
 	pub fn place_circle(
 		&mut self,
 		target_cycle: usize,
@@ -143,7 +136,7 @@ impl LevelBuilder {
 	/// color label position to button objects on them if present.
 	///
 	/// This method expects all vertices to be materialized when it is called.
-	fn apply_color_label_appearences_to_buttons(&mut self) {
+	pub(super) fn apply_color_label_appearences_to_buttons(&mut self) {
 		for vertex in &mut self.vertices {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
 				if let Some(p) = vertex.color_label_appearence {
@@ -213,7 +206,7 @@ impl LevelBuilder {
 	/// been placed explicitly
 	///
 	/// All vertices that are a part of a cycle must have a fixed placement by now
-	fn materialize_cycle_center_placements(&mut self) {
+	pub(super) fn materialize_cycle_center_placements(&mut self) {
 		for cycle_data in &mut self.cycles {
 			let Some(placement) = cycle_data.placement else {
 				continue;
@@ -299,8 +292,20 @@ impl LevelBuilder {
 		}
 	}
 
+	/// Resizes all currently placed objects to fit the default screen bounding box
+	///
+	/// ## Return Value
+	/// Final bounding box that contains all objects in the level after the resize
+	pub(super) fn fit_to_default_viewport(&mut self) -> Aabb2d {
+		self.fit_to_viewport(Aabb2d::new(LEVEL_AREA_CENTER, LEVEL_AREA_WIDTH / 2.0))
+	}
+
 	/// Resizes all currently placed objects to fit a bounding box
-	fn fit_to_viewport(&mut self, viewport: Aabb2d) {
+	///
+	/// ## Return Value
+	/// Final bounding box that contains all objects in the level after the resize.
+	/// Fits inside and is centered on `viewport`
+	fn fit_to_viewport(&mut self, viewport: Aabb2d) -> Aabb2d {
 		let bounds = self.get_bounding_box();
 		let scale = match self.scale_override {
 			Some(scale) => scale,
@@ -349,9 +354,6 @@ impl LevelBuilder {
 			*y = (*y - bounds_center.y) * scale + viewport_center.y;
 		}
 
-		self.bounding_box = Some(Aabb2d::new(
-			Vec2::ZERO,
-			(bounds.half_size() * scale).max(Vec2::ONE),
-		));
+		Aabb2d::new(Vec2::ZERO, (bounds.half_size() * scale).max(Vec2::ONE))
 	}
 }
