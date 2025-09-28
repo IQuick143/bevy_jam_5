@@ -115,6 +115,57 @@ mod layout_tests {
 	}
 
 	#[test]
+	fn unique_incorrect_solution() {
+		expect_fully_ok!(load(
+			r"
+name = 'Correct flower';
+
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+
+centre = vertex();
+
+radius = 100;
+third_turn = 2*pi/3;
+
+circle(a = cycle('manual'; v1 v2 v3 centre); sin(third_turn * 0) * radius, cos(third_turn * 0) * radius, radius);
+circle(b = cycle('manual'; v3 v4 v5 centre); sin(third_turn * 1) * radius, cos(third_turn * 1) * radius, radius);
+circle(c = cycle('manual'; v5 v6 v1 centre); sin(third_turn * 2) * radius, cos(third_turn * 2) * radius, radius);
+		",
+		));
+
+		// This should not parse, because it's a mirrored layout, which makes the vertices go counterclockwise
+		// This conflicts with the fact that vertices in their declared order should be clockwise
+		let result = load(
+			r"
+name = 'Inverted flower';
+
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+
+centre = vertex();
+
+radius = 100;
+third_turn = 2*pi/3;
+
+circle(a = cycle('manual'; v3 v2 v1 centre); sin(third_turn * 0) * radius, cos(third_turn * 0) * radius, radius);
+circle(b = cycle('manual'; v5 v4 v3 centre); sin(third_turn * 1) * radius, cos(third_turn * 1) * radius, radius);
+circle(c = cycle('manual'; v1 v6 v5 centre); sin(third_turn * 2) * radius, cos(third_turn * 2) * radius, radius);
+		",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(!result.errors.is_empty());
+	}
+
+	#[test]
 	fn indirect_hints() {
 		expect_fully_ok!(load(
 			r"
