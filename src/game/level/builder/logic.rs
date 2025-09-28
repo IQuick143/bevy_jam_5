@@ -231,29 +231,16 @@ impl LevelBuilder {
 
 	/// Checks that the level data is complete and assembles it
 	pub fn build(mut self) -> ResultNonExclusive<LevelData, LevelBuilderError> {
-		let mut is_valid = true;
-		let mut building_error = None;
+		let mut errors = LevelBuilderErrorLog::default();
 
-		let (groups, detectors, execution_order) =
-			self.compute_groups_and_detectors().unwrap_or_else(|err| {
-				is_valid = false;
-				building_error.get_or_insert(err);
-				(Vec::new(), Vec::new(), Vec::new())
-			});
-		let forbidden_group_pairs = if is_valid {
-			self.compute_forbidden_groups(&groups)
-				.unwrap_or_else(|err| {
-					is_valid = false;
-					building_error.get_or_insert(err);
-					Vec::new()
-				})
-		} else {
-			Vec::new()
-		};
-		self.validate_before_build().unwrap_or_else(|err| {
-			is_valid = false;
-			building_error.get_or_insert(err);
-		});
+		let (groups, detectors, execution_order) = self.compute_groups_and_detectors(&mut errors);
+		let forbidden_group_pairs = self
+			.compute_forbidden_groups(&groups)
+			.map_err(|err| errors.push(LevelBuilderError::OverlappedLinkedCycles(err)))
+			.unwrap_or_default();
+		if let Err(err) = self.validate_before_build() {
+			errors.push(err);
+		}
 		self.build_layout();
 		let bounding_box = self
 			.bounding_box
@@ -274,7 +261,7 @@ impl LevelBuilder {
 			.collect();
 		ResultNonExclusive::from((
 			LevelData {
-				is_valid,
+				is_valid: errors.is_ok(),
 				name: self
 					.name
 					.unwrap_or_else(|| Self::PLACEHOLDER_LEVEL_NAME.to_owned()),
@@ -291,7 +278,7 @@ impl LevelBuilder {
 				initial_zoom: self.initial_zoom.unwrap_or(1.0),
 				initial_camera_pos,
 			},
-			building_error,
+			errors.first().cloned(),
 		))
 	}
 
@@ -300,14 +287,22 @@ impl LevelBuilder {
 	/// Also assigns all cycles and detectors into their groups
 	fn compute_groups_and_detectors(
 		&mut self,
-	) -> Result<(Vec<GroupData>, Vec<DetectorData>, Vec<DetectorOrGroup>), LevelBuilderError> {
+		errors: &mut LevelBuilderErrorLog,
+	) -> (Vec<GroupData>, Vec<DetectorData>, Vec<DetectorOrGroup>) {
 		let mut groups = self.construct_cycle_groups();
 		let detectors = self.construct_detectors();
 		self.link_groups_via_detectors(&mut groups);
-		let execution_order = self.construct_execution_order(&groups, &detectors)?;
-		#[cfg(any(debug_assertions, test))]
-		self.debug_verify_execution_order(&groups, &detectors, &execution_order);
-		Ok((groups, detectors, execution_order))
+		match self.construct_execution_order(&groups, &detectors) {
+			Ok(execution_order) => {
+				#[cfg(any(debug_assertions, test))]
+				self.debug_verify_execution_order(&groups, &detectors, &execution_order);
+				(groups, detectors, execution_order)
+			}
+			Err(err) => {
+				errors.push(LevelBuilderError::OneWayLinkLoop(err));
+				(groups, detectors, Vec::new())
+			}
+		}
 	}
 
 	/// Collects all cycles into groups
@@ -440,7 +435,7 @@ impl LevelBuilder {
 		&self,
 		groups: &[GroupData],
 		detectors: &[DetectorData],
-	) -> Result<Vec<DetectorOrGroup>, LevelBuilderError> {
+	) -> Result<Vec<DetectorOrGroup>, OneWayLinkLoopError> {
 		let n_groups = groups.len();
 		let n_detectors = self.detectors.len();
 
@@ -478,7 +473,7 @@ impl LevelBuilder {
 					let index = get_merged_index(dependency);
 					if currently_visited_mark[index] {
 						// TODO: Better errors, but I really could not be bothered.
-						return Err(LevelBuilderError::OneWayLinkLoop);
+						return Err(OneWayLinkLoopError);
 					}
 					// If this node depends on nodes that have not yet been put into the topological ordering
 					// We need to first handle those and block this node
@@ -603,7 +598,7 @@ impl LevelBuilder {
 	fn compute_forbidden_groups(
 		&self,
 		groups: &[GroupData],
-	) -> Result<Vec<(usize, usize, HashSet<usize>)>, LevelBuilderError> {
+	) -> Result<Vec<(usize, usize, HashSet<usize>)>, OverlappedLinkedCyclesError> {
 		let mut forbid = Vec::new();
 		// TODO: Use a better algorithm, like come on O(n^6) ???
 		for group_a in 0..groups.len() {
@@ -612,25 +607,21 @@ impl LevelBuilder {
 				for &(cycle_a, _) in groups[group_a].cycles.iter() {
 					for &(cycle_b, _) in groups[group_b].cycles.iter() {
 						if cycle_a == cycle_b {
-							if group_a == group_b {
-								continue;
-							}
-							// TODO: Return something like `Internal Error` instead of panic in release builds
-							unreachable!(
+							debug_assert!(
+								group_a == group_b,
 								"Union-find should've partitioned cycles into disjoint groups"
 							);
+							continue;
 						}
 						'inner: for &vertex_a in self.cycles[cycle_a].vertex_indices.iter() {
 							for &vertex_b in self.cycles[cycle_b].vertex_indices.iter() {
 								if vertex_a == vertex_b {
 									if group_a == group_b {
-										return Err(LevelBuilderError::OverlappedLinkedCycles(
-											OverlappedLinkedCyclesError {
-												dest_cycle: cycle_a,
-												source_cycle: cycle_b,
-												shared_vertex: vertex_a,
-											},
-										));
+										return Err(OverlappedLinkedCyclesError {
+											dest_cycle: cycle_a,
+											source_cycle: cycle_b,
+											shared_vertex: vertex_a,
+										});
 									}
 									problems.insert(vertex_a);
 									break 'inner;

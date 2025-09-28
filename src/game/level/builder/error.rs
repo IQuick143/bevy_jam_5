@@ -64,6 +64,12 @@ pub struct OverlappedLinkedCyclesError {
 	pub shared_vertex: usize,
 }
 
+/// Marker error type for when one-way links for an oriented cycle
+///
+/// TODO: Include actual data in here to help debug the cycle
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct OneWayLinkLoopError;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LevelBuilderError {
 	/// [`set_level_name`](LevelBuilder::set_level_name)
@@ -115,9 +121,19 @@ pub enum LevelBuilderError {
 	/// There is a loop in cycle links, and their directions are contradicting
 	CycleLinkageConflict(usize, usize),
 	/// There is a loop in one-way cycle links
-	OneWayLinkLoop,
+	OneWayLinkLoop(OneWayLinkLoopError),
 	/// Vertices could not be assigned positions
 	VertexSolverError(VertexSolverError),
+}
+
+impl LevelBuilderError {
+	/// Checks whether the error is only a warning or a hard error
+	pub fn is_warning(&self) -> bool {
+		match self {
+			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. }) => true,
+			_ => false,
+		}
+	}
 }
 
 /// Errors specific to vertex position solver
@@ -136,13 +152,21 @@ pub enum VertexSolverError {
 	/// Pinning pair vertices based on heuristic
 	/// failed because there is another unpinned pair
 	/// on the same cycles
-	/// 
+	///
 	/// Contains the pair whose pinning was attempted
 	/// and one of the other vertices that blocked it
 	CannotPinTwinPair([usize; 3]),
 	/// Pinning an unsaturated pair vertex failed because another
 	/// cycle is intersecting it between the possible positions
 	CannotPinUnsaturatedPair(usize),
+}
+
+impl std::error::Error for OneWayLinkLoopError {}
+
+impl std::fmt::Display for OneWayLinkLoopError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "one way links form an oriented cycle")
+	}
 }
 
 impl std::error::Error for VertexSolverError {}
@@ -215,8 +239,19 @@ impl std::fmt::Display for LevelBuilderError {
 			),
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
-			Self::OneWayLinkLoop => write!(f, "One way links cannot form a cycle."),
+			Self::OneWayLinkLoop(e) => e.fmt(f),
 			Self::VertexSolverError(e) => e.fmt(f),
 		}
+	}
+}
+
+/// Sequence of errors and warnings emited by the level builder
+#[derive(Clone, Debug, Default, Deref, DerefMut)]
+pub struct LevelBuilderErrorLog(pub Vec<LevelBuilderError>);
+
+impl LevelBuilderErrorLog {
+	/// Checks whether there are any critical errors present, or just warnings
+	pub fn is_ok(&self) -> bool {
+		self.iter().all(LevelBuilderError::is_warning)
 	}
 }

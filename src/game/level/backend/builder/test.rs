@@ -81,6 +81,12 @@ circle(cycle_extra; -100, 100, sqrt(41));
 }
 
 #[test]
+fn unplaced_cycle() {
+	let test_case = "cycle(_ _ _ _);";
+	assert_err_eq!(parse(test_case), LevelBuilderError::UnplacedCycle(0));
+}
+
+#[test]
 fn test_structural_validation() {
 	let test_cases = r"
 # Linking a cycle to itself is already weird, but legal.
@@ -571,7 +577,10 @@ oneway(c2 c3);
 
 	for data in linkages {
 		let level = format!("{level_header}\n{data}");
-		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+		assert_err_eq!(
+			parse(&level),
+			LevelBuilderError::OneWayLinkLoop(OneWayLinkLoopError)
+		);
 	}
 }
 
@@ -780,7 +789,10 @@ circle(c1; 0,0,1);
 circle(c2; 0,0,1);
 circle(c3; 0,0,1);
 ";
-	assert_err_eq!(parse(level), LevelBuilderError::OneWayLinkLoop);
+	assert_err_eq!(
+		parse(level),
+		LevelBuilderError::OneWayLinkLoop(OneWayLinkLoopError)
+	);
 }
 
 #[test]
@@ -824,7 +836,10 @@ oneway(d7, c1);"
 	// Test every ordering
 	for statements in loop_statements.iter().permutations(loop_statements.len()) {
 		let level = format!("{}\n{}", level_header, statements.into_iter().join("\n"));
-		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+		assert_err_eq!(
+			parse(&level),
+			LevelBuilderError::OneWayLinkLoop(OneWayLinkLoopError)
+		);
 	}
 }
 

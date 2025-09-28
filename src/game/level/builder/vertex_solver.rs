@@ -4,7 +4,7 @@
 //! It is a stand-alone module because it uses a large amount of ad-hoc
 //! data structures that are best left encapsulated
 
-use super::{*, error::VertexSolverError};
+use super::{error::VertexSolverError, *};
 use itertools::Itertools as _;
 use smallvec::SmallVec;
 use std::{cmp::Ordering, f32::consts::PI};
@@ -406,10 +406,9 @@ impl PointData {
 								option_b == a1 || option_b == b1,
 							) {
 								(true, true) => {
-									errors.push(
-										VertexSolverError::VertexHasNoPointsAvailable {
-											vertex,
-										});
+									errors.push(VertexSolverError::VertexHasNoPointsAvailable {
+										vertex,
+									});
 								}
 								(true, false) => {
 									self.place_vertex(vertex, option_b, errors);
@@ -424,9 +423,8 @@ impl PointData {
 						}
 						IntersectionPointSet::Single(option) => {
 							if option == a1 || option == b1 {
-								errors.push(VertexSolverError::VertexHasNoPointsAvailable {
-									vertex,
-								});
+								errors
+									.push(VertexSolverError::VertexHasNoPointsAvailable { vertex });
 							}
 						}
 						_ => {
@@ -445,9 +443,9 @@ impl PointData {
 	}
 
 	/// Turns a vertex into a `Single` vertex placed at the given point
-	/// 
+	///
 	/// `vertex` should be a valid vertex index
-	/// 
+	///
 	/// `point` should be a valid point index (into [`PointData::points`])
 	///
 	/// This placement also propagates constraints caused by the `point` becoming occupied,
@@ -460,9 +458,9 @@ impl PointData {
 	}
 
 	/// Turns a vertex into a `Single` vertex placed at the given point
-	/// 
+	///
 	/// `vertex` should be a valid vertex index
-	/// 
+	///
 	/// `point` should be a valid point index (into [`PointData::points`])
 	///
 	/// This placement ignores geometrical constraints caused by the `point` becoming occupied,
@@ -591,7 +589,10 @@ impl LevelBuilder {
 	/// Determines geometric constraints and places uniquely determined points.
 	/// Finds cycles that have ambiguous points.
 	/// Points are deduplicated and indexed, facilitating equality comparisons.
-	fn compute_initial_geometry(&self, errors: &mut Vec<VertexSolverError>) -> (PointData, AdditionalCycleData) {
+	fn compute_initial_geometry(
+		&self,
+		errors: &mut Vec<VertexSolverError>,
+	) -> (PointData, AdditionalCycleData) {
 		let (vertex_to_cycle, absolute_precision_limit) = self.initial_characterize_layout();
 		// TODO: Verify that fixed vertices are placed on the cycles they belong to
 		// TODO: End early if all vertices are fixed
@@ -982,11 +983,27 @@ impl LevelBuilder {
 											if score_1.signum() == score_2.signum() {
 												// Whether point_a, point_b is correct order or they should be flipped
 												if score_1.is_sign_positive() {
-													point_data.place_vertex(pair_vertex, point_a, error_log);
-													point_data.place_vertex(twin_vertex, point_b, error_log);
+													point_data.place_vertex(
+														pair_vertex,
+														point_a,
+														error_log,
+													);
+													point_data.place_vertex(
+														twin_vertex,
+														point_b,
+														error_log,
+													);
 												} else {
-													point_data.place_vertex(pair_vertex, point_b, error_log);
-													point_data.place_vertex(twin_vertex, point_a, error_log);
+													point_data.place_vertex(
+														pair_vertex,
+														point_b,
+														error_log,
+													);
+													point_data.place_vertex(
+														twin_vertex,
+														point_a,
+														error_log,
+													);
 												}
 												// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
 												break 'pair_therapy;
@@ -1100,11 +1117,19 @@ impl LevelBuilder {
 														false
 													}
 													(true, false) => {
-														point_data.place_vertex(pair_vertex, point_a, error_log);
+														point_data.place_vertex(
+															pair_vertex,
+															point_a,
+															error_log,
+														);
 														true
 													}
 													(false, true) => {
-														point_data.place_vertex(pair_vertex, point_b, error_log);
+														point_data.place_vertex(
+															pair_vertex,
+															point_b,
+															error_log,
+														);
 														true
 													}
 													(false, false) => {
@@ -1159,9 +1184,17 @@ impl LevelBuilder {
 														);
 													if clockwiseness == (point_clockwiseness > 0.0)
 													{
-														point_data.place_vertex(pair_vertex, point_a, error_log);
+														point_data.place_vertex(
+															pair_vertex,
+															point_a,
+															error_log,
+														);
 													} else {
-														point_data.place_vertex(pair_vertex, point_b, error_log);
+														point_data.place_vertex(
+															pair_vertex,
+															point_b,
+															error_log,
+														);
 													}
 													debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
 												}
@@ -1292,7 +1325,11 @@ impl LevelBuilder {
 		for &cycle in cycles_to_check.iter() {
 			for logical_vertex in point_data.cycle_data[cycle].vertices.iter() {
 				if logical_vertex.vertex != pair_vertex && logical_vertex.vertex != twin_vertex {
-					return Err(VertexSolverError::CannotPinTwinPair([pair_vertex, twin_vertex, logical_vertex.vertex]));
+					return Err(VertexSolverError::CannotPinTwinPair([
+						pair_vertex,
+						twin_vertex,
+						logical_vertex.vertex,
+					]));
 				}
 			}
 		}
@@ -1311,10 +1348,8 @@ impl LevelBuilder {
 					shape: CycleShape::Circle(_),
 				}) => {
 					// Calculate disparity between inner and outer areas
-					let dir_a =
-						Dir2::new(point_data.points[point_a] - position).unwrap_or(Dir2::X);
-					let dir_b =
-						Dir2::new(point_data.points[point_b] - position).unwrap_or(Dir2::Y);
+					let dir_a = Dir2::new(point_data.points[point_a] - position).unwrap_or(Dir2::X);
+					let dir_b = Dir2::new(point_data.points[point_b] - position).unwrap_or(Dir2::Y);
 					let inner_fraction = {
 						let mut fraction = dir_a.rotation_to(dir_b).as_turn_fraction();
 						if fraction < 0.0 {
@@ -1417,14 +1452,19 @@ impl LevelBuilder {
 								constrained_outside = true;
 							}
 							if constrained_inside && constrained_outside {
-								return Err(VertexSolverError::CannotPinUnsaturatedPair(pair_vertex));
+								return Err(VertexSolverError::CannotPinUnsaturatedPair(
+									pair_vertex,
+								));
 							}
 						}
 					}
 				}
 				None => {
 					// Technically unreachable, unplaced cycles are not involved in this
-					debug_assert!(false, "Unplaced cycle encountered when pinning unsaturated vertex");
+					debug_assert!(
+						false,
+						"Unplaced cycle encountered when pinning unsaturated vertex"
+					);
 				}
 			}
 		}
@@ -1523,34 +1563,16 @@ impl LevelBuilder {
 
 	#[cfg(debug_assertions)]
 	fn debug_assert_valid_solution(&self) {
-		for vertex in self.vertices.iter() {
-			debug_assert!(
-				matches!(vertex.position, IntermediateVertexPosition::Fixed(_)),
-				"Unplaced vertex!"
-			);
-		}
-
-		for cycle in self.cycles.iter() {
-			for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
-				.vertex_indices
-				.iter()
-				.copied()
-				.map(|vertex| self.vertices[vertex].position.get_fixed().unwrap())
-				.enumerate()
-				.array_combinations::<3>()
-			{
-				// TODO: Error handling
-				debug_assert!(
-					test_index_clockwiseness(pos_1, pos_2, pos_3)
-						== (test_point_clockwiseness(vert_1, vert_2, vert_3, None) > 0.0),
-					"Vertices out of order"
-				);
-			}
-		}
-
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
-			let position = cycle.placement.unwrap().position;
-			let CycleShape::Circle(radius) = cycle.placement.unwrap().shape;
+			// TODO: This should be an internal (debug) error someday
+			// Right now it can happen if the user does not place a cycle
+			let Some(placement) = cycle.placement else {
+				continue;
+			};
+
+			let position = placement.position;
+			let CycleShape::Circle(radius) = placement.shape;
+
 			for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
 				.vertex_indices
 				.iter()
