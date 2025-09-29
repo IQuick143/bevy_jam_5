@@ -4,7 +4,7 @@
 //! It is a stand-alone module because it uses a large amount of ad-hoc
 //! data structures that are best left encapsulated
 
-use super::{error::VertexSolverError, *};
+use super::{error::{VertexSolverError, CycleDoesNotContainVertexError}, *};
 use itertools::Itertools as _;
 use smallvec::SmallVec;
 use std::{cmp::Ordering, f32::consts::PI};
@@ -650,15 +650,15 @@ impl LevelBuilder {
 					);
 					for &cycle in cycles.iter() {
 						points_on_cycle[cycle].push(point);
-						if self.cycles[cycle]
-							.placement
-							.is_some_and(|placement| !point_lies_on_cycle(placement, position))
-						{
-							errors.push(VertexSolverError::VertexPlacedOutsideItsCycle {
-								vertex,
-								cycle,
-								position,
-							});
+						if let Some(placement) = self.cycles[cycle].placement {
+							if !point_lies_on_cycle(placement, position) {
+								errors.push(VertexSolverError::CycleDoesNotContainVertex(CycleDoesNotContainVertexError {
+									vertex,
+									cycle,
+									position,
+									placement,
+								}));
+							}
 						}
 					}
 					IntersectionPointSet::Single(point)

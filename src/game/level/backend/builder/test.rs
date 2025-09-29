@@ -1066,11 +1066,7 @@ put_vertex(c; 1 0);",
 		let result = parse(r"circle(cycle(a = vertex()); 0 0 1); put_vertex(a; 0 2);");
 		assert_err_eq!(
 			result,
-			LevelBuilderError::VertexSolverError(VertexSolverError::VertexPlacedOutsideItsCycle {
-				cycle: 0,
-				vertex: 0,
-				position: Vec2::new(0.0, 2.0)
-			})
+			LevelBuilderError::VertexSolverError(VertexSolverError::CycleDoesNotContainVertex(CycleDoesNotContainVertexError { cycle: 0, placement: CyclePlacement { position: Vec2::ZERO, shape: CycleShape::Circle(1.0) }, vertex: 0, position: Vec2::new(0.0, 2.0) }))
 		);
 	}
 

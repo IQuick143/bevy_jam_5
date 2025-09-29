@@ -1,17 +1,17 @@
 use super::*;
 
-/// Error data for [`LevelBuilderError::CycleDoesNotContainVertex`]
+/// Error data for [`VertexSolverError::CycleDoesNotContainVertex`]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct CycleDoesNotContainVertexError {
-	/// Index of the cycle whose attempted placement failed
-	pub placed_cycle: usize,
+	/// Index of the affected cycle
+	pub cycle: usize,
 	/// Placement that was requested for the cycle
-	pub requested_placement: CyclePlacement,
+	pub placement: CyclePlacement,
 	/// Index of the vertex with fixed position
 	/// that would not lie on the cycle as placed
-	pub failing_vertex: usize,
+	pub vertex: usize,
 	/// Position of the failing vertex
-	pub vertex_position: Vec2,
+	pub position: Vec2,
 }
 
 /// Error data for [`LevelBuilderError::CyclesDoNotIntersect`]
@@ -96,16 +96,6 @@ pub enum LevelBuilderError {
 	/// [`place_circle`](LevelBuilder::place_circle) was called
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
-	/// A vertex or cycle positioning operation was called
-	/// in a way that would cause a vertex to not lie on its cycle.
-	/// ## Causes
-	/// - [`place_circle`](LevelBuilder::place_circle) called on a cycle
-	///   that contains a vertex that already has fixed placement
-	///   and it would not lie on the vertex
-	/// - [`place_vertex`](LevelBuilder::place_vertex) called on a vertex
-	///   that lies on a placed cycle with a position that does not lie
-	///   on the cycle
-	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
 	/// Cycles that share a vertex have been placed in a way that they do not intersect
 	CyclesDoNotIntersect(CyclesDoNotIntersectError),
 	/// Cycles that share two vertices have been placed in a way that they
@@ -162,11 +152,7 @@ pub enum VertexSolverError {
 	/// Vertices do not follow their common cycle in clockwise order
 	VerticesNotClockwise { cycle: usize, vertices: [usize; 3] },
 	/// A vertex has been explicitly placed at a position that its cycle does not intersect
-	VertexPlacedOutsideItsCycle {
-		vertex: usize,
-		cycle: usize,
-		position: Vec2,
-	},
+	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
 }
 
 impl std::error::Error for OneWayLinkLoopError {}
@@ -198,7 +184,14 @@ impl std::fmt::Display for VertexSolverError {
 			Self::CannotPinTwinPair([a, b, c]) => write!(f, "vertices {a}, {b}, and {c} could not be pinned heuristically because they lie on the same cycle"),
 			Self::CannotPinUnsaturatedPair(i) => write!(f, "vertex {i} could not be pinned heuristically because its owner cycle is intersected between its possible positions"),
 			Self::VerticesNotClockwise { cycle, vertices: [a, b, c] } => write!(f, "vertices {a}, {b}, and {c} on cycle {cycle} do not appear in clockwise order"),
-			Self::VertexPlacedOutsideItsCycle { vertex, cycle, position } => write!(f, "vertex {vertex} has been explicitly placed at position {position} which does not lie on cycle {cycle}"),
+			Self::CycleDoesNotContainVertex(e) => write!(
+				f,
+				"vertex {} has been explicitly placed at position {} which does not lie on cycle {} at {:?}",
+				e.cycle,
+				e.placement,
+				e.vertex,
+				e.position
+			),
 		}
 	}
 }
@@ -219,14 +212,6 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
 			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
 			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
-			Self::CycleDoesNotContainVertex(e) => write!(
-				f,
-				"Placement is not valid because cycle {} placed at {} would not contain vertex {} placed at {}.",
-				e.placed_cycle,
-				e.requested_placement,
-				e.failing_vertex,
-				e.vertex_position
-			),
 			Self::CyclesDoNotIntersect(e) => write!(
 				f,
 				"Cycle {} cannot be placed at {} because it shares vertex {} with cycle {} at {} and the cycles would not intersect.",
