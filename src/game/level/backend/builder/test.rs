@@ -1241,9 +1241,10 @@ circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
 circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
 
 # Hint that the central vertices go near the center
-hint_vertex(bri; 0, 0);
-hint_vertex(rgi; 0, 0);
-hint_vertex(bgi; 0, 0);
+yh = -sep / 2 / sqrt(3);
+hint_vertex(bri; 0, yh);
+hint_vertex(rgi; 0, yh);
+hint_vertex(bgi; 0, yh);
 ",
 		));
 	}

@@ -733,10 +733,12 @@ impl LevelBuilder {
 										Some(Ordering::Less) => One(point_a),
 										Some(Ordering::Equal) => {
 											errors.push(VertexSolverError::UnnecessaryHint(vertex));
+											eprintln!("eq {point_a} {point_b} {position}");
 											Two(point_a, point_b)
 										}
 										None => {
 											errors.push(VertexSolverError::UnnecessaryHint(vertex));
+											eprintln!("nc {point_a} {point_b} {position}");
 											Two(point_a, point_b)
 										}
 									}
@@ -911,344 +913,336 @@ impl LevelBuilder {
 			point_data.progress = false;
 			// Use simple deductions to place remaining undecided vertices
 			for &cycle_id in cycle_data.problematic_cycles.iter() {
-				let cycle = &self.cycles[cycle_id];
-				match cycle.placement {
-					Some(CyclePlacement {
-						position: cycle_position,
-						shape: CycleShape::Circle(_),
-					}) => {
-						// Only go through the logic if there is an undecided vertex available.
-						if let Some(first_pair_index) =
-							point_data.cycle_data[cycle_id].first_undecided_vertex
-						{
-							if point_data.cycle_data[cycle_id]
-								.first_decided_vertex
-								.is_none()
-							{
-								// There are no `Single`s available,
-								// so we go after `Pair` therapy
-
-								'pair_therapy: for pair_vertex_index in
-									0..point_data.cycle_data[cycle_id].vertices.len()
-								{
-									// Each vertex should be a `Pair` given that there was no `Single` when we reached this code
-									// If a vertex was placed, `'pair_therapy` should be stopped, as faster and more powerful algorithms apply.
-									let LogicalVertex {
-										vertex: pair_vertex,
-										inner:
-											LogicalVertexVariant::Pair {
-												next_pair: _,
-												prev_pair: _,
-												prev_single: None,
-											},
-									} = point_data.cycle_data[cycle_id].vertices[pair_vertex_index]
-									else {
-										debug_assert!(
-											false,
-											"Invariants broken, the truth goes unspoken."
-										);
-										break;
-									};
-									// To make a deduction, we need a twin vertex
-									let Some((twin_vertex, twin_vertex_index)) =
-										point_data.find_twin(pair_vertex).and_then(|twin_vertex| {
-											point_data.problematic_vertex_to_cycle[twin_vertex]
-												.iter()
-												.find(
-													|&&(twin_cycle_id, _twin_position_in_cycle)| {
-														twin_cycle_id == cycle_id
-													},
-												)
-												.map(|&(_, twin_position_in_cycle)| {
-													(twin_vertex, twin_position_in_cycle)
-												})
-										})
-									else {
-										continue;
-									};
-									// Avoid doing the work twice
-									if twin_vertex < pair_vertex {
-										continue;
-									}
-									// Go through every other pair, if both points of that pair lie on a given side
-									// of the twin pair, then we can deduce the twin pair orientation and place them
-									for constraint_vertex_index in
-										0..point_data.cycle_data[cycle_id].vertices.len()
-									{
-										// We need a separate vertex, not one already present
-										if constraint_vertex_index == pair_vertex_index
-											|| constraint_vertex_index == twin_vertex_index
-										{
-											continue;
-										}
-										let constraint_vertex = point_data.cycle_data[cycle_id]
-											.vertices[constraint_vertex_index]
-											.vertex;
-										if let (
-											IntersectionPointSet::Pair(point_a, point_b),
-											IntersectionPointSet::Pair(option_1, option_2),
-										) = (
-											point_data.vertex_constraints[pair_vertex],
-											point_data.vertex_constraints[constraint_vertex],
-										) {
-											let clockwiseness = test_index_clockwiseness(
-												pair_vertex_index,
-												twin_vertex_index,
-												constraint_vertex_index,
-											);
-											let sign = if clockwiseness { 1.0 } else { -1.0 };
-
-											let score_1 = test_point_clockwiseness(
-												point_data.points[point_a],
-												point_data.points[point_b],
-												point_data.points[option_1],
-												Some(cycle_position),
-											) * sign;
-											let score_2 = test_point_clockwiseness(
-												point_data.points[point_a],
-												point_data.points[point_b],
-												point_data.points[option_2],
-												Some(cycle_position),
-											) * sign;
-
-											// If both situations agree
-											if score_1.signum() == score_2.signum() {
-												// Whether point_a, point_b is correct order or they should be flipped
-												if score_1.is_sign_positive() {
-													point_data.place_vertex(
-														pair_vertex,
-														point_a,
-														error_log,
-													);
-													point_data.place_vertex(
-														twin_vertex,
-														point_b,
-														error_log,
-													);
-												} else {
-													point_data.place_vertex(
-														pair_vertex,
-														point_b,
-														error_log,
-													);
-													point_data.place_vertex(
-														twin_vertex,
-														point_a,
-														error_log,
-													);
-												}
-												// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
-												break 'pair_therapy;
-											}
-										} else {
-											debug_assert!(
-												false,
-												"THERE SHOULD BE ONLY PAIR VERTICES"
-											);
-										}
-									}
-								}
-							}
-							// If there is a `Single` vertex available (as an anchor)
-							// The check is done again, because pair_therapy might have created a new one
-							if point_data.cycle_data[cycle_id]
-								.first_decided_vertex
-								.is_some()
-							{
-								for pair_vertex_index in
-									first_pair_index..point_data.cycle_data[cycle_id].vertices.len()
-								{
-									let LogicalVertex {
-										vertex: pair_vertex,
-										inner:
-											LogicalVertexVariant::Pair {
-												next_pair: _,
-												prev_pair: _,
-												prev_single: Some(prev_single_index),
-											},
-									} = point_data.cycle_data[cycle_id].vertices[pair_vertex_index]
-									else {
-										continue;
-									};
-									// There ought to exist a `Single` vertex, `first_decided_vertex` points to one dammit! (or does it...)
-									let LogicalVertex {
-										vertex: prev_single_vertex,
-										inner:
-											LogicalVertexVariant::Single {
-												next_single: next_single_index,
-											},
-									} = point_data.cycle_data[cycle_id].vertices[prev_single_index]
-									else {
-										debug_assert!(
-											false,
-											"Invariants broken, the truth goes unspoken."
-										);
-										break;
-									};
-									let next_single_vertex = point_data.cycle_data[cycle_id]
-										.vertices[next_single_index]
-										.vertex;
-
-									match (
-										point_data.vertex_constraints[pair_vertex],
-										point_data.vertex_constraints[prev_single_vertex],
-										point_data.vertex_constraints[next_single_vertex],
-									) {
-										(
-											IntersectionPointSet::Pair(point_a, point_b),
-											IntersectionPointSet::Single(prev_point),
-											IntersectionPointSet::Single(next_point),
-										) => {
-											// If there is only one `Single` vertex, then it will point to itself and
-											// `prev_single_vertex` might equal `next_single_vertex`
-
-											// Inner if checks whether we have two different vertices, and if so,
-											// Executes code that might resolve the `Pair`
-											// Outer if checks if the previous code failed, and if so,
-											// Tries running a special branch that applies to twin vertices.
-											if !if prev_single_vertex != next_single_vertex {
-												// The two `Single` make a "sandwich" constraining the range of
-												// Allowed positions for the `Pair` vertex.
-												// This might be enough to eliminate one of the options
-
-												// Two constraints are available
-												let clockwiseness = test_index_clockwiseness(
-													prev_single_index,
-													pair_vertex_index,
-													next_single_index,
-												);
-												let sign = if clockwiseness { 1.0 } else { -1.0 };
-
-												let score_a = test_point_clockwiseness(
-													point_data.points[prev_point],
-													point_data.points[point_a],
-													point_data.points[next_point],
-													Some(cycle_position),
-												) * sign;
-												let score_b = test_point_clockwiseness(
-													point_data.points[prev_point],
-													point_data.points[point_b],
-													point_data.points[next_point],
-													Some(cycle_position),
-												) * sign;
-												let mut point_a_valid = score_a > 0.0;
-												let mut point_b_valid = score_b > 0.0;
-												// if one of the results is weirdly small, but not the other one,
-												// use the non-tiny one
-												if point_a_valid && point_b_valid {
-													const THRESHOLD: f32 = 0.001;
-													if score_a < score_b * THRESHOLD {
-														point_a_valid = false;
-													} else if score_b < score_a * THRESHOLD {
-														point_b_valid = false;
-													}
-												}
-												match (point_a_valid, point_b_valid) {
-													(true, true) => {
-														/* Tough luck, nothing got done here */
-														false
-													}
-													(true, false) => {
-														point_data.place_vertex(
-															pair_vertex,
-															point_a,
-															error_log,
-														);
-														true
-													}
-													(false, true) => {
-														point_data.place_vertex(
-															pair_vertex,
-															point_b,
-															error_log,
-														);
-														true
-													}
-													(false, false) => {
-														error_log.push(VertexSolverError::VertexHasNoPointsAvailable { vertex: pair_vertex });
-														// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
-														// so there's no need for more attempts at solving
-														true
-													}
-												}
-											} else {
-												false
-											} {
-												// Only one constraint is guaranteed, but twin vertices can still be decided this way
-												if let Some((twin_vertex, twin_vertex_index)) =
-													// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
-													// But in the case of a `Single` it can always be decided which order is correct.
-													point_data
-															.find_twin(pair_vertex)
-															.and_then(|twin_vertex| {
-																point_data
-																	.problematic_vertex_to_cycle[twin_vertex]
-																	.iter()
-																	.find(
-																		|&&(
-																			twin_cycle_id,
-																			_twin_position_in_cycle,
-																		)| {
-																			twin_cycle_id
-																				== cycle_id
-																		},
-																	)
-																	.map(
-																		|&(
-																			_,
-																			twin_position_in_cycle,
-																		)| {
-																			(twin_vertex, twin_position_in_cycle)
-																		},
-																	)
-															}) {
-													let clockwiseness = test_index_clockwiseness(
-														prev_single_index,
-														pair_vertex_index,
-														twin_vertex_index,
-													);
-													let point_clockwiseness =
-														test_point_clockwiseness(
-															point_data.points[prev_point],
-															point_data.points[point_a],
-															point_data.points[point_b],
-															Some(cycle_position),
-														);
-													if clockwiseness == (point_clockwiseness > 0.0)
-													{
-														point_data.place_vertex(
-															pair_vertex,
-															point_a,
-															error_log,
-														);
-													} else {
-														point_data.place_vertex(
-															pair_vertex,
-															point_b,
-															error_log,
-														);
-													}
-													debug_assert!(!error_log.is_empty() || matches!(point_data.vertex_constraints[twin_vertex], IntersectionPointSet::Single(_)), "Vertex propagation should've filled this in.");
-												}
-											}
-										}
-										_ => { /* dont care */ }
-									}
-
-									#[cfg(any(debug_assertions, test))]
-									point_data.cycle_data[cycle_id].assert_validity();
-								}
-							}
-						}
-					}
-					None => continue, // This shouldn't really happen
-				}
+				self.try_reduce_pairs_on_cycle(cycle_id, point_data, error_log);
 			}
 			cycle_data.problematic_cycles.retain(|&cycle| {
 				point_data.cycle_data[cycle]
 					.first_undecided_vertex
 					.is_some()
 			});
+		}
+	}
+
+	/// Single step of [`Self::first_pass_pair_placements`]
+	///
+	/// Attempts to reduce the number of [`IntersectionPointSet::Pair`] placements
+	/// on a single cycle
+	fn try_reduce_pairs_on_cycle(
+		&self,
+		cycle_id: usize,
+		point_data: &mut PointData,
+		error_log: &mut Vec<VertexSolverError>,
+	) {
+		let cycle = &self.cycles[cycle_id];
+		let Some(placement) = cycle.placement else {
+			// This should not really happen
+			return;
+		};
+		let cycle_position = placement.position;
+		match placement.shape {
+			CycleShape::Circle(_) => {
+				// Only go through the logic if there is an undecided vertex available.
+				if let Some(first_pair_index) =
+					point_data.cycle_data[cycle_id].first_undecided_vertex
+				{
+					if point_data.cycle_data[cycle_id]
+						.first_decided_vertex
+						.is_none()
+					{
+						// There are no `Single`s available,
+						// so we go after `Pair` therapy
+						self.try_reduce_pairs_on_cycle_without_single(
+							cycle_id,
+							cycle_position,
+							point_data,
+							error_log,
+						);
+					}
+					// If there is a `Single` vertex available (as an anchor)
+					// The check is done again, because pair_therapy might have created a new one
+					if point_data.cycle_data[cycle_id]
+						.first_decided_vertex
+						.is_some()
+					{
+						self.try_reduce_pairs_on_cycle_using_single(
+							cycle_id,
+							cycle_position,
+							first_pair_index,
+							point_data,
+							error_log,
+						);
+					}
+				}
+			}
+		}
+	}
+
+	/// Single step of [`Self::first_pass_pair_placements`]
+	///
+	/// Attempts to resolve a [`IntersectionPointSet::Pair`] placement
+	/// on a cycle where there are no [`IntersectionPointSet::Single`] vertices
+	fn try_reduce_pairs_on_cycle_without_single(
+		&self,
+		cycle_id: usize,
+		cycle_position: Vec2,
+		point_data: &mut PointData,
+		error_log: &mut Vec<VertexSolverError>,
+	) {
+		'pair_therapy: for pair_vertex_index in 0..point_data.cycle_data[cycle_id].vertices.len() {
+			// Each vertex should be a `Pair` given that there was no `Single` when we reached this code
+			// If a vertex was placed, `'pair_therapy` should be stopped, as faster and more powerful algorithms apply.
+			let LogicalVertex {
+				vertex: pair_vertex,
+				inner:
+					LogicalVertexVariant::Pair {
+						next_pair: _,
+						prev_pair: _,
+						prev_single: None,
+					},
+			} = point_data.cycle_data[cycle_id].vertices[pair_vertex_index]
+			else {
+				debug_assert!(false, "Invariants broken, the truth goes unspoken.");
+				break;
+			};
+			// To make a deduction, we need a twin vertex
+			let Some((twin_vertex, twin_vertex_index)) =
+				point_data.find_twin(pair_vertex).and_then(|twin_vertex| {
+					point_data.problematic_vertex_to_cycle[twin_vertex]
+						.iter()
+						.find(|&&(twin_cycle_id, _twin_position_in_cycle)| {
+							twin_cycle_id == cycle_id
+						})
+						.map(|&(_, twin_position_in_cycle)| (twin_vertex, twin_position_in_cycle))
+				})
+			else {
+				continue;
+			};
+			// Avoid doing the work twice
+			if twin_vertex < pair_vertex {
+				continue;
+			}
+			// Go through every other pair, if both points of that pair lie on a given side
+			// of the twin pair, then we can deduce the twin pair orientation and place them
+			for constraint_vertex_index in 0..point_data.cycle_data[cycle_id].vertices.len() {
+				// We need a separate vertex, not one already present
+				if constraint_vertex_index == pair_vertex_index
+					|| constraint_vertex_index == twin_vertex_index
+				{
+					continue;
+				}
+				let constraint_vertex =
+					point_data.cycle_data[cycle_id].vertices[constraint_vertex_index].vertex;
+				if let (
+					IntersectionPointSet::Pair(point_a, point_b),
+					IntersectionPointSet::Pair(option_1, option_2),
+				) = (
+					point_data.vertex_constraints[pair_vertex],
+					point_data.vertex_constraints[constraint_vertex],
+				) {
+					let clockwiseness = test_index_clockwiseness(
+						pair_vertex_index,
+						twin_vertex_index,
+						constraint_vertex_index,
+					);
+					let sign = if clockwiseness { 1.0 } else { -1.0 };
+
+					let score_1 = test_point_clockwiseness(
+						point_data.points[point_a],
+						point_data.points[point_b],
+						point_data.points[option_1],
+						Some(cycle_position),
+					) * sign;
+					let score_2 = test_point_clockwiseness(
+						point_data.points[point_a],
+						point_data.points[point_b],
+						point_data.points[option_2],
+						Some(cycle_position),
+					) * sign;
+
+					// If both situations agree
+					if score_1.signum() == score_2.signum() {
+						// Whether point_a, point_b is correct order or they should be flipped
+						if score_1.is_sign_positive() {
+							point_data.place_vertex(pair_vertex, point_a, error_log);
+							point_data.place_vertex(twin_vertex, point_b, error_log);
+						} else {
+							point_data.place_vertex(pair_vertex, point_b, error_log);
+							point_data.place_vertex(twin_vertex, point_a, error_log);
+						}
+						// Now that a pair of vertices has been placed, there should be singles available for the second algorithm to pick up.
+						break 'pair_therapy;
+					}
+				} else {
+					debug_assert!(false, "THERE SHOULD BE ONLY PAIR VERTICES");
+				}
+			}
+		}
+	}
+
+	/// Single step of [`Self::first_pass_pair_placements`]
+	///
+	/// Attempts to resolve a [`IntersectionPointSet::Pair`] placement
+	/// on a cycle using a [`IntersectionPointSet::Single`] vertex as reference point
+	fn try_reduce_pairs_on_cycle_using_single(
+		&self,
+		cycle_id: usize,
+		cycle_position: Vec2,
+		first_pair_index: usize,
+		point_data: &mut PointData,
+		error_log: &mut Vec<VertexSolverError>,
+	) {
+		for pair_vertex_index in first_pair_index..point_data.cycle_data[cycle_id].vertices.len() {
+			let LogicalVertex {
+				vertex: pair_vertex,
+				inner:
+					LogicalVertexVariant::Pair {
+						next_pair: _,
+						prev_pair: _,
+						prev_single: Some(prev_single_index),
+					},
+			} = point_data.cycle_data[cycle_id].vertices[pair_vertex_index]
+			else {
+				continue;
+			};
+			// There ought to exist a `Single` vertex, `first_decided_vertex` points to one dammit! (or does it...)
+			let LogicalVertex {
+				vertex: prev_single_vertex,
+				inner: LogicalVertexVariant::Single {
+					next_single: next_single_index,
+				},
+			} = point_data.cycle_data[cycle_id].vertices[prev_single_index]
+			else {
+				debug_assert!(false, "Invariants broken, the truth goes unspoken.");
+				break;
+			};
+			let next_single_vertex =
+				point_data.cycle_data[cycle_id].vertices[next_single_index].vertex;
+
+			match (
+				point_data.vertex_constraints[pair_vertex],
+				point_data.vertex_constraints[prev_single_vertex],
+				point_data.vertex_constraints[next_single_vertex],
+			) {
+				(
+					IntersectionPointSet::Pair(point_a, point_b),
+					IntersectionPointSet::Single(prev_point),
+					IntersectionPointSet::Single(next_point),
+				) => {
+					// If there is only one `Single` vertex, then it will point to itself and
+					// `prev_single_vertex` might equal `next_single_vertex`
+
+					// Inner if checks whether we have two different vertices, and if so,
+					// Executes code that might resolve the `Pair`
+					// Outer if checks if the previous code failed, and if so,
+					// Tries running a special branch that applies to twin vertices.
+					if !if prev_single_vertex != next_single_vertex {
+						// The two `Single` make a "sandwich" constraining the range of
+						// Allowed positions for the `Pair` vertex.
+						// This might be enough to eliminate one of the options
+
+						// Two constraints are available
+						let clockwiseness = test_index_clockwiseness(
+							prev_single_index,
+							pair_vertex_index,
+							next_single_index,
+						);
+						let sign = if clockwiseness { 1.0 } else { -1.0 };
+
+						let score_a = test_point_clockwiseness(
+							point_data.points[prev_point],
+							point_data.points[point_a],
+							point_data.points[next_point],
+							Some(cycle_position),
+						) * sign;
+						let score_b = test_point_clockwiseness(
+							point_data.points[prev_point],
+							point_data.points[point_b],
+							point_data.points[next_point],
+							Some(cycle_position),
+						) * sign;
+						let mut point_a_valid = score_a > 0.0;
+						let mut point_b_valid = score_b > 0.0;
+						// if one of the results is weirdly small, but not the other one,
+						// use the non-tiny one
+						if point_a_valid && point_b_valid {
+							const THRESHOLD: f32 = 0.001;
+							if score_a < score_b * THRESHOLD {
+								point_a_valid = false;
+							} else if score_b < score_a * THRESHOLD {
+								point_b_valid = false;
+							}
+						}
+						match (point_a_valid, point_b_valid) {
+							(true, true) => {
+								/* Tough luck, nothing got done here */
+								false
+							}
+							(true, false) => {
+								point_data.place_vertex(pair_vertex, point_a, error_log);
+								true
+							}
+							(false, true) => {
+								point_data.place_vertex(pair_vertex, point_b, error_log);
+								true
+							}
+							(false, false) => {
+								error_log.push(VertexSolverError::VertexHasNoPointsAvailable {
+									vertex: pair_vertex,
+								});
+								// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
+								// so there's no need for more attempts at solving
+								true
+							}
+						}
+					} else {
+						false
+					} {
+						// Only one constraint is guaranteed, but twin vertices can still be decided this way
+						if let Some((twin_vertex, twin_vertex_index)) =
+							// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
+							// But in the case of a `Single` it can always be decided which order is correct.
+							point_data.find_twin(pair_vertex).and_then(|twin_vertex| {
+									point_data.problematic_vertex_to_cycle[twin_vertex]
+										.iter()
+										.find(|&&(twin_cycle_id, _twin_position_in_cycle)| {
+											twin_cycle_id == cycle_id
+										})
+										.map(|&(_, twin_position_in_cycle)| {
+											(twin_vertex, twin_position_in_cycle)
+										})
+								}) {
+							let clockwiseness = test_index_clockwiseness(
+								prev_single_index,
+								pair_vertex_index,
+								twin_vertex_index,
+							);
+							let point_clockwiseness = test_point_clockwiseness(
+								point_data.points[prev_point],
+								point_data.points[point_a],
+								point_data.points[point_b],
+								Some(cycle_position),
+							);
+							if clockwiseness == (point_clockwiseness > 0.0) {
+								point_data.place_vertex(pair_vertex, point_a, error_log);
+							} else {
+								point_data.place_vertex(pair_vertex, point_b, error_log);
+							}
+							debug_assert!(
+								!error_log.is_empty()
+									|| matches!(
+										point_data.vertex_constraints[twin_vertex],
+										IntersectionPointSet::Single(_)
+									),
+								"Vertex propagation should've filled this in."
+							);
+						}
+					}
+				}
+				_ => { /* dont care */ }
+			}
+
+			#[cfg(any(debug_assertions, test))]
+			point_data.cycle_data[cycle_id].assert_validity();
 		}
 	}
 
