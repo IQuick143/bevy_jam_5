@@ -14,45 +14,6 @@ pub struct CycleDoesNotContainVertexError {
 	pub position: Vec2,
 }
 
-/// Error data for [`LevelBuilderError::CyclesDoNotIntersect`]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct CyclesDoNotIntersectError {
-	/// Index of the cycle whose attempted placement failed
-	pub placed_cycle: usize,
-	/// Placement that was requested for the cycle
-	pub requested_placement: CyclePlacement,
-	/// Index of the already-placed cycle that shared a vertex
-	/// with the one being placed
-	pub existing_cycle: usize,
-	/// Placement of the already-placed cycle
-	pub existing_placement: CyclePlacement,
-	/// Index of the vertex that the cycles share
-	/// that could not be placed because the cycles do not intersect
-	pub failing_vertex: usize,
-}
-
-/// Error data for [`LevelBuilderError::CyclesDoNotIntersectTwice`]
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub struct CyclesDoNotIntersectTwiceError {
-	/// Index of the cycle whose attempted placement failed
-	pub placed_cycle: usize,
-	/// Placement that was requested for the cycle
-	pub requested_placement: CyclePlacement,
-	/// Index of the already-placed cycle that shared
-	/// two vertices with the one being placed
-	pub existing_cycle: usize,
-	/// Placement of the already-placed cycle
-	pub existing_placement: CyclePlacement,
-	/// Index of the vertex that has already been placed at the only
-	/// intersection between the cycles
-	pub existing_vertex: usize,
-	/// Position of the intersection (and the already-placed vertex)
-	pub vertex_position: Vec2,
-	/// Index of the vertex that the cycles share
-	/// that could not be placed because the cycles only intersect once
-	pub failing_vertex: usize,
-}
-
 /// Error data for [`LevelBuilderError::OverlappedLinkedCycles`]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct OverlappedLinkedCyclesError {
@@ -96,11 +57,6 @@ pub enum LevelBuilderError {
 	/// [`place_circle`](LevelBuilder::place_circle) was called
 	/// on a cycle that had already been placed
 	CycleAlreadyPlaced(usize),
-	/// Cycles that share a vertex have been placed in a way that they do not intersect
-	CyclesDoNotIntersect(CyclesDoNotIntersectError),
-	/// Cycles that share two vertices have been placed in a way that they
-	/// only intersect tangentially (only enough space for one shared vertex)
-	CyclesDoNotIntersectTwice(CyclesDoNotIntersectTwiceError),
 	/// A vertex positioning operation was called on a vertex that
 	/// already has a placement too specific to perform the operation
 	/// ## Causes
@@ -228,26 +184,6 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
 			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
 			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
-			Self::CyclesDoNotIntersect(e) => write!(
-				f,
-				"Cycle {} cannot be placed at {} because it shares vertex {} with cycle {} at {} and the cycles would not intersect.",
-				e.placed_cycle,
-				e.requested_placement,
-				e.failing_vertex,
-				e.existing_cycle,
-				e.existing_placement
-			),
-			Self::CyclesDoNotIntersectTwice(e) => write!(
-				f,
-				"Cycle {} cannot be placed at {} because it shares vertices {} and {} with cycle {} at {} and the cycles would only intersect once at {}.",
-				e.placed_cycle,
-				e.requested_placement,
-				e.existing_vertex,
-				e.failing_vertex,
-				e.existing_cycle,
-				e.existing_placement,
-				e.vertex_position
-			),
 			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
 			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
 			Self::OneWayLinkLoop(e) => e.fmt(f),
