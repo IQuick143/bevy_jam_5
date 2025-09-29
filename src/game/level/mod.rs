@@ -6,8 +6,6 @@ pub mod backend;
 pub mod builder;
 pub mod list;
 pub mod list_asset;
-#[cfg(test)]
-mod test;
 
 /// Complete description of a level
 #[derive(Debug, Clone, Reflect, Asset)]
