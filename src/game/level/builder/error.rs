@@ -122,6 +122,17 @@ impl LevelBuilderError {
 		match self {
 			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. }) => true,
 			Self::VertexSolverError(VertexSolverError::VertexHasNoCycle(_)) => true,
+			Self::VertexSolverError(VertexSolverError::UnnecessaryHint(_)) => true,
+			_ => false,
+		}
+	}
+
+	/// Checks whether the error is a weak warning
+	///
+	/// Weak warnings should not be logged unless they accompany an error
+	pub fn is_weak(&self) -> bool {
+		match self {
+			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. }) => true,
 			_ => false,
 		}
 	}
@@ -137,6 +148,7 @@ pub enum VertexSolverError {
 	/// Position of a vertex is not bounded
 	VertexIsUnconstrained { vertex: usize },
 	/// Vertex has multiple available placements
+	/// and its position must be decided heuristically
 	VertexRemainsUndecided { vertex: usize },
 	/// A vertex was not assigned to any parent cycle
 	VertexHasNoCycle(usize),
@@ -154,6 +166,8 @@ pub enum VertexSolverError {
 	VerticesNotClockwise { cycle: usize, vertices: [usize; 3] },
 	/// A vertex has been explicitly placed at a position that its cycle does not intersect
 	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
+	/// A vertex was given a placement hint that did not affect its final position
+	UnnecessaryHint(usize),
 }
 
 impl std::error::Error for OneWayLinkLoopError {}
@@ -193,6 +207,7 @@ impl std::fmt::Display for VertexSolverError {
 				e.vertex,
 				e.position
 			),
+			Self::UnnecessaryHint(i) => write!(f, "placement hint on vertex {i} did not affect its position"),
 		}
 	}
 }
@@ -251,13 +266,20 @@ impl LevelBuilderErrorLog {
 		self.iter().all(LevelBuilderError::is_warning)
 	}
 
+	/// Checks whether there are any errors or warnings present that can be logged
+	pub fn has_loggable_entries(&self) -> bool {
+		!self.iter().all(LevelBuilderError::is_weak)
+	}
+
 	/// Logs all errors at appropriate log levels using the Bevy logging facilities
 	pub fn log_with_bevy(&self) {
-		for err in self.iter() {
-			if err.is_warning() {
-				warn!("{err}");
-			} else {
-				error!("{err}");
+		if self.has_loggable_entries() {
+			for err in self.iter() {
+				if err.is_warning() {
+					warn!("{err}");
+				} else {
+					error!("{err}");
+				}
 			}
 		}
 	}

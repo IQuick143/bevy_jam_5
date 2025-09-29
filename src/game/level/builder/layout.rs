@@ -141,11 +141,9 @@ impl LevelBuilder {
 			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
 				if let Some(p) = vertex.color_label_appearence {
 					let Some(vertex_position) = vertex.position.get_fixed() else {
-						log::warn!("Color label appearences cannot be applied before all vertices that belong to a cycle are placed");
 						continue;
 					};
 					let Some(placement) = self.cycles[p.owner_cycle].placement else {
-						log::warn!("Color label appearences cannot be applied before all cycles are placed");
 						continue;
 					};
 					let owner_cycle_position = placement.position;
@@ -276,11 +274,9 @@ impl LevelBuilder {
 		// Prevent zero-size bounding boxes
 		if half.x <= 0.0 {
 			half.x = 1.0;
-			log::warn!("Level bounding box has zero width.");
 		}
 		if half.y <= 0.0 {
 			half.y = 1.0;
-			log::warn!("Level bounding box has zero height.");
 		}
 		Aabb2d::new(center, half)
 	}
@@ -314,14 +310,6 @@ impl LevelBuilder {
 				// Scaling must be equal in both directions
 				scale.x.min(scale.y)
 			}
-		};
-		let scale = if scale.is_finite() {
-			scale.abs()
-		} else {
-			log::warn!(
-				"Non-finite scale value in level bound computation, level likely has 0 size."
-			);
-			1.0
 		};
 
 		let viewport_center = viewport.center();

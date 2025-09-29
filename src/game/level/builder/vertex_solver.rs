@@ -4,7 +4,10 @@
 //! It is a stand-alone module because it uses a large amount of ad-hoc
 //! data structures that are best left encapsulated
 
-use super::{error::{VertexSolverError, CycleDoesNotContainVertexError}, *};
+use super::{
+	error::{CycleDoesNotContainVertexError, VertexSolverError},
+	*,
+};
 use itertools::Itertools as _;
 use smallvec::SmallVec;
 use std::{cmp::Ordering, f32::consts::PI};
@@ -654,12 +657,14 @@ impl LevelBuilder {
 						points_on_cycle[cycle].push(point);
 						if let Some(placement) = self.cycles[cycle].placement {
 							if !point_lies_on_cycle(placement, position) {
-								errors.push(VertexSolverError::CycleDoesNotContainVertex(CycleDoesNotContainVertexError {
-									vertex,
-									cycle,
-									position,
-									placement,
-								}));
+								errors.push(VertexSolverError::CycleDoesNotContainVertex(
+									CycleDoesNotContainVertexError {
+										vertex,
+										cycle,
+										position,
+										placement,
+									},
+								));
 							}
 						}
 					}
@@ -687,7 +692,9 @@ impl LevelBuilder {
 													cycle_position.distance(hint_position);
 												if distance_from_center <= absolute_precision_limit
 												{
-													// TODO: Warning about ineffective hint
+													errors.push(
+														VertexSolverError::UnnecessaryHint(vertex),
+													);
 													IntersectionPointSet::Cycle(cycle)
 												} else {
 													let offset = hint_position - cycle_position;
@@ -724,9 +731,14 @@ impl LevelBuilder {
 									{
 										Some(Ordering::Greater) => One(point_b),
 										Some(Ordering::Less) => One(point_a),
-										// TODO: Emit a warning about an ineffective hint
-										Some(Ordering::Equal) => Two(point_a, point_b),
-										None => Two(point_a, point_b),
+										Some(Ordering::Equal) => {
+											errors.push(VertexSolverError::UnnecessaryHint(vertex));
+											Two(point_a, point_b)
+										}
+										None => {
+											errors.push(VertexSolverError::UnnecessaryHint(vertex));
+											Two(point_a, point_b)
+										}
 									}
 								}
 								None => Two(point_a, point_b),
@@ -1259,7 +1271,7 @@ impl LevelBuilder {
 				}
 				IntersectionPointSet::Cycle(_) => {}
 				IntersectionPointSet::Pair(point_a, point_b) => {
-					// TODO: Emit warning
+					error_log.push(VertexSolverError::VertexRemainsUndecided { vertex: vertex_id });
 					let selected_point = Self::collapse_and_pin_pair_placement(
 						vertex_id,
 						point_a,
@@ -1267,15 +1279,16 @@ impl LevelBuilder {
 						&self.cycles,
 						point_data,
 						cycle_data,
-					);
-					match selected_point {
-						Ok(p) => {
-							point_data.place_vertex(vertex_id, p, error_log);
-							vertex_placement.position =
-								IntermediateVertexPosition::Fixed(point_data.points[p]);
-						}
-						Err(e) => error_log.push(e),
-					}
+					)
+					.unwrap_or_else(|err| {
+						error_log.push(err);
+						// Return whichever point as a placeholder
+						// so we can grnerate a partial build
+						point_a
+					});
+					point_data.place_vertex(vertex_id, selected_point, error_log);
+					vertex_placement.position =
+						IntermediateVertexPosition::Fixed(point_data.points[selected_point]);
 				}
 				IntersectionPointSet::Empty | IntersectionPointSet::Unconstrained => {
 					// Do nothing, errors have already been emited

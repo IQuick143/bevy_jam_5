@@ -237,9 +237,7 @@ impl LevelBuilder {
 			.compute_forbidden_groups(&groups)
 			.map_err(|err| errors.push(LevelBuilderError::OverlappedLinkedCycles(err)))
 			.unwrap_or_default();
-		if let Err(err) = self.validate_before_build() {
-			errors.push(err);
-		}
+		self.validate_before_build(&mut errors);
 		errors.extend(
 			self.solve_vertex_placements()
 				.into_iter()
@@ -654,16 +652,21 @@ impl LevelBuilder {
 		intermediate: IntermediateCycleData,
 		vertex_data: &[VertexData],
 	) -> CycleData {
-		let placement = intermediate
-			.placement.unwrap_or_else(|| {
-				log::warn!("Unplaced cycle in build phase, should have been detected earlier, defaulting to some position");
-				CyclePlacement { position: Vec2::ZERO, shape: CycleShape::Circle(1.0) }
-			});
+		let placement = intermediate.placement.unwrap_or_else(|| {
+			debug_assert!(
+				false,
+				"Unplaced cycle in build phase, should have been detected earlier"
+			);
+			CyclePlacement {
+				position: Vec2::ZERO,
+				shape: CycleShape::Circle(1.0),
+			}
+		});
 		let center_sprite_position = match intermediate.center_sprite_position {
 			IntermediateCycleCenterSpritePosition::Placed(pos) => Some(pos),
 			IntermediateCycleCenterSpritePosition::Disabled => None,
 			IntermediateCycleCenterSpritePosition::Unspecified => {
-				log::warn!("Unplaced cycle center sprite in build phase, should have been materialized earlier, defaulting to None");
+				debug_assert!(false, "Unplaced cycle center sprite in build phase, should have been materialized earlier");
 				None
 			}
 		};
@@ -672,9 +675,7 @@ impl LevelBuilder {
 		let (group, relative_direction) = match intermediate.linked_cycle {
 			IntermediateLinkStatus::Group(group, relative_direction) => (group, relative_direction),
 			_ => {
-				log::warn!(
-					"Cycle built without a valid group assignment, defaulting to an invalid value"
-				);
+				debug_assert!(false, "Cycle built without a valid group assignment");
 				(0, LinkedCycleDirection::Coincident)
 			}
 		};
@@ -702,14 +703,20 @@ impl LevelBuilder {
 	}
 
 	/// Verifies that the level data is complete and ready to be built without an error
-	fn validate_before_build(&self) -> Result<(), LevelBuilderError> {
+	///
+	/// If some information is missing, an error is emited and the information is filled in
+	fn validate_before_build(&mut self, errors: &mut LevelBuilderErrorLog) {
 		// All cycles must be placed
-		for (i, cycle) in self.cycles.iter().enumerate() {
+		for (i, cycle) in self.cycles.iter_mut().enumerate() {
 			if cycle.placement.is_none() {
-				return Err(LevelBuilderError::UnplacedCycle(i));
+				errors.push(LevelBuilderError::UnplacedCycle(i));
+				// Fill in some placeholder value so we can return partial build
+				cycle.placement = Some(CyclePlacement {
+					position: Vec2::ZERO,
+					shape: CycleShape::Circle(1.0),
+				})
 			}
 		}
-		Ok(())
 	}
 
 	/// Finds the root cycle (cycle that has no link to another parent) that this cycle's links point to and
