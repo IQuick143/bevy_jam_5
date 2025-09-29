@@ -346,12 +346,19 @@ impl PointData {
 					}
 					match self.vertex_constraints[vertex] {
 						IntersectionPointSet::Pair(a, b) => {
-							let other_point = match (a == point, b == point) {
-								(true, true) => todo!(), // shouldn't happen
-								(true, false) => b,
-								(false, true) => a,
-								(false, false) => todo!(), // shouldn't happen either
-							};
+							if a == b {
+								debug_assert!(false, "Vertex has a Pair placement, but both options in the pair are the same point");
+								continue;
+							}
+							let other_point;
+							if a == point {
+								other_point = b;
+							} else if b == point {
+								other_point = a;
+							} else {
+								debug_assert!(false, "vertices_interested_in_point contains a vertex not interested in that point");
+								continue;
+							}
 							self.place_vertex_internal(vertex, other_point);
 							stack.push(other_point);
 						}
@@ -552,8 +559,7 @@ impl LevelBuilder {
 	/// Computes initial parameters that can be directly extracted from the level builder
 	///
 	/// ## Return Value
-	/// - For each vertex, list of all cycles it lies on, with the index
-	///   of the position of the vertex within the cycle
+	/// - For each vertex, list of all cycles it lies on
 	/// - Numeric tolerance based on the scale of the level
 	fn initial_characterize_layout(&self) -> (Vec<SmallVec<[usize; 2]>>, f32) {
 		let mut absolute_precision_limit = f32::EPSILON;
@@ -579,9 +585,6 @@ impl LevelBuilder {
 				None => {}
 			}
 		}
-		for (vertex_id, vert) in vertex_to_cycle.iter().enumerate() {
-			debug_assert!(!vert.is_empty(), "Vertex {vertex_id} has no cycles!");
-		}
 		(
 			vertex_to_cycle,
 			absolute_precision_limit * Self::PLACEMENT_VALIDATION_TOLERANCE,
@@ -598,7 +601,6 @@ impl LevelBuilder {
 		errors: &mut Vec<VertexSolverError>,
 	) -> (PointData, AdditionalCycleData) {
 		let (vertex_to_cycle, absolute_precision_limit) = self.initial_characterize_layout();
-		// TODO: Verify that fixed vertices are placed on the cycles they belong to
 		// TODO: End early if all vertices are fixed
 
 		// Array holding all the cycles which require

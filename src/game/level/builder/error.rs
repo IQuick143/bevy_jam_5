@@ -121,6 +121,7 @@ impl LevelBuilderError {
 	pub fn is_warning(&self) -> bool {
 		match self {
 			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. }) => true,
+			Self::VertexSolverError(VertexSolverError::VertexHasNoCycle(_)) => true,
 			_ => false,
 		}
 	}

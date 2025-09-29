@@ -1071,6 +1071,21 @@ put_vertex(c; 1 0);",
 	}
 
 	#[test]
+	fn vertex_without_cycle() {
+		let result = parse("vertex();");
+		assert_err_eq!(
+			result,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VertexHasNoCycle(0))
+		);
+
+		let result = parse("put_vertex(vertex(); 0 0);");
+		assert_err_eq!(
+			result,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VertexHasNoCycle(0))
+		);
+	}
+
+	#[test]
 	fn indirect_hints() {
 		expect_fully_ok!(parse(
 			r"
