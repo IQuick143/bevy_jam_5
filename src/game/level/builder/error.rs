@@ -75,22 +75,22 @@ pub enum LevelBuilderError {
 impl LevelBuilderError {
 	/// Checks whether the error is only a warning or a hard error
 	pub fn is_warning(&self) -> bool {
-		match self {
-			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. }) => true,
-			Self::VertexSolverError(VertexSolverError::VertexHasNoCycle(_)) => true,
-			Self::VertexSolverError(VertexSolverError::UnnecessaryHint(_)) => true,
-			_ => false,
-		}
+		matches!(
+			self,
+			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. })
+				| Self::VertexSolverError(VertexSolverError::VertexHasNoCycle(_))
+				| Self::VertexSolverError(VertexSolverError::UnnecessaryHint(_))
+		)
 	}
 
 	/// Checks whether the error is a weak warning
 	///
 	/// Weak warnings should not be logged unless they accompany an error
 	pub fn is_weak(&self) -> bool {
-		match self {
-			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. }) => true,
-			_ => false,
-		}
+		matches!(
+			self,
+			Self::VertexSolverError(VertexSolverError::VertexRemainsUndecided { .. })
+		)
 	}
 }
 

@@ -520,15 +520,14 @@ impl PointData {
 								&& self.vertices_interested_in_point[point_b]
 									.contains(&potential_vertex)
 						}) {
-					match self.vertex_constraints[potential_vertex] {
-						IntersectionPointSet::Pair(point_a2, point_b2) => {
-							if (point_a == point_a2 && point_b == point_b2)
-								|| (point_a == point_b2 && point_b == point_a2)
-							{
-								return Some(potential_vertex);
-							}
+					if let IntersectionPointSet::Pair(point_a2, point_b2) =
+						self.vertex_constraints[potential_vertex]
+					{
+						if (point_a == point_a2 && point_b == point_b2)
+							|| (point_a == point_b2 && point_b == point_a2)
+						{
+							return Some(potential_vertex);
 						}
-						_ => {}
 					}
 				}
 				None
@@ -548,7 +547,7 @@ impl LevelBuilder {
 		let mut error_log: Vec<VertexSolverError> = Vec::new();
 		let (mut point_data, mut cycle_data) = self.compute_initial_geometry(&mut error_log);
 		self.first_pass_pair_placements(&mut point_data, &mut cycle_data, &mut error_log);
-		self.pin_single_placements(&mut point_data, &mut cycle_data, &mut error_log);
+		self.pin_single_placements(&mut point_data, &cycle_data, &mut error_log);
 		self.check_oversaturated_points(&point_data, &mut error_log);
 		self.check_vertex_placements_are_clockwise(&mut error_log);
 		self.pin_cycle_placements();
@@ -577,6 +576,7 @@ impl LevelBuilder {
 				vertex_to_cycle[vertex].push(id);
 			}
 
+			#[expect(clippy::single_match, reason = "There will be more")]
 			match cycle.placement {
 				Some(CyclePlacement { position, shape }) => {
 					let size = match shape {
@@ -671,7 +671,7 @@ impl LevelBuilder {
 					IntersectionPointSet::Single(point)
 				}
 				IntermediateVertexPosition::Free => {
-					let intersection = self.compute_intersection(&cycles);
+					let intersection = self.compute_intersection(cycles);
 					match intersection {
 						IntersectionPointSet::Unconstrained => {
 							errors.push(VertexSolverError::VertexIsUnconstrained { vertex });
@@ -1388,6 +1388,7 @@ impl LevelBuilder {
 						if fraction < 0.0 {
 							fraction += 1.0;
 						}
+						#[expect(clippy::manual_clamp, reason = "clamp handles NaN differently")]
 						fraction.min(1.0).max(0.0)
 					};
 					let outer_fraction = 1.0 - inner_fraction;
