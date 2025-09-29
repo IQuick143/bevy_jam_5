@@ -81,9 +81,21 @@ mod layout_tests {
 		.expect("Level did not produce any partial data");
 		assert!(result.errors.iter().any(|err| matches!(
 			err,
-			LevelBuilderError::VertexSolverError(
-				VertexSolverError::VertexHasNoPointsAvailable { .. }
-			)
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide { .. })
+		)));
+
+		let result = load(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b); -10, 0, 10);
+		circle(cycle(b a); +10, 0, 10);
+		",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide { .. })
 		)));
 
 		expect_fully_ok!(load(
@@ -162,7 +174,45 @@ circle(c = cycle('manual'; v1 v6 v5 centre); sin(third_turn * 2) * radius, cos(t
 		",
 		)
 		.expect("Level did not produce any partial data");
-		assert!(!result.errors.is_empty());
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VerticesNotClockwise { .. })
+		)));
+	}
+
+	#[test]
+	fn put_vertex_in_wrong_order() {
+		let result = load(
+			r"
+circle(cycle(a = vertex(), b = vertex(), c = vertex()); 0 0 1);
+put_vertex(a; 0 1);
+put_vertex(b; -1, 0);
+put_vertex(c; 1 0);",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VerticesNotClockwise { .. })
+		)));
+	}
+
+	#[test]
+	fn put_vertex_outside_cycle() {
+		let result = load(
+			r"
+circle(cycle(a = vertex()); 0 0 1);
+put_vertex(a; 0 2);
+			",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| *err
+			== LevelBuilderError::VertexSolverError(
+				VertexSolverError::VertexPlacedOutsideItsCycle {
+					cycle: 0,
+					vertex: 0,
+					position: Vec2::new(0.0, 2.0)
+				}
+			)));
 	}
 
 	#[test]

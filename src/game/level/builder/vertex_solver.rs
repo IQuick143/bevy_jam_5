@@ -539,6 +539,8 @@ impl LevelBuilder {
 		let (mut point_data, mut cycle_data) = self.compute_initial_geometry(&mut error_log);
 		self.first_pass_pair_placements(&mut point_data, &mut cycle_data, &mut error_log);
 		self.pin_single_placements(&mut point_data, &mut cycle_data, &mut error_log);
+		self.check_oversaturated_points(&point_data, &mut error_log);
+		self.check_vertex_placements_are_clockwise(&mut error_log);
 		self.pin_cycle_placements();
 		#[cfg(debug_assertions)]
 		if error_log.is_empty() {
@@ -638,7 +640,6 @@ impl LevelBuilder {
 			vertex_constraints[vertex] = match self.vertices[vertex].position {
 				IntermediateVertexPosition::Fixed(position) => {
 					// TODO: come up with a way to avoid deduplicating these points maybe
-					// TODO: Does force-placing a vertex outside of its cycle fail?
 					let point = insert_point_if_needed(
 						&mut points,
 						&mut vertices_interested_in_point,
@@ -649,6 +650,16 @@ impl LevelBuilder {
 					);
 					for &cycle in cycles.iter() {
 						points_on_cycle[cycle].push(point);
+						if self.cycles[cycle]
+							.placement
+							.is_some_and(|placement| !point_lies_on_cycle(placement, position))
+						{
+							errors.push(VertexSolverError::VertexPlacedOutsideItsCycle {
+								vertex,
+								cycle,
+								position,
+							});
+						}
 					}
 					IntersectionPointSet::Single(point)
 				}
@@ -703,7 +714,8 @@ impl LevelBuilder {
 							}
 						}
 						IntersectionPointSet::Pair(point_a, point_b) => {
-							match match match self.vertices[vertex].hint_position {
+							// Drop one of the positions if the user is hinting towards the other
+							let reduced_placement = match self.vertices[vertex].hint_position {
 								Some(position) => {
 									match Vec2::distance_squared(point_a, position)
 										.partial_cmp(&Vec2::distance_squared(point_b, position))
@@ -716,7 +728,10 @@ impl LevelBuilder {
 									}
 								}
 								None => Two(point_a, point_b),
-							} {
+							};
+							// Translate the positions into point indices
+							// by adding points into the container
+							let points_placement = match reduced_placement {
 								Two(point_a, point_b) => {
 									let point_a = insert_point_if_needed(
 										&mut points,
@@ -749,7 +764,8 @@ impl LevelBuilder {
 									vertex,
 									parent_cycle,
 								)),
-							} {
+							};
+							match points_placement {
 								Two(point_a, point_b) => {
 									for &cycle in cycles.iter() {
 										problematic_cycles.push(cycle);
@@ -1563,6 +1579,63 @@ impl LevelBuilder {
 		}
 	}
 
+	fn check_oversaturated_points(
+		&self,
+		point_data: &PointData,
+		errors: &mut Vec<VertexSolverError>,
+	) {
+		let mut vertex_by_point = vec![None; point_data.points.len()];
+		for (i, &constraint) in point_data.vertex_constraints.iter().enumerate() {
+			match constraint {
+				IntersectionPointSet::Pair(_, _) => {
+					// All pairs should be singled out by now
+					debug_assert!(
+						false,
+						"Found pair placement after pair placements have been resolved"
+					);
+				}
+				IntersectionPointSet::Single(point) => {
+					if let Some(j) = vertex_by_point[point].replace(i) {
+						errors.push(VertexSolverError::TwoVerticesCollide {
+							vertex_a: i,
+							vertex_b: j,
+						});
+					}
+				}
+				// No other placements can oversaturate our points
+				_ => {}
+			}
+		}
+	}
+
+	fn check_vertex_placements_are_clockwise(&self, errors: &mut Vec<VertexSolverError>) {
+		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
+			let Some(placement) = &cycle.placement else {
+				continue;
+			};
+			let positions = cycle
+				.vertex_indices
+				.iter()
+				.filter_map(|&i| self.vertices[i].position.get_fixed().map(|p| (i, p)))
+				.collect::<Vec<_>>();
+			if positions.len() < 3 {
+				continue;
+			}
+			for ((ia, a), (ib, b), (ic, c)) in positions.into_iter().circular_tuple_windows() {
+				let score = test_point_clockwiseness(a, b, c, Some(placement.position));
+				if score < 0.001 {
+					errors.push(VertexSolverError::VerticesNotClockwise {
+						cycle: cycle_id,
+						vertices: [ia, ib, ic],
+					});
+					// Break the inner loop, we do not need additional diagnostics
+					// for the same cycle
+					break;
+				}
+			}
+		}
+	}
+
 	#[cfg(debug_assertions)]
 	fn debug_assert_valid_solution(&self) {
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
@@ -1742,6 +1815,12 @@ fn point_lies_on_circle(center: Vec2, radius: f32, point: Vec2) -> bool {
 		radius,
 		LevelBuilder::PLACEMENT_VALIDATION_TOLERANCE,
 	)
+}
+
+fn point_lies_on_cycle(cycle: CyclePlacement, point: Vec2) -> bool {
+	match cycle.shape {
+		CycleShape::Circle(radius) => point_lies_on_circle(cycle.position, radius, point),
+	}
 }
 
 /// Tests if a, b, c are an "increasing triplet" in circular ordering

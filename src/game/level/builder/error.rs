@@ -137,7 +137,7 @@ impl LevelBuilderError {
 }
 
 /// Errors specific to vertex position solver
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum VertexSolverError {
 	/// There are no valid positions for a vertex
 	VertexHasNoPointsAvailable { vertex: usize },
@@ -159,6 +159,14 @@ pub enum VertexSolverError {
 	/// Pinning an unsaturated pair vertex failed because another
 	/// cycle is intersecting it between the possible positions
 	CannotPinUnsaturatedPair(usize),
+	/// Vertices do not follow their common cycle in clockwise order
+	VerticesNotClockwise { cycle: usize, vertices: [usize; 3] },
+	/// A vertex has been explicitly placed at a position that its cycle does not intersect
+	VertexPlacedOutsideItsCycle {
+		vertex: usize,
+		cycle: usize,
+		position: Vec2,
+	},
 }
 
 impl std::error::Error for OneWayLinkLoopError {}
@@ -189,6 +197,8 @@ impl std::fmt::Display for VertexSolverError {
 			Self::VertexHasNoCycle(i) => write!(f, "vertex {i} does not lie on any cycle"),
 			Self::CannotPinTwinPair([a, b, c]) => write!(f, "vertices {a}, {b}, and {c} could not be pinned heuristically because they lie on the same cycle"),
 			Self::CannotPinUnsaturatedPair(i) => write!(f, "vertex {i} could not be pinned heuristically because its owner cycle is intersected between its possible positions"),
+			Self::VerticesNotClockwise { cycle, vertices: [a, b, c] } => write!(f, "vertices {a}, {b}, and {c} on cycle {cycle} do not appear in clockwise order"),
+			Self::VertexPlacedOutsideItsCycle { vertex, cycle, position } => write!(f, "vertex {vertex} has been explicitly placed at position {position} which does not lie on cycle {cycle}"),
 		}
 	}
 }
