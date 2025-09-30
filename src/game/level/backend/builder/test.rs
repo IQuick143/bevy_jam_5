@@ -1249,6 +1249,78 @@ hint_vertex(bgi; 0, yh);
 		));
 	}
 
+	/// The layout solver should be able to solve the tricycle layout with any combination of the three hints.
+	/// In any permutation, and even if a single hint is used (even multiple times)
+	#[test]
+	fn tricycle_interleaved_hint_permutations() {
+		let level = r"
+r = 1;
+sep = 1.3;
+
+bri = vertex();
+rgi = vertex();
+bgi = vertex();
+bro = vertex();
+rgo = vertex();
+bgo = vertex();
+circle(cycle('manual'; _ _ _ _ bgo bri bgi bro); -sep / 2, 0, r);
+circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
+circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# Hint that the central vertices go near the center
+yh = -sep / 2 / sqrt(3);
+";
+		let hints = [
+			"hint_vertex(bri; 0, yh);",
+			"hint_vertex(rgi; 0, yh);",
+			"hint_vertex(bgi; 0, yh);",
+		];
+		// Single hints
+		for hint in hints.iter() {
+			expect_fully_ok!(parse(&(level.to_owned() + &hint)));
+		}
+		// Arbitrary hint combination
+		for hint_combo in hints.iter().combinations_with_replacement(3) {
+			let hint = hint_combo.into_iter().join("");
+			println!("{hint}");
+			expect_fully_ok!(parse(&(level.to_owned() + &hint)));
+		}
+	}
+
+	/// The layout solver should be able to solve the tricycle layout independent of vertex order
+	#[test]
+	fn tricycle_interleaved_vertex_permutations() {
+		let vertex_array = [
+			"bri = vertex();",
+			"rgi = vertex();",
+			"bgi = vertex();",
+			"bro = vertex();",
+			"rgo = vertex();",
+			"bgo = vertex();",
+		];
+
+		// Pls don't do a trillion permutations
+		assert!(vertex_array.len() <= 6);
+		for permutation in vertex_array.iter().permutations(vertex_array.len()) {
+			let vertices = permutation.into_iter().join("\n");
+			expect_fully_ok!(parse(&format!(
+				r"
+r = 1;
+sep = 1.3;
+
+{vertices}
+circle(cycle('manual'; _ _ _ _ bgo bri bgi bro); -sep / 2, 0, r);
+circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
+circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# Hint that the central vertices go near the center
+yh = -sep / 2 / sqrt(3);
+hint_vertex(bri; 0, yh);
+"
+			)));
+		}
+	}
+
 	fn get_flower(
 		flower_id: &str,
 		n_petals: usize,
