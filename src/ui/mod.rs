@@ -17,7 +17,7 @@ pub mod prelude {
 		freeze::{ui_not_frozen, FreezeUi},
 		interaction::{InteractionPalette, InteractionQuery},
 		palette as ui_palette,
-		screen_fade::{AddFadeEvent as _, FadeAnimation, FadeAnimationBundle},
+		screen_fade::{AddFadeMessage as _, FadeAnimation, FadeAnimationBundle},
 		widgets::{Containers as _, Widgets as _},
 	};
 }
@@ -27,7 +27,7 @@ use bevy::{
 	prelude::*,
 };
 
-pub fn char_input_pressed(c: char) -> impl Fn(EventReader<KeyboardInput>) -> bool {
+pub fn char_input_pressed(c: char) -> impl Fn(MessageReader<KeyboardInput>) -> bool {
 	let key = Key::Character(String::from(c).into());
 	move |mut events| {
 		events

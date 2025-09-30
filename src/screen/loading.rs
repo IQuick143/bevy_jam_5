@@ -21,9 +21,9 @@ pub(super) fn plugin(app: &mut App) {
 fn enter_loading(mut commands: Commands, font: Res<GlobalFont>) {
 	commands
 		.ui_root()
-		.insert(StateScoped(Screen::Loading))
+		.insert(DespawnOnExit(Screen::Loading))
 		.with_children(|children| {
-			children.label("Loading...", font.0.clone_weak());
+			children.label("Loading...", font.0.clone());
 		});
 }
 

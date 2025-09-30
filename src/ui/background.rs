@@ -42,7 +42,7 @@ struct BackgroundMaterialHandle(Handle<BackgroundMaterial>);
 impl FromWorld for BackgroundMaterialHandle {
 	fn from_world(world: &mut World) -> Self {
 		let images = world.resource::<HandleMap<ImageKey>>();
-		let texture = images[&ImageKey::Background].clone_weak();
+		let texture = images[&ImageKey::Background].clone();
 		let mut materials = world.resource_mut::<Assets<BackgroundMaterial>>();
 		let handle = materials.add(BackgroundMaterial {
 			texture,
@@ -89,7 +89,7 @@ fn spawn_background(
 ) {
 	commands.spawn((
 		Mesh2d(meshes.add(Rectangle::from_length(MESH_SIZE).mesh())),
-		MeshMaterial2d(material.clone_weak()),
+		MeshMaterial2d(material.0.clone()),
 		Transform::from_translation(Vec3::Z * layers::BACKGROUND)
 			.with_rotation(Quat::from_rotation_z(BACKGROUND_ROTATION)),
 		Parallax(BACKGROUND_PARALLAX),
@@ -98,7 +98,7 @@ fn spawn_background(
 }
 
 fn set_background_mode(
-	mode: Trigger<BackgroundMode>,
+	mode: On<BackgroundMode>,
 	material: Res<BackgroundMaterialHandle>,
 	mut materials: ResMut<Assets<BackgroundMaterial>>,
 	mut query: Query<&mut Visibility, With<IsBackground>>,

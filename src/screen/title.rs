@@ -54,7 +54,7 @@ impl FromWorld for AnimatedBackgroundMaterial {
 		let material = graphics::ScrollingTextureMaterial {
 			scale: Vec2::new(ANIMATED_BACKGROUND_X_OVERFLOW, 1.0),
 			speed: ANIMATED_BACKGROUND_SPEED,
-			texture: images[&ImageKey::TitleBack].clone_weak(),
+			texture: images[&ImageKey::TitleBack].clone(),
 		};
 		let mut materials = world.resource_mut::<Assets<graphics::ScrollingTextureMaterial>>();
 		Self(materials.add(material))
@@ -70,7 +70,7 @@ fn enter_title(
 ) {
 	commands
 		.ui_root()
-		.insert(StateScoped(Screen::Title))
+		.insert(DespawnOnExit(Screen::Title))
 		.with_children(|children| {
 			// Invisible spacer node to bring the menu lower
 			children.spawn(Node {
@@ -78,33 +78,33 @@ fn enter_title(
 				..default()
 			});
 			children
-				.button("Play", font.0.clone_weak())
+				.button("Play", font.0.clone())
 				.insert(TitleAction::GoToScreen(Screen::LevelSelect));
 			children
-				.button("Settings", font.0.clone_weak())
+				.button("Settings", font.0.clone())
 				.insert(TitleAction::GoToScreen(Screen::Settings));
 			children
-				.button("Credits", font.0.clone_weak())
+				.button("Credits", font.0.clone())
 				.insert(TitleAction::GoToScreen(Screen::Credits));
 
 			#[cfg(not(target_family = "wasm"))]
 			children
-				.button("Exit", font.0.clone_weak())
+				.button("Exit", font.0.clone())
 				.insert(TitleAction::Exit);
 		});
 	commands.spawn((
-		StateScoped(Screen::Title),
+		DespawnOnExit(Screen::Title),
 		Sprite {
 			custom_size: Some(graphics::GAME_AREA * assets::TITLE_IMAGE_OVERFLOW),
-			image: image_handles[&ImageKey::Title].clone_weak(),
+			image: image_handles[&ImageKey::Title].clone(),
 			..default()
 		},
 		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_IMAGE),
 	));
 	commands.spawn((
-		StateScoped(Screen::Title),
+		DespawnOnExit(Screen::Title),
 		Mesh2d(meshes.add(Rectangle::from_size(ANIMATED_BACKGROUND_MESH_SIZE))),
-		MeshMaterial2d(background_material.clone_weak()),
+		MeshMaterial2d(background_material.0.clone()),
 		Transform::from_translation(Vec3::Z * graphics::layers::TITLE_BACKDROP),
 		Parallax(ANIMATED_BACKGROUND_PARALLAX),
 	));
@@ -113,7 +113,7 @@ fn enter_title(
 fn handle_title_action(
 	mut commands: Commands,
 	mut button_query: InteractionQuery<&TitleAction>,
-	#[cfg(not(target_family = "wasm"))] mut app_exit: EventWriter<AppExit>,
+	#[cfg(not(target_family = "wasm"))] mut app_exit: MessageWriter<AppExit>,
 ) {
 	for (interaction, action) in &mut button_query {
 		if matches!(interaction, Interaction::Pressed) {

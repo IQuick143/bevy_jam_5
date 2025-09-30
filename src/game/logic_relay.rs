@@ -1,36 +1,36 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
 use super::{components::*, logic::TurnCycleResult, prelude::*};
-use crate::{send_event, AppSet};
+use crate::{send_message, AppSet};
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
 		.init_resource::<GameState>()
 		.init_resource::<IsLevelCompleted>()
-		.add_event::<TurnCycleResult>()
-		.add_event::<GameLayoutChanged>()
-		.add_event::<RotateCycleGroup>()
-		.add_event::<RotateSingleCycle>()
-		.add_event::<RecordCycleGroupRotation>()
-		.add_event::<TurnBlockedByGroupConflict>()
+		.add_message::<TurnCycleResult>()
+		.add_message::<GameLayoutChanged>()
+		.add_message::<RotateCycleGroup>()
+		.add_message::<RotateSingleCycle>()
+		.add_message::<RecordCycleGroupRotation>()
+		.add_message::<TurnBlockedByGroupConflict>()
 		.add_systems(
 			LevelInitialization,
 			(
 				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
 				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
-				send_event(GameLayoutChanged),
+				send_message(GameLayoutChanged),
 			),
 		)
 		.add_systems(
 			Update,
 			(
-				cycle_group_rotation_system.run_if(on_event::<RotateCycleGroup>),
+				cycle_group_rotation_system.run_if(on_message::<RotateCycleGroup>),
 				(
 					button_trigger_check_system,
 					level_completion_check_system,
 					cycle_turnability_update_system,
 				)
-					.run_if(on_event::<GameLayoutChanged>)
+					.run_if(on_message::<GameLayoutChanged>)
 					.after(cycle_group_rotation_system),
 			)
 				.in_set(AppSet::GameLogic),
@@ -57,34 +57,34 @@ pub struct RotateCycle {
 	pub amount: i64,
 }
 
-/// Internal event sent to a cycle entity to rotate [`super::components::Object`]
+/// Internal message sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle, ignores linkages.
 ///
 /// Signals a rotation of a cycle occuring.
-#[derive(Event, Clone, Copy, Debug)]
+#[derive(Message, Clone, Copy, Debug)]
 pub struct RotateSingleCycle(pub RotateCycle);
 
-/// Event sent to a cycle entity to rotate [`super::components::Object`]
+/// Message sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle and all cycles linked to it
 /// Should be sent only if it is valid to rotate the given cycle.
-#[derive(Event, Clone, Copy, Debug)]
+#[derive(Message, Clone, Copy, Debug)]
 pub struct RotateCycleGroup(pub RotateCycle);
 
-/// Event sent together with a [`RotateCycleGroup`] event
+/// Message sent together with a [`RotateCycleGroup`] event
 /// if that rotation is eligible for being recorded in move history
-#[derive(Event, Clone, Copy, Debug)]
+#[derive(Message, Clone, Copy, Debug)]
 pub struct RecordCycleGroupRotation(pub RotateCycle);
 
-/// Event that is sent when state of the game map changes,
+/// Message that is sent when state of the game map changes,
 /// usually by turning a cycle
-#[derive(Event, Clone, Copy, Default, Debug)]
+#[derive(Message, Clone, Copy, Default, Debug)]
 pub struct GameLayoutChanged;
 
-/// Event indicating that a pair of groups that cannot be turned together
+/// Message indicating that a pair of groups that cannot be turned together
 /// blocked the execution of a turn.
 /// Emitted for each pair of conflicting groups.
 /// The value indexes into [`LevelData::forbidden_group_pairs`]
-#[derive(Event, Clone, Copy, Default, Debug)]
+#[derive(Message, Clone, Copy, Default, Debug)]
 pub struct TurnBlockedByGroupConflict(pub usize);
 
 /// Contains an information whether the level being played has been completed
@@ -94,11 +94,11 @@ pub struct IsLevelCompleted(pub bool);
 
 /// Rotates cycles in game state and sends out events to other systems
 fn cycle_group_rotation_system(
-	mut group_events: EventReader<RotateCycleGroup>,
-	mut single_events: EventWriter<RotateSingleCycle>,
-	mut update_event: EventWriter<GameLayoutChanged>,
-	mut blocked_event: EventWriter<TurnBlockedByGroupConflict>,
-	mut turn_events: EventWriter<TurnCycleResult>,
+	mut group_events: MessageReader<RotateCycleGroup>,
+	mut single_events: MessageWriter<RotateSingleCycle>,
+	mut update_event: MessageWriter<GameLayoutChanged>,
+	mut blocked_event: MessageWriter<TurnBlockedByGroupConflict>,
+	mut turn_events: MessageWriter<TurnCycleResult>,
 	mut game_state: ResMut<GameState>,
 	mut entity_index: ResMut<GameStateEcsIndex>,
 	active_level: PlayingLevelData,

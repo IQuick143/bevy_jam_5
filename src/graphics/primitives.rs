@@ -1,8 +1,8 @@
 //! Custom primitives for mesh generation
 
 use bevy::{
+	mesh::{Indices, PrimitiveTopology},
 	prelude::*,
-	render::mesh::{Indices, PrimitiveTopology},
 };
 use std::f32::consts::{PI, TAU};
 

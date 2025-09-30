@@ -47,7 +47,7 @@ fn spawn_splash(mut commands: Commands, asset_server: Res<AssetServer>) {
 		.insert((
 			Name::new("Splash screen"),
 			BackgroundColor(SPLASH_BACKGROUND_COLOR),
-			StateScoped(Screen::Splash),
+			DespawnOnExit(Screen::Splash),
 		))
 		.with_children(|children| {
 			children.spawn((

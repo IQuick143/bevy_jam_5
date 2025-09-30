@@ -17,8 +17,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<LastLevelSessionId>()
 		.init_resource::<ExpiringLevelSessionId>()
 		.init_resource::<LevelHandle>()
-		.add_event::<EnterLevel>()
-		.add_event::<SpawnLevel>()
+		.add_message::<EnterLevel>()
+		.add_message::<SpawnLevel>()
 		.configure_sets(
 			LevelInitialization,
 			(SpawnPrimaryEntities, SpawnVisuals).chain(),
@@ -29,7 +29,7 @@ pub(super) fn plugin(app: &mut App) {
 				handle_enter_level.after(AppSet::ExecuteInput),
 				(
 					(|w: &mut World| w.run_schedule(LevelInitialization))
-						.run_if(on_event::<SpawnLevel>),
+						.run_if(on_message::<SpawnLevel>),
 					despawn_expired_level_entities
 						.run_if(resource_changed::<ExpiringLevelSessionId>),
 				)
@@ -79,14 +79,14 @@ pub enum LevelInitializationSet {
 	SpawnVisuals,
 }
 
-/// An event that is sent to switch the game to a level
+/// A message that is sent to switch the game to a level
 /// or to exit a level entirely
-#[derive(Event, Clone, Debug)]
+#[derive(Message, Clone, Debug)]
 pub struct EnterLevel(pub Option<Handle<LevelData>>);
 
-/// An event that is sent to spawn entities for a particular level.
+/// A message that is sent to spawn entities for a particular level.
 /// These will replace any older entities
-#[derive(Event, Clone, Debug)]
+#[derive(Message, Clone, Debug)]
 pub struct SpawnLevel(pub Handle<LevelData>, pub LevelSessionId);
 
 /// Identifier of a level session.
@@ -109,8 +109,8 @@ impl LastLevelSessionId {
 struct ExpiringLevelSessionId(LevelSessionId);
 
 fn handle_enter_level(
-	mut enter_events: EventReader<EnterLevel>,
-	mut spawn_events: EventWriter<SpawnLevel>,
+	mut enter_events: MessageReader<EnterLevel>,
+	mut spawn_events: MessageWriter<SpawnLevel>,
 	mut last_session_id: ResMut<LastLevelSessionId>,
 	mut expiring_session_id: ResMut<ExpiringLevelSessionId>,
 	mut active_level: ResMut<LevelHandle>,
@@ -128,7 +128,7 @@ fn handle_enter_level(
 				};
 				*game_state = GameState::new(level);
 				last_session_id.0 .0 += 1;
-				spawn_events.write(SpawnLevel(level_handle.clone_weak(), last_session_id.0));
+				spawn_events.write(SpawnLevel(level_handle.clone(), last_session_id.0));
 			} else {
 				log::warn!("Got an invalid level handle");
 				active_level.0 = None;
@@ -153,7 +153,7 @@ fn despawn_expired_level_entities(
 
 fn spawn_primary_level_entities(
 	mut commands: Commands,
-	mut events: EventReader<SpawnLevel>,
+	mut events: MessageReader<SpawnLevel>,
 	levels: Res<Assets<LevelData>>,
 ) {
 	for SpawnLevel(level_handle, session_id) in events.read() {
@@ -406,15 +406,15 @@ fn create_vertex_visuals(
 	for id in &query {
 		let node = commands
 			.spawn((
-				Mesh2d(meshes.vertices.clone_weak()),
-				MeshMaterial2d(materials.cycle_rings_ready.clone_weak()),
+				Mesh2d(meshes.vertices.clone()),
+				MeshMaterial2d(materials.cycle_rings_ready.clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 			))
 			.id();
 		let outline = commands
 			.spawn((
-				Mesh2d(meshes.vertex_outlines.clone_weak()),
-				MeshMaterial2d(materials.cycle_ring_outlines.clone_weak()),
+				Mesh2d(meshes.vertex_outlines.clone()),
+				MeshMaterial2d(materials.cycle_ring_outlines.clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
@@ -470,14 +470,14 @@ fn create_cycle_visuals(
 		let ring = commands
 			.spawn((
 				Mesh2d(meshes.add(mesh)),
-				MeshMaterial2d(materials.cycle_rings_ready.clone_weak()),
+				MeshMaterial2d(materials.cycle_rings_ready.clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 			))
 			.id();
 		let outline = commands
 			.spawn((
 				Mesh2d(meshes.add(outline_mesh)),
-				MeshMaterial2d(materials.cycle_ring_outlines.clone_weak()),
+				MeshMaterial2d(materials.cycle_ring_outlines.clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
@@ -490,7 +490,7 @@ fn create_cycle_visuals(
 			let hitbox = commands
 				.spawn((
 					Mesh2d(meshes.add(hitbox_mesh)),
-					MeshMaterial2d(materials.cycle_hitboxes.clone_weak()),
+					MeshMaterial2d(materials.cycle_hitboxes.clone()),
 					Transform::from_translation(Vec3::Z * layers::CYCLE_SHADOWS),
 					Visibility::Hidden,
 				))
@@ -506,7 +506,7 @@ fn create_cycle_visuals(
 				.spawn((
 					Sprite {
 						custom_size: Some(SPRITE_SIZE),
-						image: images[&ImageKey::CycleCenter(*turnability)].clone_weak(),
+						image: images[&ImageKey::CycleCenter(*turnability)].clone(),
 						color: palette.cycle_ready,
 						..default()
 					},
@@ -517,7 +517,7 @@ fn create_cycle_visuals(
 				.spawn((
 					Sprite {
 						custom_size: Some(SPRITE_SIZE * 2.0),
-						image: images[&ImageKey::CycleRotationArrow].clone_weak(),
+						image: images[&ImageKey::CycleRotationArrow].clone(),
 						color: palette.cycle_ready,
 						..default()
 					},
@@ -561,7 +561,7 @@ fn create_hard_link_visuals(
 				b,
 				declared_link.direction,
 				&mut meshes,
-				materials.link_lines.clone_weak(),
+				materials.link_lines.clone(),
 			);
 		});
 	}
@@ -600,9 +600,9 @@ fn create_one_way_link_visuals(
 				declared_link.direction,
 				declared_link.multiplicity,
 				&mut meshes,
-				materials.link_lines.clone_weak(),
-				standard_meshes.one_way_link_tips.clone_weak(),
-				standard_meshes.one_way_link_backheads.clone_weak(),
+				materials.link_lines.clone(),
+				standard_meshes.one_way_link_tips.clone(),
+				standard_meshes.one_way_link_backheads.clone(),
 				&digit_atlas,
 				palette.link_multiplicity_label,
 				palette.inverted_link_multiplicity_label,
@@ -667,16 +667,16 @@ fn create_hard_link_visual(
 		),
 	};
 	children.spawn((
-		Mesh2d(mesh.clone_weak()),
+		Mesh2d(mesh.clone()),
 		Transform::from_rotation(rotation.mul_quat(extra_rotation))
 			.with_translation((position + offset).extend(layers::CYCLE_LINKS)),
-		MeshMaterial2d(material.clone_weak()),
+		MeshMaterial2d(material.clone()),
 	));
 	children.spawn((
 		Mesh2d(mesh),
 		Transform::from_rotation(rotation.mul_quat(extra_rotation.inverse()))
 			.with_translation((position - offset).extend(layers::CYCLE_LINKS)),
-		MeshMaterial2d(material.clone_weak()),
+		MeshMaterial2d(material.clone()),
 	));
 }
 
@@ -772,7 +772,7 @@ fn create_one_way_link_visual(
 		Mesh2d(line_mesh),
 		Transform::from_rotation(rotation)
 			.with_translation(line_center_position.extend(layers::CYCLE_LINKS)),
-		MeshMaterial2d(material.clone_weak()),
+		MeshMaterial2d(material.clone()),
 	));
 
 	// Rotates a tip arm to be parallel to arrow body
@@ -789,18 +789,18 @@ fn create_one_way_link_visual(
 			tip_distance_from_a - ONEWAY_MULTILINK_TIP_SPACING * i as f32;
 		let tip_position = dir_a_to_b * this_tip_distance_from_a;
 		children.spawn((
-			Mesh2d(tip_mesh.clone_weak()),
+			Mesh2d(tip_mesh.clone()),
 			Transform::from_rotation(main_tip_rotation * relative_tip_rotation)
 				.with_translation(tip_position.extend(layers::CYCLE_LINKS))
 				.mul_transform(tip_inner_transform),
-			MeshMaterial2d(material.clone_weak()),
+			MeshMaterial2d(material.clone()),
 		));
 		children.spawn((
-			Mesh2d(tip_mesh.clone_weak()),
+			Mesh2d(tip_mesh.clone()),
 			Transform::from_rotation(main_tip_rotation * relative_tip_rotation.inverse())
 				.with_translation(tip_position.extend(layers::CYCLE_LINKS))
 				.mul_transform(tip_inner_transform),
-			MeshMaterial2d(material.clone_weak()),
+			MeshMaterial2d(material.clone()),
 		));
 	}
 
@@ -812,7 +812,7 @@ fn create_one_way_link_visual(
 			Mesh2d(backhead_mesh),
 			Transform::from_rotation(rotation)
 				.with_translation(backhead_position.extend(layers::CYCLE_LINKS)),
-			MeshMaterial2d(material.clone_weak()),
+			MeshMaterial2d(material.clone()),
 		));
 
 		// Use the color corresponding to the direction
@@ -855,7 +855,7 @@ fn create_thing_sprites(
 		let (color, anchor, z_depth) = match thing {
 			ThingData::Object(ObjectData::Player) => (
 				palette.player,
-				Anchor::Custom(PLAYER_FLAG_SPRITE_ANCHOR),
+				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::OBJECT_SPRITES,
 			),
 			ThingData::Object(ObjectData::Box(_)) => {
@@ -863,7 +863,7 @@ fn create_thing_sprites(
 			}
 			ThingData::Glyph(GlyphData::Flag) => (
 				palette.goal_closed,
-				Anchor::Custom(PLAYER_FLAG_SPRITE_ANCHOR),
+				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::GLYPH_SPRITES,
 			),
 			ThingData::Glyph(GlyphData::Button(_)) => {
@@ -873,12 +873,12 @@ fn create_thing_sprites(
 		commands.entity(id).with_children(|children| {
 			children.spawn((
 				Sprite {
-					image: sprites[&ImageKey::Object(ThingType::from(*thing))].clone_weak(),
+					image: sprites[&ImageKey::Object(ThingType::from(*thing))].clone(),
 					custom_size: Some(SPRITE_SIZE),
 					color,
-					anchor,
 					..default()
 				},
+				anchor,
 				Transform::from_translation(Vec3::Z * z_depth),
 			));
 		});
@@ -921,15 +921,15 @@ fn create_button_color_markers(
 	for (id, color, label_appearence) in &query {
 		commands.entity(id).with_children(|children| {
 			let label_mesh = if label_appearence.has_arrow_tip {
-				meshes.arrow_labels.clone_weak()
+				meshes.arrow_labels.clone()
 			} else {
-				meshes.square_labels.clone_weak()
+				meshes.square_labels.clone()
 			};
 			let (translation, label_rotation, sprite_rotation) =
 				get_button_color_label_placement(label_appearence);
 
 			children.spawn((
-				MeshMaterial2d(materials.colored_button_labels.clone_weak()),
+				MeshMaterial2d(materials.colored_button_labels.clone()),
 				Mesh2d(label_mesh),
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_LABELS))
 					.with_rotation(Quat::from_rotation_z(label_rotation)),
@@ -961,10 +961,10 @@ fn create_logical_color_sprite(
 			transform,
 			Sprite {
 				custom_size: Some(COLOR_SPRITE_SIZE),
-				image: sprite_atlas.image.clone_weak(),
+				image: sprite_atlas.image.clone(),
 				color: sprite_color,
 				texture_atlas: Some(TextureAtlas {
-					layout: sprite_atlas.layout.clone_weak(),
+					layout: sprite_atlas.layout.clone(),
 					index: logical_color.color_index,
 				}),
 				..default()
@@ -1070,10 +1070,10 @@ fn typeset_number(
 			start_transform.mul_transform(digit_transform),
 			Sprite {
 				custom_size: Some(digit_sprite_size),
-				image: digit_atlas.image.clone_weak(),
+				image: digit_atlas.image.clone(),
 				color,
 				texture_atlas: Some(TextureAtlas {
-					layout: digit_atlas.layout.clone_weak(),
+					layout: digit_atlas.layout.clone(),
 					index: sprite_index,
 				}),
 				..default()
