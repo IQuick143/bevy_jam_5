@@ -1277,7 +1277,7 @@ yh = -sep / 2 / sqrt(3);
 		];
 		// Single hints
 		for hint in hints.iter() {
-			expect_fully_ok!(parse(&(level.to_owned() + &hint)));
+			expect_fully_ok!(parse(&(level.to_owned() + hint)));
 		}
 		// Arbitrary hint combination
 		for hint_combo in hints.iter().combinations_with_replacement(3) {
