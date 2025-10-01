@@ -62,6 +62,10 @@ pub struct CycleCenterVisualEntities {
 	pub arrow: Entity,
 }
 
+/// Reference to entity that indicates a cycle's hitbox
+#[derive(Component, Clone, Debug, Reflect, Deref, DerefMut)]
+pub struct CycleHitboxVisualEntity(pub Entity);
+
 /// Refernces to entities that make up the visualization of a vertex
 #[derive(Component, Clone, Debug, Reflect)]
 pub struct VertexVisualEntities {
@@ -84,6 +88,8 @@ pub struct GameObjectMaterials {
 	pub cycle_ring_outlines: Handle<ColorMaterial>,
 	/// Material for outlines of cycle rings and vertices that are not selectable
 	pub cycle_ring_outlines_disabled: Handle<ColorMaterial>,
+	/// Material for shadows/fill of cycles that are currently selected
+	pub cycle_hitboxes: Handle<ColorMaterial>,
 	/// Material for lines that represent links between cycles
 	pub link_lines: Handle<ColorMaterial>,
 	/// Meterial for labels that show logical color of buttons
@@ -115,6 +121,10 @@ impl FromWorld for GameObjectMaterials {
 			color: Srgba::hex("94A3B8").unwrap().into(),
 			..default()
 		});
+		let cycle_hitboxes = materials.add(ColorMaterial {
+			color: Srgba::hex("A3B7D1").unwrap().with_alpha(0.3).into(),
+			..default()
+		});
 		let link_lines = materials.add(ColorMaterial {
 			color: palettes::tailwind::SLATE_300.into(),
 			..default()
@@ -130,6 +140,7 @@ impl FromWorld for GameObjectMaterials {
 			cycle_rings_disabled,
 			cycle_ring_outlines,
 			cycle_ring_outlines_disabled,
+			cycle_hitboxes,
 			link_lines,
 			colored_button_labels,
 		}
@@ -316,12 +327,14 @@ fn cycle_center_interaction_visuals_update_system(
 		&ComputedCycleTurnability,
 		Option<&CycleCenterVisualEntities>,
 		Option<&CycleRingVisualEntities>,
+		Option<&CycleHitboxVisualEntity>,
 	)>,
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,
 	vertices_q: Query<&VertexVisualEntities>,
 	mut sprites_q: Query<&mut Sprite>,
 	mut meshes_q: Query<(&mut Transform, &mut MeshMaterial2d<ColorMaterial>)>,
+	mut visibility_q: Query<&mut Visibility>,
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
@@ -339,9 +352,12 @@ fn cycle_center_interaction_visuals_update_system(
 	let mut meshes_to_repaint = HashMap::<Entity, CycleStatus>::default();
 	let mut outlines_to_repaint = HashMap::<Entity, CycleStatus>::default();
 	let mut sprites_to_repaint = HashMap::<Entity, CycleStatus>::default();
+	let mut hitboxes_to_repaint = HashMap::<Entity, bool>::default();
 
-	for (_, cycle, is_turnable, center_visuals, ring_visuals) in &cycles_q {
+	for data in &cycles_q {
+		let (interaction, cycle, is_turnable, center_visuals, ring_visuals, hitbox_visuals) = data;
 		let is_selected = selected_groups.contains(&cycle.group_id);
+		let is_directly_selected = *interaction != CycleInteraction::None;
 
 		let cycle_status = if is_selected {
 			CycleStatus::Selected
@@ -354,6 +370,10 @@ fn cycle_center_interaction_visuals_update_system(
 		if let Some(visuals) = center_visuals {
 			let sprite_status = sprites_to_repaint.entry(visuals.sprite).or_default();
 			*sprite_status = (*sprite_status).max(cycle_status);
+		}
+		if let Some(hitbox) = hitbox_visuals {
+			let sprite_status = hitboxes_to_repaint.entry(**hitbox).or_default();
+			*sprite_status = *sprite_status || is_directly_selected;
 		}
 
 		level.cycles[cycle.id]
@@ -434,6 +454,18 @@ fn cycle_center_interaction_visuals_update_system(
 				transform.translation.z = layers::ACTIVE_CYCLE_RING_OUTLINES;
 				material.0 = materials.cycle_ring_outlines.clone();
 			}
+		}
+	}
+
+	for (id, is_directly_selected) in hitboxes_to_repaint {
+		let Ok(mut visibility) = visibility_q.get_mut(id) else {
+			log::warn!("Cycle hitbox mesh entity does not have a Visibility component");
+			continue;
+		};
+		if is_directly_selected {
+			*visibility = default();
+		} else {
+			*visibility = Visibility::Hidden;
 		}
 	}
 }

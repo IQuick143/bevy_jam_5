@@ -127,22 +127,22 @@ impl_try_into_for_domain_value! {
 
 pub fn pictogram_color_name_to_id(name: &str) -> Result<usize, ()> {
 	match name {
-		"desc" => Ok(0),                    // -,
-		"asc" => Ok(1),                     //  |
-		"x" | "cross" => Ok(2),             //  |
-		"minus" | "hbar" => Ok(3),          //  |
-		"beam" | "vbar" => Ok(4),           //  |
-		"plus" => Ok(5),                    //  |  Lateral and diagonal beams
+		"desc" | "\\" => Ok(0),             // -,
+		"asc" | "/" => Ok(1),               //  |
+		"x" | "X" | "cross" => Ok(2),       //  |
+		"minus" | "hbar" | "-" => Ok(3),    //  |
+		"beam" | "vbar" | "|" => Ok(4),     //  |
+		"plus" | "+" => Ok(5),              //  |  Lateral and diagonal beams
 		"desc_neg" => Ok(6),                //  |
 		"asc_neg" => Ok(7),                 //  |
 		"x_neg" | "cross_neg" => Ok(8),     //  |
 		"minus_neg" | "hbar_neg" => Ok(9),  //  |
 		"beam_neg" | "vbar_neg" => Ok(10),  //  |
 		"plus_neg" => Ok(11),               // -`
-		"up" => Ok(12),                     // -,
-		"down" => Ok(13),                   //  |
-		"left" => Ok(14),                   //  |
-		"right" => Ok(15),                  //  | Triangles that span full length of the box
+		"up" | "^" => Ok(12),               // -,
+		"down" | "v" => Ok(13),             //  |
+		"left" | "<" => Ok(14),             //  |
+		"right" | ">" => Ok(15),            //  | Triangles that span full length of the box
 		"up_neg" => Ok(16),                 //  |
 		"down_neg" => Ok(17),               //  |
 		"left_neg" => Ok(18),               //  |
@@ -156,27 +156,30 @@ pub fn pictogram_color_name_to_id(name: &str) -> Result<usize, ()> {
 		"start_neg" => Ok(26),              //  |
 		"end_neg" => Ok(27),                // -`
 		"tb" => Ok(28),                     // -, Two opposing center-boud triangles
-		"lr" | "rl" => Ok(29),              // -`
+		"lr" | "rl" | "><" => Ok(29),       // -`
 		"lt" => Ok(30),                     // -,
 		"rt" => Ok(31),                     //  | Half of the box filled, diagonally (as a right triangle)
 		"lb" => Ok(32),                     //  |
 		"rb" => Ok(33),                     // -`
 		"wide_diamond" => Ok(34),           // -, Wide diamond (square, not rhombus)
 		"corners" => Ok(35),                // -`
-		"star" => Ok(36),                   // Star pictogram
+		"star" | "*" => Ok(36),             // Star pictogram
 		"checker_asc" => Ok(37),            // -, Two opposite quadrants are filled
 		"checker_desc" => Ok(38),           // -`
 		"heart" => Ok(39),                  // -,
 		"spade" => Ok(40),                  //  | Card suites
 		"club" => Ok(41),                   //  |
 		"diamond" => Ok(42),                // -`
-		"one" => Ok(43),                    // -,
-		"two" => Ok(44),                    //  |
-		"three" => Ok(45),                  //  | Dice dots
-		"four" => Ok(46),                   //  |
-		"five" => Ok(47),                   //  |
-		"six" => Ok(48),                    // -`
+		"one" | "d1" => Ok(43),             // -,
+		"two" | "d2" => Ok(44),             //  |
+		"three" | "d3" => Ok(45),           //  | Dice dots
+		"four" | "d4" => Ok(46),            //  |
+		"five" | "d5" => Ok(47),            //  |
+		"six" | "d6" => Ok(48),             // -`
 		"fill" => Ok(49),                   // Filled box
+		"lightbulb" => Ok(50),              // Lightbulb picrogram
+		"power" => Ok(51),                  // Power symbol
+		"sun" => Ok(52),                    // Sun pictogram
 		_ => Err(()),
 	}
 }
