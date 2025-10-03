@@ -32,35 +32,39 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 		grid_template_columns: vec![RepeatedGridTrack::px(1, 290.0), RepeatedGridTrack::auto(1)],
 		..default()
 	};
-	commands
-		.ui_root()
-		.insert(DespawnOnExit(Screen::Credits))
-		.with_children(|children| {
-			children.header("Made by", font.0.clone());
-			children.spawn(table_node.clone())
-				.with_children(|children| {
-					children.text("IQuick 143", JustifyContent::End, font.0.clone());
-					children.text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone());
-					children.text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone());
-					children.text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone());
-					children.text("SoysCodingCafe", JustifyContent::End, font.0.clone());
-					children.text("Level Design", JustifyContent::Start, font.0.clone());
-					children.text("spilledcereals", JustifyContent::End, font.0.clone());
-					children.text("Music, SFX", JustifyContent::Start, font.0.clone());
-				});
+	commands.spawn(
+		(
+			widgets::ui_root(),
+			DespawnOnExit(Screen::Credits),
+			children![
+				widgets::header("Made by", font.0.clone()),
+				(
+					table_node.clone(),
+					children![
+						widgets::text("IQuick 143", JustifyContent::End, font.0.clone()),
+						widgets::text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone()),
+						widgets::text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone()),
+						widgets::text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone()),
+						widgets::text("SoysCodingCafe", JustifyContent::End, font.0.clone()),
+						widgets::text("Level Design", JustifyContent::Start, font.0.clone()),
+						widgets::text("spilledcereals", JustifyContent::End, font.0.clone()),
+						widgets::text("Music, SFX", JustifyContent::Start, font.0.clone()),
+					]
+				),
 
-			children.header("Assets", font.0.clone());
-			table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
-			children.spawn(table_node)
-				.with_children(|children| {
-					children.text("Bevy logo", JustifyContent::End, font.0.clone());
-					children.text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone());
-					children.text("Comfortaa font", JustifyContent::End, font.0.clone());
-					children.text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone());
-				});
-
-			children.button("Back", font.0.clone()).insert(CreditsAction::Back);
-		});
+				widgets::header("Assets", font.0.clone()),
+				({table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
+				table_node},
+				children![
+					widgets::text("Bevy logo", JustifyContent::End, font.0.clone()),
+						widgets::text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone()),
+						widgets::text("Comfortaa font", JustifyContent::End, font.0.clone()),
+						widgets::text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone()),
+				]),
+				(widgets::menu_button("Back", font.0.clone()),CreditsAction::Back),
+			]
+		)
+	);
 }
 
 fn exit_credits(mut _commands: Commands) {

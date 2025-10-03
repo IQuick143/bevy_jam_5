@@ -40,10 +40,9 @@ fn spawn_screen(
 		.get(&levels.0)
 		.expect("The LevelList asset should be valid");
 	commands
-		.ui_root()
-		.insert(DespawnOnExit(Screen::LevelSelect))
+		.spawn((widgets::ui_root(), DespawnOnExit(Screen::LevelSelect)))
 		.with_children(|parent| {
-			parent.header("Level Select", font.0.clone());
+			parent.spawn(widgets::header("Level Select", font.0.clone()));
 			parent
 				.spawn(Node {
 					display: Display::Grid,
@@ -57,9 +56,10 @@ fn spawn_screen(
 				.with_children(|parent| {
 					for (level_id, level_meta) in levels.levels.iter().enumerate() {
 						if let Some(level) = level_assets.get(&level_meta.data_handle) {
-							let mut button =
-								parent.small_button(level.name.clone(), font.0.clone());
-							button.insert(LevelSelectAction::PlayLevel(level_id));
+							let mut button = parent.spawn((
+								widgets::grid_button(level.name.clone(), font.0.clone()),
+								LevelSelectAction::PlayLevel(level_id),
+							));
 							if save.is_level_completed(&level_meta.identifier) {
 								button.with_child((
 									Name::new("Level Completed Marker"),
@@ -84,9 +84,10 @@ fn spawn_screen(
 						}
 					}
 				});
-			parent
-				.button("Back", font.0.clone())
-				.insert(LevelSelectAction::Back);
+			parent.spawn((
+				widgets::menu_button("Back", font.0.clone()),
+				LevelSelectAction::Back,
+			));
 		});
 }
 

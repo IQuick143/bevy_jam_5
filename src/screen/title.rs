@@ -68,30 +68,34 @@ fn enter_title(
 	background_material: Res<AnimatedBackgroundMaterial>,
 	image_handles: Res<HandleMap<ImageKey>>,
 ) {
-	commands
-		.ui_root()
-		.insert(DespawnOnExit(Screen::Title))
-		.with_children(|children| {
+	commands.spawn((
+		widgets::ui_root(),
+		DespawnOnExit(Screen::Title),
+		children![
 			// Invisible spacer node to bring the menu lower
-			children.spawn(Node {
+			Node {
 				height: Val::Px(200.0),
 				..default()
-			});
-			children
-				.button("Play", font.0.clone())
-				.insert(TitleAction::GoToScreen(Screen::LevelSelect));
-			children
-				.button("Settings", font.0.clone())
-				.insert(TitleAction::GoToScreen(Screen::Settings));
-			children
-				.button("Credits", font.0.clone())
-				.insert(TitleAction::GoToScreen(Screen::Credits));
-
+			},
+			(
+				widgets::menu_button("Play", font.0.clone()),
+				TitleAction::GoToScreen(Screen::LevelSelect)
+			),
+			(
+				widgets::menu_button("Settings", font.0.clone()),
+				TitleAction::GoToScreen(Screen::Settings)
+			),
+			(
+				widgets::menu_button("Credits", font.0.clone()),
+				TitleAction::GoToScreen(Screen::Credits)
+			),
 			#[cfg(not(target_family = "wasm"))]
-			children
-				.button("Exit", font.0.clone())
-				.insert(TitleAction::Exit);
-		});
+			(
+				widgets::menu_button("Exit", font.0.clone()),
+				TitleAction::Exit
+			),
+		],
+	));
 	commands.spawn((
 		DespawnOnExit(Screen::Title),
 		Sprite {

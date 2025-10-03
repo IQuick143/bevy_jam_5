@@ -145,11 +145,13 @@ fn spawn_game_ui(
 	colors: Res<ThingPalette>,
 ) {
 	commands
-		.ui_root_justified(JustifyContent::Start)
-		.insert(DespawnOnExit(Screen::Playing))
+		.spawn((
+			widgets::ui_root_justified(JustifyContent::Start),
+			DespawnOnExit(Screen::Playing),
+		))
 		.with_children(|parent| {
-			parent
-				.spawn(Node {
+			parent.spawn((
+				Node {
 					width: Val::Vw(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: Val::Px(10.0),
@@ -157,18 +159,23 @@ fn spawn_game_ui(
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::Start,
 					..default()
-				})
-				.with_children(|parent| {
-					parent
-						.tool_button("Back", font.0.clone())
-						.insert(GameUiAction::Back);
-					parent
-						.tool_button("Reset", font.0.clone())
-						.insert(GameUiAction::Reset);
-					parent
-						.tool_button("Undo", font.0.clone())
-						.insert((GameUiAction::Undo, UndoButton));
-				});
+				},
+				children![
+					(
+						widgets::toolbar_button("Back", font.0.clone()),
+						GameUiAction::Back,
+					),
+					(
+						widgets::toolbar_button("Reset", font.0.clone()),
+						GameUiAction::Reset,
+					),
+					(
+						widgets::toolbar_button("Undo", font.0.clone()),
+						GameUiAction::Undo,
+						UndoButton,
+					),
+				],
+			));
 			parent
 				.spawn(Node {
 					width: Val::Vw(100.0),
@@ -181,19 +188,21 @@ fn spawn_game_ui(
 					..default()
 				})
 				.with_children(|parent| {
-					parent.tool_button("Next Level", font.0.clone()).insert((
-						GameUiAction::NextLevel,
-						NextLevelButton,
-						BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
-						InteractionPalette {
-							none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
-							hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
-							pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
-						},
-					));
+					parent
+						.spawn(widgets::toolbar_button("Next Level", font.0.clone()))
+						.insert((
+							GameUiAction::NextLevel,
+							NextLevelButton,
+							BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
+							InteractionPalette {
+								none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
+								hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
+								pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
+							},
+						));
 				});
-			parent
-				.spawn(Node {
+			parent.spawn((
+				Node {
 					width: Val::Vw(100.0),
 					height: Val::Vh(10.0),
 					margin: UiRect::all(Val::Px(10.0)),
@@ -202,9 +211,9 @@ fn spawn_game_ui(
 					align_items: AlignItems::Center,
 					column_gap: Val::Px(LEVEL_TITLE_CHECK_GAP),
 					..default()
-				})
-				.with_children(|parent| {
-					parent.spawn((
+				},
+				children![
+					(
 						LevelNameBox,
 						Text::default(),
 						TextFont {
@@ -213,8 +222,8 @@ fn spawn_game_ui(
 							..default()
 						},
 						TextColor(ui_palette::LABEL_TEXT),
-					));
-					parent.spawn((
+					),
+					(
 						LevelCompletionCheckmarkBox::default(),
 						Node {
 							width: Val::Px(LEVEL_TITLE_SIZE),
@@ -227,35 +236,36 @@ fn spawn_game_ui(
 							image_mode: NodeImageMode::Stretch,
 							..default()
 						},
-					));
-				});
+					),
+				],
+			));
 		});
 
-	commands
-		.ui_root_justified(JustifyContent::End)
-		.insert(DespawnOnExit(Screen::Playing))
-		.with_children(|parent| {
-			parent
-				.spawn(Node {
-					width: Val::Vh(100.0),
-					min_width: Val::Vw(50.0),
-					max_width: Val::Vw(100.0),
-					padding: UiRect::all(Val::Px(10.0)),
-					justify_content: JustifyContent::Center,
+	commands.spawn((
+		widgets::ui_root_justified(JustifyContent::End),
+		DespawnOnExit(Screen::Playing),
+		children![(
+			Node {
+				width: Val::Vh(100.0),
+				min_width: Val::Vw(50.0),
+				max_width: Val::Vw(100.0),
+				padding: UiRect::all(Val::Px(10.0)),
+				justify_content: JustifyContent::Center,
+				..default()
+			},
+			children![(
+				HoverText,
+				Text::default(),
+				TextFont {
+					font: font.0.clone(),
+					font_size: 20.0,
 					..default()
-				})
-				.with_child((
-					HoverText,
-					Text::default(),
-					TextFont {
-						font: font.0.clone(),
-						font_size: 20.0,
-						..default()
-					},
-					TextLayout::new_with_justify(Justify::Center),
-					TextColor(ui_palette::LABEL_TEXT),
-				));
-		});
+				},
+				TextLayout::new_with_justify(Justify::Center),
+				TextColor(ui_palette::LABEL_TEXT),
+			)],
+		)],
+	));
 }
 
 fn game_ui_input_recording_system(
