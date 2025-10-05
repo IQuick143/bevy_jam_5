@@ -174,7 +174,7 @@ fn accept_slider_inputs(
 			&ComputedNode,
 			&RelativeCursorPosition,
 		),
-		Changed<RelativeCursorPosition>,
+		Or<(Changed<RelativeCursorPosition>, Changed<Interaction>)>,
 	>,
 ) {
 	for (mut slider, interaction, node, cursor_pos) in &mut slider_q {
@@ -187,7 +187,7 @@ fn accept_slider_inputs(
 		let node_width = node.size.x * node.inverse_scale_factor;
 		let bar_offset = NODE_RADIUS + RING_OUTLINE_WIDTH;
 		let bar_width = node_width - 2.0 * bar_offset;
-		let corrected_cursor_offset = (cursor_pos.x * node_width - bar_offset) / bar_width;
+		let corrected_cursor_offset = ((cursor_pos.x + 0.5) * node_width - bar_offset) / bar_width;
 		let new_position = (corrected_cursor_offset * slider.step_count as f32)
 			.round()
 			.clamp(0.0, slider.step_count as f32) as u32;
