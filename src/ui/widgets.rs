@@ -90,7 +90,7 @@ pub fn common_button(
 	)
 }
 
-/// Header label. Bigger than [`Widgets::label`]
+/// Header label. Bigger than [`label`]
 pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	(
 		Name::new("Header"),
