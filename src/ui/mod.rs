@@ -8,6 +8,7 @@ pub mod interaction;
 pub mod multistate;
 pub mod palette;
 pub mod screen_fade;
+pub mod scrollbox;
 pub mod slider;
 pub mod widgets;
 
@@ -46,5 +47,6 @@ pub(super) fn plugin(app: &mut App) {
 		background::plugin,
 		slider::plugin,
 		multistate::plugin,
+		scrollbox::plugin,
 	));
 }

@@ -8,7 +8,7 @@ use crate::{
 		level::{list::LevelList, LevelData},
 	},
 	save::SaveGame,
-	ui::{consts::*, prelude::*},
+	ui::{consts::*, prelude::*, scrollbox::Scrollbox},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -48,12 +48,15 @@ fn spawn_screen(
 	));
 	let main_id = commands
 		.spawn((
+			Scrollbox {
+				step: COMMON_GAP_PX + GRID_BUTTON_HEIGHT_PX,
+			},
 			Node {
 				flex_direction: FlexDirection::Column,
 				justify_content: JustifyContent::Start,
 				align_content: AlignContent::Center,
 				height: Val::Percent(60.0),
-				row_gap: Val::Px(10.0),
+				row_gap: COMMON_GAP,
 				overflow: Overflow::scroll_y(),
 				..default()
 			},

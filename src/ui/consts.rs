@@ -11,7 +11,8 @@ pub const MENU_BUTTON_TEXT_SIZE: f32 = HEADING_TEXT_SIZE;
 pub const WIDE_BUTTON_WIDTH: Val = Px(200.0);
 pub const COMMON_BUTTON_TEXT_SIZE: f32 = 30.0;
 pub const LABEL_WIDTH: Val = Px(500.0);
-pub const COMMON_GAP: Val = Px(10.0);
+pub const COMMON_GAP_PX: f32 = 10.0;
+pub const COMMON_GAP: Val = Px(COMMON_GAP_PX);
 pub const COMMON_TEXT_SIZE: f32 = 24.0;
 
 // Double-columned screens
@@ -19,7 +20,8 @@ pub const WIDE_GAP: Val = Px(20.0);
 pub const INLINE_BUTTON_PADDING: UiRect = UiRect::axes(Px(10.0), Px(5.0));
 
 // Level select
-pub const GRID_BUTTON_HEIGHT: Val = Px(45.0);
+pub const GRID_BUTTON_HEIGHT_PX: f32 = 45.0;
+pub const GRID_BUTTON_HEIGHT: Val = Px(GRID_BUTTON_HEIGHT_PX);
 pub const LEVEL_COMPLETED_MARKER_SIZE: Val = Px(30.0);
 pub const LEVEL_COMPLETED_MARKER_MARGIN: Val = Px(7.5);
 
