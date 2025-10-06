@@ -32,10 +32,14 @@ pub struct LevelInfo {
 }
 
 /// Information about a hub and a group of levels it contains
-#[derive(Clone, Debug, Reflect)]
+#[derive(Clone, Debug, Default, Reflect)]
 pub struct HubLevelInfo {
 	/// Index of the hub that this hub logically subdivides
 	pub parent_hub: Option<usize>,
+	/// List of hubs that subdivide this hub
+	pub child_hubs: Vec<usize>,
+	/// List of levels that belong directly to the hub (not transitively)
+	pub levels: Vec<usize>,
 }
 
 /// Helper object for construction of a level list
@@ -74,7 +78,10 @@ impl LevelListBuilder {
 	}
 
 	pub fn add_hub(&mut self) -> Result<usize, LevelListBuildError> {
-		self.list.hubs.push(HubLevelInfo { parent_hub: None });
+		self.list.hubs.push(HubLevelInfo {
+			parent_hub: None,
+			..default()
+		});
 		Ok(self.list.hubs.len() - 1)
 	}
 
@@ -138,6 +145,7 @@ impl LevelListBuilder {
 			return Err(LevelListBuildError::OrphanedLevel(i));
 		}
 		self.find_and_set_root_hub()?;
+		self.fill_hub_child_lists();
 		self.load_level_assets(asset_load_context);
 		Ok(self.list)
 	}
@@ -177,6 +185,20 @@ impl LevelListBuilder {
 		}
 		self.list.root_hub = first_root;
 		Ok(())
+	}
+
+	/// Fills in the child lists of hubs based on parent references
+	///
+	/// Assumes the child lists start off empty
+	fn fill_hub_child_lists(&mut self) {
+		for i in 0..self.list.hubs.len() {
+			if let Some(parent) = self.list.hubs[i].parent_hub {
+				self.list.hubs[parent].child_hubs.push(i);
+			}
+		}
+		for (i, level) in self.list.levels.iter().enumerate() {
+			self.list.hubs[level.parent_hub].levels.push(i);
+		}
 	}
 
 	fn load_level_assets(&mut self, load_context: &mut LoadContext) {
