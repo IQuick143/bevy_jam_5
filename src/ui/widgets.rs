@@ -5,43 +5,68 @@ use bevy::{prelude::*, ui::Val::*};
 
 /// Largest type of buttons, use for menus
 pub fn menu_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
-	(
-		Name::new("Button"),
-		Button,
-		Node {
-			width: WIDE_BUTTON_WIDTH,
-			height: MENU_BUTTON_HEIGHT,
-			justify_content: JustifyContent::Center,
-			align_items: AlignItems::Center,
-			..default()
-		},
-		BackgroundColor(NODE_BACKGROUND),
-		InteractionPalette {
-			none: NODE_BACKGROUND,
-			hovered: BUTTON_HOVERED_BACKGROUND,
-			pressed: BUTTON_PRESSED_BACKGROUND,
-		},
-		children![(
-			Name::new("Button Text"),
-			Text::new(text),
-			TextFont {
-				font_size: MENU_BUTTON_TEXT_SIZE,
-				font,
-				..default()
-			},
-			TextColor(BUTTON_TEXT),
-		)],
+	common_button(
+		text.into(),
+		font,
+		MENU_BUTTON_TEXT_SIZE,
+		default(),
+		WIDE_BUTTON_WIDTH,
+		MENU_BUTTON_HEIGHT,
 	)
 }
 
 /// Large buttons for grids
 pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
+	common_button(
+		text.into(),
+		font,
+		COMMON_BUTTON_TEXT_SIZE,
+		default(),
+		WIDE_BUTTON_WIDTH,
+		GRID_BUTTON_HEIGHT,
+	)
+}
+
+/// Small button for toolbars
+pub fn toolbar_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
+	common_button(
+		text.into(),
+		font,
+		COMMON_BUTTON_TEXT_SIZE,
+		TOOLBAR_BUTTON_PADDING,
+		Auto,
+		Auto,
+	)
+}
+
+/// Small button whose size matches [`text`]
+pub fn inline_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
+	common_button(
+		text.into(),
+		font,
+		COMMON_TEXT_SIZE,
+		INLINE_BUTTON_PADDING,
+		Auto,
+		Auto,
+	)
+}
+
+/// Base of all button bundles
+pub fn common_button(
+	text: String,
+	font: Handle<Font>,
+	font_size: f32,
+	padding: UiRect,
+	width: Val,
+	height: Val,
+) -> impl Bundle {
 	(
 		Name::new("Button"),
 		Button,
 		Node {
-			width: WIDE_BUTTON_WIDTH,
-			height: GRID_BUTTON_HEIGHT,
+			padding,
+			width,
+			height,
 			justify_content: JustifyContent::Center,
 			align_items: AlignItems::Center,
 			..default()
@@ -56,65 +81,7 @@ pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 			Name::new("Button Text"),
 			Text::new(text),
 			TextFont {
-				font_size: COMMON_BUTTON_TEXT_SIZE,
-				font,
-				..default()
-			},
-			TextColor(BUTTON_TEXT),
-		)],
-	)
-}
-
-/// Small button for toolbars
-pub fn toolbar_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
-	(
-		Name::new("Button"),
-		Button,
-		Node {
-			padding: TOOLBAR_BUTTON_PADDING,
-			align_items: AlignItems::Center,
-			..default()
-		},
-		BackgroundColor(NODE_BACKGROUND),
-		InteractionPalette {
-			none: NODE_BACKGROUND,
-			hovered: BUTTON_HOVERED_BACKGROUND,
-			pressed: BUTTON_PRESSED_BACKGROUND,
-		},
-		children![(
-			Name::new("Button Text"),
-			Text::new(text),
-			TextFont {
-				font_size: COMMON_BUTTON_TEXT_SIZE,
-				font,
-				..default()
-			},
-			TextColor(BUTTON_TEXT),
-		)],
-	)
-}
-
-/// Small button whose size matches [`text`]
-pub fn inline_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
-	(
-		Name::new("Button"),
-		Button,
-		Node {
-			padding: INLINE_BUTTON_PADDING,
-			align_items: AlignItems::Center,
-			..default()
-		},
-		BackgroundColor(NODE_BACKGROUND),
-		InteractionPalette {
-			none: NODE_BACKGROUND,
-			hovered: BUTTON_HOVERED_BACKGROUND,
-			pressed: BUTTON_PRESSED_BACKGROUND,
-		},
-		children![(
-			Name::new("Button Text"),
-			Text::new(text),
-			TextFont {
-				font_size: COMMON_TEXT_SIZE,
+				font_size,
 				font,
 				..default()
 			},
