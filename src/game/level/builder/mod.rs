@@ -117,6 +117,8 @@ struct IntermediateCycleData {
 	pub outgoing_one_way_links: Vec<OneWayIntermediateData>,
 	/// Detectors, pairs of detector ID's and their offsets on this cycle. (The second, positional, index is the index of the vertex this detector comes *after*)
 	pub placed_detectors: Vec<(usize, usize)>,
+	/// Walls, values are their offsets on this cycle. (The positional index is the index of the vertex this wall comes *after*)
+	pub walls: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]

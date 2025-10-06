@@ -22,6 +22,7 @@ pub struct HubId(pub usize);
 pub enum DomainValue {
 	Vertex(VertexId),
 	Detector(DetectorId),
+	Wall,
 	Cycle(CycleId),
 	Object(ObjectData),
 	Glyph(GlyphData),
@@ -34,6 +35,7 @@ pub enum DomainValue {
 pub enum DomainType {
 	Vertex,
 	Detector,
+	Wall,
 	Cycle,
 	Object,
 	Glyph,
@@ -47,6 +49,7 @@ impl std::fmt::Display for DomainType {
 		let display_name = match self {
 			Self::Vertex => "vertex",
 			Self::Detector => "detector",
+			Self::Wall => "wall",
 			Self::Cycle => "cycle",
 			Self::Object => "object",
 			Self::Glyph => "glyph",
@@ -65,6 +68,7 @@ impl DomainVariableValue for DomainValue {
 		match self {
 			Self::Vertex(_) => Self::Type::Vertex,
 			Self::Detector(_) => Self::Type::Detector,
+			Self::Wall => Self::Type::Wall,
 			Self::Cycle(_) => Self::Type::Cycle,
 			Self::Object(_) => Self::Type::Object,
 			Self::Glyph(_) => Self::Type::Glyph,

@@ -92,8 +92,12 @@ pub struct GameObjectMaterials {
 	pub cycle_hitboxes: Handle<ColorMaterial>,
 	/// Material for lines that represent links between cycles
 	pub link_lines: Handle<ColorMaterial>,
-	/// Meterial for labels that show logical color of buttons
+	/// Material for labels that show logical color of buttons
 	pub colored_button_labels: Handle<ColorMaterial>,
+	/// Material for detectors
+	pub detector: Handle<ColorMaterial>,
+	/// Material for walls
+	pub wall: Handle<ColorMaterial>,
 }
 
 impl FromWorld for GameObjectMaterials {
@@ -133,6 +137,15 @@ impl FromWorld for GameObjectMaterials {
 			color: Color::BLACK,
 			..default()
 		});
+		// TODO: Textures
+		let detector = materials.add(ColorMaterial {
+			color: palettes::css::ORANGE.into(),
+			..default()
+		});
+		let wall = materials.add(ColorMaterial {
+			color: palettes::css::GRAY.into(),
+			..default()
+		});
 
 		Self {
 			cycle_rings_ready,
@@ -143,6 +156,8 @@ impl FromWorld for GameObjectMaterials {
 			cycle_hitboxes,
 			link_lines,
 			colored_button_labels,
+			detector,
+			wall,
 		}
 	}
 }
@@ -163,6 +178,8 @@ pub struct GameObjectMeshes {
 	/// Mesh for back side of tips of arrows for one-way links
 	/// with numeric multiplicity labels
 	pub one_way_link_backheads: Handle<Mesh>,
+	/// Mesh for a thin rectangle, used for detectors and walls
+	pub detector_rectangle: Handle<Mesh>,
 }
 
 impl FromWorld for GameObjectMeshes {
@@ -194,6 +211,8 @@ impl FromWorld for GameObjectMeshes {
 				.mesh()
 				.resolution(ONEWAY_LINK_TIP_RESOLUTION),
 		);
+		let detector_rectangle =
+			meshes.add(Rectangle::from_size(Vec2::new(CYCLE_LINK_WIDTH, SPRITE_LENGTH)).mesh());
 
 		Self {
 			vertices,
@@ -202,6 +221,7 @@ impl FromWorld for GameObjectMeshes {
 			arrow_labels,
 			one_way_link_tips,
 			one_way_link_backheads,
+			detector_rectangle,
 		}
 	}
 }
