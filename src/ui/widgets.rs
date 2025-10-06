@@ -1,6 +1,6 @@
 //! Helper traits for creating common widgets.
 
-use super::{interaction::InteractionPalette, palette::*};
+use super::{consts::*, interaction::InteractionPalette, palette::*};
 use bevy::{prelude::*, ui::Val::*};
 
 /// Largest type of buttons, use for menus
@@ -9,8 +9,8 @@ pub fn menu_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 		Name::new("Button"),
 		Button,
 		Node {
-			width: Px(200.0),
-			height: Px(65.0),
+			width: WIDE_BUTTON_WIDTH,
+			height: MENU_BUTTON_HEIGHT,
 			justify_content: JustifyContent::Center,
 			align_items: AlignItems::Center,
 			..default()
@@ -25,7 +25,7 @@ pub fn menu_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 			Name::new("Button Text"),
 			Text::new(text),
 			TextFont {
-				font_size: 40.0,
+				font_size: MENU_BUTTON_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -40,8 +40,8 @@ pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 		Name::new("Button"),
 		Button,
 		Node {
-			width: Px(200.0),
-			height: Px(45.0),
+			width: WIDE_BUTTON_WIDTH,
+			height: GRID_BUTTON_HEIGHT,
 			justify_content: JustifyContent::Center,
 			align_items: AlignItems::Center,
 			..default()
@@ -56,7 +56,7 @@ pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 			Name::new("Button Text"),
 			Text::new(text),
 			TextFont {
-				font_size: 30.0,
+				font_size: COMMON_BUTTON_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -71,7 +71,7 @@ pub fn toolbar_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundl
 		Name::new("Button"),
 		Button,
 		Node {
-			padding: UiRect::all(Px(10.0)),
+			padding: TOOLBAR_BUTTON_PADDING,
 			align_items: AlignItems::Center,
 			..default()
 		},
@@ -85,7 +85,7 @@ pub fn toolbar_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundl
 			Name::new("Button Text"),
 			Text::new(text),
 			TextFont {
-				font_size: 30.0,
+				font_size: COMMON_BUTTON_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -100,7 +100,7 @@ pub fn inline_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle
 		Name::new("Button"),
 		Button,
 		Node {
-			padding: UiRect::axes(Px(10.0), Px(5.0)),
+			padding: INLINE_BUTTON_PADDING,
 			align_items: AlignItems::Center,
 			..default()
 		},
@@ -114,7 +114,7 @@ pub fn inline_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle
 			Name::new("Button Text"),
 			Text::new(text),
 			TextFont {
-				font_size: 24.0,
+				font_size: COMMON_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -128,8 +128,8 @@ pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	(
 		Name::new("Header"),
 		Node {
-			width: Px(500.0),
-			height: Px(65.0),
+			width: LABEL_WIDTH,
+			height: HEADING_HEIGHT,
 			justify_content: JustifyContent::Center,
 			align_items: AlignItems::Center,
 			..default()
@@ -139,7 +139,7 @@ pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 			Name::new("Header Text"),
 			Text::new(text),
 			TextFont {
-				font_size: 40.0,
+				font_size: HEADING_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -153,7 +153,7 @@ pub fn label(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	(
 		Name::new("Label"),
 		Node {
-			width: Px(500.0),
+			width: LABEL_WIDTH,
 			justify_content: JustifyContent::Center,
 			align_items: AlignItems::Center,
 			..default()
@@ -162,7 +162,7 @@ pub fn label(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 			Name::new("Label Text"),
 			Text::new(text),
 			TextFont {
-				font_size: 24.0,
+				font_size: COMMON_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -184,7 +184,7 @@ pub fn text(text: impl Into<String>, align: JustifyContent, font: Handle<Font>) 
 			Name::new("Text Content"),
 			Text::new(text),
 			TextFont {
-				font_size: 24.0,
+				font_size: COMMON_TEXT_SIZE,
 				font,
 				..default()
 			},
@@ -208,7 +208,7 @@ pub fn ui_root_justified(justify_content: JustifyContent) -> impl Bundle {
 			justify_content,
 			align_items: AlignItems::Center,
 			flex_direction: FlexDirection::Column,
-			row_gap: Px(10.0),
+			row_gap: COMMON_GAP,
 			position_type: PositionType::Absolute,
 			..default()
 		},

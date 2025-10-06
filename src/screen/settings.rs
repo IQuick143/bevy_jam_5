@@ -7,6 +7,7 @@ use crate::{
 	settings::Settings,
 	ui::{
 		background::BackgroundMode,
+		consts::*,
 		multistate::{MultiStateButton, MultiStateButtonLabels},
 		prelude::*,
 		slider::Slider,
@@ -61,9 +62,9 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 				Node {
 					display: Display::Grid,
 					width: Val::Percent(100.0),
-					column_gap: Val::Px(20.0),
-					row_gap: Val::Px(10.0),
-					padding: UiRect::vertical(Val::Px(10.0)),
+					column_gap: WIDE_GAP,
+					row_gap: COMMON_GAP,
+					padding: UiRect::vertical(COMMON_GAP),
 					grid_template_columns: vec![RepeatedGridTrack::auto(2)],
 					..default()
 				},

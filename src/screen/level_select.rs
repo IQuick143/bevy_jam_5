@@ -8,7 +8,7 @@ use crate::{
 		level::{list::LevelList, LevelData},
 	},
 	save::SaveGame,
-	ui::prelude::*,
+	ui::{consts::*, prelude::*},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -46,8 +46,8 @@ fn spawn_screen(
 			parent
 				.spawn(Node {
 					display: Display::Grid,
-					column_gap: Val::Px(10.0),
-					row_gap: Val::Px(10.0),
+					column_gap: COMMON_GAP,
+					row_gap: COMMON_GAP,
 					justify_content: JustifyContent::Center,
 					align_content: AlignContent::Center,
 					grid_template_columns: vec![RepeatedGridTrack::auto(3)],
@@ -64,11 +64,11 @@ fn spawn_screen(
 								button.with_child((
 									Name::new("Level Completed Marker"),
 									Node {
-										width: Val::Px(30.0),
-										height: Val::Px(30.0),
+										width: LEVEL_COMPLETED_MARKER_SIZE,
+										height: LEVEL_COMPLETED_MARKER_SIZE,
 										position_type: PositionType::Absolute,
-										bottom: Val::Px(7.5),
-										right: Val::Px(7.5),
+										bottom: LEVEL_COMPLETED_MARKER_MARGIN,
+										right: LEVEL_COMPLETED_MARKER_MARGIN,
 										..default()
 									},
 									ImageNode {

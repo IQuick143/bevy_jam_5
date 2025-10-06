@@ -10,7 +10,7 @@ use crate::{
 		prelude::*,
 	},
 	send_message,
-	ui::{hover::HoverText, prelude::*},
+	ui::{consts::*, hover::HoverText, prelude::*},
 	AppSet,
 };
 
@@ -133,11 +133,6 @@ impl PlayingLevelListEntry<'_> {
 	}
 }
 
-/// Size of the level title label on the playing screen
-const LEVEL_TITLE_SIZE: f32 = 35.0;
-/// Width of the gap between title label and checkmark indicating completion
-const LEVEL_TITLE_CHECK_GAP: f32 = 15.0;
-
 fn spawn_game_ui(
 	mut commands: Commands,
 	font: Res<GlobalFont>,
@@ -152,10 +147,10 @@ fn spawn_game_ui(
 		.with_children(|parent| {
 			parent.spawn((
 				Node {
-					width: Val::Vw(100.0),
+					width: Val::Percent(100.0),
 					flex_direction: FlexDirection::Row,
-					column_gap: Val::Px(10.0),
-					padding: UiRect::all(Val::Px(10.0)),
+					column_gap: COMMON_GAP,
+					padding: UiRect::all(COMMON_GAP),
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::Start,
 					..default()
@@ -178,10 +173,10 @@ fn spawn_game_ui(
 			));
 			parent
 				.spawn(Node {
-					width: Val::Vw(100.0),
+					width: Val::Percent(100.0),
 					flex_direction: FlexDirection::Row,
-					column_gap: Val::Px(10.0),
-					padding: UiRect::all(Val::Px(10.0)),
+					column_gap: COMMON_GAP,
+					padding: UiRect::all(COMMON_GAP),
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::End,
 					position_type: PositionType::Absolute,
@@ -203,9 +198,9 @@ fn spawn_game_ui(
 				});
 			parent.spawn((
 				Node {
-					width: Val::Vw(100.0),
-					height: Val::Vh(10.0),
-					margin: UiRect::all(Val::Px(10.0)),
+					width: Val::Percent(100.0),
+					height: LEVEL_TITLE_HEIGHT,
+					margin: UiRect::all(COMMON_GAP),
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
 					align_items: AlignItems::Center,
@@ -249,7 +244,7 @@ fn spawn_game_ui(
 				width: Val::Vh(100.0),
 				min_width: Val::Vw(50.0),
 				max_width: Val::Vw(100.0),
-				padding: UiRect::all(Val::Px(10.0)),
+				padding: UiRect::all(COMMON_GAP),
 				justify_content: JustifyContent::Center,
 				..default()
 			},
@@ -258,7 +253,7 @@ fn spawn_game_ui(
 				Text::default(),
 				TextFont {
 					font: font.0.clone(),
-					font_size: 20.0,
+					font_size: HOVER_HINT_TEXT_SIZE,
 					..default()
 				},
 				TextLayout::new_with_justify(Justify::Center),

@@ -1,6 +1,7 @@
 //! Reusable UI widgets & theming.
 
 pub mod background;
+pub mod consts;
 pub mod freeze;
 pub mod hover;
 pub mod interaction;

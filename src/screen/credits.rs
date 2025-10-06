@@ -3,7 +3,10 @@
 use bevy::prelude::*;
 
 use super::*;
-use crate::{assets::GlobalFont, ui::prelude::*};
+use crate::{
+	assets::GlobalFont,
+	ui::{consts::*, prelude::*},
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Credits), enter_credits);
@@ -22,14 +25,21 @@ enum CreditsAction {
 	Back,
 }
 
+const MAX_CENTERED_PANEL_WIDTH: f32 = 800.0;
+const AUTHOR_NAME_FIELD_WIDTH: f32 = 290.0;
+const ASSET_NAME_FIELD_WIDTH: f32 = 175.0;
+
 fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 	let mut table_node = Node {
 		display: Display::Grid,
 		width: Val::Percent(100.0),
-		max_width: Val::Px(800.0),
-		column_gap: Val::Px(20.0),
-		row_gap: Val::Px(10.0),
-		grid_template_columns: vec![RepeatedGridTrack::px(1, 290.0), RepeatedGridTrack::auto(1)],
+		max_width: Val::Px(MAX_CENTERED_PANEL_WIDTH),
+		column_gap: WIDE_GAP,
+		row_gap: COMMON_GAP,
+		grid_template_columns: vec![
+			RepeatedGridTrack::px(1, AUTHOR_NAME_FIELD_WIDTH),
+			RepeatedGridTrack::auto(1),
+		],
 		..default()
 	};
 	commands.spawn(
@@ -53,14 +63,18 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 				),
 
 				widgets::header("Assets", font.0.clone()),
-				({table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
-				table_node},
-				children![
-					widgets::text("Bevy logo", JustifyContent::End, font.0.clone()),
+				(
+					{
+						table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, ASSET_NAME_FIELD_WIDTH);
+						table_node
+					},
+					children![
+						widgets::text("Bevy logo", JustifyContent::End, font.0.clone()),
 						widgets::text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone()),
 						widgets::text("Comfortaa font", JustifyContent::End, font.0.clone()),
 						widgets::text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone()),
-				]),
+					],
+				),
 				(widgets::menu_button("Back", font.0.clone()),CreditsAction::Back),
 			]
 		)
