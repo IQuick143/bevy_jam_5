@@ -60,7 +60,7 @@ fn scrollbox_movement(
 	for msg in inputs.read() {
 		match msg.unit {
 			MouseScrollUnit::Line => {
-				// Line-based devices like the mouse snd the scrollbox
+				// Line-based devices like the mouse send the scrollbox
 				// into movement, but do not move it directly
 				inertia.line += scrollbox.step * msg.y * SCROLL_FRICTION.ln();
 			}
