@@ -18,6 +18,7 @@ pub const COMMON_TEXT_SIZE: f32 = 24.0;
 // Double-columned screens
 pub const WIDE_GAP: Val = Px(20.0);
 pub const INLINE_BUTTON_PADDING: UiRect = UiRect::axes(Px(10.0), Px(5.0));
+pub const INLINE_BUTTON_WIDTH: Val = Px(150.0);
 
 // Level select
 pub const GRID_BUTTON_HEIGHT_PX: f32 = 45.0;

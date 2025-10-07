@@ -46,7 +46,7 @@ pub fn inline_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle
 		font,
 		COMMON_TEXT_SIZE,
 		INLINE_BUTTON_PADDING,
-		Auto,
+		INLINE_BUTTON_WIDTH,
 		Auto,
 	)
 }
