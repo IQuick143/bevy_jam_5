@@ -1,6 +1,7 @@
 use std::{
 	marker::PhantomData,
 	path::{Path, PathBuf},
+	time::{Duration, Instant},
 };
 
 use bevy::prelude::*;
@@ -25,6 +26,7 @@ impl RegisterSaveableResource for App {
 			.init_resource::<JsonStore<T>>()
 			.add_systems(Startup, load_system::<T>)
 			.add_systems(Update, save_system::<T>.run_if(resource_changed::<T>))
+			.add_systems(Update, write_system::<T>)
 	}
 }
 
@@ -61,19 +63,35 @@ fn load_system<T: Saveable + Resource>(
 	}
 }
 
-fn save_system<T: Saveable + Resource>(
+fn save_system<T: Saveable + Resource>(mut store: ResMut<JsonStore<T>>, resource: Res<T>) {
+	resource.write_json(&mut store.value);
+	store.dirty = true;
+}
+
+fn write_system<T: Saveable + Resource>(
 	mut store: ResMut<JsonStore<T>>,
-	resource: Res<T>,
 	storage_path: Res<StoragePath>,
 ) {
-	resource.write_json(&mut store.value);
-	let data = store.value.to_string();
-	io::write(&data, &storage_path.0, T::FILENAME);
+	if store.dirty
+		&& store
+			.last_saved
+			.is_none_or(|last_saved| Instant::now() - last_saved > Duration::from_secs(10))
+	{
+		let data = store.value.to_string();
+		io::write(&data, &storage_path.0, T::FILENAME);
+		store.dirty = false;
+		store.last_saved = Some(Instant::now());
+	}
 }
 
 #[derive(Resource, Default)]
 struct JsonStore<T> {
+	/// The json data stored by this resource
 	value: JsonValue,
+	/// The last instant (if any) this resource was saved. Used for debouncing.
+	last_saved: Option<Instant>,
+	/// Whether [`Self::value`] has been changed since last save to disk.
+	dirty: bool,
 	_phantom: PhantomData<T>,
 }
 
