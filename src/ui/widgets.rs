@@ -1,6 +1,7 @@
 //! Helper traits for creating common widgets.
 
 use super::{consts::*, interaction::InteractionPalette, palette::*};
+use crate::assets::UiButtonAtlas;
 use bevy::{prelude::*, ui::Val::*};
 
 /// Largest type of buttons, use for menus
@@ -27,15 +28,31 @@ pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	)
 }
 
-/// Small button for toolbars
-pub fn toolbar_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
-	common_button(
-		text.into(),
-		font,
-		COMMON_BUTTON_TEXT_SIZE,
-		TOOLBAR_BUTTON_PADDING,
-		Auto,
-		Auto,
+/// Button rendered by a pair of sprites
+pub fn sprite_button(sprites: &UiButtonAtlas, sprite_index: usize) -> impl Bundle {
+	(
+		Name::new("Button"),
+		Button,
+		Node {
+			height: Val::Px(SPRITE_BUTTON_HEIGHT),
+			width: Val::Px(
+				SPRITE_BUTTON_HEIGHT * UiButtonAtlas::TILE_SIZE.x as f32
+					/ UiButtonAtlas::TILE_SIZE.y as f32,
+			),
+			..default()
+		},
+		children![(
+			Name::new("Button Image"),
+			ImageNode {
+				image: sprites.image.clone(),
+				texture_atlas: Some(TextureAtlas {
+					layout: sprites.layout.clone(),
+					index: sprite_index,
+				}),
+				color: SPRITE_BUTTON_FILL,
+				..default()
+			}
+		)],
 	)
 }
 

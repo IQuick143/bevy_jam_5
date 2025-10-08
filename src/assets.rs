@@ -22,6 +22,7 @@ pub(super) fn plugin(app: &mut App) {
 
 	app.init_resource::<BoxColorSpriteAtlas>();
 	app.init_resource::<DigitAtlas>();
+	app.init_resource::<UiButtonAtlas>();
 	app.init_resource::<GlobalFont>();
 }
 
@@ -219,6 +220,59 @@ impl DigitAtlas {
 }
 
 impl FromWorld for DigitAtlas {
+	fn from_world(world: &mut World) -> Self {
+		let mut layouts = world.resource_mut::<Assets<TextureAtlasLayout>>();
+		let layout = layouts.add(Self::construct_atlas_layout());
+		let asset_server = world.resource::<AssetServer>();
+		let image = asset_server.load(Self::IMAGE_ASSET_PATH);
+		Self { image, layout }
+	}
+}
+
+/// Sprite sheet for UI buttons
+#[derive(Resource, Reflect)]
+#[reflect(Resource)]
+pub struct UiButtonAtlas {
+	/// The image with the full sprite sheet
+	pub image: Handle<Image>,
+	/// Atlas layout for the sprite sheet
+	pub layout: Handle<TextureAtlasLayout>,
+}
+
+impl UiButtonAtlas {
+	/// Index of the sprite for the exit button
+	pub const EXIT: usize = 0;
+	/// Index of the sprite for the restart button
+	pub const RESTART: usize = 1;
+	/// Index of the sprite for the undo button
+	pub const UNDO: usize = 2;
+	/// Index of the sprite for the next level button
+	pub const PROCEED: usize = 3;
+
+	/// Path to the sprite sheet image
+	const IMAGE_ASSET_PATH: &'static str = "images/ui-buttons.png";
+
+	/// Size of each button sprite in pixels
+	pub const TILE_SIZE: UVec2 = UVec2::new(300, 240);
+	/// Width of the gap between tiles and at the edges
+	/// of the sheet, in pixels
+	const PADDING_WIDTH: u32 = 15;
+	/// How many sprites there are (rows and columns)
+	const SPRITE_COUNTS: UVec2 = UVec2::new(4, 1);
+
+	/// Constructs a [`TextureAtlasLayout`] for the sprite sheet
+	fn construct_atlas_layout() -> TextureAtlasLayout {
+		TextureAtlasLayout::from_grid(
+			Self::TILE_SIZE,
+			Self::SPRITE_COUNTS.x,
+			Self::SPRITE_COUNTS.y,
+			Some(UVec2::splat(Self::PADDING_WIDTH)),
+			Some(UVec2::splat(Self::PADDING_WIDTH)),
+		)
+	}
+}
+
+impl FromWorld for UiButtonAtlas {
 	fn from_world(world: &mut World) -> Self {
 		let mut layouts = world.resource_mut::<Assets<TextureAtlasLayout>>();
 		let layout = layouts.add(Self::construct_atlas_layout());

@@ -3,7 +3,7 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
-	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList},
+	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	game::{
 		drawing::ThingPalette,
 		level::list::{LevelInfo, LevelList},
@@ -137,6 +137,7 @@ fn spawn_game_ui(
 	mut commands: Commands,
 	font: Res<GlobalFont>,
 	images: Res<HandleMap<ImageKey>>,
+	button_sprites: Res<UiButtonAtlas>,
 	colors: Res<ThingPalette>,
 ) {
 	commands
@@ -157,15 +158,15 @@ fn spawn_game_ui(
 				},
 				children![
 					(
-						widgets::toolbar_button("Back", font.0.clone()),
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
 						GameUiAction::Back,
 					),
 					(
-						widgets::toolbar_button("Reset", font.0.clone()),
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::RESTART),
 						GameUiAction::Reset,
 					),
 					(
-						widgets::toolbar_button("Undo", font.0.clone()),
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::UNDO),
 						GameUiAction::Undo,
 						UndoButton,
 					),
@@ -183,18 +184,11 @@ fn spawn_game_ui(
 					..default()
 				})
 				.with_children(|parent| {
-					parent
-						.spawn(widgets::toolbar_button("Next Level", font.0.clone()))
-						.insert((
-							GameUiAction::NextLevel,
-							NextLevelButton,
-							BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
-							InteractionPalette {
-								none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
-								hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
-								pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
-							},
-						));
+					parent.spawn((
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::PROCEED),
+						GameUiAction::NextLevel,
+						NextLevelButton,
+					));
 				});
 			parent.spawn((
 				Node {
