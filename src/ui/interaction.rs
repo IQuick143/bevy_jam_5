@@ -8,12 +8,17 @@ pub(super) fn plugin(app: &mut App) {
 	app.register_type::<InteractionPalette>();
 	app.add_systems(
 		Update,
-		(apply_interaction_palette, trigger_interaction_sfx).run_if(ui_not_frozen),
+		(
+			apply_interaction_palette,
+			apply_interaction_palette_to_sprite_widgets,
+			trigger_interaction_sfx,
+		)
+			.run_if(ui_not_frozen),
 	);
 }
 
-pub type InteractionQuery<'w, 's, T> =
-	Query<'w, 's, (&'static Interaction, T), Changed<Interaction>>;
+pub type InteractionQuery<'w, 's, T, F = ()> =
+	Query<'w, 's, (&'static Interaction, T), (Changed<Interaction>, F)>;
 
 /// Palette for widget interactions.
 #[derive(Component, Debug, Reflect)]
@@ -24,8 +29,20 @@ pub struct InteractionPalette {
 	pub pressed: Color,
 }
 
+/// Marker for entities whose [`InteractionPalette`] applies to their children
+/// which are expected to be [`ImageNode`]s
+///
+/// By default, [`InteractionPalette`] applies to the [`BackgroundColor`]
+/// of the target entity itself
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct InteractionPaletteForChildSprites;
+
 fn apply_interaction_palette(
-	mut palette_query: InteractionQuery<(&InteractionPalette, &mut BackgroundColor)>,
+	mut palette_query: InteractionQuery<
+		(&InteractionPalette, &mut BackgroundColor),
+		Without<InteractionPaletteForChildSprites>,
+	>,
 ) {
 	for (interaction, (palette, mut background)) in &mut palette_query {
 		*background = match interaction {
@@ -34,6 +51,27 @@ fn apply_interaction_palette(
 			Interaction::Pressed => palette.pressed,
 		}
 		.into();
+	}
+}
+
+fn apply_interaction_palette_to_sprite_widgets(
+	widget_q: InteractionQuery<
+		(&InteractionPalette, &Children),
+		With<InteractionPaletteForChildSprites>,
+	>,
+	mut sprite_q: Query<&mut ImageNode>,
+) {
+	for (interaction, (palette, children)) in &widget_q {
+		let color = match interaction {
+			Interaction::None => palette.none,
+			Interaction::Hovered => palette.hovered,
+			Interaction::Pressed => palette.pressed,
+		};
+		for child_id in children {
+			if let Ok(mut image) = sprite_q.get_mut(*child_id) {
+				image.color = color;
+			}
+		}
 	}
 }
 

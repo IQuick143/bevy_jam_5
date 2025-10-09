@@ -10,6 +10,8 @@ pub const HEADER_TEXT: Color = BUTTON_TEXT;
 pub const NODE_BACKGROUND: Color = Color::Srgba(SLATE_400);
 
 pub const SPRITE_BUTTON_FILL: Color = Color::Srgba(SLATE_200);
+pub const SPRITE_BUTTON_HOVERED: Color = Color::Srgba(SLATE_400);
+pub const SPRITE_BUTTON_PRESSED: Color = Color::Srgba(SLATE_500);
 
 pub const SLIDER_OUTLINE: Color = Color::Srgba(SLATE_700);
 pub const SLIDER_FILL: Color = Color::Srgba(SLATE_200);

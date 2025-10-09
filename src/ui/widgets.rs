@@ -1,6 +1,10 @@
 //! Helper traits for creating common widgets.
 
-use super::{consts::*, interaction::InteractionPalette, palette::*};
+use super::{
+	consts::*,
+	interaction::{InteractionPalette, InteractionPaletteForChildSprites},
+	palette::*,
+};
 use crate::assets::UiButtonAtlas;
 use bevy::{prelude::*, ui::Val::*};
 
@@ -41,6 +45,12 @@ pub fn sprite_button(sprites: &UiButtonAtlas, sprite_index: usize) -> impl Bundl
 			),
 			..default()
 		},
+		InteractionPalette {
+			none: SPRITE_BUTTON_FILL,
+			hovered: SPRITE_BUTTON_HOVERED,
+			pressed: SPRITE_BUTTON_PRESSED,
+		},
+		InteractionPaletteForChildSprites,
 		children![(
 			Name::new("Button Image"),
 			ImageNode {
