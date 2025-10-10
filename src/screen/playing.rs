@@ -10,7 +10,7 @@ use crate::{
 		prelude::*,
 	},
 	send_message,
-	ui::{consts::*, hover::HoverText, prelude::*},
+	ui::{consts::*, hover::HoverText, interaction::InteractionEnabled, prelude::*},
 	AppSet,
 };
 
@@ -74,6 +74,7 @@ struct NextLevelButton;
 
 /// Marker component for the undo button
 #[derive(Component, Clone, Copy, Debug, Default)]
+#[require(InteractionEnabled(false))]
 struct UndoButton;
 
 /// Marker component for the level name label
@@ -430,15 +431,10 @@ fn tick_completion_cue_animation(
 
 fn update_undo_button_display(
 	history: Res<MoveHistory>,
-	mut query: Query<&mut Node, With<UndoButton>>,
+	mut query: Query<&mut InteractionEnabled, With<UndoButton>>,
 ) {
-	let display = if history.is_empty() {
-		Display::None
-	} else {
-		Display::DEFAULT
-	};
-	for mut node in &mut query {
-		node.display = display;
+	for mut enabled in &mut query {
+		enabled.set_if_neq(InteractionEnabled(!history.is_empty()));
 	}
 }
 
