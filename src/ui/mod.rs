@@ -1,14 +1,16 @@
 //! Reusable UI widgets & theming.
 
 pub mod background;
+pub mod consts;
 pub mod freeze;
 pub mod hover;
 pub mod interaction;
 pub mod multistate;
 pub mod palette;
 pub mod screen_fade;
+pub mod scrollbox;
 pub mod slider;
-mod widgets;
+pub mod widgets;
 
 #[allow(unused_imports)]
 pub mod prelude {
@@ -18,7 +20,7 @@ pub mod prelude {
 		interaction::{InteractionPalette, InteractionQuery},
 		palette as ui_palette,
 		screen_fade::{AddFadeMessage as _, FadeAnimation, FadeAnimationBundle},
-		widgets::{Containers as _, Widgets as _},
+		widgets,
 	};
 }
 
@@ -45,5 +47,6 @@ pub(super) fn plugin(app: &mut App) {
 		background::plugin,
 		slider::plugin,
 		multistate::plugin,
+		scrollbox::plugin,
 	));
 }

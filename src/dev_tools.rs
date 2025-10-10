@@ -40,6 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 			toggle_turning_animation_speed.run_if(input_just_pressed(KeyCode::KeyT)),
 			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
+			toggle_fps_diagnostic.run_if(input_just_pressed(KeyCode::KeyF)),
 		),
 	);
 	app.add_systems(Startup, init_viewport_box);
@@ -96,6 +97,11 @@ fn init_viewport_box(mut commands: Commands) {
 			},
 			BorderColor::all(palettes::basic::NAVY),
 		));
+}
+
+fn toggle_fps_diagnostic(mut config: ResMut<FpsOverlayConfig>) {
+	config.enabled = !config.enabled;
+	config.frame_time_graph_config.enabled = config.enabled;
 }
 
 fn toggle_debug_outline_display(
