@@ -18,6 +18,10 @@ pub const SPRITE_BUTTON_DISABLED: Color = Color::Srgba(Srgba {
 	..SLATE_200
 });
 
+pub const NEXT_LEVEL_BUTTON_BACKGROUND: Color = Color::Srgba(GREEN_400);
+pub const NEXT_LEVEL_BUTTON_HOVERED_BACKGROUND: Color = Color::Srgba(GREEN_500);
+pub const NEXT_LEVEL_BUTTON_PRESSED_BACKGROUND: Color = Color::Srgba(GREEN_600);
+
 pub const SLIDER_OUTLINE: Color = Color::Srgba(SLATE_700);
 pub const SLIDER_FILL: Color = Color::Srgba(SLATE_200);
 pub const SLIDER_HOVERED_FILL: Color = Color::Srgba(SLATE_400);

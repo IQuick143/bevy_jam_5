@@ -10,7 +10,7 @@ use crate::{
 		prelude::*,
 	},
 	send_message,
-	ui::{consts::*, hover::HoverText, interaction::InteractionEnabled, prelude::*},
+	ui::{consts::*, hover::HoverText, interaction::InteractionEnabled, palette::*, prelude::*},
 	AppSet,
 };
 
@@ -185,11 +185,21 @@ fn spawn_game_ui(
 					..default()
 				})
 				.with_children(|parent| {
-					parent.spawn((
-						widgets::sprite_button(&button_sprites, UiButtonAtlas::PROCEED),
-						GameUiAction::NextLevel,
-						NextLevelButton,
-					));
+					parent
+						.spawn(widgets::sprite_button(
+							&button_sprites,
+							UiButtonAtlas::PROCEED,
+						))
+						.insert((
+							GameUiAction::NextLevel,
+							NextLevelButton,
+							InteractionPalette {
+								none: NEXT_LEVEL_BUTTON_BACKGROUND,
+								hovered: NEXT_LEVEL_BUTTON_HOVERED_BACKGROUND,
+								pressed: NEXT_LEVEL_BUTTON_PRESSED_BACKGROUND,
+								disabled: BUTTON_DISABLED_BACKGROUND,
+							},
+						));
 				});
 			parent.spawn((
 				Node {
