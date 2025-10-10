@@ -85,12 +85,9 @@ fn exit_credits(mut _commands: Commands) {
 	//commands.trigger(PlaySoundtrack::Disable);
 }
 
-fn handle_credits_action(
-	mut commands: Commands,
-	mut button_query: InteractionQuery<&CreditsAction>,
-) {
-	for (interaction, action) in &mut button_query {
-		if matches!(interaction, Interaction::Pressed) {
+fn handle_credits_action(mut commands: Commands, button_query: InteractionQuery<&CreditsAction>) {
+	for (interaction, enabled, action) in &button_query {
+		if enabled.is_none_or(|e| **e) && matches!(interaction, Interaction::Pressed) {
 			match action {
 				CreditsAction::Back => {
 					commands.do_screen_transition(Screen::Title);

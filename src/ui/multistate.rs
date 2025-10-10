@@ -45,8 +45,8 @@ impl MultiStateButtonLabels {
 }
 
 fn update_multistate_state(mut query: InteractionQuery<&mut MultiStateButton>) {
-	for (interaction, mut button) in &mut query {
-		if *interaction == Interaction::Pressed {
+	for (interaction, enabled, mut button) in &mut query {
+		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
 			button.current_state += 1;
 			if button.current_state >= button.state_count {
 				button.current_state = 0;

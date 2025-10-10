@@ -116,11 +116,11 @@ fn enter_title(
 
 fn handle_title_action(
 	mut commands: Commands,
-	mut button_query: InteractionQuery<&TitleAction>,
+	button_query: InteractionQuery<&TitleAction>,
 	#[cfg(not(target_family = "wasm"))] mut app_exit: MessageWriter<AppExit>,
 ) {
-	for (interaction, action) in &mut button_query {
-		if matches!(interaction, Interaction::Pressed) {
+	for (interaction, enabled, action) in &button_query {
+		if enabled.is_none_or(|e| **e) && matches!(interaction, Interaction::Pressed) {
 			match action {
 				TitleAction::GoToScreen(screen) => {
 					commands.do_screen_transition(*screen);

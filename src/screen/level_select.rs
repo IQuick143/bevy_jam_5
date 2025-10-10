@@ -123,8 +123,8 @@ fn handle_level_select_screen_action(
 	mut next_level: ResMut<NextState<PlayingLevel>>,
 	query: InteractionQuery<&LevelSelectAction>,
 ) {
-	for (interaction, action) in &query {
-		if *interaction != Interaction::Pressed {
+	for (interaction, enabled, action) in &query {
+		if enabled.is_none_or(|e| **e) && *interaction != Interaction::Pressed {
 			continue;
 		}
 		match action {

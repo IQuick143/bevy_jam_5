@@ -49,6 +49,7 @@ pub fn sprite_button(sprites: &UiButtonAtlas, sprite_index: usize) -> impl Bundl
 			none: SPRITE_BUTTON_FILL,
 			hovered: SPRITE_BUTTON_HOVERED,
 			pressed: SPRITE_BUTTON_PRESSED,
+			disabled: SPRITE_BUTTON_DISABLED,
 		},
 		InteractionPaletteForChildSprites,
 		children![(
@@ -103,6 +104,7 @@ pub fn common_button(
 			none: NODE_BACKGROUND,
 			hovered: BUTTON_HOVERED_BACKGROUND,
 			pressed: BUTTON_PRESSED_BACKGROUND,
+			disabled: BUTTON_DISABLED_BACKGROUND,
 		},
 		children![(
 			Name::new("Button Text"),

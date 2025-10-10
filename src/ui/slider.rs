@@ -150,11 +150,15 @@ fn apply_slider_interaction_palettes(
 	slider_q: InteractionQuery<&SliderChildren>,
 	mut node_q: Query<&mut BackgroundColor>,
 ) {
-	for (interaction, children) in &slider_q {
-		let new_color = match interaction {
-			Interaction::None => SLIDER_FILL,
-			Interaction::Hovered => SLIDER_HOVERED_FILL,
-			Interaction::Pressed => SLIDER_PRESSED_FILL,
+	for (interaction, enabled, children) in &slider_q {
+		let new_color = if enabled.is_none_or(|e| **e) {
+			match interaction {
+				Interaction::None => SLIDER_FILL,
+				Interaction::Hovered => SLIDER_HOVERED_FILL,
+				Interaction::Pressed => SLIDER_PRESSED_FILL,
+			}
+		} else {
+			SLIDER_DISABLED_FILL
 		};
 		for node_id in [children.handle, children.body] {
 			let Ok(mut background_color) = node_q.get_mut(node_id) else {

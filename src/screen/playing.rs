@@ -261,8 +261,8 @@ fn game_ui_input_recording_system(
 	query: InteractionQuery<&GameUiAction>,
 	mut events: MessageWriter<GameUiAction>,
 ) {
-	for (interaction, action) in &query {
-		if *interaction == Interaction::Pressed {
+	for (interaction, enabled, action) in &query {
+		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
 			events.write(*action);
 		}
 	}

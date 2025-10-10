@@ -129,8 +129,8 @@ fn background_mode_to_option_index(mode: BackgroundMode) -> u32 {
 }
 
 fn handle_settings_action(mut commands: Commands, query: InteractionQuery<&SettingsAction>) {
-	for (interaction, action) in &query {
-		if *interaction == Interaction::Pressed {
+	for (interaction, enabled, action) in &query {
+		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
 			match action {
 				SettingsAction::Back => {
 					commands.do_screen_transition(Screen::Title);
