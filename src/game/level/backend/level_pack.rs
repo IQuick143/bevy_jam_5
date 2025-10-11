@@ -51,7 +51,9 @@ impl LevelListBuilder {
 		use DomainValue::*;
 		use VariableValue::*;
 
-		let hub_id = self.add_hub()?;
+		let hub_name: &str = args.read_as()?;
+		args.read_separator()?;
+		let hub_id = self.add_hub(hub_name.to_owned())?;
 
 		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {

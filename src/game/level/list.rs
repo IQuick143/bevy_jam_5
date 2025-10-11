@@ -34,6 +34,8 @@ pub struct LevelInfo {
 /// Information about a hub and a group of levels it contains
 #[derive(Clone, Debug, Default, Reflect)]
 pub struct HubLevelInfo {
+	/// Display name of the hub
+	pub hub_name: String,
 	/// Index of the hub that this hub logically subdivides
 	pub parent_hub: Option<usize>,
 	/// List of hubs that subdivide this hub
@@ -77,8 +79,9 @@ impl LevelListBuilder {
 		Ok(self.list.levels.len() - 1)
 	}
 
-	pub fn add_hub(&mut self) -> Result<usize, LevelListBuildError> {
+	pub fn add_hub(&mut self, hub_name: String) -> Result<usize, LevelListBuildError> {
 		self.list.hubs.push(HubLevelInfo {
+			hub_name,
 			parent_hub: None,
 			..default()
 		});

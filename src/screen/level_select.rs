@@ -77,6 +77,19 @@ fn spawn_screen(
 	));
 
 	for hub in &levels.hubs {
+		if hub.levels.is_empty() {
+			continue;
+		}
+
+		commands.spawn((
+			Node {
+				justify_content: JustifyContent::Center,
+				padding: UiRect::top(COMMON_GAP),
+				..default()
+			},
+			ChildOf(main_id),
+			children![widgets::label(hub.hub_name.clone(), font.0.clone())],
+		));
 		commands
 			.spawn((
 				Node {
