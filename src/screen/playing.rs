@@ -152,7 +152,7 @@ fn spawn_game_ui(
 					width: Val::Percent(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: COMMON_GAP,
-					padding: UiRect::all(COMMON_GAP),
+					padding: TOOLBAR_MARGIN,
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::Start,
 					..default()
@@ -178,7 +178,7 @@ fn spawn_game_ui(
 					width: Val::Percent(100.0),
 					flex_direction: FlexDirection::Row,
 					column_gap: COMMON_GAP,
-					padding: UiRect::all(COMMON_GAP),
+					padding: TOOLBAR_MARGIN,
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::End,
 					position_type: PositionType::Absolute,

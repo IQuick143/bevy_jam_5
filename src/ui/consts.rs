@@ -15,6 +15,7 @@ pub const COMMON_GAP_PX: f32 = 10.0;
 pub const COMMON_GAP: Val = Px(COMMON_GAP_PX);
 pub const COMMON_TEXT_SIZE: f32 = 24.0;
 pub const SPRITE_BUTTON_HEIGHT: f32 = 45.0;
+pub const TOOLBAR_MARGIN: UiRect = UiRect::axes(Px(15.0), COMMON_GAP);
 
 // Double-columned screens
 pub const WIDE_GAP: Val = Px(20.0);

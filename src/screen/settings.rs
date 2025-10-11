@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::{
-	assets::{GlobalFont, SfxKey},
+	assets::{GlobalFont, SfxKey, UiButtonAtlas},
 	audio::sfx::PlaySfx,
 	settings::Settings,
 	ui::{
@@ -52,7 +52,12 @@ const SLIDER_WIDTH: f32 = 200.0;
 /// Number of steps on each slider on the Settings screen
 const SLIDER_STEP_COUNT: u32 = 8;
 
-fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<Settings>) {
+fn enter_settings(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	button_sprites: Res<UiButtonAtlas>,
+	settings: Res<Settings>,
+) {
 	commands.spawn((
 		widgets::ui_root(),
 		DespawnOnExit(Screen::Settings),
@@ -112,11 +117,18 @@ fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<S
 					),
 				],
 			),
-			(
-				widgets::menu_button("Back", font.0.clone()),
-				SettingsAction::Back,
-			),
 		],
+	));
+	commands.spawn((
+		Node {
+			margin: TOOLBAR_MARGIN,
+			..default()
+		},
+		DespawnOnExit(Screen::Settings),
+		children![(
+			widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
+			SettingsAction::Back,
+		)],
 	));
 }
 

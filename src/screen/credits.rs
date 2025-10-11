@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 use super::*;
 use crate::{
-	assets::GlobalFont,
+	assets::{GlobalFont, UiButtonAtlas},
 	ui::{consts::*, prelude::*},
 };
 
@@ -29,7 +29,11 @@ const MAX_CENTERED_PANEL_WIDTH: f32 = 800.0;
 const AUTHOR_NAME_FIELD_WIDTH: f32 = 290.0;
 const ASSET_NAME_FIELD_WIDTH: f32 = 175.0;
 
-fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
+fn enter_credits(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	button_sprites: Res<UiButtonAtlas>,
+) {
 	let mut table_node = Node {
 		display: Display::Grid,
 		width: Val::Percent(100.0),
@@ -75,10 +79,20 @@ fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
 						widgets::text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone()),
 					],
 				),
-				(widgets::menu_button("Back", font.0.clone()),CreditsAction::Back),
 			]
 		)
 	);
+	commands.spawn((
+		Node {
+			margin: TOOLBAR_MARGIN,
+			..default()
+		},
+		DespawnOnExit(Screen::Credits),
+		children![(
+			widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
+			CreditsAction::Back,
+		)],
+	));
 }
 
 fn exit_credits(mut _commands: Commands) {

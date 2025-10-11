@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use super::*;
 use crate::{
-	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList},
+	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	game::{
 		drawing::ThingPalette,
 		level::{list::LevelList, LevelData},
@@ -35,6 +35,7 @@ fn spawn_screen(
 	save: Res<SaveGame>,
 	images: Res<HandleMap<ImageKey>>,
 	colors: Res<ThingPalette>,
+	button_sprites: Res<UiButtonAtlas>,
 ) {
 	let levels = level_list_asset
 		.get(&levels.0)
@@ -55,7 +56,7 @@ fn spawn_screen(
 				flex_direction: FlexDirection::Column,
 				justify_content: JustifyContent::Start,
 				align_content: AlignContent::Center,
-				height: Val::Percent(60.0),
+				height: Val::Percent(75.0),
 				row_gap: COMMON_GAP,
 				overflow: Overflow::scroll_y(),
 				..default()
@@ -64,9 +65,15 @@ fn spawn_screen(
 		))
 		.id();
 	commands.spawn((
-		widgets::menu_button("Back", font.0.clone()),
-		LevelSelectAction::Back,
-		ChildOf(root_id),
+		Node {
+			margin: TOOLBAR_MARGIN,
+			..default()
+		},
+		DespawnOnExit(Screen::LevelSelect),
+		children![(
+			widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
+			LevelSelectAction::Back,
+		)],
 	));
 
 	for hub in &levels.hubs {
