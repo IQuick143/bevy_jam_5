@@ -2,15 +2,12 @@
 
 use super::super::{
 	super::{
-		builder::{error::LevelBuilderError, LevelBuilder},
+		builder::{error::LevelBuilderError, LevelBuildResult, LevelBuilder},
 		*,
 	},
 	domain::*,
 };
-use crate::{
-	epilang::interpreter::{LoadedVariableTypeError, VariablePool},
-	game::level::builder::ResultNonExclusive,
-};
+use crate::epilang::interpreter::{LoadedVariableTypeError, VariablePool};
 
 /// Finalization procedure for the [`LevelBuilder`] backend.
 /// Call this when the Epilang program is done executing.
@@ -18,11 +15,9 @@ pub fn finalize(
 	mut builder: LevelBuilder,
 	variable_pool: &VariablePool<DomainValue>,
 	warning_handler: impl FnMut(FinalizeWarning),
-) -> ResultNonExclusive<LevelData, FinalizeError> {
-	match read_variables_before_finalize(&mut builder, variable_pool, warning_handler) {
-		Ok(()) => builder.build().map_err(FinalizeError::BuilderError),
-		Err(err) => err.into(),
-	}
+) -> Result<LevelBuildResult, FinalizeError> {
+	read_variables_before_finalize(&mut builder, variable_pool, warning_handler)
+		.map(|_| builder.build())
 }
 
 fn read_variables_before_finalize(
