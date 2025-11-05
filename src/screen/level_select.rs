@@ -129,9 +129,9 @@ fn spawn_screen(
 									..default()
 								},
 							));
-						} else {
-							log::warn!("Invalid level asset handle");
 						}
+					} else {
+						log::warn!("Invalid level asset handle");
 					}
 				}
 			});
