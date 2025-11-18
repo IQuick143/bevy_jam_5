@@ -1,7 +1,0 @@
-name = 'Bicycle';
-
-box = box('start');
-
-circle(cycle(_, a = vertex(), _ vertex(button(), player())); -4, 0 3);
-circle(cycle(_ vertex(box, flag()) _, b = vertex()); 4 0 3);
-circle(cycle('manual'; a b); 0 0 1);

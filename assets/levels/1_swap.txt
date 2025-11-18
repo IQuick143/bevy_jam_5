@@ -1,9 +1,0 @@
-name = 'Swap';
-
-col = 'checker_asc';
-f = vertex();
-main = cycle(_ player() flag() _ _ f);
-side = cycle('manual'; f _ box(col) button() _ _);
-
-circle(main; 0 0 100);
-circle(side; 160, -120, 100);
