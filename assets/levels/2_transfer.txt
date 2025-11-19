@@ -1,5 +1,0 @@
-name = 'Transfer';
-
-f = vertex();
-circle(cycle(_ _ player() _ _ f); 0 0 100);
-circle(cycle(f _ flag() _ _); 144 108 80);

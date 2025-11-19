@@ -1,8 +1,0 @@
-name = 'Manual';
-
-box = box('up');
-
-e = vertex();
-f = vertex();
-circle(cycle(flag() _ player() _ e f); 0 0 100);
-circle(cycle('manual'; f e box button()); 100 60 60);
