@@ -64,7 +64,9 @@ impl bevy::asset::AssetLoader for LevelLoader {
 			parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path()))
 				.map_err(LevelLoadingError::Parsing)
 				.map(|result| {
-					result.errors.log_with_bevy();
+					result
+						.errors
+						.log_with_bevy(&load_context.asset_path().to_string());
 					result.level
 				})
 		}

@@ -16,7 +16,7 @@ pub fn run_state_explorer(
 ) -> Result<(), String> {
 	let loaded =
 		parse_and_run(level_source, |_| {}).map_err(|e| format!("Could not build level: {e}"))?;
-	loaded.errors.log_with_bevy();
+	loaded.errors.log_with_bevy(level_source);
 	let graph = StateGraph::traverse_state_graph(&loaded.level, options);
 	graph
 		.wrap_in_html_page(output)

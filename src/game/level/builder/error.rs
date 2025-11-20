@@ -208,8 +208,9 @@ impl LevelBuilderErrorLog {
 	}
 
 	/// Logs all errors at appropriate log levels using the Bevy logging facilities
-	pub fn log_with_bevy(&self) {
+	pub fn log_with_bevy(&self, level_name: &str) {
 		if self.has_loggable_entries() {
+			warn!("Level {level_name} encountered errors during loading:");
 			for err in self.iter() {
 				if err.is_warning() {
 					warn!("{err}");
