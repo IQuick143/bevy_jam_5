@@ -1113,14 +1113,14 @@ put_vertex(c; 1 0);",
 	#[test]
 	fn road_rage() {
 		// This level can be decided with no hints
-		expect_fully_ok!(parse(include_str!("../../../../../assets/levels/car.txt")));
+		expect_fully_ok!(parse(include_str!("../../../../../epilang/tests/car.txt")));
 	}
 
 	#[test]
 	fn olympic() {
 		// A chain of cycles can also be automatically resolved
 		expect_fully_ok!(parse(include_str!(
-			"../../../../../assets/levels/olympic.txt"
+			"../../../../../epilang/tests/olympic.txt"
 		)));
 	}
 
