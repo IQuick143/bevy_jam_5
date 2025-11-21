@@ -1633,7 +1633,7 @@ impl LevelBuilder {
 			}
 			for ((ia, a), (ib, b), (ic, c)) in positions.into_iter().circular_tuple_windows() {
 				let score = test_point_clockwiseness(a, b, c, Some(placement.position));
-				if score < 0.001 {
+				if score < 0.0 {
 					errors.push(VertexSolverError::VerticesNotClockwise {
 						cycle: cycle_id,
 						vertices: [ia, ib, ic],
