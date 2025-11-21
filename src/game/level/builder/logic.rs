@@ -97,7 +97,7 @@ impl LevelBuilder {
 			return Err(LevelBuilderError::DetectorOnEmptyCycle);
 		}
 		// If there are walls but no vertices, this cycle is invalid.
-		if vertex_indices.is_empty() && !detectors.is_empty() {
+		if vertex_indices.is_empty() && !walls.is_empty() {
 			return Err(LevelBuilderError::WallOnEmptyCycle);
 		}
 		if let Some((index, _)) = detectors
