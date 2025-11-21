@@ -1,0 +1,15 @@
+name = 'Sync';
+hint = 'Linkages make cycles move in Sync!';
+
+c = 'wide_diamond';
+
+g = vertex();
+h = vertex();
+main = cycle(_ _ flag() _ player() _ g h);
+spin = cycle('manual'; h g);
+side = cycle('still'; _ box(c) _ button() _ _);
+link(spin side);
+
+circle(main; 0 0 100);
+circle(spin; 110 0 40);
+circle(side; 240 0 60);

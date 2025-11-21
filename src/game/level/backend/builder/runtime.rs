@@ -57,7 +57,7 @@ impl InterpreterBackend for LevelBuilder {
 			"circle" => self.call_circle(args),
 			"put_center" => self.call_put_center(args),
 			"put_vertex" => self.call_put_vertex(args),
-			"set_vertex_angle" => self.call_set_vertex_angle(args),
+			"hint_vertex" => self.call_hint_vertex(args),
 			"link" => self.call_link(false, args, warnings),
 			"oneway" => self.call_link(true, args, warnings),
 			"cycle_color_labels" => self.call_cycle_color_labels(args),
@@ -296,7 +296,7 @@ impl LevelBuilder {
 			None
 		};
 		args.read_end()?;
-		self.place_cycle(cycle_id, Vec2::new(x, y), r, &[])?;
+		self.place_circle(cycle_id, Vec2::new(x, y), r)?;
 		if let Some(position) = center_position {
 			self.place_cycle_center(cycle_id, position)?;
 		}
@@ -312,14 +312,6 @@ impl LevelBuilder {
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
-	fn call_set_vertex_angle(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
-		let VertexId(vertex_id) = args.read_as()?;
-		args.read_separator()?;
-		let degrees: f32 = args.read_single_as()?;
-		self.place_vertex_at_angle(vertex_id, degrees * PI / 180.0)?;
-		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
-	}
-
 	fn call_put_vertex(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
 		let VertexId(vertex_id) = args.read_as()?;
 		args.read_separator()?;
@@ -327,6 +319,16 @@ impl LevelBuilder {
 		let y = args.read_as()?;
 		args.read_end()?;
 		self.place_vertex(vertex_id, Vec2::new(x, y))?;
+		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
+	}
+
+	fn call_hint_vertex(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
+		let VertexId(vertex_id) = args.read_as()?;
+		args.read_separator()?;
+		let x = args.read_as()?;
+		let y = args.read_as()?;
+		args.read_end()?;
+		self.add_vertex_hint(vertex_id, Vec2::new(x, y))?;
 		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
 	}
 

@@ -1,0 +1,7 @@
+name = 'Intro';
+hint = 'Left/Right click a cycle center to turn it!';
+
+circle(cycle(_ flag() _ _ _ player() _); 0 0 100);
+
+bb_left = bb_top = -150;
+bb_right = bb_bottom = 150;

@@ -1,7 +1,10 @@
 use itertools::Itertools;
 
 use super::{
-	super::super::{builder::error::*, *},
+	super::super::{
+		builder::{error::*, LevelBuildResult},
+		*,
+	},
 	finalize::FinalizeError,
 	runtime::RuntimeError,
 	Error,
@@ -9,35 +12,54 @@ use super::{
 use crate::epilang::interpreter::{FunctionCallError, InterpreterError, LogicError};
 use std::f32::consts::PI;
 
-fn parse(level_file: &str) -> Result<LevelData, Error> {
-	match super::parse_and_run(level_file, |_| {}) {
-		builder::ResultNonExclusive::Ok(level) => {
-			assert!(level.is_valid);
-			Ok(level)
-		}
-		builder::ResultNonExclusive::Partial(_, err) => Err(err),
-		builder::ResultNonExclusive::Err(err) => Err(err),
-	}
+fn parse(level_file: &str) -> Result<LevelBuildResult, Error> {
+	super::parse_and_run(level_file, |_| {})
 }
 
 macro_rules! assert_err_eq {
 	($left:expr, $right:expr) => {
-		let left = $left;
 		let right = $right;
-		let err = left.expect_err("Negative test sample parrsed without error!");
-		let builder_error = match err {
-			Error::Runtime(InterpreterError::LogicError(err, _)) => match *err {
-				LogicError::FunctionCall(
-					FunctionCallError::Domain(RuntimeError::BuilderError(err)),
-					_,
-				) => err,
-				_ => panic!("Negative test sample returned incorrect error!\n{err}"),
-			},
-			Error::Finalize(FinalizeError::BuilderError(err)) => err,
-			_ => panic!("Negative test sample returned incorrect error!\n{err}"),
-		};
-		assert_eq!(builder_error, right);
+		match $left {
+			Ok(result) => {
+				assert!(
+					result.errors.iter().any(|err| *err == right),
+					"Negative test sample did not report the expected error (expected: {right}, got: {:?})",
+					result.errors.0,
+				);
+			}
+			Err(err) => {
+				let builder_error = match err {
+					Error::Runtime(InterpreterError::LogicError(err, _)) => match *err {
+						LogicError::FunctionCall(
+							FunctionCallError::Domain(RuntimeError::BuilderError(err)),
+							_,
+						) => err,
+						_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+					},
+					Error::Finalize(FinalizeError::BuilderError(err)) => err,
+					_ => panic!("Negative test sample returned incorrect error!\n{err}"),
+				};
+				assert_eq!(builder_error, right);
+			}
+		}
 	};
+}
+
+macro_rules! expect_fully_ok {
+	($result:expr) => {{
+		let result = ($result).expect("Level failed to parse and did not return a partial build");
+		let no_errors_reported = result.errors.is_ok();
+		assert!(
+			no_errors_reported,
+			"Level builder emited errors: {:?}",
+			result.errors.0
+		);
+		assert!(
+			result.level.is_valid,
+			"Level builder emited no errors, but level is marked as invalid"
+		);
+		result.level
+	}};
 }
 
 #[test]
@@ -76,8 +98,14 @@ circle(cycle_a; -100, 0.0, 100);
 circle(cycle_b; +100, 0, 100);
 circle(cycle_extra; -100, 100, sqrt(41));
 ";
-	let level = parse(data).expect("Test sample did not parse correctly!");
+	let level = expect_fully_ok!(parse(data));
 	assert_eq!(level.name, "?!#_AAA 648");
+}
+
+#[test]
+fn unplaced_cycle() {
+	let test_case = "cycle(_ _ _ _);";
+	assert_err_eq!(parse(test_case), LevelBuilderError::UnplacedCycle(0));
 }
 
 #[test]
@@ -86,17 +114,22 @@ fn test_structural_validation() {
 # Linking a cycle to itself is already weird, but legal.
 # The link, however, cannot be inverted.
 a = cycle(_ _);
+circle(a; 0 0 1);
 link('invert'; a a);
 
 # Intersecting cycles cannot be linked.
 a = cycle(x = vertex(), _);
 b = cycle(x _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
 link(a b);
 
 # Two (declared) links between the same two cycles may exist as well,
 # but they cannot be conflicting like this.
 a = cycle(_ _);
 b = cycle(_ _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
 link(a b);
 link('invert'; b a);
 
@@ -105,6 +138,9 @@ link('invert'; b a);
 a = cycle(_ _);
 b = cycle(_ _);
 c = cycle(_ _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
+circle(c; 0 0 1);
 link(a b c);
 link('invert'; a c);
 
@@ -113,6 +149,10 @@ a = cycle(_ _);
 b = cycle(_ _);
 c = cycle(_ _);
 d = cycle(_ _);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
+circle(c; 0 0 1);
+circle(d; 0 0 1);
 link(a b c d);
 link('invert'; a d);
 
@@ -121,6 +161,9 @@ link('invert'; a d);
 a = cycle(x = vertex(), _);
 b = cycle(_ _);
 c = cycle(_ x);
+circle(a; 0 0 1);
+circle(b; 0 0 1);
+circle(c; 0 0 1);
 link(a b c);
 ";
 
@@ -150,19 +193,22 @@ link(a b c);
 fn logical_colors_test() {
 	let data = r"
 # Default, with no call_color
-vertex(box());
+a = vertex(box());
 
 # Numeric colors are specified with numbers
-vertex(box(42));
+b = vertex(box(42));
 
 # Pictogram colors are specified by name
-vertex(box('star'));
+c = vertex(box('star'));
 
 # Pictogram colors may also be specified by their id
-vertex(box(pict(16)));
+d = vertex(box(pict(16)));
 
 # Colorless object can be forced by explicit blank color value
-vertex(box(_));
+e = vertex(box(_));
+
+z = cycle(a b c d e);
+circle(z; 0 0 100);
 ";
 
 	let expected_colors = [
@@ -173,7 +219,7 @@ vertex(box(_));
 		None,
 	];
 
-	let level = parse(data).expect("Test sample did not parse correctly!");
+	let level = expect_fully_ok!(parse(data));
 	for (vertex, expected_color) in level.vertices.iter().zip(expected_colors) {
 		let Some(ObjectData::Box(call_color)) = vertex.object else {
 			panic!("Vertex does not contain a box.");
@@ -212,6 +258,10 @@ j = vertex(button(col; 'rot' 60));
 k = vertex(button(col; 'above' 'square'));
 l = vertex(button(col; _ 'arrow'));
 
+# Put them all on a cycle so the level builder passes
+z = cycle(a b c d g h i j k l);
+circle(z; 0 0 100);
+
 m = vertex(button(col));
 n = vertex(button(col));
 o = vertex(button(col));
@@ -226,8 +276,8 @@ y = cycle(q, r, s, t);
 circle(x; 0, 0, 100);
 circle(y; 0, 0, 100);
 
-set_vertex_angle(m; 0.5);
-set_vertex_angle(q; 0.5);
+hint_vertex(m; 1 100);
+hint_vertex(q; 1 100);
 
 # Labels can be positioned symmetrically around a cycle,
 # with respect to where they are relative to the cycle center
@@ -312,7 +362,7 @@ cycle_color_labels(y; 'lr' 'in' 'arrow');
 		},
 	];
 
-	let level = parse(data).expect("Test sample did not parse correctly!");
+	let level = expect_fully_ok!(parse(data));
 	for (vertex, expected_appearence) in level.vertices.iter().zip(expected_appearences) {
 		let Some(GlyphData::Button(Some((_, appearence)))) = vertex.glyph else {
 			panic!("Vertex does not contain a colored button.");
@@ -478,8 +528,7 @@ oneway(c1 c5);
 
 	for data in linkages {
 		let level = format!("{level_header}\n{data}");
-		let output = parse(&level);
-		assert!(output.is_ok(), "{output:?}");
+		expect_fully_ok!(parse(&level));
 	}
 }
 
@@ -549,7 +598,10 @@ oneway(c2 c3);
 
 	for data in linkages {
 		let level = format!("{level_header}\n{data}");
-		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+		assert_err_eq!(
+			parse(&level),
+			LevelBuilderError::OneWayLinkLoop(OneWayLinkLoopError)
+		);
 	}
 }
 
@@ -569,9 +621,7 @@ circle(C; 0, 0, 1);
 oneway(A, B);
 oneway(B, C);
 oneway(A, C);";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
-	let output = output.unwrap();
+	let output = expect_fully_ok!(parse(level));
 	let ordering: Vec<usize> = output
 		.execution_order
 		.iter()
@@ -617,9 +667,7 @@ circle(B; 0, 0, 1);
 circle(C; 0, 0, 1);
 
 oneway(A, B, C);";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
-	let output = output.unwrap();
+	let output = expect_fully_ok!(parse(level));
 	let ordering: Vec<usize> = output
 		.execution_order
 		.iter()
@@ -664,8 +712,7 @@ circle(c1; 0,0,1);
 circle(c2; 0,0,1);
 circle(target; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -698,8 +745,7 @@ circle(target1; 0,0,1);
 circle(target2; 0,0,1);
 circle(target3; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -733,8 +779,7 @@ circle(source1; 0,0,1);
 circle(source2; 0,0,1);
 circle(target; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -758,7 +803,10 @@ circle(c1; 0,0,1);
 circle(c2; 0,0,1);
 circle(c3; 0,0,1);
 ";
-	assert_err_eq!(parse(level), LevelBuilderError::OneWayLinkLoop);
+	assert_err_eq!(
+		parse(level),
+		LevelBuilderError::OneWayLinkLoop(OneWayLinkLoopError)
+	);
 }
 
 #[test]
@@ -802,7 +850,10 @@ oneway(d7, c1);"
 	// Test every ordering
 	for statements in loop_statements.iter().permutations(loop_statements.len()) {
 		let level = format!("{}\n{}", level_header, statements.into_iter().join("\n"));
-		assert_err_eq!(parse(&level), LevelBuilderError::OneWayLinkLoop);
+		assert_err_eq!(
+			parse(&level),
+			LevelBuilderError::OneWayLinkLoop(OneWayLinkLoopError)
+		);
 	}
 }
 
@@ -821,8 +872,7 @@ oneway(unplaced, c1);
 
 circle(c1; 0,0,1);
 ";
-	let output = parse(level);
-	assert!(output.is_ok(), "{output:?}");
+	expect_fully_ok!(parse(level));
 }
 
 #[test]
@@ -837,4 +887,473 @@ cycle = cycle(d);
 circle(cycle; 0,0,1);
 ";
 	assert_err_eq!(parse(level), LevelBuilderError::DetectorOnEmptyCycle);
+}
+
+mod layout_tests {
+	use super::*;
+	use bevy::math::Vec2;
+	use rand::{seq::SliceRandom, SeedableRng as _};
+
+	#[test]
+	fn basic_metatest() {
+		expect_fully_ok!(parse(r""));
+	}
+
+	#[test]
+	fn basic_unicycle() {
+		expect_fully_ok!(parse(r"circle(cycle(_ _ _ _ _); 3, 5, 20);"));
+	}
+
+	#[test]
+	fn basic_dicycles_single() {
+		expect_fully_ok!(parse(
+			r"
+		v = vertex();
+		circle(cycle(v _ _ _ _); -10, 0, 10);
+		circle(cycle(v _ _ _ _); +10, 0, 10);
+		",
+		));
+
+		expect_fully_ok!(parse(
+			r"
+		v = vertex();
+		circle(cycle(v _); -7, 0, 10);
+		circle(cycle(v); +7, 0, 10);
+		",
+		));
+
+		expect_fully_ok!(parse(
+			r"
+		v = vertex();
+		circle(cycle(v _ _ _ _); 0, 0, 10);
+		circle(cycle(v _ _ _ _); 0, 0, 10);
+		",
+		));
+	}
+
+	#[test]
+	fn basic_dicycles_double() {
+		let result = parse(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _ _); -10, 0, 10);
+		circle(cycle(b a _ _ _ _); +10, 0, 10);
+		",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide { .. })
+		)));
+
+		let result = parse(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b); -10, 0, 10);
+		circle(cycle(b a); +10, 0, 10);
+		",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide { .. })
+		)));
+
+		expect_fully_ok!(parse(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _ _); -7, 0, 10);
+		circle(cycle(b a _ _ _ _); +7, 0, 10);
+		",
+		));
+
+		expect_fully_ok!(parse(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _ _); -7, 0, 10);
+		circle(cycle(b a _ _ _ _); +7, 0, 10);
+		",
+		));
+
+		expect_fully_ok!(parse(
+			r"
+		a = vertex();
+		b = vertex();
+		circle(cycle(a b _ _ _); 0, 0, 10);
+		circle(cycle(a _ b _ _); 0, 0, 10);
+		",
+		));
+	}
+
+	#[test]
+	fn unique_incorrect_solution() {
+		expect_fully_ok!(parse(
+			r"
+name = 'Correct flower';
+
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+
+centre = vertex();
+
+radius = 100;
+third_turn = 2*pi/3;
+
+circle(a = cycle('manual'; v1 v2 v3 centre); sin(third_turn * 0) * radius, cos(third_turn * 0) * radius, radius);
+circle(b = cycle('manual'; v3 v4 v5 centre); sin(third_turn * 1) * radius, cos(third_turn * 1) * radius, radius);
+circle(c = cycle('manual'; v5 v6 v1 centre); sin(third_turn * 2) * radius, cos(third_turn * 2) * radius, radius);
+		",
+		));
+
+		// This should not parse, because it's a mirrored layout, which makes the vertices go counterclockwise
+		// This conflicts with the fact that vertices in their declared order should be clockwise
+		let result = parse(
+			r"
+name = 'Inverted flower';
+
+v1 = vertex();
+v2 = vertex();
+v3 = vertex();
+v4 = vertex();
+v5 = vertex();
+v6 = vertex();
+
+centre = vertex();
+
+radius = 100;
+third_turn = 2*pi/3;
+
+circle(a = cycle('manual'; v3 v2 v1 centre); sin(third_turn * 0) * radius, cos(third_turn * 0) * radius, radius);
+circle(b = cycle('manual'; v5 v4 v3 centre); sin(third_turn * 1) * radius, cos(third_turn * 1) * radius, radius);
+circle(c = cycle('manual'; v1 v6 v5 centre); sin(third_turn * 2) * radius, cos(third_turn * 2) * radius, radius);
+		",
+		)
+		.expect("Level did not produce any partial data");
+		assert!(result.errors.iter().any(|err| matches!(
+			err,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VerticesNotClockwise { .. })
+		)));
+	}
+
+	#[test]
+	fn put_vertex_in_wrong_order() {
+		let result = parse(
+			r"
+circle(cycle(a = vertex(), b = vertex(), c = vertex()); 0 0 1);
+put_vertex(a; 0 1);
+put_vertex(b; -1, 0);
+put_vertex(c; 1 0);",
+		);
+		assert_err_eq!(
+			result,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VerticesNotClockwise {
+				cycle: 0,
+				vertices: [0, 1, 2]
+			})
+		);
+	}
+
+	#[test]
+	fn put_vertex_outside_cycle() {
+		let result = parse(r"circle(cycle(a = vertex()); 0 0 1); put_vertex(a; 0 2);");
+		assert_err_eq!(
+			result,
+			LevelBuilderError::VertexSolverError(VertexSolverError::CycleDoesNotContainVertex(
+				CycleDoesNotContainVertexError {
+					cycle: 0,
+					placement: CyclePlacement {
+						position: Vec2::ZERO,
+						shape: CycleShape::Circle(1.0)
+					},
+					vertex: 0,
+					position: Vec2::new(0.0, 2.0)
+				}
+			))
+		);
+	}
+
+	#[test]
+	fn vertex_without_cycle() {
+		let result = parse("vertex();");
+		assert_err_eq!(
+			result,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VertexHasNoCycle(0))
+		);
+
+		let result = parse("put_vertex(vertex(); 0 0);");
+		assert_err_eq!(
+			result,
+			LevelBuilderError::VertexSolverError(VertexSolverError::VertexHasNoCycle(0))
+		);
+	}
+
+	#[test]
+	fn indirect_hints() {
+		expect_fully_ok!(parse(
+			r"
+		a = vertex();
+		b = vertex();
+		rando_vertex = vertex();
+		circle(cycle(a b _ _ _ _); -7, 0, 10);
+		circle(cycle(b a _ _ rando_vertex _); +7, 0, 10);
+		# This hint is enough to decide the ambiguity
+		hint_vertex(rando_vertex; 0, +7);
+		",
+		));
+	}
+
+	#[test]
+	fn road_rage() {
+		// This level can be decided with no hints
+		expect_fully_ok!(parse(include_str!("../../../../../epilang/tests/car.txt")));
+	}
+
+	#[test]
+	fn olympic() {
+		// A chain of cycles can also be automatically resolved
+		expect_fully_ok!(parse(include_str!(
+			"../../../../../epilang/tests/olympic.txt"
+		)));
+	}
+
+	#[test]
+	fn olympic_polymorphic() {
+		let header = "R=12;o=10;\n";
+
+		for n_cycles in 3..10 {
+			let mut vertices = Vec::new();
+			for i in 0..n_cycles - 1 {
+				vertices.push(format!("v{i}a=vertex();\n"));
+				vertices.push(format!("v{i}b=vertex();\n"));
+			}
+			let mut cycles = Vec::new();
+			for i in 0..n_cycles {
+				let extra_vertices = (0..i).map(|_| "_").join(" ");
+				let start_vertices = if i > 0 {
+					format!("v{}a v{}b ", i - 1, i - 1)
+				} else {
+					"".to_owned()
+				};
+				let end_vertices = if i < n_cycles - 1 {
+					format!("v{}b v{}a ", i, i)
+				} else {
+					"".to_owned()
+				};
+				cycles.push(format!("circle(cycle({start_vertices} {extra_vertices} {end_vertices}); {i}*o, 0, R);\n"));
+			}
+			let mut rng = rand::rngs::SmallRng::seed_from_u64(101);
+			for _ in 0..60 {
+				expect_fully_ok!(parse(
+					&(header.to_owned() + &vertices.join("") + &cycles.join(""))
+				));
+				vertices.shuffle(&mut rng);
+				cycles.shuffle(&mut rng);
+			}
+		}
+	}
+
+	#[test]
+	fn olympic_with_holes() {
+		// Like olympic, but some cycles have only one shared vertex
+		// This can still be laid out by deducing the pairs and then choosing arbitrarily for the singles
+		expect_fully_ok!(parse(
+			r"
+a1 = vertex();
+a2 = vertex();
+a3 = vertex();
+a4 = vertex();
+a5 = vertex();
+
+b1 = vertex();
+b2 = vertex();
+# b3 = vertex();
+# b4 = vertex();
+b5 = vertex();
+
+circle(cycle(a1 b1); 0,0,1.4);
+circle(cycle(a2 b2 b1 a1); 0,1,1.4);
+circle(cycle(a3 b2 a2); 0,2,1.4);
+circle(cycle(a4 a3); 0,3,1.4);
+circle(cycle(a5 b5 a4); 0,4,1.4);
+circle(cycle(a5 b5); 0,5,1.4);
+",
+		));
+	}
+
+	#[test]
+	fn pair_surrounded_by_singles() {
+		expect_fully_ok!(parse(
+			r"
+undecided = vertex();
+single_1 = vertex();
+single_2 = vertex();
+
+circle(cycle(undecided, single_1, single_2); 0, 0, 10);
+circle(cycle(undecided); 0, +10, 10);
+hint_vertex(single_1; 0,+1);
+hint_vertex(single_2; 0,-1);",
+		));
+	}
+
+	#[test]
+	fn twin_partial_interaction() {
+		// A single Pair vertex should be enough to resolve a twin pair
+		expect_fully_ok!(parse(
+			r"
+undecided = vertex();
+twins_a1 = vertex();
+twins_b1 = vertex();
+twins_a2 = vertex();
+twins_b2 = vertex();
+
+circle(cycle(undecided, twins_a1, twins_b1, twins_a2, twins_b2); 0, 0, 10);
+# Interleaving twin vertices should not be resolvable
+circle(cycle(twins_a1, twins_a2); 0, -10, 10);
+circle(cycle(twins_b1, twins_b2); +10, 0, 10);
+# This vertex should resolve twins_a which should resolve twins_b which should resolve undecided
+circle(cycle(undecided); 0, +10, 10);",
+		));
+	}
+
+	#[test]
+	fn tricycle_interleaved() {
+		expect_fully_ok!(parse(
+			r"
+r = 1;
+sep = 1.3;
+
+bri = vertex();
+rgi = vertex();
+bgi = vertex();
+bro = vertex();
+rgo = vertex();
+bgo = vertex();
+circle(cycle('manual'; _ _ _ _ bgo bri bgi bro); -sep / 2, 0, r);
+circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
+circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# Hint that the central vertices go near the center
+yh = -sep / 2 / sqrt(3);
+hint_vertex(bri; 0, yh);
+hint_vertex(rgi; 0, yh);
+hint_vertex(bgi; 0, yh);
+",
+		));
+	}
+
+	/// The layout solver should be able to solve the tricycle layout with any combination of the three hints.
+	/// In any permutation, and even if a single hint is used (even multiple times)
+	#[test]
+	fn tricycle_interleaved_hint_permutations() {
+		let level = r"
+r = 1;
+sep = 1.3;
+
+bri = vertex();
+rgi = vertex();
+bgi = vertex();
+bro = vertex();
+rgo = vertex();
+bgo = vertex();
+circle(cycle('manual'; _ _ _ _ bgo bri bgi bro); -sep / 2, 0, r);
+circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
+circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# Hint that the central vertices go near the center
+yh = -sep / 2 / sqrt(3);
+";
+		let hints = [
+			"hint_vertex(bri; 0, yh);",
+			"hint_vertex(rgi; 0, yh);",
+			"hint_vertex(bgi; 0, yh);",
+		];
+		// Single hints
+		for hint in hints.iter() {
+			expect_fully_ok!(parse(&(level.to_owned() + hint)));
+		}
+		// Arbitrary hint combination
+		for hint_combo in hints.iter().combinations_with_replacement(3) {
+			let hint = hint_combo.into_iter().join("");
+			println!("{hint}");
+			expect_fully_ok!(parse(&(level.to_owned() + &hint)));
+		}
+	}
+
+	/// The layout solver should be able to solve the tricycle layout independent of vertex order
+	#[test]
+	fn tricycle_interleaved_vertex_permutations() {
+		let vertex_array = [
+			"bri = vertex();",
+			"rgi = vertex();",
+			"bgi = vertex();",
+			"bro = vertex();",
+			"rgo = vertex();",
+			"bgo = vertex();",
+		];
+
+		// Pls don't do a trillion permutations
+		assert!(vertex_array.len() <= 6);
+		for permutation in vertex_array.iter().permutations(vertex_array.len()) {
+			let vertices = permutation.into_iter().join("\n");
+			expect_fully_ok!(parse(&format!(
+				r"
+r = 1;
+sep = 1.3;
+
+{vertices}
+circle(cycle('manual'; _ _ _ _ bgo bri bgi bro); -sep / 2, 0, r);
+circle(cycle('manual'; _ _ _ _ bro rgi bri rgo); 0, -sep / 2 * sqrt(3), r);
+circle(cycle('manual'; _ _ _ _ rgo bgi rgi bgo); sep / 2, 0, r);
+
+# Hint that the central vertices go near the center
+yh = -sep / 2 / sqrt(3);
+hint_vertex(bri; 0, yh);
+"
+			)));
+		}
+	}
+
+	fn get_flower(
+		flower_id: &str,
+		n_petals: usize,
+		n_extra_vertices: usize,
+		radius: f32,
+		position: Vec2,
+	) -> String {
+		let mut level = String::new();
+		for i in 0..n_petals {
+			level.push_str(&format!("v_{flower_id}_{i} = vertex();\n"));
+		}
+		level.push_str(&format!("center_{flower_id} = vertex();\n"));
+		level.push_str(&format!("radius_{flower_id} = {radius};\n"));
+		level.push_str(&format!("pos_x_{flower_id} = {};\n", position.x));
+		level.push_str(&format!("pos_y_{flower_id} = {};\n", position.y));
+		let additional = (0..n_extra_vertices).map(|_| "_").join(" ");
+		for i in 0..n_petals {
+			let j = (i + 1) % n_petals;
+			level.push_str(&format!("circle(cycle(v_{flower_id}_{j} center_{flower_id} v_{flower_id}_{i} {additional}); pos_x_{flower_id} + radius_{flower_id} * cos(-2 * pi * {i} / {n_petals}), pos_y_{flower_id} + radius_{flower_id} * sin(-2 * pi * {i} / {n_petals}), radius_{flower_id});\n"));
+		}
+		level
+	}
+
+	#[test]
+	fn flower() {
+		let flowers: Vec<String> = (3..8)
+			.map(|n_petals| {
+				get_flower(&format!("flower_{n_petals}"), n_petals, 3, 10.0, Vec2::ZERO)
+			})
+			.collect();
+		for flower in flowers.iter() {
+			expect_fully_ok!(parse(flower));
+		}
+		expect_fully_ok!(parse(&flowers.iter().join("")));
+	}
 }

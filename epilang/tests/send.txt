@@ -1,0 +1,18 @@
+name = 'Send';
+
+c = 'lt';
+
+a = vertex();
+f = vertex();
+g = vertex();
+h = vertex();
+main = cycle(a player() flag() box(c) _ f g);
+side = cycle(h _ button() _);
+connect = cycle('still'; a h);
+spin = cycle('manual'; g f _);
+link(spin connect);
+
+circle(main; 0 0 100);
+circle(connect; 140 0 40);
+circle(side; 210.7, -70.7, 60);
+circle(spin; 50 120 50);
