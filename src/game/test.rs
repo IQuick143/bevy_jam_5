@@ -1039,6 +1039,7 @@ fn stress_test_random_levels() {
 		include_str!("../../assets/levels/6_sync2.txt"),
 		include_str!("../../assets/levels/send.txt"),
 		include_str!("../../assets/levels/linked_sort.txt"),
+		//include_str!("../../assets/levels/detectors/two_rails.txt"), // TODO: Verify non-group levels. // This level is here specifically because it failed layouting once.
 	];
 	for level in levels {
 		println!("{level}");
