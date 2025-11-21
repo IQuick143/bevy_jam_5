@@ -85,8 +85,8 @@ mod utils {
 	pub fn app_with_level(level: &str) -> App {
 		let mut app = setup_app();
 		let level = parser::parse_and_run(level, |_| {})
-			.value()
-			.expect("Level data should compile correctly!");
+			.expect("Level data should compile correctly!")
+			.level;
 		assert!(level.is_valid);
 
 		app.world_mut()
@@ -913,6 +913,8 @@ blue = cycle(_ button(0) _ bgo bri bgi bro);
 red = cycle(_ button(1) _ bro rgi bri rgo);
 green = cycle(_ button(2) _ rgo bgi rgi bgo);
 
+hint_vertex(bgi; 0,0);
+
 circle(blue; -87, 50 130);
 circle(red; 0, -100, 130);
 circle(green; 87 50 130);
@@ -1030,15 +1032,17 @@ circle(c2; 0 0 1);
 #[test]
 fn stress_test_random_levels() {
 	let levels = [
-		include_str!("../../assets/levels/1_intro.txt"),
-		include_str!("../../assets/levels/2_sort.txt"),
-		//include_str!("../../assets/levels/rubik.txt"),
-		include_str!("../../assets/levels/5_sync.txt"),
-		include_str!("../../assets/levels/6_sync2.txt"),
-		include_str!("../../assets/levels/send.txt"),
-		include_str!("../../assets/levels/linked_sort.txt"),
+		include_str!("../../epilang/tests/1_intro.txt"),
+		include_str!("../../epilang/tests/2_sort.txt"),
+		//include_str!("../../epilang/tests/rubik.txt"),
+		include_str!("../../epilang/tests/5_sync.txt"),
+		include_str!("../../epilang/tests/6_sync2.txt"),
+		include_str!("../../epilang/tests/send.txt"),
+		include_str!("../../epilang/tests/linked_sort.txt"),
+		//include_str!("../../epilang/tests/detectors/two_rails.txt"), // TODO: Verify non-group levels. // This level is here specifically because it failed layouting once.
 	];
 	for level in levels {
+		println!("{level}");
 		let mut app = app_with_level(level);
 		move_fuzz(&mut app, 4096, 1337133713371337);
 	}

@@ -61,14 +61,14 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			match parse_and_run(&s, |w| log::warn!("{}: {w}", load_context.asset_path())) {
-				builder::ResultNonExclusive::Ok(level) => Ok(level),
-				builder::ResultNonExclusive::Partial(level, err) => {
-					log::warn!("{}: partially loaded: {err}", load_context.asset_path());
-					Ok(level)
-				}
-				builder::ResultNonExclusive::Err(err) => Err(LevelLoadingError::Parsing(err)),
-			}
+			parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path()))
+				.map_err(LevelLoadingError::Parsing)
+				.map(|result| {
+					result
+						.errors
+						.log_with_bevy(&load_context.asset_path().to_string());
+					result.level
+				})
 		}
 	}
 

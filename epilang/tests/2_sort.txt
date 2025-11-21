@@ -1,0 +1,22 @@
+name = 'Partition';
+
+c0 = 'up';
+c1 = 'minus';
+
+main = cycle(
+    vertex(box(c0) button(c1))
+    vertex(box(c1) button(c1))
+    vertex(box(c0) button(c1))
+    vertex(box(c0) button(c1))
+    vertex(box(c1) button(c0))
+    vertex(box(c1) button(c0))
+    vertex(box(c0) button(c0))
+    vertex(box(c1) button(c0)),
+    x = vertex(box(c0) button(c0)),
+    y = vertex(box(c1) button(c1))
+);
+
+circle(main; 0 0 100);
+circle(cycle(y x); 120 0 40);
+
+cycle_color_labels(main; 'tb' 'in' 'arrow');

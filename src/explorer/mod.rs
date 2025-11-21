@@ -14,10 +14,10 @@ pub fn run_state_explorer(
 	output: &mut impl Write,
 	options: StateExplorerOptions,
 ) -> Result<(), String> {
-	let level = parse_and_run(level_source, |_| {})
-		.relaxed()
-		.map_err(|e| format!("Could not build level: {e}"))?;
-	let graph = StateGraph::traverse_state_graph(&level, options);
+	let loaded =
+		parse_and_run(level_source, |_| {}).map_err(|e| format!("Could not build level: {e}"))?;
+	loaded.errors.log_with_bevy(level_source);
+	let graph = StateGraph::traverse_state_graph(&loaded.level, options);
 	graph
 		.wrap_in_html_page(output)
 		.map_err(|e| format!("Could not save explorer result: {e}"))
