@@ -37,6 +37,7 @@ pub enum ImageKey {
 	InGameWarning,
 	Checkmark,
 	CheckmarkSolid,
+	Star,
 }
 
 impl AssetKey for ImageKey {
@@ -100,6 +101,7 @@ impl FromWorld for HandleMap<ImageKey> {
 				ImageKey::CheckmarkSolid,
 				asset_server.load("images/check-solid.png"),
 			),
+			(ImageKey::Star, asset_server.load("images/star.png")),
 		]
 		.into()
 	}

@@ -5,7 +5,11 @@ use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	game::{
 		drawing::ThingPalette,
-		level::{list::LevelList, LevelData},
+		level::{
+			completion::{CompletionStatus, LevelHubCompletion},
+			list::LevelList,
+			LevelData,
+		},
 	},
 	save::SaveGame,
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox},
@@ -76,20 +80,68 @@ fn spawn_screen(
 		)],
 	));
 
-	for hub in &levels.hubs {
+	let hub_completion = LevelHubCompletion::from_save(levels, &save);
+	for (hub_id, hub) in levels.hubs.iter().enumerate() {
 		if hub.levels.is_empty() {
 			continue;
 		}
 
-		commands.spawn((
+		let hub_title_wrapper = commands
+			.spawn((
+				Node {
+					padding: UiRect::top(COMMON_GAP),
+					justify_content: JustifyContent::Center,
+					..default()
+				},
+				ChildOf(main_id),
+			))
+			.id();
+		let mut hub_title = commands.spawn((
 			Node {
 				justify_content: JustifyContent::Center,
-				padding: UiRect::top(COMMON_GAP),
+				padding: UiRect::horizontal(px(
+					LEVEL_COMPLETED_MARKER_SIZE_PX + LEVEL_COMPLETED_MARKER_MARGIN_PX
+				)),
 				..default()
 			},
-			ChildOf(main_id),
-			children![widgets::label(hub.hub_name.clone(), font.0.clone())],
+			ChildOf(hub_title_wrapper),
+			children![(
+				Name::new("Label Text"),
+				Text::new(hub.hub_name.clone()),
+				TextFont {
+					font_size: COMMON_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColor(ui_palette::LABEL_TEXT),
+			)],
 		));
+		let completion_status = hub_completion.hub_completion_status(hub_id);
+		if completion_status >= CompletionStatus::Completed {
+			let image_key = match completion_status {
+				CompletionStatus::Completed => ImageKey::Checkmark,
+				CompletionStatus::Cleared => ImageKey::Star,
+				CompletionStatus::Started => unreachable!(),
+			};
+			hub_title.with_child((
+				Name::new("Hub Completed Marker"),
+				Node {
+					width: LEVEL_COMPLETED_MARKER_SIZE,
+					height: LEVEL_COMPLETED_MARKER_SIZE,
+					position_type: PositionType::Absolute,
+					bottom: px(0),
+					right: px(0),
+					..default()
+				},
+				ImageNode {
+					image: images[&image_key].clone(),
+					color: colors.checkmark,
+					image_mode: NodeImageMode::Stretch,
+					..default()
+				},
+			));
+		}
+
 		commands
 			.spawn((
 				Node {
