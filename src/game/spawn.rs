@@ -247,7 +247,7 @@ fn spawn_primary_level_entities(
 			})
 			.collect::<Vec<_>>();
 
-		// Spawn detectors
+		// Spawn detectors and their links
 		let _detectors = level
 			.cycles
 			.iter()
@@ -262,6 +262,21 @@ fn spawn_primary_level_entities(
 				let (position, normal_direction) =
 					get_position_and_normal_for_detector(level, cycle_id, offset)
 						.unwrap_or((Vec2::ZERO, Dir2::NORTH_EAST));
+				for link in level.detectors[detector].declared_links.iter() {
+					commands.spawn((
+						*session_id,
+						DeclaredOneWayLink {
+							center_sprite: false,
+							start_position: position,
+							end_cycle: link.dest_cycle,
+							direction: link.direction,
+							multiplicity: link.multiplicity,
+						},
+						link.direction,
+						Transform::from_translation(position.extend(0.0)),
+						Visibility::default(),
+					));
+				}
 				commands
 					.spawn((
 						*session_id,
@@ -312,8 +327,9 @@ fn spawn_primary_level_entities(
 			})
 			.collect::<Vec<_>>();
 
-		// Spawn links
+		// Spawn cycle links
 		// Links are children of their source cycle
+		// Two way "hard" links
 		for (index, link) in level.declared_links.iter().enumerate() {
 			let source_center_pos = level.cycles[link.source_cycle]
 				.center_sprite_appearence
@@ -331,7 +347,8 @@ fn spawn_primary_level_entities(
 					));
 				});
 		}
-		for (index, link) in level.declared_one_way_links.iter().enumerate() {
+		// One way links
+		for link in level.declared_one_way_links.iter() {
 			let source_center_pos = level.cycles[link.source]
 				.center_sprite_appearence
 				.0
@@ -340,12 +357,20 @@ fn spawn_primary_level_entities(
 				.get_entity(cycles[link.source])
 				.expect("The entity has just been spawned")
 				.with_children(|children| {
-					children.spawn((
-						DeclaredOneWayLink(index),
-						link.direction,
-						Transform::from_translation(source_center_pos.extend(0.0)),
-						Visibility::default(),
-					));
+					if let Some(position) = get_link_endpoint(link.source, level) {
+						children.spawn((
+							DeclaredOneWayLink {
+								center_sprite: true,
+								start_position: position,
+								end_cycle: link.dest_cycle,
+								direction: link.direction,
+								multiplicity: link.multiplicity,
+							},
+							link.direction,
+							Transform::from_translation(source_center_pos.extend(0.0)),
+							Visibility::default(),
+						));
+					}
 				});
 		}
 
@@ -709,12 +734,19 @@ fn create_one_way_link_visuals(
 		return;
 	};
 
-	for (id, &DeclaredOneWayLink(index)) in &links_q {
+	for (
+		id,
+		&DeclaredOneWayLink {
+			center_sprite,
+			start_position,
+			end_cycle,
+			direction,
+			multiplicity,
+		},
+	) in &links_q
+	{
 		// Fetch endpoints
-		let declared_link = &level.declared_one_way_links[index];
-		let a = get_link_endpoint(declared_link.source, level);
-		let b = get_link_endpoint(declared_link.dest_cycle, level);
-		let (Some(a), Some(b)) = (a, b) else {
+		let Some(b) = get_link_endpoint(end_cycle, level) else {
 			continue;
 		};
 
@@ -722,10 +754,11 @@ fn create_one_way_link_visuals(
 		commands.entity(id).with_children(|children| {
 			create_one_way_link_visual(
 				children,
-				a,
+				start_position,
 				b,
-				declared_link.direction,
-				declared_link.multiplicity,
+				direction,
+				multiplicity,
+				center_sprite,
 				&mut meshes,
 				materials.link_lines.clone(),
 				standard_meshes.one_way_link_tips.clone(),
@@ -813,6 +846,7 @@ fn create_one_way_link_visual(
 	b: Vec2,
 	direction: LinkedCycleDirection,
 	multiplicity: u64,
+	use_circle_center: bool,
 	meshes: &mut Assets<Mesh>,
 	material: Handle<ColorMaterial>,
 	tip_mesh: Handle<Mesh>,
@@ -827,8 +861,13 @@ fn create_one_way_link_visual(
 	}
 	// Distance between cycle centers
 	let d = a.distance(b);
-	// Length of the whole arrow, from base to tip
-	let arrow_length = d - CYCLE_LINK_END_CUT - ONEWAY_LINK_TARGET_OFFSET;
+	// Distance from a until the tip of the arrow
+	let arrow_end = d - ONEWAY_LINK_TARGET_OFFSET;
+	let arrow_start = if use_circle_center {
+		CYCLE_LINK_END_CUT
+	} else {
+		0.0
+	};
 
 	// Whether multiplicity should be indicated with a number
 	let use_numeric =
@@ -842,8 +881,8 @@ fn create_one_way_link_visual(
 	// How many tips the arrow should have (`--->>>`)
 	let tip_count;
 	// Length of the line that makes up the main body of the arrow
-	// Only goes up to the first tip in a multilink arrow
-	let line_length;
+	// Distance from a up to the first tip in a multilink arrow / end of main body
+	let line_end;
 
 	if use_numeric {
 		let mut digits_string = String::new();
@@ -871,14 +910,16 @@ fn create_one_way_link_visual(
 
 		let text_width = get_number_typeset_width(&digits) * ONEWAY_MULTILINK_DIGIT_SIZE.x;
 		tip_count = 1;
-		line_length = arrow_length - text_width - ONEWAY_MULTILINK_TEXT_BEFORE - padding_after;
+		line_end = arrow_end - text_width - ONEWAY_MULTILINK_TEXT_BEFORE - padding_after;
 	} else {
 		tip_count = multiplicity;
-		line_length = arrow_length - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
+		line_end = arrow_end - ONEWAY_MULTILINK_TIP_SPACING * (tip_count - 1) as f32;
 		// Assign to this so we can use it later
 		digits = String::new();
 		padding_after = 0.0;
 	};
+
+	let line_length = line_end - arrow_start;
 
 	if line_length <= 0.0 {
 		// The link cannot be rendered if the cycles are too close
@@ -893,7 +934,7 @@ fn create_one_way_link_visual(
 	let line_mesh = meshes.add(line_mesh);
 	let dir_a_to_b = (b - a).normalize();
 	let rotation = Quat::from_rotation_arc_2d(Vec2::X, dir_a_to_b);
-	let line_center_distance_from_a = line_length / 2.0 + CYCLE_LINK_END_CUT;
+	let line_center_distance_from_a = (arrow_start + line_end) / 2.0;
 	let line_center_position = dir_a_to_b * line_center_distance_from_a;
 	children.spawn((
 		Mesh2d(line_mesh),
@@ -908,7 +949,7 @@ fn create_one_way_link_visual(
 	// Rotation of the arrow tip to either side of the arrow body
 	let relative_tip_rotation = Quat::from_rotation_z(ONEWAY_LINK_TIP_ANGLE);
 	// Distance to the farthest tip in case of multiarrow
-	let tip_distance_from_a = d - ONEWAY_LINK_TARGET_OFFSET;
+	let tip_distance_from_a = arrow_end;
 	// Displace the tip's rotation center to its end so we can use it easier
 	let tip_inner_transform = Transform::from_translation(Vec3::Y * ONEWAY_LINK_TIP_LENGTH / 2.0);
 	for i in 0..tip_count {
@@ -933,7 +974,7 @@ fn create_one_way_link_visual(
 
 	if use_numeric {
 		// Backhead
-		let backhead_distance_from_a = CYCLE_LINK_END_CUT + line_length;
+		let backhead_distance_from_a = line_end;
 		let backhead_position = backhead_distance_from_a * dir_a_to_b;
 		children.spawn((
 			Mesh2d(backhead_mesh),

@@ -27,11 +27,8 @@ pub struct LevelBuilder {
 	/// Cycle links that have been explicitly added (no symmetry or transitivity)
 	declared_links: Vec<DeclaredLinkData>,
 	/// One way links between cycles that have been explicitly added (no transitivity)
+	/// For declared oneway links from detectors to cycle see [`Self::detectors`] and [`DetectorData::declared_links`]
 	declared_one_way_cycle_links: Vec<DeclaredOneWayLinkData>,
-	/// One way links from detectors that have been explicitly added (no transitivity)
-	// TODO: Populate and use this
-	#[expect(dead_code)]
-	declared_one_way_detector_links: Vec<DeclaredOneWayLinkData>,
 	/// Bounding box (or parts thereof) set by the caller
 	explicit_bounding_box: PartialBoundingBox,
 	/// A conversion factor from logical "epilang" units to level units.

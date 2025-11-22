@@ -96,6 +96,8 @@ pub struct CycleData {
 pub struct DetectorData {
 	/// List of groups this detector points to.
 	pub linked_groups: Vec<OneWayLinkData>,
+	/// List of links to draw as outgoing
+	pub declared_links: Vec<DeclaredOneWayLinkData>,
 }
 
 /// Description of a group of cycles
@@ -125,7 +127,7 @@ pub struct DeclaredLinkData {
 /// Description of a declared (and visualized) cycle link
 #[derive(Debug, Clone, Copy, Reflect)]
 pub struct DeclaredOneWayLinkData {
-	/// Cycle/Detector id from which the link goes
+	/// Cycle id from which the link goes
 	pub source: usize,
 	/// Cycle to which the link goes
 	pub dest_cycle: usize,

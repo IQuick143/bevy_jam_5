@@ -112,10 +112,15 @@ pub struct GameStateEcsIndex {
 pub struct DeclaredLink(pub usize);
 
 /// Component that identifies an entity that represents a declared one-way link
-///
-/// Parametrized by the index of the link in [`LevelData::declared_one_way_links`]
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, Deref, DerefMut)]
-pub struct DeclaredOneWayLink(pub usize);
+#[derive(Component, Clone, Copy, PartialEq, Debug, Default, Reflect)]
+pub struct DeclaredOneWayLink {
+	// Whether there is a center sprite at the origin. (false for detectors)
+	pub center_sprite: bool,
+	pub start_position: Vec2,
+	pub end_cycle: usize,
+	pub direction: LinkedCycleDirection,
+	pub multiplicity: u64,
+}
 
 /// A temporary marker object used for showing something to the player
 /// Gets invalidated (all these entities despawn)

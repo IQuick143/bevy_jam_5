@@ -17,7 +17,6 @@ impl LevelBuilder {
 			detectors: Vec::new(),
 			declared_links: Vec::new(),
 			declared_one_way_cycle_links: Vec::new(),
-			declared_one_way_detector_links: Vec::new(),
 			explicit_bounding_box: default(),
 			scale_override: None,
 			initial_zoom: None,
@@ -411,6 +410,16 @@ impl LevelBuilder {
 								direction: link.direction * target_direction_in_group,
 								multiplicity: link.multiplicity,
 							}
+						})
+						.collect(),
+					declared_links: self.detectors[detector]
+						.links
+						.iter()
+						.map(|link| DeclaredOneWayLinkData {
+							source: detector,
+							dest_cycle: link.target_cycle,
+							direction: link.direction,
+							multiplicity: link.multiplicity,
 						})
 						.collect(),
 				});
