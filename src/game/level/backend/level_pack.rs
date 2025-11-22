@@ -3,7 +3,7 @@
 use super::{super::list::*, domain::*};
 use crate::epilang::{
 	builtins,
-	interpreter::{ArgumentError::*, FunctionCallError::*, *},
+	interpreter::{ArgumentError, ArgumentError::*, FunctionCallError::*, *},
 	values::{DomainVariableValue, VariableValue},
 };
 use itertools::Itertools as _;
@@ -52,15 +52,32 @@ impl LevelListBuilder {
 		use VariableValue::*;
 
 		let hub_name: &str = args.read_as()?;
+		let children_to_complete = args
+			.optional_read_as::<i32>()
+			.map(usize::try_from)
+			.transpose()
+			.map_err(|_| ArgumentError::InvalidValue)?;
 		args.read_separator()?;
-		let hub_id = self.add_hub(hub_name.to_owned())?;
 
+		let mut child_levels = Vec::new();
+		let mut child_hubs = Vec::new();
 		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {
-				Domain(Level(LevelId(level_id))) => self.set_parent_for_level(*level_id, hub_id)?,
-				Domain(Hub(HubId(other_id))) => self.set_parent_for_hub(*other_id, hub_id)?,
+				Domain(Level(LevelId(level_id))) => child_levels.push(*level_id),
+				Domain(Hub(HubId(other_id))) => child_hubs.push(*other_id),
 				_ => return Err(TypeError(arg.get_type()).into()),
 			}
+		}
+
+		let children_to_complete =
+			children_to_complete.unwrap_or_else(|| child_levels.len() + child_hubs.len());
+		let hub_id = self.add_hub(hub_name.to_owned(), children_to_complete)?;
+
+		for level_id in child_levels {
+			self.set_parent_for_level(level_id, hub_id)?;
+		}
+		for other_id in child_hubs {
+			self.set_parent_for_hub(other_id, hub_id)?;
 		}
 
 		args.read_end()?;

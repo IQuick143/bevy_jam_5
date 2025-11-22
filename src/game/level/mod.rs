@@ -4,6 +4,7 @@ use std::f32::consts::TAU;
 pub mod asset;
 pub mod backend;
 pub mod builder;
+pub mod completion;
 pub mod list;
 pub mod list_asset;
 

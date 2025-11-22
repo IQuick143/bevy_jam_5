@@ -42,6 +42,9 @@ pub struct HubLevelInfo {
 	pub child_hubs: Vec<usize>,
 	/// List of levels that belong directly to the hub (not transitively)
 	pub levels: Vec<usize>,
+	/// How many children (levels of hubs) need to be completed
+	/// before this is marked as completed
+	pub children_to_complete: usize,
 }
 
 /// Helper object for construction of a level list
@@ -79,10 +82,15 @@ impl LevelListBuilder {
 		Ok(self.list.levels.len() - 1)
 	}
 
-	pub fn add_hub(&mut self, hub_name: String) -> Result<usize, LevelListBuildError> {
+	pub fn add_hub(
+		&mut self,
+		hub_name: String,
+		children_to_complete: usize,
+	) -> Result<usize, LevelListBuildError> {
 		self.list.hubs.push(HubLevelInfo {
 			hub_name,
 			parent_hub: None,
+			children_to_complete,
 			..default()
 		});
 		Ok(self.list.hubs.len() - 1)
