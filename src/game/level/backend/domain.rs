@@ -1,6 +1,6 @@
 //! General domain shared between the backend implementations
 
-use super::super::*;
+use super::super::{list::LevelOrHubId, *};
 use crate::epilang::{interpreter::*, values::*};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -123,6 +123,16 @@ impl_try_into_for_domain_value! {
 	},
 	Level(LevelId),
 	Hub(HubId),
+}
+
+impl TryFrom<&VariableValue<'_, DomainValue>> for LevelOrHubId {
+	type Error = ArgumentError<DomainType>;
+	fn try_from(value: &VariableValue<'_, DomainValue>) -> std::result::Result<Self, Self::Error> {
+		value
+			.try_into()
+			.map(|LevelId(id)| LevelOrHubId::Level(id))
+			.or_else(|_| value.try_into().map(|HubId(id)| LevelOrHubId::Hub(id)))
+	}
 }
 
 pub fn pictogram_color_name_to_id(name: &str) -> Result<usize, ()> {

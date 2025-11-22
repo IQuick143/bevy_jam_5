@@ -15,6 +15,13 @@ pub struct LevelList {
 	pub root_hub: usize,
 }
 
+/// Identifier of a level or a hub
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+pub enum LevelOrHubId {
+	Level(usize),
+	Hub(usize),
+}
+
 /// Information about a single level
 #[derive(Clone, Debug, Reflect)]
 pub struct LevelInfo {
@@ -29,6 +36,8 @@ pub struct LevelInfo {
 	/// Index of the level that comes after this
 	/// in the standard playing order
 	pub next_level: Option<usize>,
+	/// Levels and hubs that must be completed before this is unlocked
+	pub prerequisites: Vec<LevelOrHubId>,
 }
 
 /// Information about a hub and a group of levels it contains
@@ -45,6 +54,8 @@ pub struct HubLevelInfo {
 	/// How many children (levels of hubs) need to be completed
 	/// before this is marked as completed
 	pub children_to_complete: usize,
+	/// Levels and hubs that must be completed before this is unlocked
+	pub prerequisites: Vec<LevelOrHubId>,
 }
 
 /// Helper object for construction of a level list
@@ -77,6 +88,7 @@ impl LevelListBuilder {
 				.map_err(|err| LevelListBuildError::BadAssetPath(path.to_owned(), err))?
 				.into_owned(),
 			identifier: path.to_string(),
+			prerequisites: Vec::new(),
 		});
 		self.has_parent_hub.push(false);
 		Ok(self.list.levels.len() - 1)
@@ -148,6 +160,24 @@ impl LevelListBuilder {
 		Ok(())
 	}
 
+	pub fn create_prerequisite(
+		&mut self,
+		dependency: LevelOrHubId,
+		dependent: LevelOrHubId,
+	) -> Result<(), LevelListBuildError> {
+		self.check_id_in_range(dependency)?;
+		self.check_id_in_range(dependent)?;
+		match dependent {
+			LevelOrHubId::Level(level_id) => {
+				self.list.levels[level_id].prerequisites.push(dependency);
+			}
+			LevelOrHubId::Hub(hub_id) => {
+				self.list.hubs[hub_id].prerequisites.push(dependency);
+			}
+		}
+		Ok(())
+	}
+
 	pub fn build(
 		mut self,
 		asset_load_context: &mut LoadContext,
@@ -159,6 +189,18 @@ impl LevelListBuilder {
 		self.fill_hub_child_lists();
 		self.load_level_assets(asset_load_context);
 		Ok(self.list)
+	}
+
+	fn check_id_in_range(&self, id: LevelOrHubId) -> Result<(), LevelListBuildError> {
+		match id {
+			LevelOrHubId::Level(level_id) if level_id >= self.list.levels.len() => {
+				Err(LevelListBuildError::LevelIndexOutOfRange(level_id))
+			}
+			LevelOrHubId::Hub(hub_id) if hub_id >= self.list.hubs.len() => {
+				Err(LevelListBuildError::HubIndexOutOfRange(hub_id))
+			}
+			_ => Ok(()),
+		}
 	}
 
 	/// Checks if `ancestor` is the same as or an ancestor of `successor`

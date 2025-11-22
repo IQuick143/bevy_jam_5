@@ -32,6 +32,7 @@ impl InterpreterBackend for LevelListBuilder {
 			"level" => self.call_level(args),
 			"hub" => self.call_hub(args),
 			"next" => self.call_next(args, warnings),
+			"prereq" => self.call_prereq(args, warnings),
 			_ => Err(FunctionDoesNotExist),
 		}
 	}
@@ -105,6 +106,28 @@ impl LevelListBuilder {
 
 		Ok(ReturnValue::void())
 	}
+
+	fn call_prereq(
+		&mut self,
+		mut args: ArgumentStream<DomainValue>,
+		mut warnings: WarningSink<RuntimeWarning>,
+	) -> CallResult {
+		let mut targets = Vec::new();
+		while let Some(level_or_hub_id) = args.read_as_until_end_or_separator()? {
+			targets.push(level_or_hub_id);
+		}
+		args.read_end()?;
+
+		if targets.len() < 2 {
+			warnings.emit(RuntimeWarning::EmptyPrereq.into());
+		}
+
+		for (a, b) in targets.iter().copied().tuple_windows() {
+			self.create_prerequisite(a, b)?;
+		}
+
+		Ok(ReturnValue::void())
+	}
 }
 
 #[derive(Debug)]
@@ -147,6 +170,9 @@ pub enum RuntimeWarning {
 	/// next was called with less than two levels,
 	/// creating no succession relation
 	EmptyNext,
+	/// prereq was called with less than two levels,
+	/// creating no prerequisite
+	EmptyPrereq,
 }
 
 impl std::error::Error for RuntimeWarning {}
@@ -155,6 +181,7 @@ impl std::fmt::Display for RuntimeWarning {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::EmptyNext => f.write_str("too few levels to actually create a succession"),
+			Self::EmptyPrereq => f.write_str("too few levels and hubs to create a prerequisite"),
 		}
 	}
 }

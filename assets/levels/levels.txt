@@ -1,5 +1,5 @@
 hub('Ptolemy''s Epicycles';
-	hub('Welcome to Epicycles' 5;
+	welcome = hub('Welcome to Epicycles' 5;
 		intro = level('levels/1_intro.txt'),
 		transfer = level('levels/2_transfer.txt'),
 		boxes = level('levels/3_boxes.txt'),
@@ -7,8 +7,8 @@ hub('Ptolemy''s Epicycles';
 		sync = level('levels/5_sync.txt'),
 		sync2 = level('levels/6_sync2.txt'),
 		colors = level('levels/7_colors.txt'),
-	)
-	hub('Easy puzzles' 4;
+	),
+	easy = hub('Easy puzzles' 4;
 		lotus = level('levels/lotus.txt'),
 		bicycle = level('levels/bicycle.txt'),
 		send = level('levels/send.txt'),
@@ -16,22 +16,22 @@ hub('Ptolemy''s Epicycles';
 		partition = level('levels/2_sort.txt'),
 		sort = level('levels/num_sort.txt'),
 		disrupt = level('levels/disrupt.txt'),
-	)
-	hub('Medium puzzles' 3;
+	),
+	medium = hub('Medium puzzles' 3;
 		teamwork = level('levels/teamwork.txt'),
 		tricycle = level('levels/tricycle.txt'),
 		olympic = level('levels/olympic.txt'),
 		grid = level('levels/three_row_simple.txt'),
 		linked_partition = level('levels/linked_sort.txt'),
-	)
-	hub('Hard puzzles' 2;
+	),
+	hard = hub('Hard puzzles' 2;
 		tricycle2 = level('levels/cargo.txt'),
 		tricycle3 = level('levels/cargo_single.txt'),
 		grid2 = level('levels/three_row.txt'),
 		car = level('levels/car.txt'),
 		# rubik = level('levels/rubik.txt'),
-	)
-	hub('Animation testing';
+	),
+	at = hub('Animation testing';
 		at_full = level('levels/at_full_circles.txt'),
 		at_single = level('levels/at_single_vertices.txt'),
 		at_corner = level('levels/at_corner.txt'),
@@ -74,3 +74,6 @@ next(
 	at_companion
 	at_blocked
 );
+
+prereq(intro transfer boxes manual sync sync2 colors);
+prereq(welcome easy medium hard);

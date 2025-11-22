@@ -82,7 +82,7 @@ fn spawn_screen(
 
 	let hub_completion = LevelHubCompletion::from_save(levels, &save);
 	for (hub_id, hub) in levels.hubs.iter().enumerate() {
-		if hub.levels.is_empty() {
+		if hub.levels.is_empty() || !hub_completion.is_hub_unlocked(levels, hub_id) {
 			continue;
 		}
 
@@ -157,6 +157,10 @@ fn spawn_screen(
 			))
 			.with_children(|parent| {
 				for &level_id in &hub.levels {
+					if !hub_completion.is_level_unlocked(levels, level_id) {
+						continue;
+					}
+
 					let level_meta = &levels.levels[level_id];
 					if let Some(level) = level_assets.get(&level_meta.data_handle) {
 						let mut button = parent.spawn((

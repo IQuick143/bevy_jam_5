@@ -1,7 +1,7 @@
 //! Precomputed level and hub completion information
 
 use super::list::LevelList;
-use crate::save::SaveGame;
+use crate::{game::level::list::LevelOrHubId, save::SaveGame};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
 pub enum CompletionStatus {
@@ -16,6 +16,7 @@ pub enum CompletionStatus {
 
 #[derive(Clone, Debug, Default)]
 pub struct LevelHubCompletion {
+	levels_completed: Vec<bool>,
 	hub_completion: Vec<LevelHubCompletionState>,
 }
 
@@ -29,6 +30,7 @@ struct LevelHubCompletionState {
 impl LevelHubCompletion {
 	pub fn new(level_list: &LevelList) -> Self {
 		Self {
+			levels_completed: vec![false; level_list.levels.len()],
 			hub_completion: vec![LevelHubCompletionState::default(); level_list.hubs.len()],
 		}
 	}
@@ -44,6 +46,7 @@ impl LevelHubCompletion {
 	}
 
 	pub fn set_level_completed(&mut self, level_list: &LevelList, level_id: usize) {
+		self.levels_completed[level_id] = true;
 		let parent_hub = level_list.levels[level_id].parent_hub;
 		self.add_completed_child_to_hub(level_list, parent_hub, true, true);
 	}
@@ -106,5 +109,22 @@ impl LevelHubCompletion {
 
 	pub fn hub_completion_status(&self, hub_id: usize) -> CompletionStatus {
 		self.hub_completion[hub_id].completion_status
+	}
+
+	pub fn is_level_unlocked(&self, level_list: &LevelList, level_id: usize) -> bool {
+		self.is_prerequisite_satisfied(&level_list.levels[level_id].prerequisites)
+	}
+
+	pub fn is_hub_unlocked(&self, level_list: &LevelList, hub_id: usize) -> bool {
+		self.is_prerequisite_satisfied(&level_list.hubs[hub_id].prerequisites)
+	}
+
+	fn is_prerequisite_satisfied(&self, prerequisites: &[LevelOrHubId]) -> bool {
+		prerequisites.iter().all(|prereq| match prereq {
+			LevelOrHubId::Level(level_id) => self.levels_completed[*level_id],
+			LevelOrHubId::Hub(hub_id) => {
+				self.hub_completion_status(*hub_id) >= CompletionStatus::Completed
+			}
+		})
 	}
 }
