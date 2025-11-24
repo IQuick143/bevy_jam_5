@@ -273,7 +273,7 @@ fn spawn_primary_level_entities(
 							multiplicity: link.multiplicity,
 						},
 						link.direction,
-						Transform::from_translation(position.extend(0.0)),
+						Transform::from_translation(position.extend(layers::DETECTORS)),
 						Visibility::default(),
 					));
 				}
@@ -317,7 +317,7 @@ fn spawn_primary_level_entities(
 							cycle: cycle_id,
 							offset,
 						},
-						Transform::from_translation(position.extend(0.0)).looking_to(
+						Transform::from_translation(position.extend(layers::DETECTORS)).looking_to(
 							Dir3::NEG_Z,
 							Dir3::new_unchecked(normal_direction.extend(0.0)),
 						),
@@ -560,20 +560,24 @@ fn create_detector_and_wall_visuals(
 	mut commands: Commands,
 	detector_query: Query<Entity, Added<Detector>>,
 	wall_query: Query<Entity, Added<Wall>>,
-	materials: Res<GameObjectMaterials>,
-	meshes: Res<GameObjectMeshes>,
+	images: Res<HandleMap<ImageKey>>,
+	colors: Res<ThingPalette>,
 ) {
 	for id in &detector_query {
-		commands.entity(id).insert((
-			Mesh2d(meshes.detector_rectangle.clone()),
-			MeshMaterial2d(materials.detector.clone()),
-		));
+		commands.entity(id).insert(Sprite {
+			image: images[&ImageKey::Detector].clone(),
+			color: colors.detector,
+			custom_size: Some(SPRITE_SIZE),
+			..default()
+		});
 	}
 	for id in &wall_query {
-		commands.entity(id).insert((
-			Mesh2d(meshes.detector_rectangle.clone()),
-			MeshMaterial2d(materials.wall.clone()),
-		));
+		commands.entity(id).insert(Sprite {
+			image: images[&ImageKey::Wall].clone(),
+			color: colors.wall,
+			custom_size: Some(SPRITE_SIZE),
+			..default()
+		});
 	}
 }
 

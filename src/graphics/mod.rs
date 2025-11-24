@@ -181,6 +181,8 @@ pub mod layers {
 	pub const BOX_COLOR_SPRITES: f32 = -8.0;
 	/// Z depth of sprites for players and boxes
 	pub const OBJECT_SPRITES: f32 = -10.0;
+	/// Zdepth of detectors and walls
+	pub const DETECTORS: f32 = -40.0;
 	/// Z depth of sprites that indicate logical color of buttons
 	pub const BUTTON_COLOR_SPRITES: f32 = -48.0;
 	/// Z depth of backdrop for labels that indicate logical color of buttons
