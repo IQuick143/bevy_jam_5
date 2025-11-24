@@ -299,7 +299,7 @@ impl LevelBuilder {
 	) -> (Vec<GroupData>, Vec<DetectorData>, Vec<DetectorOrGroup>) {
 		let mut groups = self.construct_cycle_groups();
 		let detectors = self.construct_detectors();
-		self.link_groups_via_detectors(&mut groups);
+		self.compute_lists_of_detection_cycles(&mut groups);
 		match self.construct_execution_order(&groups, &detectors) {
 			Ok(execution_order) => {
 				#[cfg(any(debug_assertions, test))]
@@ -434,7 +434,9 @@ impl LevelBuilder {
 		detectors
 	}
 
-	fn link_groups_via_detectors(&self, groups: &mut [GroupData]) {
+	/// Updates [`GroupData`] with data on which cycles need to run detection logic
+	/// Fills in [`GroupData::outgoing_detector_cycles`]
+	fn compute_lists_of_detection_cycles(&self, groups: &mut [GroupData]) {
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
 			if !cycle.placed_detectors.is_empty() || !cycle.walls.is_empty() {
 				let IntermediateLinkStatus::Group(group, _) = cycle.linked_cycle else {
