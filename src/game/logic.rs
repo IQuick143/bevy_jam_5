@@ -319,7 +319,7 @@ impl GameState {
 }
 
 /// Information about a cycle turning action that took place
-#[derive(Message, Clone, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct TurnCycleResult {
 	/// How many ticks (clockwise) each cycle group turned,
 	/// or would have if the rotation was blocked

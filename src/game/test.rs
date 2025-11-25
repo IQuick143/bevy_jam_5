@@ -2,7 +2,7 @@ mod utils {
 	use crate::game::{
 		components::{Cycle, GameStateEcsIndex, Vertex},
 		level::{backend::builder as parser, GlyphData, ObjectData},
-		logic_relay::RotateCycleGroup,
+		logic_relay::{RotateCycleGroup, RotationCause},
 		prelude::*,
 	};
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
@@ -132,10 +132,13 @@ mod utils {
 		In((id, amount)): In<(usize, i32)>,
 		mut events: MessageWriter<RotateCycleGroup>,
 	) {
-		events.write(RotateCycleGroup(RotateCycle {
-			target_cycle: id,
-			amount: amount as i64,
-		}));
+		events.write(RotateCycleGroup {
+			rotation: RotateCycle {
+				target_cycle: id,
+				amount: amount as i64,
+			},
+			cause: RotationCause::Manual,
+		});
 	}
 
 	pub trait GameLogicAppExt {

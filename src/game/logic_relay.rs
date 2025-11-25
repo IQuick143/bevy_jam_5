@@ -7,11 +7,10 @@ pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
 		.init_resource::<GameState>()
 		.init_resource::<IsLevelCompleted>()
-		.add_message::<TurnCycleResult>()
+		.add_message::<RotateCycleGroupWithResult>()
 		.add_message::<GameLayoutChanged>()
 		.add_message::<RotateCycleGroup>()
 		.add_message::<RotateSingleCycle>()
-		.add_message::<RecordCycleGroupRotation>()
 		.add_message::<TurnBlockedByGroupConflict>()
 		.add_message::<TurnBlockedByWallHit>()
 		.add_systems(
@@ -58,6 +57,16 @@ pub struct RotateCycle {
 	pub amount: i64,
 }
 
+/// Enumerates the possible causes of a rotation action
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum RotationCause {
+	/// Rotation caused by a user directly by triggering it
+	#[default]
+	Manual,
+	/// Rotation command issued to undo a previous action
+	Undo,
+}
+
 /// Internal message sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle, ignores linkages.
 ///
@@ -69,12 +78,10 @@ pub struct RotateSingleCycle(pub RotateCycle);
 /// entities that lie on the cycle and all cycles linked to it
 /// Should be sent only if it is valid to rotate the given cycle.
 #[derive(Message, Clone, Copy, Debug)]
-pub struct RotateCycleGroup(pub RotateCycle);
-
-/// Message sent together with a [`RotateCycleGroup`] event
-/// if that rotation is eligible for being recorded in move history
-#[derive(Message, Clone, Copy, Debug)]
-pub struct RecordCycleGroupRotation(pub RotateCycle);
+pub struct RotateCycleGroup {
+	pub rotation: RotateCycle,
+	pub cause: RotationCause,
+}
 
 /// Message that is sent when state of the game map changes,
 /// usually by turning a cycle
@@ -99,6 +106,14 @@ pub struct TurnBlockedByWallHit {
 	pub wall: usize,
 }
 
+/// Message emited after a turn has been handled,
+/// including its result
+#[derive(Message, Clone, Debug)]
+pub struct RotateCycleGroupWithResult {
+	pub action: RotateCycleGroup,
+	pub result: TurnCycleResult,
+}
+
 /// Contains an information whether the level being played has been completed
 /// in this session (making moves after completion does not matter)
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
@@ -111,15 +126,15 @@ fn cycle_group_rotation_system(
 	mut update_event: MessageWriter<GameLayoutChanged>,
 	mut blocked_event: MessageWriter<TurnBlockedByGroupConflict>,
 	mut wall_hit_event: MessageWriter<TurnBlockedByWallHit>,
-	mut turn_events: MessageWriter<TurnCycleResult>,
+	mut turn_events: MessageWriter<RotateCycleGroupWithResult>,
 	mut game_state: ResMut<GameState>,
 	mut entity_index: ResMut<GameStateEcsIndex>,
 	active_level: PlayingLevelData,
 ) -> Result<(), BevyError> {
 	let level = active_level.get()?;
 	for event in group_events.read() {
-		let target_cycle = event.0.target_cycle;
-		let rotate_by = event.0.amount;
+		let target_cycle = event.rotation.target_cycle;
+		let rotate_by = event.rotation.amount;
 		match game_state.turn_cycle_with_links(level, target_cycle, rotate_by) {
 			Err(err) => warn!("Could not turn cycle: {err}"),
 			Ok(result) => {
@@ -143,7 +158,10 @@ fn cycle_group_rotation_system(
 					}
 					result.reorder_sequence_by_all_cycle_turns(level, &mut entity_index.objects)?;
 				}
-				turn_events.write(result);
+				turn_events.write(RotateCycleGroupWithResult {
+					action: *event,
+					result,
+				});
 			}
 		}
 	}
