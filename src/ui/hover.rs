@@ -10,6 +10,8 @@ pub const PLAYER: &str = "It's a you!";
 pub const CYCLE_MANUAL: &str = "This cycle can only be turned while you stand on it.";
 pub const CYCLE_AUTOMATIC: &str = "This cycle can be turned by left/right clicking its center.";
 pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
+pub const WALL: &str = "A wall, does not let objects through.";
+pub const DETECTOR: &str = "A detector, triggers oneways when something goes through";
 
 pub const BLOCKADE_WARNING: &str =
 	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
@@ -56,8 +58,18 @@ fn update_hover(
 		let mut closest_distance = f32::MAX;
 		for (entity, hoverable, transform) in query.iter() {
 			let translation = transform.translation();
+			// This is a formula to extract the z rotation from the quaternion without trig functions
+			// Trust me
+			let rotation = transform.rotation();
+			let rotation = Rot2 {
+				cos: rotation.w,
+				sin: rotation.z,
+			}
+			.try_normalize()
+			.unwrap_or_default();
+			let rotation = rotation * rotation;
 			// Cursor position in local coordinates
-			let transformed_cursor = cursor_pos - translation.xy();
+			let transformed_cursor = rotation.inverse() * (cursor_pos - translation.xy());
 			let mut hovered = false;
 			let mut distance = f32::MAX;
 			if let Some(bounding_circle) = hoverable.hover_bounding_circle {

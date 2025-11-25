@@ -120,8 +120,19 @@ fn toggle_box_outlines(mut render: ResMut<RenderOutlines>, mut ui_debug: ResMut<
 fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
 	for (hover, transform) in hoverables.iter() {
 		if let Some(bounding_box) = hover.hover_bounding_box {
+			let quat = transform.rotation();
+			let rotation = Rot2 {
+				cos: quat.w,
+				sin: quat.z,
+			}
+			.try_normalize()
+			.unwrap_or_default();
+			let rotation = rotation * rotation;
 			gizmos.rect_2d(
-				transform.translation().xy() + bounding_box.center(),
+				Isometry2d::new(
+					transform.translation().xy() + bounding_box.center(),
+					rotation,
+				),
 				bounding_box.half_size() * 2.0,
 				palettes::basic::LIME,
 			);
