@@ -320,8 +320,8 @@ impl LevelBuilder {
 	/// [`GroupData::cycles`] and [`GroupData::linked_groups`] are filled in.
 	/// [`GroupData::outgoing_detector_cycles`] are **not** filled in yet
 	/// as detectors have not yet been constructed
-	/// (call [`Self::link_groups_via_detectors`] after building detectors)
-	/// (yes, [`Self::link_groups_via_detectors`] does not take detectors directly,
+	/// (call [`Self::compute_lists_of_detection_cycles`] after building detectors)
+	/// (yes, [`Self::compute_lists_of_detection_cycles`] does not take detectors directly,
 	/// but it depends on correct detector numbering that is
 	/// modified by [`Self::construct_detectors`])
 	fn construct_cycle_groups(&mut self) -> Vec<GroupData> {
