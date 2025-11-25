@@ -9,7 +9,7 @@ use super::{
 	prelude::*,
 };
 use crate::{assets::*, graphics::*, AppSet};
-use bevy::{ecs::schedule::ScheduleLabel, sprite::Anchor};
+use bevy::{ecs::schedule::ScheduleLabel, platform::collections::HashMap, sprite::Anchor};
 use std::f32::consts::{PI, TAU};
 
 pub(super) fn plugin(app: &mut App) {
@@ -296,7 +296,7 @@ fn spawn_primary_level_entities(
 			.collect::<Vec<_>>();
 
 		// Spawn walls
-		let _walls = level
+		let walls = level
 			.cycles
 			.iter()
 			.enumerate()
@@ -304,28 +304,33 @@ fn spawn_primary_level_entities(
 				cycle_data
 					.wall_indices
 					.iter()
-					.map(move |&offset| (cycle_id, offset))
+					.enumerate()
+					.map(move |(wall_id, &offset)| (cycle_id, wall_id, offset))
 			})
-			.map(|(cycle_id, offset)| {
+			.map(|(cycle_id, wall_id, offset)| {
 				let (position, normal_direction) =
 					get_position_and_normal_for_detector(level, cycle_id, offset)
 						.unwrap_or((Vec2::ZERO, Dir2::NORTH_EAST));
-				commands
-					.spawn((
-						*session_id,
-						Wall {
-							cycle: cycle_id,
-							offset,
-						},
-						Transform::from_translation(position.extend(layers::DETECTORS)).looking_to(
-							Dir3::NEG_Z,
-							Dir3::new_unchecked(normal_direction.extend(0.0)),
-						),
-						Visibility::default(),
-					))
-					.id()
+				(
+					(cycle_id, wall_id),
+					commands
+						.spawn((
+							*session_id,
+							Wall {
+								cycle: cycle_id,
+								wall: wall_id,
+							},
+							Transform::from_translation(position.extend(layers::DETECTORS))
+								.looking_to(
+									Dir3::NEG_Z,
+									Dir3::new_unchecked(normal_direction.extend(0.0)),
+								),
+							Visibility::default(),
+						))
+						.id(),
+				)
 			})
-			.collect::<Vec<_>>();
+			.collect::<HashMap<_, _>>();
 
 		// Spawn cycle links
 		// Links are children of their source cycle
@@ -379,6 +384,7 @@ fn spawn_primary_level_entities(
 			let entity_index = GameStateEcsIndex {
 				cycles,
 				vertices,
+				walls,
 				..default()
 			};
 			commands.insert_resource(entity_index);

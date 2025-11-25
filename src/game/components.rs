@@ -2,7 +2,7 @@
 //! Components with a more specialized puspose belong to their respective modules
 
 use super::level::{LevelData, LinkedCycleDirection};
-use bevy::{ecs::system::SystemParam, prelude::*};
+use bevy::{ecs::system::SystemParam, platform::collections::HashMap, prelude::*};
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -48,8 +48,8 @@ pub struct Detector {
 pub struct Wall {
 	/// Index into [`LevelData::cycles`]
 	pub cycle: usize,
-	/// Index into [`CycleData::vertex_positions`](crate::game::level::CycleData::vertex_positions) on the cycle given by [`Self::cycle`]
-	pub offset: usize,
+	/// Index into [`CycleData::wall_indices`](crate::game::level::CycleData::wall_indices) on the cycle given by [`Self::cycle`]
+	pub wall: usize,
 }
 
 /// A component describing a cycle
@@ -103,6 +103,9 @@ pub struct GameStateEcsIndex {
 	/// Entities that represent glyphs, in the same order their
 	/// owner vertices appear in [`LevelData::vertices`]
 	pub glyphs: Vec<Option<Entity>>,
+	/// Entities that represent walls, indexed by (cycle_id, wall_id_in_cycle),
+	/// see also [`TurnBlockedByWallHit`](super::logic_relay::TurnBlockedByWallHit)
+	pub walls: HashMap<(usize, usize), Entity>,
 }
 
 /// Component that identifies an entity that represents a declared hard link
@@ -123,6 +126,7 @@ pub struct DeclaredOneWayLink {
 }
 
 /// A temporary marker object used for showing something to the player
-/// Gets invalidated (all these entities despawn)
+/// Gets invalidated (all these entities despawn) at the start of a turn
+/// See `marker_despawn_system` in [`super::drawing`]
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct TemporaryMarker;

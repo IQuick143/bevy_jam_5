@@ -13,6 +13,7 @@ pub fn plugin(app: &mut App) {
 		.add_message::<RotateSingleCycle>()
 		.add_message::<RecordCycleGroupRotation>()
 		.add_message::<TurnBlockedByGroupConflict>()
+		.add_message::<TurnBlockedByWallHit>()
 		.add_systems(
 			LevelInitialization,
 			(
@@ -87,6 +88,17 @@ pub struct GameLayoutChanged;
 #[derive(Message, Clone, Copy, Default, Debug)]
 pub struct TurnBlockedByGroupConflict(pub usize);
 
+/// Message indicating that a cycle with a wall
+/// blocked the execution of a turn.
+/// Emitted for each wall that would've been hit.
+#[derive(Message, Clone, Copy, Default, Debug)]
+pub struct TurnBlockedByWallHit {
+	/// The value indexes into [`LevelData::cycles`]
+	pub cycle: usize,
+	/// The value indexes into [`super::level::CycleData::wall_indices`]
+	pub wall: usize,
+}
+
 /// Contains an information whether the level being played has been completed
 /// in this session (making moves after completion does not matter)
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
@@ -98,6 +110,7 @@ fn cycle_group_rotation_system(
 	mut single_events: MessageWriter<RotateSingleCycle>,
 	mut update_event: MessageWriter<GameLayoutChanged>,
 	mut blocked_event: MessageWriter<TurnBlockedByGroupConflict>,
+	mut wall_hit_event: MessageWriter<TurnBlockedByWallHit>,
 	mut turn_events: MessageWriter<TurnCycleResult>,
 	mut game_state: ResMut<GameState>,
 	mut entity_index: ResMut<GameStateEcsIndex>,
@@ -112,6 +125,12 @@ fn cycle_group_rotation_system(
 			Ok(result) => {
 				for clash in &result.clashes {
 					blocked_event.write(TurnBlockedByGroupConflict(*clash));
+				}
+				for wall_hit in &result.wall_hits {
+					wall_hit_event.write(TurnBlockedByWallHit {
+						cycle: wall_hit.0,
+						wall: wall_hit.1,
+					});
 				}
 				// TODO: Events?
 				if !result.blocked() && result.layout_changed() {

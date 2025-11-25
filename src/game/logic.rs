@@ -381,7 +381,7 @@ impl TurnCycleResult {
 	///
 	/// ## Parameters
 	/// `target_sequence` - the sequence to reorder. Must be zippable
-	/// with [`LevelData::groups`]
+	/// with [`LevelData::vertices`]
 	pub fn reorder_sequence_by_all_cycle_turns<T: Default>(
 		&self,
 		level: &LevelData,
@@ -406,6 +406,8 @@ impl TurnCycleResult {
 
 	/// Reorders in-place a sequence of values that correspond
 	/// to individual vertices to simulate the turn of a single cycle
+	/// # Error
+	/// May error or give incorrect results if `target_sequence` has a different amoutn of elements than `level_data.vertices.len()`
 	pub fn reorder_sequence_by_single_cycle_turn<T: Default>(
 		level_data: &LevelData,
 		cycle_index: usize,
