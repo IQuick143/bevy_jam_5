@@ -889,6 +889,20 @@ circle(cycle; 0,0,1);
 	assert_err_eq!(parse(level), LevelBuilderError::DetectorOnEmptyCycle);
 }
 
+#[test]
+fn empty_cycle_wall_test() {
+	let level = r"
+name = 'empty cycle wall test';
+
+d = wall();
+
+cycle = cycle(d);
+
+circle(cycle; 0,0,1);
+";
+	assert_err_eq!(parse(level), LevelBuilderError::WallOnEmptyCycle);
+}
+
 mod layout_tests {
 	use super::*;
 	use bevy::math::Vec2;

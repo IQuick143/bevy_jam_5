@@ -851,6 +851,114 @@ circle(c = cycle(_ _ _ wall() box() _); 0 0 100);
 	assert_ne!(state_3, state_4);
 }
 
+#[test]
+fn test_walls_overlap() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls_2';
+hint = 'A player should not be reading this message!';
+
+circle(a = cycle(wall() wall() box() _ _); 0 0 100);
+circle(b = cycle(wall(), d = detector(), box() _ _); 0 0 100);
+oneway(d a);
+",
+	);
+
+	let state_a = app.read_vertices();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	let state_b1 = app.read_vertices();
+
+	app.turn_cycle(1, -1);
+	app.update();
+
+	let state_b2 = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+
+	let state_c1 = app.read_vertices();
+
+	app.turn_cycle(1, 1);
+	app.update();
+
+	let state_c2 = app.read_vertices();
+	assert_eq!(state_a, state_b1);
+	assert_eq!(state_a, state_b2);
+	assert_ne!(state_a, state_c1);
+	assert_ne!(state_a, state_c2);
+	assert_ne!(state_c1, state_c2);
+}
+
+#[test]
+fn test_walls_full_rotation() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls_3';
+hint = 'A player should not be reading this message!';
+
+circle(cycle(wall() box() _ _ _); 0 0 100);
+",
+	);
+
+	let state_a = app.read_vertices();
+
+	app.turn_cycle(0, 4);
+	app.update();
+
+	let state_b1 = app.read_vertices();
+
+	app.turn_cycle(0, 8);
+	app.update();
+
+	let state_b2 = app.read_vertices();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	let state_b3 = app.read_vertices();
+
+	app.turn_cycle(1, 135);
+	app.update();
+
+	let state_b4 = app.read_vertices();
+
+	assert_eq!(state_a, state_b1);
+	assert_eq!(state_a, state_b2);
+	assert_eq!(state_a, state_b3);
+	assert_eq!(state_a, state_b4);
+}
+
+#[test]
+fn test_multiple_fails_at_once() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls + Lockup';
+hint = 'A player should not be reading this message!';
+
+v = vertex(box());
+
+circle(a = cycle(wall() v _ _ _); 0 0 100);
+circle(b = cycle(v wall() _ _ _); 0 0 100);
+circle(c = cycle(_); 0 0 100);
+
+oneway(c a);
+oneway(c b);
+",
+	);
+
+	let state_a = app.read_vertices();
+
+	app.turn_cycle(2, 1);
+	app.update();
+
+	let state_b = app.read_vertices();
+
+	assert_eq!(state_a, state_b);
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk(
 	n_cycles: usize,
