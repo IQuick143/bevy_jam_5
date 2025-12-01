@@ -2,7 +2,7 @@
 //! Components with a more specialized puspose belong to their respective modules
 
 use super::level::{LevelData, LinkedCycleDirection};
-use bevy::{ecs::system::SystemParam, prelude::*};
+use bevy::{ecs::system::SystemParam, platform::collections::HashMap, prelude::*};
 
 /// [`Object`] entity that represents the player character
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
@@ -31,6 +31,26 @@ pub struct Glyph;
 /// A vertex (node) on the circle
 #[derive(Component, Debug, Clone, Copy, Default, Reflect)]
 pub struct Vertex;
+
+/// A visual detector on the circle
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct Detector {
+	/// Index into [`LevelData::cycles`]
+	pub cycle: usize,
+	/// Index into [`CycleData::vertex_positions`](crate::game::level::CycleData::vertex_positions) on the cycle given by [`Self::cycle`]
+	pub offset: usize,
+	/// Index into [`LevelData::detectors`]
+	pub detector_id: usize,
+}
+
+/// A visual wall on the circle
+#[derive(Component, Debug, Clone, Copy, Default, Reflect)]
+pub struct Wall {
+	/// Index into [`LevelData::cycles`]
+	pub cycle: usize,
+	/// Index into [`CycleData::wall_indices`](crate::game::level::CycleData::wall_indices) on the cycle given by [`Self::cycle`]
+	pub wall: usize,
+}
 
 /// A component describing a cycle
 #[derive(Component, Debug, Clone, Reflect)]
@@ -83,6 +103,9 @@ pub struct GameStateEcsIndex {
 	/// Entities that represent glyphs, in the same order their
 	/// owner vertices appear in [`LevelData::vertices`]
 	pub glyphs: Vec<Option<Entity>>,
+	/// Entities that represent walls, indexed by (cycle_id, wall_id_in_cycle),
+	/// see also [`TurnBlockedByWallHit`](super::logic_relay::TurnBlockedByWallHit)
+	pub walls: HashMap<(usize, usize), Entity>,
 }
 
 /// Component that identifies an entity that represents a declared hard link
@@ -92,12 +115,18 @@ pub struct GameStateEcsIndex {
 pub struct DeclaredLink(pub usize);
 
 /// Component that identifies an entity that represents a declared one-way link
-///
-/// Parametrized by the index of the link in [`LevelData::declared_one_way_links`]
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, Deref, DerefMut)]
-pub struct DeclaredOneWayLink(pub usize);
+#[derive(Component, Clone, Copy, PartialEq, Debug, Default, Reflect)]
+pub struct DeclaredOneWayLink {
+	// Whether there is a center sprite at the origin. (false for detectors)
+	pub center_sprite: bool,
+	pub start_position: Vec2,
+	pub end_cycle: usize,
+	pub direction: LinkedCycleDirection,
+	pub multiplicity: u64,
+}
 
 /// A temporary marker object used for showing something to the player
-/// Gets invalidated (all these entities despawn)
+/// Gets invalidated (all these entities despawn) at the start of a turn
+/// See `marker_despawn_system` in [`super::drawing`]
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct TemporaryMarker;

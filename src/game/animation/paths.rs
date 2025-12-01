@@ -5,6 +5,7 @@ use crate::{
 	game::{
 		components::*,
 		level::{CyclePlacement, LevelData, ThingData},
+		logic_relay::RotateCycleGroupWithResult,
 		prelude::*,
 	},
 	screen::Screen,
@@ -247,7 +248,7 @@ impl AnimationPathSegmentMeasurements {
 }
 
 fn listen_for_moves(
-	mut rotation_events: MessageReader<TurnCycleResult>,
+	mut rotation_events: MessageReader<RotateCycleGroupWithResult>,
 	mut objects: Query<(&mut Transform, Option<&mut PathAnimation>), With<Object>>,
 	active_level: PlayingLevelData,
 	entity_index: Res<GameStateEcsIndex>,
@@ -260,12 +261,12 @@ fn listen_for_moves(
 		}
 	};
 	for event in rotation_events.read() {
-		if event.blocked() {
+		if event.result.blocked() {
 			continue;
 		}
 
 		// Maps vertices that have been affected to the path segments taken by the objects on them
-		let vertex_paths = event.get_vertex_paths(level_data);
+		let vertex_paths = event.result.get_vertex_paths(level_data);
 
 		let moved_objects = entity_index
 			.objects

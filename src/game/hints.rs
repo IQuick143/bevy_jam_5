@@ -2,6 +2,7 @@
 
 use super::{level::*, prelude::*, spawn::SpawnLevel};
 use crate::{
+	game::components::{Detector, Wall},
 	graphics::SPRITE_LENGTH,
 	ui::hover::{self, *},
 };
@@ -12,7 +13,11 @@ pub(super) fn plugin(app: &mut App) {
 		LevelInitialization,
 		(
 			apply_level_hint_text,
-			(init_cycle_hover_hints, init_thing_hover_hints)
+			(
+				init_cycle_hover_hints,
+				init_thing_hover_hints,
+				init_wall_and_detector_hint,
+			)
 				.after(LevelInitializationSet::SpawnPrimaryEntities),
 		),
 	);
@@ -86,6 +91,28 @@ fn init_thing_hover_hints(
 		};
 		commands.entity(id).insert(Hoverable {
 			hover_text,
+			hover_bounding_box: Some(bounding_box),
+			hover_bounding_circle: None,
+		});
+	}
+}
+
+fn init_wall_and_detector_hint(
+	mut commands: Commands,
+	w_query: Query<Entity, With<Wall>>,
+	d_query: Query<Entity, With<Detector>>,
+) {
+	let bounding_box = Aabb2d::new(Vec2::ZERO, SPRITE_LENGTH * Vec2::new(0.120, 0.4));
+	for wall in w_query.iter() {
+		commands.entity(wall).insert(Hoverable {
+			hover_text: WALL,
+			hover_bounding_box: Some(bounding_box),
+			hover_bounding_circle: None,
+		});
+	}
+	for detector in d_query.iter() {
+		commands.entity(detector).insert(Hoverable {
+			hover_text: DETECTOR,
 			hover_bounding_box: Some(bounding_box),
 			hover_bounding_circle: None,
 		});

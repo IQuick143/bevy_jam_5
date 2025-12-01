@@ -35,6 +35,7 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					marker_despawn_system.run_if(on_message::<RotateCycleGroup>),
 					cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
+					wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
 				)
 					.chain(),
 				cycle_center_interaction_visuals_update_system
@@ -92,7 +93,7 @@ pub struct GameObjectMaterials {
 	pub cycle_hitboxes: Handle<ColorMaterial>,
 	/// Material for lines that represent links between cycles
 	pub link_lines: Handle<ColorMaterial>,
-	/// Meterial for labels that show logical color of buttons
+	/// Material for labels that show logical color of buttons
 	pub colored_button_labels: Handle<ColorMaterial>,
 }
 
@@ -222,6 +223,8 @@ pub struct ThingPalette {
 	pub inverted_link_multiplicity_label: Color,
 	pub warning_sign: Color,
 	pub checkmark: Color,
+	pub wall: Color,
+	pub detector: Color,
 }
 
 impl Default for ThingPalette {
@@ -241,6 +244,8 @@ impl Default for ThingPalette {
 			inverted_link_multiplicity_label: Srgba::hex("F29FA7").unwrap().into(),
 			warning_sign: p::RED_400.into(),
 			checkmark: p::GREEN_300.into(),
+			wall: Srgba::hex("DBACAB").unwrap().into(),
+			detector: palettes::css::ORANGE.into(),
 		}
 	}
 }
@@ -530,6 +535,50 @@ fn cycle_blocked_marker_system(
 			TemporaryMarker,
 			Hoverable {
 				hover_text: hover::BLOCKADE_WARNING,
+				hover_bounding_circle: None,
+				hover_bounding_box: Some(Aabb2d::new(
+					Vec2::new(0.0, SPRITE_LENGTH / 2.0),
+					size / 2.0,
+				)),
+			},
+			session.get_session(),
+		));
+	}
+}
+
+fn wall_blocked_marker_system(
+	mut commands: Commands,
+	mut events: MessageReader<TurnBlockedByWallHit>,
+	walls_q: Query<&Transform, With<Wall>>,
+	entity_index: Res<GameStateEcsIndex>,
+	images: Res<HandleMap<ImageKey>>,
+	session: Res<LastLevelSessionId>,
+	palette: Res<ThingPalette>,
+) {
+	for event in events.read() {
+		let Some(vertex_transform) = entity_index
+			.walls
+			.get(&(event.cycle, event.wall))
+			.and_then(|entity| walls_q.get(*entity).ok())
+		else {
+			log::warn!("Nonexistent wall!");
+			continue;
+		};
+		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
+		commands.spawn((
+			Sprite {
+				image: images[&ImageKey::InGameWarning].clone(),
+				custom_size: Some(size),
+				color: palette.warning_sign,
+				..default()
+			},
+			Anchor::BOTTOM_CENTER,
+			Transform::from_translation(
+				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+			),
+			TemporaryMarker,
+			Hoverable {
+				hover_text: hover::WALL_HIT_WARNING,
 				hover_bounding_circle: None,
 				hover_bounding_box: Some(Aabb2d::new(
 					Vec2::new(0.0, SPRITE_LENGTH / 2.0),

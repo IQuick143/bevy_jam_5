@@ -1,7 +1,7 @@
 //! Recording and rewinding of moves
 
 use super::{
-	logic_relay::{RecordCycleGroupRotation, RotateCycle, RotateCycleGroup},
+	logic_relay::{RotateCycle, RotateCycleGroup, RotateCycleGroupWithResult, RotationCause},
 	spawn::LevelInitialization,
 };
 use crate::AppSet;
@@ -36,10 +36,13 @@ pub struct UndoMove;
 
 fn record_moves(
 	mut history: ResMut<MoveHistory>,
-	mut events: MessageReader<RecordCycleGroupRotation>,
+	mut events: MessageReader<RotateCycleGroupWithResult>,
 ) {
-	for RecordCycleGroupRotation(rotation) in events.read() {
-		history.push(*rotation);
+	// Zip the events, they should match eventually
+	for event in events.read() {
+		if event.action.cause == RotationCause::Manual && !event.result.blocked() {
+			history.push(event.action.rotation);
+		}
 	}
 }
 
@@ -51,7 +54,10 @@ fn undo_moves(
 	for _ in events.read() {
 		if let Some(mut rotation) = history.pop() {
 			rotation.amount *= -1;
-			rotations.write(RotateCycleGroup(rotation));
+			rotations.write(RotateCycleGroup {
+				rotation,
+				cause: RotationCause::Undo,
+			});
 		} else {
 			log::warn!("Undo command received, but no moves have been recorded");
 		}

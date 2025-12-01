@@ -49,6 +49,8 @@ pub enum LevelBuilderError {
 	RepeatingVertexInCycle(usize),
 	/// A detector was attempted on a cycle with no vertices
 	DetectorOnEmptyCycle,
+	/// A wall was attempted on a cycle with no vertices
+	WallOnEmptyCycle,
 	/// A cycle has been explicitly assigned negative radius
 	CycleRadiusNotPositive(usize, f32),
 	/// [`build`](LevelBuilder::build) was called
@@ -180,6 +182,7 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::CycleIndexOutOfRange(i) => write!(f, "Cycle {i} has been referenced, but there are not that many cycles."),
 			Self::RepeatingVertexInCycle(i) => write!(f, "Cannot create cycle that contains vertex {i} multiple times."),
 			Self::DetectorOnEmptyCycle => write!(f, "Cannot create cycle that contains no vertices and nonzero amount of detectors."),
+			Self::WallOnEmptyCycle => write!(f, "Cannot create cycle that contains no vertices and nonzero amount of walls."),
 			Self::CycleRadiusNotPositive(i, r) => write!(f, "Radius of cycle {i} is not positive ({r})"),
 			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
 			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),

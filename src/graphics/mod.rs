@@ -56,7 +56,7 @@ pub const CYCLE_LINK_SPACING: f32 = SPRITE_LENGTH * 0.7;
 
 /// How much shorter cycle links should be than the distance
 /// between the centers of the cycles, in world units
-pub const CYCLE_LINK_END_CUT: f32 = SPRITE_LENGTH / 2.0;
+pub const CYCLE_LINK_END_CUT: f32 = 0.99 * SPRITE_LENGTH / 2.0;
 
 /// How much space should be left between the end of a one-way link visual
 /// and its target cycle's center
@@ -181,6 +181,8 @@ pub mod layers {
 	pub const BOX_COLOR_SPRITES: f32 = -8.0;
 	/// Z depth of sprites for players and boxes
 	pub const OBJECT_SPRITES: f32 = -10.0;
+	/// Zdepth of detectors and walls
+	pub const DETECTORS: f32 = -40.0;
 	/// Z depth of sprites that indicate logical color of buttons
 	pub const BUTTON_COLOR_SPRITES: f32 = -48.0;
 	/// Z depth of backdrop for labels that indicate logical color of buttons
