@@ -1,3 +1,4 @@
+use crate::{camera::CameraHarness, screen::Screen};
 use bevy::{
 	math::bounding::{Aabb2d, BoundingCircle, BoundingVolume},
 	prelude::*,
@@ -14,17 +15,47 @@ pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 pub const BLOCKADE_WARNING: &str =
 	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
 
-use crate::{camera::CameraHarness, screen::Screen};
+pub(super) fn plugin(app: &mut App) {
+	app.init_resource::<HintText>().add_systems(
+		Update,
+		(
+			update_hover_state,
+			update_hover_text_cache,
+			update_hover_text.run_if(resource_changed::<HintText>),
+		),
+	);
+}
 
+/// Marker component for a text node that displays the hover hint
 #[derive(Component, Clone, Copy, Debug, Reflect)]
+#[require(Text)]
 pub struct HoverText;
 
-#[derive(Component, Clone, Debug, Reflect)]
-pub struct Hoverable {
-	pub hover_text: &'static str,
-	pub hover_bounding_circle: Option<BoundingCircle>,
-	pub hover_bounding_box: Option<Aabb2d>,
-}
+/// Indicates whether an entity is currently hovered.
+/// Not to be confused with [`bevy::picking::hover::Hovered`],
+/// which has sliiightly different semantics. Most notably,
+/// only one entity of some kinds can be [`IsHovered`] at once
+/// (it is more of a matter of whether the entity is "selected").
+///
+/// Systems can update this component themselves to provide
+/// customized hover detection for their entity kinds, or add
+/// the [`HoverHintBoundingRect`] and [`HoverHintBoundingCircle`]
+/// components to the entities that automatically update [`IsHovered`]
+/// for entities in world space.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
+pub struct IsHovered(pub bool);
+
+/// Component that indicates that the entity provides a hint when hovered
+#[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
+#[require(IsHovered)]
+pub struct HoverHint(pub &'static str);
+
+/// [`IsHovered`] entities whose hover hitbox is
+#[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
+pub struct HoverHintBoundingRect(pub Aabb2d);
+
+#[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
+pub struct HoverHintBoundingCircle(pub BoundingCircle);
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Reflect, Default)]
@@ -33,16 +64,16 @@ pub struct HintText {
 	pub hint_text: Option<String>,
 }
 
-pub fn plugin(app: &mut App) {
-	app.init_resource::<HintText>()
-		.add_systems(Update, (update_hover, update_hover_text));
-}
-
-fn update_hover(
-	query: Query<(Entity, &Hoverable, &GlobalTransform)>,
+fn update_hover_state(
+	query: Query<(
+		Entity,
+		&GlobalTransform,
+		Option<&HoverHintBoundingRect>,
+		Option<&HoverHintBoundingCircle>,
+	)>,
+	mut hovered_query: Query<(Entity, &mut IsHovered)>,
 	window: Single<&Window>,
 	camera: Single<(&Camera, &GlobalTransform), With<CameraHarness>>,
-	mut hint_text: ResMut<HintText>,
 ) {
 	let (camera, camera_transform) = *camera;
 	let cursor_pos = window
@@ -51,20 +82,20 @@ fn update_hover(
 	if let Some(cursor_pos) = cursor_pos {
 		let mut closest_hoverable: Option<Entity> = None;
 		let mut closest_distance = f32::MAX;
-		for (entity, hoverable, transform) in query.iter() {
+		for (entity, transform, bounding_rect, bounding_circle) in query.iter() {
 			let translation = transform.translation();
 			// Cursor position in local coordinates
 			let transformed_cursor = cursor_pos - translation.xy();
 			let mut hovered = false;
 			let mut distance = f32::MAX;
-			if let Some(bounding_circle) = hoverable.hover_bounding_circle {
+			if let Some(bounding_circle) = bounding_circle {
 				let circle_distance = (transformed_cursor - bounding_circle.center).length();
 				if circle_distance < bounding_circle.radius() {
 					hovered = true;
 					distance = distance.min(circle_distance);
 				}
 			}
-			if let Some(bounding_box) = hoverable.hover_bounding_box {
+			if let Some(bounding_box) = bounding_rect {
 				if Vec2::cmplt(bounding_box.min, transformed_cursor).all()
 					&& Vec2::cmpgt(bounding_box.max, transformed_cursor).all()
 				{
@@ -82,13 +113,28 @@ fn update_hover(
 				closest_hoverable = Some(entity);
 			}
 		}
-		if let Some(target_hover) = closest_hoverable {
-			if let Ok((_, hoverable, _)) = query.get(target_hover) {
-				hint_text.hover_text = Some(hoverable.hover_text.into());
-			}
-		} else {
-			hint_text.hover_text = None;
+
+		// Set the nearest entity we hit as hovered,
+		// all others as not hovered
+		for (id, mut is_hovered) in &mut hovered_query {
+			**is_hovered = closest_hoverable == Some(id);
 		}
+	}
+}
+
+fn update_hover_text_cache(
+	query: Query<(&HoverHint, &IsHovered)>,
+	mut hint_text: ResMut<HintText>,
+) {
+	// Find the text on the entity with highest priority (lowest priority number)
+	let hover_text = query
+		.iter()
+		.find(|(_, is_hovered)| ***is_hovered)
+		.map(|(hint, _)| **hint);
+
+	// Copy the string (and update) only if not equal
+	if hint_text.hover_text.as_deref() != hover_text {
+		hint_text.hover_text = hover_text.map(str::to_owned);
 	}
 }
 

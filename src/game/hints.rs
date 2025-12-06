@@ -43,15 +43,14 @@ fn init_cycle_hover_hints(
 		let Some(offset) = center_sprite.0 else {
 			continue;
 		};
-		commands.entity(id).insert(Hoverable {
-			hover_text: match turnability {
+		commands.entity(id).insert((
+			HoverHint(match turnability {
 				CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
 				CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
 				CycleTurnability::Never => hover::CYCLE_STILL,
-			},
-			hover_bounding_circle: Some(BoundingCircle::new(offset, SPRITE_LENGTH / 2.0)),
-			hover_bounding_box: None,
-		});
+			}),
+			HoverHintBoundingCircle(BoundingCircle::new(offset, SPRITE_LENGTH / 2.0)),
+		));
 	}
 }
 
@@ -84,10 +83,8 @@ fn init_thing_hover_hints(
 				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 3.0)),
 			),
 		};
-		commands.entity(id).insert(Hoverable {
-			hover_text,
-			hover_bounding_box: Some(bounding_box),
-			hover_bounding_circle: None,
-		});
+		commands
+			.entity(id)
+			.insert((HoverHint(hover_text), HoverHintBoundingRect(bounding_box)));
 	}
 }

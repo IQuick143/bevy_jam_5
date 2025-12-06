@@ -7,7 +7,7 @@ use crate::{
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
 		*,
 	},
-	ui::hover::{self, Hoverable},
+	ui::hover::{self, HoverHint, HoverHintBoundingRect},
 	AppSet,
 };
 use bevy::{
@@ -528,14 +528,8 @@ fn cycle_blocked_marker_system(
 				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
 			),
 			TemporaryMarker,
-			Hoverable {
-				hover_text: hover::BLOCKADE_WARNING,
-				hover_bounding_circle: None,
-				hover_bounding_box: Some(Aabb2d::new(
-					Vec2::new(0.0, SPRITE_LENGTH / 2.0),
-					size / 2.0,
-				)),
-			},
+			HoverHint(hover::BLOCKADE_WARNING),
+			HoverHintBoundingRect(Aabb2d::new(Vec2::new(0.0, SPRITE_LENGTH / 2.0), size / 2.0)),
 			session.get_session(),
 		));
 	}

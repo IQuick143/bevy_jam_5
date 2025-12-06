@@ -6,7 +6,10 @@ use crate::{
 	graphics::VERTICAL_PADDING_FRACTION,
 	save::SaveGame,
 	screen::PlayingLevel,
-	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
+	ui::{
+		hover::{HoverHintBoundingCircle, HoverHintBoundingRect},
+		prelude::FadeAnimationBundle,
+	},
 };
 use bevy::{
 	color::palettes,
@@ -123,22 +126,24 @@ fn toggle_box_outlines(mut render: ResMut<RenderOutlines>, mut ui_debug: ResMut<
 	ui_debug.toggle();
 }
 
-fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
-	for (hover, transform) in hoverables.iter() {
-		if let Some(bounding_box) = hover.hover_bounding_box {
-			gizmos.rect_2d(
-				transform.translation().xy() + bounding_box.center(),
-				bounding_box.half_size() * 2.0,
-				palettes::basic::LIME,
-			);
-		}
-		if let Some(bounding_circle) = hover.hover_bounding_circle {
-			gizmos.circle_2d(
-				transform.translation().xy() + bounding_circle.center,
-				bounding_circle.radius(),
-				palettes::basic::LIME,
-			);
-		}
+fn draw_hover_boxes(
+	mut gizmos: Gizmos,
+	rects: Query<(&HoverHintBoundingRect, &GlobalTransform)>,
+	circles: Query<(&HoverHintBoundingCircle, &GlobalTransform)>,
+) {
+	for (bounding_box, transform) in &rects {
+		gizmos.rect_2d(
+			transform.translation().xy() + bounding_box.center(),
+			bounding_box.half_size() * 2.0,
+			palettes::basic::LIME,
+		);
+	}
+	for (bounding_circle, transform) in &circles {
+		gizmos.circle_2d(
+			transform.translation().xy() + bounding_circle.center,
+			bounding_circle.radius(),
+			palettes::basic::LIME,
+		);
 	}
 }
 
