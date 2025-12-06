@@ -7,7 +7,7 @@ use crate::{
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
 		*,
 	},
-	ui::hover::{self, HoverHint, HoverHintBoundingRect},
+	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority},
 	AppSet,
 };
 use bevy::{
@@ -529,6 +529,7 @@ fn cycle_blocked_marker_system(
 			),
 			TemporaryMarker,
 			HoverHint(hover::BLOCKADE_WARNING),
+			HoverPriority(hover::prio::WORLD_UI),
 			HoverHintBoundingRect(Aabb2d::new(Vec2::new(0.0, SPRITE_LENGTH / 2.0), size / 2.0)),
 			session.get_session(),
 		));

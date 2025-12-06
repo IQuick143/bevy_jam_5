@@ -15,6 +15,22 @@ pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 pub const BLOCKADE_WARNING: &str =
 	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
 
+/// Priority markers that indicate which hoverable entity
+/// should be selected if the pointer overlaps more of them at once
+pub mod prio {
+	/// True UI
+	#[expect(unused)]
+	pub const STATIC_UI: u32 = 10;
+	/// World space UI
+	pub const WORLD_UI: u32 = 20;
+	/// Object sprites
+	pub const OBJECT: u32 = 40;
+	/// Glyph sprites
+	pub const GLYPH: u32 = 40;
+	/// Cycles
+	pub const CYCLE: u32 = 50;
+}
+
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<HintText>().add_systems(
 		Update,
@@ -50,6 +66,11 @@ pub struct IsHovered(pub bool);
 #[require(IsHovered)]
 pub struct HoverHint(pub &'static str);
 
+/// If [`IsHovered`] entities overlap and multiple are hovered
+/// simultaneously, the one with lowest [`HoverPriority`] is chosen
+#[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Deref, DerefMut)]
+pub struct HoverPriority(pub u32);
+
 /// [`IsHovered`] entities whose hover hitbox is
 #[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
 pub struct HoverHintBoundingRect(pub Aabb2d);
@@ -68,6 +89,7 @@ fn update_hover_state(
 	query: Query<(
 		Entity,
 		&GlobalTransform,
+		Option<&HoverPriority>,
 		Option<&HoverHintBoundingRect>,
 		Option<&HoverHintBoundingCircle>,
 	)>,
@@ -81,11 +103,12 @@ fn update_hover_state(
 		.and_then(|p| camera.viewport_to_world_2d(camera_transform, p).ok());
 	if let Some(cursor_pos) = cursor_pos {
 		let mut closest_hoverable: Option<Entity> = None;
-		let mut closest_distance = f32::MAX;
-		for (entity, transform, bounding_rect, bounding_circle) in query.iter() {
+		let mut closest_priority_and_distance = (u32::MAX, f32::MAX);
+		for (entity, transform, priority, bounding_rect, bounding_circle) in query.iter() {
 			let translation = transform.translation();
 			// Cursor position in local coordinates
 			let transformed_cursor = cursor_pos - translation.xy();
+			let priority = priority.copied().as_deref().copied().unwrap_or(u32::MAX);
 			let mut hovered = false;
 			let mut distance = f32::MAX;
 			if let Some(bounding_circle) = bounding_circle {
@@ -108,8 +131,8 @@ fn update_hover_state(
 				}
 			}
 
-			if hovered && distance < closest_distance {
-				closest_distance = distance;
+			if hovered && (priority, distance) < closest_priority_and_distance {
+				closest_priority_and_distance = (priority, distance);
 				closest_hoverable = Some(entity);
 			}
 		}
@@ -123,14 +146,15 @@ fn update_hover_state(
 }
 
 fn update_hover_text_cache(
-	query: Query<(&HoverHint, &IsHovered)>,
+	query: Query<(&HoverHint, &IsHovered, Option<&HoverPriority>)>,
 	mut hint_text: ResMut<HintText>,
 ) {
 	// Find the text on the entity with highest priority (lowest priority number)
 	let hover_text = query
 		.iter()
-		.find(|(_, is_hovered)| ***is_hovered)
-		.map(|(hint, _)| **hint);
+		.filter(|(_, is_hovered, _)| ***is_hovered)
+		.min_by_key(|(_, _, prio)| prio.copied().unwrap_or(HoverPriority(u32::MAX)))
+		.map(|(hint, _, _)| **hint);
 
 	// Copy the string (and update) only if not equal
 	if hint_text.hover_text.as_deref() != hover_text {

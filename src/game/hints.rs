@@ -50,6 +50,7 @@ fn init_cycle_hover_hints(
 				CycleTurnability::Never => hover::CYCLE_STILL,
 			}),
 			HoverHintBoundingCircle(BoundingCircle::new(offset, SPRITE_LENGTH / 2.0)),
+			HoverPriority(hover::prio::CYCLE),
 		));
 	}
 }
@@ -59,17 +60,19 @@ fn init_thing_hover_hints(
 	query: Query<(Entity, &ThingData), Added<ThingData>>,
 ) {
 	for (id, thing) in &query {
-		let (hover_text, bounding_box) = match thing {
+		let (hover_text, bounding_box, priority) = match thing {
 			ThingData::Object(ObjectData::Player) => (
 				hover::PLAYER,
 				Aabb2d::new(
 					SPRITE_LENGTH * Vec2::new(0.0, 0.25),
 					SPRITE_LENGTH * Vec2::new(0.25, 0.4),
 				),
+				hover::prio::OBJECT,
 			),
 			ThingData::Object(ObjectData::Box(_)) => (
 				hover::BOX,
 				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 4.0)),
+				hover::prio::OBJECT,
 			),
 			ThingData::Glyph(GlyphData::Flag) => (
 				hover::FLAG,
@@ -77,14 +80,18 @@ fn init_thing_hover_hints(
 					SPRITE_LENGTH * Vec2::new(0.0, 0.08),
 					SPRITE_LENGTH * Vec2::new(0.25, 0.30),
 				),
+				hover::prio::GLYPH,
 			),
 			ThingData::Glyph(GlyphData::Button(_)) => (
 				hover::BUTTON,
 				Aabb2d::new(Vec2::ZERO, Vec2::splat(SPRITE_LENGTH / 3.0)),
+				hover::prio::GLYPH,
 			),
 		};
-		commands
-			.entity(id)
-			.insert((HoverHint(hover_text), HoverHintBoundingRect(bounding_box)));
+		commands.entity(id).insert((
+			HoverHint(hover_text),
+			HoverHintBoundingRect(bounding_box),
+			HoverPriority(priority),
+		));
 	}
 }
