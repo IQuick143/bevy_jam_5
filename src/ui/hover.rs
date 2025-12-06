@@ -12,6 +12,11 @@ pub const CYCLE_MANUAL: &str = "This cycle can only be turned while you stand on
 pub const CYCLE_AUTOMATIC: &str = "This cycle can be turned by left/right clicking its center.";
 pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
 
+pub const UI_EXIT: &str = "Exit [Esc]";
+pub const UI_RESET: &str = "Reset [R]";
+pub const UI_UNDO: &str = "Undo [Z]";
+pub const UI_NEXT: &str = "Next level [N]";
+
 pub const BLOCKADE_WARNING: &str =
 	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
 
@@ -19,7 +24,6 @@ pub const BLOCKADE_WARNING: &str =
 /// should be selected if the pointer overlaps more of them at once
 pub mod prio {
 	/// True UI
-	#[expect(unused)]
 	pub const STATIC_UI: u32 = 10;
 	/// World space UI
 	pub const WORLD_UI: u32 = 20;
@@ -36,6 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			update_hover_state,
+			update_hover_state_from_interaction,
 			update_hover_text_cache,
 			update_hover_text.run_if(resource_changed::<HintText>),
 		),
@@ -71,12 +76,18 @@ pub struct HoverHint(pub &'static str);
 #[derive(Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Deref, DerefMut)]
 pub struct HoverPriority(pub u32);
 
-/// [`IsHovered`] entities whose hover hitbox is
+/// [`IsHovered`] entities whose hover hitbox is a rectangle
 #[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
 pub struct HoverHintBoundingRect(pub Aabb2d);
 
+/// [`IsHovered`] entities whose hover hitbox is a circle
 #[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
 pub struct HoverHintBoundingCircle(pub BoundingCircle);
+
+/// [`IsHovered`] entities whose hover state is comuted from [`Interaction`]
+#[derive(Component, Clone, Copy, Debug, Default)]
+#[require(IsHovered, Interaction)]
+pub struct UseHoverFromInteraction;
 
 /// Contains an overview of conditions that are needed to complete the level
 #[derive(Resource, Debug, Clone, Reflect, Default)]
@@ -85,15 +96,32 @@ pub struct HintText {
 	pub hint_text: Option<String>,
 }
 
+fn update_hover_state_from_interaction(
+	mut query: Query<
+		(&mut IsHovered, &Interaction),
+		(With<UseHoverFromInteraction>, Changed<Interaction>),
+	>,
+) {
+	for (mut is_hovered, interaction) in &mut query {
+		**is_hovered = *interaction != Interaction::None;
+	}
+}
+
 fn update_hover_state(
-	query: Query<(
-		Entity,
-		&GlobalTransform,
-		Option<&HoverPriority>,
-		Option<&HoverHintBoundingRect>,
-		Option<&HoverHintBoundingCircle>,
-	)>,
-	mut hovered_query: Query<(Entity, &mut IsHovered)>,
+	query: Query<
+		(
+			Entity,
+			&GlobalTransform,
+			Option<&HoverPriority>,
+			Option<&HoverHintBoundingRect>,
+			Option<&HoverHintBoundingCircle>,
+		),
+		Or<(With<HoverHintBoundingRect>, With<HoverHintBoundingCircle>)>,
+	>,
+	mut hovered_query: Query<
+		(Entity, &mut IsHovered),
+		Or<(With<HoverHintBoundingRect>, With<HoverHintBoundingCircle>)>,
+	>,
 	window: Single<&Window>,
 	camera: Single<(&Camera, &GlobalTransform), With<CameraHarness>>,
 ) {

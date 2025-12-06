@@ -10,7 +10,13 @@ use crate::{
 		prelude::*,
 	},
 	send_message,
-	ui::{consts::*, hover::HoverText, interaction::InteractionEnabled, palette::*, prelude::*},
+	ui::{
+		consts::*,
+		hover::{self, HoverHint, HoverPriority, HoverText, UseHoverFromInteraction},
+		interaction::InteractionEnabled,
+		palette::*,
+		prelude::*,
+	},
 	AppSet,
 };
 
@@ -161,15 +167,24 @@ fn spawn_game_ui(
 					(
 						widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
 						GameUiAction::Back,
+						HoverHint(hover::UI_EXIT),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
 					),
 					(
 						widgets::sprite_button(&button_sprites, UiButtonAtlas::RESTART),
 						GameUiAction::Reset,
+						HoverHint(hover::UI_RESET),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
 					),
 					(
 						widgets::sprite_button(&button_sprites, UiButtonAtlas::UNDO),
 						GameUiAction::Undo,
 						UndoButton,
+						HoverHint(hover::UI_UNDO),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
 					),
 				],
 			));
@@ -199,6 +214,9 @@ fn spawn_game_ui(
 								pressed: NEXT_LEVEL_BUTTON_PRESSED_BACKGROUND,
 								disabled: BUTTON_DISABLED_BACKGROUND,
 							},
+							HoverHint(hover::UI_NEXT),
+							HoverPriority(hover::prio::STATIC_UI),
+							UseHoverFromInteraction,
 						));
 				});
 			parent.spawn((
