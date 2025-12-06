@@ -5,7 +5,7 @@ use crate::{
 	graphics::SPRITE_LENGTH,
 	ui::hover::{self, *},
 };
-use bevy::math::bounding::{Aabb2d, BoundingCircle};
+use bevy::math::bounding::Aabb2d;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
@@ -34,23 +34,18 @@ fn apply_level_hint_text(
 
 fn init_cycle_hover_hints(
 	mut commands: Commands,
-	query: Query<
-		(Entity, &CycleTurnability, &CycleCenterSpriteAppearence),
-		Added<CycleTurnability>,
-	>,
+	query: Query<(Entity, &CycleTurnability), Added<CycleTurnability>>,
 ) {
-	for (id, turnability, center_sprite) in &query {
-		let Some(offset) = center_sprite.0 else {
-			continue;
-		};
+	for (id, turnability) in &query {
 		commands.entity(id).insert((
 			HoverHint(match turnability {
 				CycleTurnability::Always => hover::CYCLE_AUTOMATIC,
 				CycleTurnability::WithPlayer => hover::CYCLE_MANUAL,
 				CycleTurnability::Never => hover::CYCLE_STILL,
 			}),
-			HoverHintBoundingCircle(BoundingCircle::new(offset, SPRITE_LENGTH / 2.0)),
 			HoverPriority(hover::prio::CYCLE),
+			// Hover hint inputs for cycles are handled together
+			// with their game inputs
 		));
 	}
 }
