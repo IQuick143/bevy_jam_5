@@ -1,19 +1,30 @@
-use bevy::prelude::*;
-
-use crate::{assets::SfxKey, audio::sfx::PlaySfx};
-
 use super::freeze::ui_not_frozen;
+use crate::{assets::SfxKey, audio::sfx::PlaySfx};
+use bevy::{
+	ecs::{lifecycle::HookContext, world::DeferredWorld},
+	prelude::*,
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.register_type::<InteractionPalette>();
 	app.add_systems(
 		Update,
 		(
-			apply_interaction_palette,
-			apply_interaction_palette_to_sprite_widgets,
-			trigger_interaction_sfx,
-		)
-			.run_if(ui_not_frozen),
+			(
+				apply_interaction_palette.in_set(ApplyInteractionPaletteSystems),
+				trigger_interaction_sfx,
+			)
+				.run_if(ui_not_frozen),
+			// If the UI is frozen, update only based on a limited set of triggers (enable/disable)
+			apply_enable_disable_interaction_palette
+				.in_set(ApplyInteractionPaletteSystems)
+				.run_if(not(ui_not_frozen)),
+			(
+				propagate_interaction_color_to_node_widgets,
+				propagate_interaction_color_to_sprite_widgets,
+			)
+				.after(ApplyInteractionPaletteSystems),
+		),
 	);
 }
 
@@ -43,6 +54,8 @@ pub type InteractionQuery<'w, 's, T, F = ()> = Query<
 /// Palette for widget interactions.
 #[derive(Component, Debug, Reflect)]
 #[reflect(Component)]
+#[require(InteractionColor)]
+#[component(on_add = on_add_interaction_palette)]
 pub struct InteractionPalette {
 	pub none: Color,
 	pub hovered: Color,
@@ -59,35 +72,30 @@ pub struct InteractionPalette {
 #[reflect(Component)]
 pub struct InteractionPaletteForChildSprites;
 
-fn apply_interaction_palette(
-	mut palette_query: InteractionQuery<
-		(&InteractionPalette, &mut BackgroundColor),
-		Without<InteractionPaletteForChildSprites>,
-	>,
-) {
-	for (interaction, enabled, (palette, mut background)) in &mut palette_query {
-		*background = if enabled.is_none_or(|e| **e) {
-			match interaction {
-				Interaction::None => palette.none,
-				Interaction::Hovered => palette.hovered,
-				Interaction::Pressed => palette.pressed,
-			}
-		} else {
-			palette.disabled
+/// Cache for a color that is applied to an entity
+/// in different ways, depending on presence of other marker components
+#[derive(Component, Clone, Copy, PartialEq, Debug, Default, Deref, DerefMut)]
+struct InteractionColor(Color);
+
+/// System set where [`InteractionColor`] is updated
+#[derive(SystemSet, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
+struct ApplyInteractionPaletteSystems;
+
+fn on_add_interaction_palette(mut world: DeferredWorld, context: HookContext) {
+	let mut entity = world.entity_mut(context.entity);
+	if let Some(palette) = entity.get::<InteractionPalette>() {
+		let clear_color = palette.none;
+		if let Some(mut color) = entity.get_mut::<InteractionColor>() {
+			**color = clear_color;
 		}
-		.into();
 	}
 }
 
-fn apply_interaction_palette_to_sprite_widgets(
-	widget_q: InteractionQuery<
-		(&InteractionPalette, &Children),
-		With<InteractionPaletteForChildSprites>,
-	>,
-	mut sprite_q: Query<&mut ImageNode>,
+fn apply_interaction_palette(
+	mut palette_query: InteractionQuery<(&InteractionPalette, &mut InteractionColor)>,
 ) {
-	for (interaction, enabled, (palette, children)) in &widget_q {
-		let color = if enabled.is_none_or(|e| **e) {
+	for (interaction, enabled, (palette, mut color)) in &mut palette_query {
+		let new_color = if enabled.is_none_or(|e| **e) {
 			match interaction {
 				Interaction::None => palette.none,
 				Interaction::Hovered => palette.hovered,
@@ -96,9 +104,58 @@ fn apply_interaction_palette_to_sprite_widgets(
 		} else {
 			palette.disabled
 		};
+		color.set_if_neq(InteractionColor(new_color));
+	}
+}
+
+fn apply_enable_disable_interaction_palette(
+	mut palette_query: Query<
+		(
+			&InteractionEnabled,
+			&InteractionPalette,
+			&mut InteractionColor,
+		),
+		Changed<InteractionEnabled>,
+	>,
+) {
+	for (enabled, palette, mut color) in &mut palette_query {
+		let new_color = if **enabled {
+			palette.none
+		} else {
+			palette.disabled
+		};
+		color.set_if_neq(InteractionColor(new_color));
+	}
+}
+
+fn propagate_interaction_color_to_node_widgets(
+	mut query: Query<
+		(&InteractionColor, &mut BackgroundColor),
+		(
+			Changed<InteractionColor>,
+			Without<InteractionPaletteForChildSprites>,
+		),
+	>,
+) {
+	for (color, mut background_color) in &mut query {
+		background_color.0 = **color;
+	}
+}
+
+fn propagate_interaction_color_to_sprite_widgets(
+	widget_q: Query<
+		(&InteractionColor, &Children),
+		(
+			Changed<InteractionColor>,
+			With<InteractionPaletteForChildSprites>,
+		),
+	>,
+	mut sprite_q: Query<&mut ImageNode>,
+) {
+	for (color, children) in &widget_q {
 		for child_id in children {
 			if let Ok(mut image) = sprite_q.get_mut(*child_id) {
-				image.color = color;
+				image.color = **color;
 			}
 		}
 	}
