@@ -28,7 +28,7 @@ pub mod prio {
 	/// World space UI
 	pub const WORLD_UI: u32 = 20;
 	/// Object sprites
-	pub const OBJECT: u32 = 40;
+	pub const OBJECT: u32 = 30;
 	/// Glyph sprites
 	pub const GLYPH: u32 = 40;
 	/// Cycles
