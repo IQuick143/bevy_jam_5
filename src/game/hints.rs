@@ -60,7 +60,7 @@ fn init_thing_hover_hints(
 				hover::PLAYER,
 				Aabb2d::new(
 					SPRITE_LENGTH * Vec2::new(0.0, 0.25),
-					SPRITE_LENGTH * Vec2::new(0.25, 0.4),
+					SPRITE_LENGTH * Vec2::new(0.22, 0.375),
 				),
 				hover::prio::OBJECT,
 			),
