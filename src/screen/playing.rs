@@ -35,7 +35,10 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				(
-					send_message(GameUiAction::Reset).run_if(char_input_pressed('r')),
+					send_message(GameUiAction::Reset).run_if(
+						char_input_pressed('r')
+							.and(|history: Res<MoveHistory>| !history.is_empty()),
+					),
 					send_message(GameUiAction::NextLevel).run_if(
 						char_input_pressed('n')
 							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
@@ -78,7 +81,7 @@ pub struct PlayingLevel(pub Option<usize>);
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct NextLevelButton;
 
-/// Marker component for the undo button
+/// Marker component for the undo and reset buttons
 #[derive(Component, Clone, Copy, Debug, Default)]
 #[require(InteractionEnabled(false))]
 struct UndoButton;
@@ -174,6 +177,7 @@ fn spawn_game_ui(
 					(
 						widgets::sprite_button(&button_sprites, UiButtonAtlas::RESTART),
 						GameUiAction::Reset,
+						UndoButton,
 						HoverHint(hover::UI_RESET),
 						HoverPriority(hover::prio::STATIC_UI),
 						UseHoverFromInteraction,
