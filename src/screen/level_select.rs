@@ -12,7 +12,7 @@ use crate::{
 		},
 	},
 	save::SaveGame,
-	ui::{consts::*, prelude::*, scrollbox::Scrollbox},
+	ui::{consts::*, palette::*, prelude::*, scrollbox::Scrollbox},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -186,6 +186,14 @@ fn spawn_screen(
 									..default()
 								},
 							));
+						} else {
+							// Make the button a different color to indicate it's new
+							button.insert(InteractionPalette {
+								none: NEW_LEVEL_BUTTON_BACKGROUND,
+								hovered: BUTTON_HOVERED_BACKGROUND,
+								pressed: BUTTON_PRESSED_BACKGROUND,
+								disabled: BUTTON_DISABLED_BACKGROUND,
+							});
 						}
 					} else {
 						log::warn!("Invalid level asset handle");

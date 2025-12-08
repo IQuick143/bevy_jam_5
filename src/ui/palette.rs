@@ -1,5 +1,7 @@
 use bevy::{color::palettes::tailwind::*, prelude::*};
 
+pub const NEW_LEVEL_BUTTON_BACKGROUND: Color =
+	Color::Srgba(Srgba::rgb(0.4862745, 0.54509807, 0.6313726));
 pub const BUTTON_HOVERED_BACKGROUND: Color = Color::Srgba(SLATE_500);
 pub const BUTTON_PRESSED_BACKGROUND: Color = Color::Srgba(SLATE_300);
 pub const BUTTON_DISABLED_BACKGROUND: Color = Color::Srgba(SLATE_300);
