@@ -47,10 +47,6 @@ fn spawn_screen(
 	let root_id = commands
 		.spawn((widgets::ui_root(), DespawnOnExit(Screen::LevelSelect)))
 		.id();
-	commands.spawn((
-		widgets::header("Level Select", font.0.clone()),
-		ChildOf(root_id),
-	));
 	let main_id = commands
 		.spawn((
 			Scrollbox {
@@ -58,9 +54,10 @@ fn spawn_screen(
 			},
 			Node {
 				flex_direction: FlexDirection::Column,
-				justify_content: JustifyContent::Start,
+				justify_content: JustifyContent::Center,
 				align_content: AlignContent::Center,
-				height: Val::Percent(75.0),
+				height: Val::Percent(90.0),
+				width: Val::Percent(90.0),
 				row_gap: COMMON_GAP,
 				overflow: Overflow::scroll_y(),
 				..default()
@@ -145,12 +142,13 @@ fn spawn_screen(
 		commands
 			.spawn((
 				Node {
-					display: Display::Grid,
+					display: Display::Flex,
+					flex_wrap: FlexWrap::Wrap,
 					column_gap: COMMON_GAP,
 					row_gap: COMMON_GAP,
+					width: Val::Percent(100.0),
 					justify_content: JustifyContent::Center,
 					align_content: AlignContent::Center,
-					grid_template_columns: vec![RepeatedGridTrack::auto(3)],
 					..default()
 				},
 				ChildOf(main_id),

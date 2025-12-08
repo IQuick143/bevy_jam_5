@@ -26,8 +26,8 @@ pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 		text.into(),
 		font,
 		COMMON_BUTTON_TEXT_SIZE,
-		default(),
-		WIDE_BUTTON_WIDTH,
+		GRID_BUTTON_PADDING,
+		Val::Auto,
 		GRID_BUTTON_HEIGHT,
 	)
 }
