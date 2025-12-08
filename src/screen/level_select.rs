@@ -45,7 +45,10 @@ fn spawn_screen(
 		.get(&levels.0)
 		.expect("The LevelList asset should be valid");
 	let root_id = commands
-		.spawn((widgets::ui_root(), DespawnOnExit(Screen::LevelSelect)))
+		.spawn((
+			widgets::ui_root_justified(JustifyContent::Center),
+			DespawnOnExit(Screen::LevelSelect),
+		))
 		.id();
 	let main_id = commands
 		.spawn((
@@ -54,10 +57,10 @@ fn spawn_screen(
 			},
 			Node {
 				flex_direction: FlexDirection::Column,
-				justify_content: JustifyContent::Center,
+				justify_content: JustifyContent::Start,
 				align_content: AlignContent::Center,
-				height: Val::Percent(90.0),
 				width: Val::Percent(90.0),
+				padding: UiRect::vertical(Val::Percent(5.0)),
 				row_gap: COMMON_GAP,
 				overflow: Overflow::scroll_y(),
 				..default()
