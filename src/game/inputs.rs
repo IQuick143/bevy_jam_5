@@ -112,7 +112,6 @@ fn cycle_inputs_system(
 fn cycle_rotation_with_inputs_system(
 	query: Query<(&Cycle, &CycleInteraction), Changed<CycleInteraction>>,
 	mut rot_events: MessageWriter<RotateCycleGroup>,
-	mut record_events: MessageWriter<RecordCycleGroupRotation>,
 ) {
 	for (cycle, interaction) in &query {
 		let amount = match interaction {
@@ -124,7 +123,9 @@ fn cycle_rotation_with_inputs_system(
 			target_cycle: cycle.id,
 			amount,
 		};
-		rot_events.write(RotateCycleGroup(rotation));
-		record_events.write(RecordCycleGroupRotation(rotation));
+		rot_events.write(RotateCycleGroup {
+			rotation,
+			cause: RotationCause::Manual,
+		});
 	}
 }

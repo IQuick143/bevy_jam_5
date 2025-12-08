@@ -51,12 +51,13 @@ impl InterpreterBackend for LevelBuilder {
 			"button" => Self::call_button(args),
 			"vertex" => self.call_vertex(args),
 			"detector" => self.call_detector(args),
+			"wall" => self.call_wall(args),
 			"set_thing" => self.call_set_thing(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
 			"put_center" => self.call_put_center(args),
 			"put_vertex" => self.call_put_vertex(args),
-			"set_vertex_angle" => self.call_set_vertex_angle(args),
+			"hint_vertex" => self.call_hint_vertex(args),
 			"link" => self.call_link(false, args, warnings),
 			"oneway" => self.call_link(true, args, warnings),
 			"cycle_color_labels" => self.call_cycle_color_labels(args),
@@ -202,6 +203,11 @@ impl LevelBuilder {
 		Ok(ReturnValue::pure(DetectorId(self.add_detector()?).into()))
 	}
 
+	fn call_wall(&mut self, args: ArgumentStream<DomainValue>) -> CallResult {
+		args.read_end()?;
+		Ok(ReturnValue::pure(DomainValue::Wall.into()))
+	}
+
 	fn call_set_thing(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
 		let mut target_vertices = Vec::new();
 		while let Some(VertexId(vertex_id)) = args.read_as_until_end_or_separator()? {
@@ -247,6 +253,7 @@ impl LevelBuilder {
 
 		let mut vertices = Vec::new();
 		let mut detectors = Vec::new();
+		let mut walls = Vec::new();
 		// TODO: Better handling of overlapping detectors.
 		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {
@@ -265,12 +272,15 @@ impl LevelBuilder {
 				Domain(Detector(DetectorId(id))) => {
 					detectors.push((*id, (vertices.len() as i32) - 1))
 				}
+				Domain(Wall) => {
+					walls.push((vertices.len() as i32) - 1);
+				}
 				other => return Err(TypeError(other.get_type()).into()),
 			}
 		}
 
 		args.read_end()?;
-		let cycle_id = self.add_cycle(turnability, vertices, detectors)?;
+		let cycle_id = self.add_cycle(turnability, vertices, detectors, walls)?;
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
@@ -286,7 +296,7 @@ impl LevelBuilder {
 			None
 		};
 		args.read_end()?;
-		self.place_cycle(cycle_id, Vec2::new(x, y), r, &[])?;
+		self.place_circle(cycle_id, Vec2::new(x, y), r)?;
 		if let Some(position) = center_position {
 			self.place_cycle_center(cycle_id, position)?;
 		}
@@ -302,14 +312,6 @@ impl LevelBuilder {
 		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
 	}
 
-	fn call_set_vertex_angle(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
-		let VertexId(vertex_id) = args.read_as()?;
-		args.read_separator()?;
-		let degrees: f32 = args.read_single_as()?;
-		self.place_vertex_at_angle(vertex_id, degrees * PI / 180.0)?;
-		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
-	}
-
 	fn call_put_vertex(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
 		let VertexId(vertex_id) = args.read_as()?;
 		args.read_separator()?;
@@ -317,6 +319,16 @@ impl LevelBuilder {
 		let y = args.read_as()?;
 		args.read_end()?;
 		self.place_vertex(vertex_id, Vec2::new(x, y))?;
+		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
+	}
+
+	fn call_hint_vertex(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
+		let VertexId(vertex_id) = args.read_as()?;
+		args.read_separator()?;
+		let x = args.read_as()?;
+		let y = args.read_as()?;
+		args.read_end()?;
+		self.add_vertex_hint(vertex_id, Vec2::new(x, y))?;
 		Ok(ReturnValue::with_side_effect(VertexId(vertex_id).into()))
 	}
 

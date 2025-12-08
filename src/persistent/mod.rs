@@ -1,6 +1,7 @@
 use std::{
 	marker::PhantomData,
 	path::{Path, PathBuf},
+	time::{Duration, Instant},
 };
 
 use bevy::prelude::*;
@@ -25,6 +26,7 @@ impl RegisterSaveableResource for App {
 			.init_resource::<JsonStore<T>>()
 			.add_systems(Startup, load_system::<T>)
 			.add_systems(Update, save_system::<T>.run_if(resource_changed::<T>))
+			.add_systems(Update, write_system::<T>)
 	}
 }
 
@@ -33,7 +35,7 @@ fn load_system<T: Saveable + Resource>(
 	mut resource: ResMut<T>,
 	storage_path: Res<StoragePath>,
 ) {
-	let path = T::get_path(storage_path.0.clone());
+	let path = storage_path.0.join(format!("{}.json", T::FILENAME));
 	match io::read(&path) {
 		Ok(value) => {
 			store.value = value;
@@ -41,28 +43,55 @@ fn load_system<T: Saveable + Resource>(
 			log::info!("Loaded file {}", path.display());
 		}
 		Err(error) => {
-			log::error!("Failed to load {} with error {}", path.display(), error);
+			log::error!(
+				"Failed to load {} with error {} trying to load newfile",
+				path.display(),
+				error
+			);
+			let path = storage_path.0.join(format!("{}.json.new", T::FILENAME));
+			match io::read(&path) {
+				Ok(value) => {
+					store.value = value;
+					resource.bypass_change_detection().read_json(&store.value);
+					log::info!("Loaded file {}", path.display());
+				}
+				Err(error) => {
+					log::error!("Failed to load {} with error {}", path.display(), error);
+				}
+			}
 		}
 	}
 }
 
-fn save_system<T: Saveable + Resource>(
+fn save_system<T: Saveable + Resource>(mut store: ResMut<JsonStore<T>>, resource: Res<T>) {
+	resource.write_json(&mut store.value);
+	store.dirty = true;
+}
+
+fn write_system<T: Saveable + Resource>(
 	mut store: ResMut<JsonStore<T>>,
-	resource: Res<T>,
 	storage_path: Res<StoragePath>,
 ) {
-	let path = T::get_path(storage_path.0.clone());
-	resource.write_json(&mut store.value);
-	if let Err(error) = io::write(&store.value, &path) {
-		log::error!("Failed to save {} with error {}", path.display(), error);
-	} else {
-		log::info!("Saved file {}", path.display());
+	if store.dirty
+		&& store
+			.last_saved
+			.is_none_or(|last_saved| Instant::now() - last_saved > Duration::from_secs(10))
+	{
+		let data = store.value.to_string();
+		io::write(&data, &storage_path.0, T::FILENAME);
+		store.dirty = false;
+		store.last_saved = Some(Instant::now());
 	}
 }
 
 #[derive(Resource, Default)]
 struct JsonStore<T> {
+	/// The json data stored by this resource
 	value: JsonValue,
+	/// The last instant (if any) this resource was saved. Used for debouncing.
+	last_saved: Option<Instant>,
+	/// Whether [`Self::value`] has been changed since last save to disk.
+	dirty: bool,
 	_phantom: PhantomData<T>,
 }
 
@@ -74,12 +103,6 @@ pub trait Saveable: Default {
 	fn write_json(&self, store: &mut JsonValue);
 	/// Reads overrides from a Json representation and uses them to update itself
 	fn read_json(&mut self, store: &JsonValue);
-	/// Gets the save file path from a base path
-	fn get_path(mut path: PathBuf) -> PathBuf {
-		path.set_file_name(Self::FILENAME);
-		path.set_extension("json");
-		path
-	}
 }
 
 #[derive(Resource)]

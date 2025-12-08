@@ -1,7 +1,0 @@
-name = 'Boxes';
-
-box = box('desc');
-
-circle(cycle(_ _ flag() _ player()); 0 0 100);
-circle(cycle(_ _ box _ button()); 300, -80, 80);
-circle(cycle(box button() _ _); 200 120 60);

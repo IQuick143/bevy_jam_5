@@ -11,6 +11,8 @@ pub const PLAYER: &str = "It's a you!";
 pub const CYCLE_MANUAL: &str = "This cycle can only be turned while you stand on it.";
 pub const CYCLE_AUTOMATIC: &str = "This cycle can be turned by left/right clicking its center.";
 pub const CYCLE_STILL: &str = "This cycle cannot be turned on its own.";
+pub const WALL: &str = "A wall, does not let objects through.";
+pub const DETECTOR: &str = "A detector, triggers oneways when something goes through";
 
 pub const UI_EXIT: &str = "Exit [Esc]";
 pub const UI_RESET: &str = "Reset [R]";
@@ -19,6 +21,8 @@ pub const UI_NEXT: &str = "Next level [N]";
 
 pub const BLOCKADE_WARNING: &str =
 	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
+pub const WALL_HIT_WARNING: &str =
+	"The last turn did not execute because this wall would've been hit by an object on this cycle.";
 
 /// Priority markers that indicate which hoverable entity
 /// should be selected if the pointer overlaps more of them at once
@@ -29,6 +33,8 @@ pub mod prio {
 	pub const WORLD_UI: u32 = 20;
 	/// Object sprites
 	pub const OBJECT: u32 = 30;
+	/// Detectors and walls
+	pub const DETECTOR: u32 = 35;
 	/// Glyph sprites
 	pub const GLYPH: u32 = 40;
 	/// Cycles
@@ -134,8 +140,18 @@ fn update_hover_state(
 		let mut closest_priority_and_distance = (u32::MAX, f32::MAX);
 		for (entity, transform, priority, bounding_rect, bounding_circle) in query.iter() {
 			let translation = transform.translation();
+			// This is a formula to extract the z rotation from the quaternion without trig functions
+			// Trust me
+			let rotation = transform.rotation();
+			let rotation = Rot2 {
+				cos: rotation.w,
+				sin: rotation.z,
+			}
+			.try_normalize()
+			.unwrap_or_default();
+			let rotation = rotation * rotation;
 			// Cursor position in local coordinates
-			let transformed_cursor = cursor_pos - translation.xy();
+			let transformed_cursor = rotation.inverse() * (cursor_pos - translation.xy());
 			let priority = priority.copied().as_deref().copied().unwrap_or(u32::MAX);
 			let mut hovered = false;
 			let mut distance = f32::MAX;

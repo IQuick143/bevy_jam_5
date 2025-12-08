@@ -34,8 +34,9 @@ pub struct LevelData {
 	/// Data for all cycle links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
 	pub declared_links: Vec<DeclaredLinkData>,
-	/// Data for all one way links that have been explicitly declared in the level file.
+	/// Data for all cycle one-way links that have been explicitly declared in the level file.
 	/// Will be used for rendering the links
+	/// See [`CycleData::detector_indices`] and [`DetectorData::declared_links`] for detector one-ways.
 	pub declared_one_way_links: Vec<DeclaredOneWayLinkData>,
 	/// Bounding box
 	pub bounding_box: Aabb2d,
@@ -83,6 +84,8 @@ pub struct CycleData {
 	/// that identify the detectors that lie on the cycle, and numerical offsets,
 	/// that identify which vertex this detector comes after
 	pub detector_indices: Vec<(usize, usize)>,
+	/// Numerical offsets, that identify which vertex a wall comes after
+	pub wall_indices: Vec<usize>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,
 	/// Group this cycle belongs to
@@ -95,6 +98,8 @@ pub struct CycleData {
 pub struct DetectorData {
 	/// List of groups this detector points to.
 	pub linked_groups: Vec<OneWayLinkData>,
+	/// List of links to draw as outgoing
+	pub declared_links: Vec<DeclaredOneWayLinkData>,
 }
 
 /// Description of a group of cycles
@@ -106,7 +111,7 @@ pub struct GroupData {
 	pub cycles: Vec<(usize, LinkedCycleDirection)>,
 	/// One Way Links to other groups that should get triggered by this one.
 	pub linked_groups: Vec<OneWayLinkData>,
-	/// List of cycle indices this group contains that have detectors on them.
+	/// List of cycle indices this group contains that have detectors or walls on them.
 	pub outgoing_detector_cycles: Vec<usize>,
 }
 
@@ -124,7 +129,7 @@ pub struct DeclaredLinkData {
 /// Description of a declared (and visualized) cycle link
 #[derive(Debug, Clone, Copy, Reflect)]
 pub struct DeclaredOneWayLinkData {
-	/// Cycle/Detector id from which the link goes
+	/// Cycle id from which the link goes
 	pub source: usize,
 	/// Cycle to which the link goes
 	pub dest_cycle: usize,

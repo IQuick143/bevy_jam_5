@@ -1,0 +1,23 @@
+name = 'A';
+hint = '';
+
+bb_top = -100;
+bb_bottom = 100;
+bb_left = -60;
+bb_right = 110;
+
+ra1 = vertex();
+ra2 = vertex();
+ra3 = vertex();
+ra4 = vertex();
+
+rb1 = vertex();
+rb2 = vertex();
+rb3 = vertex();
+rb4 = vertex();
+
+circle(cycle(d1 d2 ra1 ra2 d1 ra3 ra4); -550, 0, 550);
+circle(cycle(d1 d2 rb1 rb2 d2 rb3 rb4); -500, 0, 600);
+
+circle(cycle(ra2 ra1 rb1 rb2); 50, +60, 60);
+circle(cycle(ra4 ra3 rb3 rb4); 50, -60, 60);

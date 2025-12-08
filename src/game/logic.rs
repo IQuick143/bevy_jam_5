@@ -70,12 +70,13 @@ impl GameState {
 		cycle_index: usize,
 		rotate_by: i64,
 	) -> Result<TurnCycleResult, GameStateActionError> {
-		let groups_turned_by =
+		let (groups_turned_by, wall_hits) =
 			self.calculate_rotation_tables_for_cycle_turn(level, cycle_index, rotate_by)?;
 		let clashes = self.find_cycle_clashes(level, &groups_turned_by);
 		Ok(TurnCycleResult {
 			groups_turned_by,
 			clashes,
+			wall_hits,
 		})
 	}
 
@@ -151,12 +152,14 @@ impl GameState {
 	///
 	/// ## Return Value
 	/// Number of turns (positive is clockwise) taken by each cycle group
+	/// Cycle and wall index hit by objects during the simulation
 	fn calculate_rotation_tables_for_cycle_turn(
 		&self,
 		level: &LevelData,
 		cycle_index: usize,
 		rotate_by: i64,
-	) -> Result<Vec<i64>, GameStateActionError> {
+	) -> Result<(Vec<i64>, Vec<(usize, usize)>), GameStateActionError> {
+		let mut collisions = Vec::new();
 		let mut detector_rotations = vec![0i64; level.detectors.len()];
 		let mut group_rotations = vec![0i64; level.groups.len()];
 
@@ -188,8 +191,9 @@ impl GameState {
 						};
 						let n_vertices = detector_cycle.vertex_indices.len();
 						let n_detectors = detector_cycle.detector_indices.len();
-						if n_vertices == 0 || n_detectors == 0 {
-							return Err(GameStateActionError::BrokenLevelData("cycle with no vertices or no detectors is somehow in the outgoing_detector_cycles list."));
+						let n_walls = detector_cycle.wall_indices.len();
+						if n_vertices == 0 || (n_detectors == 0 && n_walls == 0) {
+							return Err(GameStateActionError::BrokenLevelData("cycle with no vertices or no detectors and no walls is somehow in the outgoing_detector_cycles list."));
 						}
 						// Grab vertex occupancy data from state
 						let vertex_occupation = detector_cycle
@@ -219,6 +223,7 @@ impl GameState {
 						for (detector_id, _) in &detector_cycle.detector_indices {
 							detector_rotations[*detector_id] += (n_objects as i64) * full_turns;
 						}
+						let mut wall_hits = vec![n_objects != 0 && full_turns != 0; n_walls];
 						if partial_turns != 0 {
 							// How long of a strip of vertices needs to be scanned for objects
 							let interval_length = partial_turns.unsigned_abs();
@@ -252,6 +257,20 @@ impl GameState {
 								} as i64;
 								detector_rotations[detector_id] += detections;
 							}
+							for (wall, &offset) in detector_cycle.wall_indices.iter().enumerate() {
+								let detections = if partial_turns > 0 {
+									objects_in_interval[(offset + 1) % n_vertices]
+								} else {
+									-objects_in_interval
+										[(offset + 1 + interval_length) % n_vertices]
+								} as i64;
+								wall_hits[wall] |= detections != 0;
+							}
+						}
+						for (wall, &wall_hit) in wall_hits.iter().enumerate() {
+							if wall_hit {
+								collisions.push((detector_cycle_id, wall));
+							}
 						}
 					}
 				}
@@ -268,7 +287,7 @@ impl GameState {
 			}
 		}
 
-		Ok(group_rotations)
+		Ok((group_rotations, collisions))
 	}
 
 	/// Finds all pairs of cycles that cannot turn at the same time,
@@ -300,7 +319,7 @@ impl GameState {
 }
 
 /// Information about a cycle turning action that took place
-#[derive(Message, Clone, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct TurnCycleResult {
 	/// How many ticks (clockwise) each cycle group turned,
 	/// or would have if the rotation was blocked
@@ -314,12 +333,19 @@ pub struct TurnCycleResult {
 	///
 	/// Elements can be used to index [`LevelData::forbidden_group_pairs`]
 	pub clashes: Vec<usize>,
+	/// All walls that would be hit by an object
+	///
+	/// Unless empty, the rotation was blocked
+	///
+	/// Elements can be used to index [`LevelData::cycles`]
+	/// and the resulting [`CycleData::wall_indices`](crate::game::level::CycleData::wall_indices)
+	pub wall_hits: Vec<(usize, usize)>,
 }
 
 impl TurnCycleResult {
 	/// Whether the rotation was blocked by a clash
 	pub fn blocked(&self) -> bool {
-		!self.clashes.is_empty()
+		!self.clashes.is_empty() || !self.wall_hits.is_empty()
 	}
 
 	/// True if the rotation caused a shift in layout,
@@ -355,7 +381,7 @@ impl TurnCycleResult {
 	///
 	/// ## Parameters
 	/// `target_sequence` - the sequence to reorder. Must be zippable
-	/// with [`LevelData::groups`]
+	/// with [`LevelData::vertices`]
 	pub fn reorder_sequence_by_all_cycle_turns<T: Default>(
 		&self,
 		level: &LevelData,
@@ -380,6 +406,8 @@ impl TurnCycleResult {
 
 	/// Reorders in-place a sequence of values that correspond
 	/// to individual vertices to simulate the turn of a single cycle
+	/// # Error
+	/// May error or give incorrect results if `target_sequence` has a different amoutn of elements than `level_data.vertices.len()`
 	pub fn reorder_sequence_by_single_cycle_turn<T: Default>(
 		level_data: &LevelData,
 		cycle_index: usize,

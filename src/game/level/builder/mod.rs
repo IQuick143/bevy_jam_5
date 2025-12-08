@@ -7,9 +7,9 @@ pub mod error;
 mod layout;
 /// Contains the logic for assembling and verifying level datastructures inside a [`LevelBuilder`] impl.
 mod logic;
+mod vertex_solver;
 
 use super::*;
-use bevy::math::bounding::Aabb2d;
 
 /// Helper object for constructing a valid [`LevelData`]
 #[derive(Debug)]
@@ -27,15 +27,10 @@ pub struct LevelBuilder {
 	/// Cycle links that have been explicitly added (no symmetry or transitivity)
 	declared_links: Vec<DeclaredLinkData>,
 	/// One way links between cycles that have been explicitly added (no transitivity)
+	/// For declared oneway links from detectors to cycle see [`Self::detectors`] and [`DetectorData::declared_links`]
 	declared_one_way_cycle_links: Vec<DeclaredOneWayLinkData>,
-	/// One way links from detectors that have been explicitly added (no transitivity)
-	// TODO: Populate and use this
-	#[expect(dead_code)]
-	declared_one_way_detector_links: Vec<DeclaredOneWayLinkData>,
 	/// Bounding box (or parts thereof) set by the caller
 	explicit_bounding_box: PartialBoundingBox,
-	/// Bounding box
-	bounding_box: Option<Aabb2d>,
 	/// A conversion factor from logical "epilang" units to level units.
 	/// If `None` then this conversion is computed in order to fit the level into the usual bounding box.
 	scale_override: Option<f32>,
@@ -84,6 +79,8 @@ pub struct PartialVec2 {
 struct IntermediateVertexData {
 	/// Position of the vertex, if it has been placed yet
 	pub position: IntermediateVertexPosition,
+	/// Position to use as a hint when placing the vertex, if any
+	pub hint_position: Option<Vec2>,
 	/// Object that lies on the vertex, if any
 	pub object: Option<ObjectData>,
 	/// Glyph that lies on the vertex, if any
@@ -98,14 +95,7 @@ struct IntermediateCycleData {
 	/// Placement of the cycle, if it has been placed yet
 	pub placement: Option<CyclePlacement>,
 	/// Position of the cycle's center indicator, if it has been placed yet
-	///
-	/// Unlike in the level description structures,
-	/// **this is the absolute position in global coordinates**
-	///
-	/// Value of `None` indicates the center has not been placed
-	/// (default position will be used). Value of `Some(None)` indicates
-	/// the center indicator has been explicitly toggled off.
-	pub center_sprite_position: Option<Option<Vec2>>,
+	pub center_sprite_position: IntermediateCycleCenterSpritePosition,
 	/// Indices into [`LevelData::vertices`]
 	/// that identify the vertices that lie on the cycle, in clockwise order
 	pub vertex_indices: Vec<usize>,
@@ -117,6 +107,33 @@ struct IntermediateCycleData {
 	pub outgoing_one_way_links: Vec<OneWayIntermediateData>,
 	/// Detectors, pairs of detector ID's and their offsets on this cycle. (The second, positional, index is the index of the vertex this detector comes *after*)
 	pub placed_detectors: Vec<(usize, usize)>,
+	/// Walls, values are their offsets on this cycle. (The positional index is the index of the vertex this wall comes *after*)
+	pub walls: Vec<usize>,
+}
+
+/// Position of a cycle's center indicator specified by the user
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+enum IntermediateCycleCenterSpritePosition {
+	/// User has not yet chosen a position for the center indicator
+	#[default]
+	Unspecified,
+	/// User has requested that the center indicator not be drawn
+	Disabled,
+	/// User has placed the center indicator at a specific position
+	///
+	/// Unlike in the level description structures,
+	/// **this is the absolute position in global coordinates**
+	Placed(Vec2),
+}
+
+impl IntermediateCycleCenterSpritePosition {
+	pub fn placed(self) -> Option<Vec2> {
+		if let Self::Placed(p) = self {
+			Some(p)
+		} else {
+			None
+		}
+	}
 }
 
 #[derive(Clone, Debug)]
@@ -150,9 +167,6 @@ enum IntermediateVertexPosition {
 	Free,
 	/// The vertex has a fixed position
 	Fixed(Vec2),
-	/// Exactly one cycle that owns the vertex has been placed
-	/// and the vertex may still be moved along it
-	Partial(PartiallyBoundVertexPosition),
 }
 
 impl IntermediateVertexPosition {
@@ -162,16 +176,6 @@ impl IntermediateVertexPosition {
 			_ => None,
 		}
 	}
-}
-
-/// Placement of a vertex that belongs to a placed cycle,
-/// but does not yet have a definite placement
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct PartiallyBoundVertexPosition {
-	/// Index of the cycle that owns the vertex
-	owner_cycle: usize,
-	/// Index of the vertex within the owner cycle's vertex list
-	index_in_owner: usize,
 }
 
 /// Placeholder appearence for a button color label that will be
@@ -188,108 +192,14 @@ struct CycleBoundButtonColorLabelAppearence {
 	positions: CycleBoundColorLabelPositionSet,
 }
 
-/// Container that holds one or two of something
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum OneTwo<T> {
-	One(T),
-	Two(T, T),
-}
-use OneTwo::*;
-
-impl<T> OneTwo<T> {
-	fn add_to_one(self, x: T) -> Result<Self, (T, T, T)> {
-		match self {
-			One(a) => Ok(Two(a, x)),
-			Two(a, b) => Err((a, b, x)),
-		}
-	}
-
-	fn first(self) -> T {
-		match self {
-			One(x) | Two(x, _) => x,
-		}
-	}
-}
-
-impl<T> IntoIterator for OneTwo<T> {
-	type Item = T;
-	type IntoIter = <Vec<T> as IntoIterator>::IntoIter;
-	fn into_iter(self) -> Self::IntoIter {
-		match self {
-			One(a) => vec![a].into_iter(),
-			Two(a, b) => vec![a, b].into_iter(),
-		}
-	}
-}
-
-/// Result type that allows both a value and an error.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum ResultNonExclusive<T, E> {
-	Ok(T),
-	Partial(T, E),
-	Err(E),
-}
-
-#[allow(dead_code)]
-impl<T, E> ResultNonExclusive<T, E> {
-	pub fn value(self) -> Option<T> {
-		match self {
-			ResultNonExclusive::Ok(value) => Some(value),
-			ResultNonExclusive::Partial(value, _) => Some(value),
-			ResultNonExclusive::Err(_) => None,
-		}
-	}
-
-	pub fn error(self) -> Option<E> {
-		match self {
-			ResultNonExclusive::Ok(_) => None,
-			ResultNonExclusive::Partial(_, err) => Some(err),
-			ResultNonExclusive::Err(err) => Some(err),
-		}
-	}
-
-	pub fn into<A, B>(self) -> ResultNonExclusive<A, B>
-	where
-		A: From<T>,
-		B: From<E>,
-	{
-		match self {
-			ResultNonExclusive::Ok(value) => ResultNonExclusive::Ok(value.into()),
-			ResultNonExclusive::Partial(value, err) => {
-				ResultNonExclusive::Partial(value.into(), err.into())
-			}
-			ResultNonExclusive::Err(err) => ResultNonExclusive::Err(err.into()),
-		}
-	}
-
-	pub fn map_err<E2>(self, map: impl FnOnce(E) -> E2) -> ResultNonExclusive<T, E2> {
-		match self {
-			ResultNonExclusive::Ok(value) => ResultNonExclusive::Ok(value),
-			ResultNonExclusive::Partial(value, err) => ResultNonExclusive::Partial(value, map(err)),
-			ResultNonExclusive::Err(err) => ResultNonExclusive::Err(map(err)),
-		}
-	}
-
-	pub fn relaxed(self) -> Result<T, E> {
-		match self {
-			ResultNonExclusive::Ok(ok) => Ok(ok),
-			ResultNonExclusive::Partial(ok, _) => Ok(ok),
-			ResultNonExclusive::Err(err) => Err(err),
-		}
-	}
-}
-
-impl<T, E> From<(T, Option<E>)> for ResultNonExclusive<T, E> {
-	fn from(value: (T, Option<E>)) -> Self {
-		match value {
-			(value, None) => ResultNonExclusive::Ok(value),
-			(value, Some(err)) => ResultNonExclusive::Partial(value, err),
-		}
-	}
-}
-
-impl<T, E> From<E> for ResultNonExclusive<T, E> {
-	fn from(err: E) -> Self {
-		ResultNonExclusive::Err(err)
-	}
+/// The result of building a level
+#[derive(Clone, Debug)]
+pub struct LevelBuildResult {
+	/// The level data
+	///
+	/// If hard errors are present, this will contain a best-effort
+	/// subset of the level as described, with [`LevelData::is_valid`] set to false
+	pub level: LevelData,
+	/// Errors and warnings emited by the builder
+	pub errors: error::LevelBuilderErrorLog,
 }

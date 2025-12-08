@@ -2,7 +2,7 @@ mod utils {
 	use crate::game::{
 		components::{Cycle, GameStateEcsIndex, Vertex},
 		level::{backend::builder as parser, GlyphData, ObjectData},
-		logic_relay::RotateCycleGroup,
+		logic_relay::{RotateCycleGroup, RotationCause},
 		prelude::*,
 	};
 	use bevy::{ecs::system::RunSystemOnce, prelude::*};
@@ -85,8 +85,8 @@ mod utils {
 	pub fn app_with_level(level: &str) -> App {
 		let mut app = setup_app();
 		let level = parser::parse_and_run(level, |_| {})
-			.value()
-			.expect("Level data should compile correctly!");
+			.expect("Level data should compile correctly!")
+			.level;
 		assert!(level.is_valid);
 
 		app.world_mut()
@@ -132,10 +132,13 @@ mod utils {
 		In((id, amount)): In<(usize, i32)>,
 		mut events: MessageWriter<RotateCycleGroup>,
 	) {
-		events.write(RotateCycleGroup(RotateCycle {
-			target_cycle: id,
-			amount: amount as i64,
-		}));
+		events.write(RotateCycleGroup {
+			rotation: RotateCycle {
+				target_cycle: id,
+				amount: amount as i64,
+			},
+			cause: RotationCause::Manual,
+		});
 	}
 
 	pub trait GameLogicAppExt {
@@ -788,6 +791,174 @@ oneway(c a);
 	}
 }
 
+/// Tests walls
+#[test]
+fn test_walls_basic() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls_1';
+hint = 'A player should not be reading this message!';
+
+circle(a = cycle(wall() box() _ _); 0 0 100);
+circle(b = cycle(wall() box() detector() _ _ _); 0 0 100);
+circle(c = cycle(_ _ _ wall() box() _); 0 0 100);
+",
+	);
+
+	let state_1 = app.read_vertices();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	let state_1_a = app.read_vertices();
+
+	app.turn_cycle(1, -1);
+	app.update();
+
+	let state_1_b = app.read_vertices();
+
+	app.turn_cycle(2, -1);
+	app.update();
+
+	let state_1_c = app.read_vertices();
+
+	app.turn_cycle(0, 3);
+	app.update();
+
+	let state_1_d = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+
+	let state_2 = app.read_vertices();
+
+	app.turn_cycle(1, 1);
+	app.update();
+
+	let state_3 = app.read_vertices();
+
+	app.turn_cycle(2, 1);
+	app.update();
+
+	let state_4 = app.read_vertices();
+
+	assert_eq!(state_1, state_1_a);
+	assert_eq!(state_1, state_1_b);
+	assert_eq!(state_1, state_1_c);
+	assert_eq!(state_1, state_1_d);
+	assert_ne!(state_1, state_2);
+	assert_ne!(state_2, state_3);
+	assert_ne!(state_3, state_4);
+}
+
+#[test]
+fn test_walls_overlap() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls_2';
+hint = 'A player should not be reading this message!';
+
+circle(a = cycle(wall() wall() box() _ _); 0 0 100);
+circle(b = cycle(wall(), d = detector(), box() _ _); 0 0 100);
+oneway(d a);
+",
+	);
+
+	let state_a = app.read_vertices();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	let state_b1 = app.read_vertices();
+
+	app.turn_cycle(1, -1);
+	app.update();
+
+	let state_b2 = app.read_vertices();
+
+	app.turn_cycle(0, 1);
+	app.update();
+
+	let state_c1 = app.read_vertices();
+
+	app.turn_cycle(1, 1);
+	app.update();
+
+	let state_c2 = app.read_vertices();
+	assert_eq!(state_a, state_b1);
+	assert_eq!(state_a, state_b2);
+	assert_ne!(state_a, state_c1);
+	assert_ne!(state_a, state_c2);
+	assert_ne!(state_c1, state_c2);
+}
+
+#[test]
+fn test_walls_full_rotation() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls_3';
+hint = 'A player should not be reading this message!';
+
+circle(cycle(wall() box() _ _ _); 0 0 100);
+",
+	);
+
+	let state_a = app.read_vertices();
+
+	app.turn_cycle(0, 4);
+	app.update();
+
+	let state_b1 = app.read_vertices();
+
+	app.turn_cycle(0, 8);
+	app.update();
+
+	let state_b2 = app.read_vertices();
+
+	app.turn_cycle(0, -1);
+	app.update();
+
+	let state_b3 = app.read_vertices();
+
+	app.turn_cycle(1, 135);
+	app.update();
+
+	let state_b4 = app.read_vertices();
+
+	assert_eq!(state_a, state_b1);
+	assert_eq!(state_a, state_b2);
+	assert_eq!(state_a, state_b3);
+	assert_eq!(state_a, state_b4);
+}
+
+#[test]
+fn test_multiple_fails_at_once() {
+	let mut app = app_with_level(
+		r"
+name = 'Walls + Lockup';
+hint = 'A player should not be reading this message!';
+
+v = vertex(box());
+
+circle(a = cycle(wall() v _ _ _); 0 0 100);
+circle(b = cycle(v wall() _ _ _); 0 0 100);
+circle(c = cycle(_); 0 0 100);
+
+oneway(c a);
+oneway(c b);
+",
+	);
+
+	let state_a = app.read_vertices();
+
+	app.turn_cycle(2, 1);
+	app.update();
+
+	let state_b = app.read_vertices();
+
+	assert_eq!(state_a, state_b);
+}
+
 /// Generates a random iterator of `n_steps` moves in the form (cycle, rotation).
 fn generate_random_cycle_walk(
 	n_cycles: usize,
@@ -821,10 +992,14 @@ fn generate_random_returning_cycle_walk(
 }
 
 /// Perform a large amount of random moves and then undoes them.
+///
 /// ## ASSERTS:
 /// That the amount of objects is invariant.
 ///
 /// That after doing all moves in reverse the state has returned to the starting position.
+///
+/// ## Notes:
+/// Does not take into account blocked moves and will not work correctly with them.
 fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
 	let n_cycles = app.conut_cycles();
 	let intial_state = app.read_vertices();
@@ -912,6 +1087,8 @@ rgo = vertex();
 blue = cycle(_ button(0) _ bgo bri bgi bro);
 red = cycle(_ button(1) _ bro rgi bri rgo);
 green = cycle(_ button(2) _ rgo bgi rgi bgo);
+
+hint_vertex(bgi; 0,0);
 
 circle(blue; -87, 50 130);
 circle(red; 0, -100, 130);
@@ -1030,15 +1207,17 @@ circle(c2; 0 0 1);
 #[test]
 fn stress_test_random_levels() {
 	let levels = [
-		include_str!("../../assets/levels/1_intro.txt"),
-		include_str!("../../assets/levels/2_sort.txt"),
-		//include_str!("../../assets/levels/rubik.txt"),
-		include_str!("../../assets/levels/5_sync.txt"),
-		include_str!("../../assets/levels/6_sync2.txt"),
-		include_str!("../../assets/levels/send.txt"),
-		include_str!("../../assets/levels/linked_sort.txt"),
+		include_str!("../../epilang/tests/1_intro.txt"),
+		include_str!("../../epilang/tests/2_sort.txt"),
+		//include_str!("../../epilang/tests/rubik.txt"),
+		include_str!("../../epilang/tests/5_sync.txt"),
+		include_str!("../../epilang/tests/6_sync2.txt"),
+		include_str!("../../epilang/tests/send.txt"),
+		include_str!("../../epilang/tests/linked_sort.txt"),
+		//include_str!("../../epilang/tests/detectors/two_rails.txt"), // TODO: Verify non-group levels. // This level is here specifically because it failed layouting once.
 	];
 	for level in levels {
+		println!("{level}");
 		let mut app = app_with_level(level);
 		move_fuzz(&mut app, 4096, 1337133713371337);
 	}
