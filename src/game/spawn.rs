@@ -273,7 +273,7 @@ fn spawn_primary_level_entities(
 							multiplicity: link.multiplicity,
 						},
 						link.direction,
-						Transform::from_translation(position.extend(layers::DETECTORS)),
+						Transform::from_translation(position.extend(layers::CYCLE_LINKS)),
 						Visibility::default(),
 					));
 				}
@@ -285,7 +285,7 @@ fn spawn_primary_level_entities(
 							offset,
 							detector_id: detector,
 						},
-						Transform::from_translation(position.extend(0.0)).looking_to(
+						Transform::from_translation(position.extend(layers::DETECTORS)).looking_to(
 							Dir3::NEG_Z,
 							Dir3::new_unchecked(normal_direction.extend(0.0)),
 						),

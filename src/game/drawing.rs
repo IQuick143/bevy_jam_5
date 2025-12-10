@@ -530,7 +530,8 @@ fn cycle_blocked_marker_system(
 			},
 			Anchor::BOTTOM_CENTER, // TODO: Check if this is correct behaviour mimicking
 			Transform::from_translation(
-				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
+					.with_z(layers::FAIL_MARKERS),
 			),
 			TemporaryMarker,
 			HoverHint(hover::BLOCKADE_WARNING),
@@ -569,7 +570,8 @@ fn wall_blocked_marker_system(
 			},
 			Anchor::BOTTOM_CENTER,
 			Transform::from_translation(
-				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
+					.with_z(layers::FAIL_MARKERS),
 			),
 			TemporaryMarker,
 			HoverHint(hover::WALL_HIT_WARNING),

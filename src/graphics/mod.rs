@@ -177,11 +177,13 @@ pub mod layers {
 	pub const TITLE_IMAGE: f32 = -10.0;
 	/// Z depth of the secondary/backdrop title screen illistration
 	pub const TITLE_BACKDROP: f32 = -20.0;
+	/// Z depth of the move failure markers
+	pub const FAIL_MARKERS: f32 = -5.0;
 	/// Z depth of sprites that indicate logical color of boxes
 	pub const BOX_COLOR_SPRITES: f32 = -8.0;
 	/// Z depth of sprites for players and boxes
 	pub const OBJECT_SPRITES: f32 = -10.0;
-	/// Zdepth of detectors and walls
+	/// Z depth of detectors and walls
 	pub const DETECTORS: f32 = -40.0;
 	/// Z depth of sprites that indicate logical color of buttons
 	pub const BUTTON_COLOR_SPRITES: f32 = -48.0;
