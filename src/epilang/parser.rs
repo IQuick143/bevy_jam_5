@@ -212,7 +212,13 @@ macro_rules! pomelo_token_conversions {
 		impl Token {
 			fn into_pomelo_token(self, loc: Range<SourceLocation>) -> pomelo_parser::Token {
 				match self {
-					$( Self::$variant $(($param))? => pomelo_parser::Token::$variant((loc $(, $param)?)) ),*
+					$( Self::$variant $(($param))? => {
+						#[allow(
+							clippy::double_parens,
+							reason = "These parens are needed only in some branches"
+						)]
+						pomelo_parser::Token::$variant((loc $(, $param)?))
+					} )*
 				}
 			}
 		}
