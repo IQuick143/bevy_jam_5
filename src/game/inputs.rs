@@ -69,7 +69,7 @@ fn cycle_inputs_system(
 			match placement.shape {
 				CycleShape::Circle(radius) => {
 					if d_sq <= radius.powi(2) {
-						Some((e, d_sq, is_turnable))
+						Some((e, d_sq / radius.powi(2), is_turnable))
 					} else {
 						None
 					}
