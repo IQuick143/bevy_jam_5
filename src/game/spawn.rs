@@ -273,7 +273,7 @@ fn spawn_primary_level_entities(
 							multiplicity: link.multiplicity,
 						},
 						link.direction,
-						Transform::from_translation(position.extend(layers::CYCLE_LINKS)),
+						Transform::from_translation(position.extend(0.0)),
 						Visibility::default(),
 					));
 				}
