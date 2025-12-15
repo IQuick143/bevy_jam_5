@@ -37,7 +37,7 @@ pub(super) fn plugin(app: &mut App) {
 				(
 					send_message(GameUiAction::Reset).run_if(
 						char_input_pressed('r')
-							.and(|history: Res<MoveHistory>| !history.is_empty()),
+							.and(|history: Res<MoveHistory>| history.has_undoable_move()),
 					),
 					send_message(GameUiAction::NextLevel).run_if(
 						char_input_pressed('n')
@@ -45,7 +45,11 @@ pub(super) fn plugin(app: &mut App) {
 					),
 					send_message(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
-							.and(|history: Res<MoveHistory>| !history.is_empty()),
+							.and(|history: Res<MoveHistory>| history.has_undoable_move()),
+					),
+					send_message(GameUiAction::Redo).run_if(
+						char_input_pressed('y')
+							.and(|history: Res<MoveHistory>| history.has_redoable_move()),
 					),
 					game_ui_input_recording_system,
 				)
@@ -66,7 +70,8 @@ pub(super) fn plugin(app: &mut App) {
 						.and(resource_equals(IsLevelCompleted(true))),
 				),
 				tick_completion_cue_animation,
-				update_undo_button_display.run_if(resource_changed::<MoveHistory>),
+				(update_undo_button_display, update_redo_button_display)
+					.run_if(resource_changed::<MoveHistory>),
 			)
 				.run_if(in_state(Screen::Playing)),
 		);
@@ -85,6 +90,11 @@ struct NextLevelButton;
 #[derive(Component, Clone, Copy, Debug, Default)]
 #[require(InteractionEnabled(false))]
 struct UndoButton;
+
+/// Marker component for the redo button
+#[derive(Component, Clone, Copy, Debug, Default)]
+#[require(InteractionEnabled(false))]
+struct RedoButton;
 
 /// Marker component for the level name label
 #[derive(Component, Clone, Copy, Debug, Default)]
@@ -110,6 +120,7 @@ enum GameUiAction {
 	Reset,
 	NextLevel,
 	Undo,
+	Redo,
 }
 
 /// Message that is sent to signal that the currently selected level should be (re)loaded
@@ -187,6 +198,14 @@ fn spawn_game_ui(
 						GameUiAction::Undo,
 						UndoButton,
 						HoverHint(hover::UI_UNDO),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
+					),
+					(
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::REDO),
+						GameUiAction::Redo,
+						RedoButton,
+						HoverHint(hover::UI_REDO),
 						HoverPriority(hover::prio::STATIC_UI),
 						UseHoverFromInteraction,
 					),
@@ -306,7 +325,7 @@ fn game_ui_input_processing_system(
 	playing_level: PlayingLevelListEntry,
 	mut commands: Commands,
 	mut next_level: ResMut<NextState<PlayingLevel>>,
-	mut undo_commands: MessageWriter<UndoMove>,
+	mut undo_commands: MessageWriter<AlterHistory>,
 ) {
 	if let Some(action) = events.read().last() {
 		match action {
@@ -326,7 +345,10 @@ fn game_ui_input_processing_system(
 				}
 			}
 			GameUiAction::Undo => {
-				undo_commands.write(UndoMove);
+				undo_commands.write(AlterHistory::Undo);
+			}
+			GameUiAction::Redo => {
+				undo_commands.write(AlterHistory::Redo);
 			}
 		}
 	}
@@ -466,7 +488,16 @@ fn update_undo_button_display(
 	mut query: Query<&mut InteractionEnabled, With<UndoButton>>,
 ) {
 	for mut enabled in &mut query {
-		enabled.set_if_neq(InteractionEnabled(!history.is_empty()));
+		enabled.set_if_neq(InteractionEnabled(history.has_undoable_move()));
+	}
+}
+
+fn update_redo_button_display(
+	history: Res<MoveHistory>,
+	mut query: Query<&mut InteractionEnabled, With<RedoButton>>,
+) {
+	for mut enabled in &mut query {
+		enabled.set_if_neq(InteractionEnabled(history.has_redoable_move()));
 	}
 }
 

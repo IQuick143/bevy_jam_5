@@ -49,7 +49,7 @@ pub struct ComputedCycleTurnability(pub bool);
 pub struct IsTriggered(pub bool);
 
 /// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RotateCycle {
 	/// Index of the cycle to rotate
 	pub target_cycle: usize,
@@ -65,6 +65,8 @@ pub enum RotationCause {
 	Manual,
 	/// Rotation command issued to undo a previous action
 	Undo,
+	/// Rotation command issued to replay a previously undone action
+	Redo,
 }
 
 /// Internal message sent to a cycle entity to rotate [`super::components::Object`]
