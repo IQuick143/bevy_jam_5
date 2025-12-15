@@ -8,9 +8,9 @@ use bevy::{
 };
 
 pub(super) fn plugin(app: &mut App) {
-	app.init_resource::<GameObjectMaterials>()
-		.init_resource::<GameObjectMeshes>()
-		.init_resource::<ThingPalette>();
+	app.init_resource::<ThingPalette>()
+		.init_resource::<GameObjectMaterials>()
+		.init_resource::<GameObjectMeshes>();
 }
 
 /// Identifies a color used somewhere in the game
@@ -31,6 +31,14 @@ pub enum ColorKey {
 	Checkmark,
 	Wall,
 	Detector,
+	CycleRingsReady,
+	CycleRingsSelect,
+	CycleRingsDisabled,
+	CycleRingOutlines,
+	CycleRingOutlinesDisabled,
+	CycleHitboxes,
+	LinkLines,
+	ColoredButtonLabels,
 }
 
 /// Identifies a material used somewhere in the game
@@ -72,73 +80,48 @@ pub enum MeshKey {
 	OneWayLinkBackheads,
 }
 
+impl MaterialKey {
+	pub fn to_color_key(self) -> ColorKey {
+		match self {
+			Self::CycleRingsReady => ColorKey::CycleRingsReady,
+			Self::CycleRingsSelect => ColorKey::CycleRingsSelect,
+			Self::CycleRingsDisabled => ColorKey::CycleRingsDisabled,
+			Self::CycleRingOutlines => ColorKey::CycleRingOutlines,
+			Self::CycleRingOutlinesDisabled => ColorKey::CycleRingOutlinesDisabled,
+			Self::CycleHitboxes => ColorKey::CycleHitboxes,
+			Self::LinkLines => ColorKey::LinkLines,
+			Self::ColoredButtonLabels => ColorKey::ColoredButtonLabels,
+		}
+	}
+}
+
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Deref, DerefMut)]
 pub struct GameObjectMaterials(pub HashMap<MaterialKey, Handle<ColorMaterial>>);
 
 impl FromWorld for GameObjectMaterials {
 	fn from_world(world: &mut World) -> Self {
-		let mut materials = world.resource_mut::<Assets<ColorMaterial>>();
+		let material_keys = [
+			MaterialKey::CycleRingsReady,
+			MaterialKey::CycleRingsSelect,
+			MaterialKey::CycleRingsDisabled,
+			MaterialKey::CycleRingOutlines,
+			MaterialKey::CycleRingOutlinesDisabled,
+			MaterialKey::CycleHitboxes,
+			MaterialKey::LinkLines,
+			MaterialKey::ColoredButtonLabels,
+		];
 
-		Self(HashMap::from_iter([
-			(
-				MaterialKey::CycleRingsReady,
-				materials.add(ColorMaterial {
-					color: SLATE_200.into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::CycleRingsSelect,
-				materials.add(ColorMaterial {
-					color: SLATE_400.into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::CycleRingsDisabled,
-				materials.add(ColorMaterial {
-					color: SLATE_100.into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::CycleRingOutlines,
-				materials.add(ColorMaterial {
-					color: SLATE_700.into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::CycleRingOutlinesDisabled,
-				materials.add(ColorMaterial {
-					// Roughly Tailwind Slate-350
-					color: Srgba::hex("94A3B8").unwrap().into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::CycleHitboxes,
-				materials.add(ColorMaterial {
-					color: Srgba::hex("A3B7D1").unwrap().with_alpha(0.3).into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::LinkLines,
-				materials.add(ColorMaterial {
-					color: SLATE_300.into(),
-					..default()
-				}),
-			),
-			(
-				MaterialKey::ColoredButtonLabels,
-				materials.add(ColorMaterial {
-					color: Color::BLACK,
-					..default()
-				}),
-			),
-		]))
+		let palette = world.resource::<ThingPalette>();
+		let material_to_color = material_keys.map(|key| (key, palette[&key.to_color_key()]));
+
+		let mut materials = world.resource_mut::<Assets<ColorMaterial>>();
+		Self(
+			material_to_color
+				.into_iter()
+				.map(|(key, color)| (key, materials.add(ColorMaterial { color, ..default() })))
+				.collect(),
+		)
 	}
 }
 
@@ -223,6 +206,20 @@ impl Default for ThingPalette {
 			(ColorKey::Checkmark, GREEN_300.into()),
 			(ColorKey::Wall, Srgba::hex("DBACAB").unwrap().into()),
 			(ColorKey::Detector, palettes::css::ORANGE.into()),
+			(ColorKey::CycleRingsReady, SLATE_200.into()),
+			(ColorKey::CycleRingsSelect, SLATE_400.into()),
+			(ColorKey::CycleRingsDisabled, SLATE_100.into()),
+			(ColorKey::CycleRingOutlines, SLATE_700.into()),
+			(
+				ColorKey::CycleRingOutlinesDisabled,
+				Srgba::hex("94A3B8").unwrap().into(),
+			),
+			(
+				ColorKey::CycleHitboxes,
+				Srgba::hex("A3B7D1").unwrap().with_alpha(0.3).into(),
+			),
+			(ColorKey::LinkLines, SLATE_300.into()),
+			(ColorKey::ColoredButtonLabels, Color::BLACK),
 		]))
 	}
 }
