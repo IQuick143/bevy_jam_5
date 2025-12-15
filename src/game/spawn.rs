@@ -543,15 +543,15 @@ fn create_vertex_visuals(
 	for id in &query {
 		let node = commands
 			.spawn((
-				Mesh2d(meshes.vertices.clone()),
-				MeshMaterial2d(materials.cycle_rings_ready.clone()),
+				Mesh2d(meshes[&MeshKey::Vertices].clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingsReady].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 			))
 			.id();
 		let outline = commands
 			.spawn((
-				Mesh2d(meshes.vertex_outlines.clone()),
-				MeshMaterial2d(materials.cycle_ring_outlines.clone()),
+				Mesh2d(meshes[&MeshKey::VertexOutlines].clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingOutlines].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
@@ -572,7 +572,7 @@ fn create_detector_and_wall_visuals(
 	for id in &detector_query {
 		commands.entity(id).insert(Sprite {
 			image: images[&ImageKey::Detector].clone(),
-			color: colors.detector,
+			color: colors[&ColorKey::Detector],
 			custom_size: Some(SPRITE_SIZE),
 			..default()
 		});
@@ -580,7 +580,7 @@ fn create_detector_and_wall_visuals(
 	for id in &wall_query {
 		commands.entity(id).insert(Sprite {
 			image: images[&ImageKey::Wall].clone(),
-			color: colors.wall,
+			color: colors[&ColorKey::Wall],
 			custom_size: Some(SPRITE_SIZE),
 			..default()
 		});
@@ -632,14 +632,14 @@ fn create_cycle_visuals(
 		let ring = commands
 			.spawn((
 				Mesh2d(meshes.add(mesh)),
-				MeshMaterial2d(materials.cycle_rings_ready.clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingsReady].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 			))
 			.id();
 		let outline = commands
 			.spawn((
 				Mesh2d(meshes.add(outline_mesh)),
-				MeshMaterial2d(materials.cycle_ring_outlines.clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingOutlines].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
@@ -652,7 +652,7 @@ fn create_cycle_visuals(
 			let hitbox = commands
 				.spawn((
 					Mesh2d(meshes.add(hitbox_mesh)),
-					MeshMaterial2d(materials.cycle_hitboxes.clone()),
+					MeshMaterial2d(materials[&MaterialKey::CycleHitboxes].clone()),
 					Transform::from_translation(Vec3::Z * layers::CYCLE_SHADOWS),
 					Visibility::Hidden,
 				))
@@ -669,7 +669,7 @@ fn create_cycle_visuals(
 					Sprite {
 						custom_size: Some(SPRITE_SIZE),
 						image: images[&ImageKey::CycleCenter(*turnability)].clone(),
-						color: palette.cycle_ready,
+						color: palette[&ColorKey::CycleReady],
 						..default()
 					},
 					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_SPRITES)),
@@ -680,7 +680,7 @@ fn create_cycle_visuals(
 					Sprite {
 						custom_size: Some(SPRITE_SIZE * 2.0),
 						image: images[&ImageKey::CycleRotationArrow].clone(),
-						color: palette.cycle_ready,
+						color: palette[&ColorKey::CycleReady],
 						..default()
 					},
 					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_ARROWS)),
@@ -723,7 +723,7 @@ fn create_hard_link_visuals(
 				b,
 				declared_link.direction,
 				&mut meshes,
-				materials.link_lines.clone(),
+				materials[&MaterialKey::LinkLines].clone(),
 			);
 		});
 	}
@@ -770,12 +770,12 @@ fn create_one_way_link_visuals(
 				multiplicity,
 				center_sprite,
 				&mut meshes,
-				materials.link_lines.clone(),
-				standard_meshes.one_way_link_tips.clone(),
-				standard_meshes.one_way_link_backheads.clone(),
+				materials[&MaterialKey::LinkLines].clone(),
+				standard_meshes[&MeshKey::OneWayLinkTips].clone(),
+				standard_meshes[&MeshKey::OneWayLinkBackheads].clone(),
 				&digit_atlas,
-				palette.link_multiplicity_label,
-				palette.inverted_link_multiplicity_label,
+				palette[&ColorKey::LinkMultiplicityLabel],
+				palette[&ColorKey::InvertedLinkMultiplicityLabel],
 			);
 		});
 	}
@@ -1032,21 +1032,25 @@ fn create_thing_sprites(
 	for (id, thing) in &query {
 		let (color, anchor, z_depth) = match thing {
 			ThingData::Object(ObjectData::Player) => (
-				palette.player,
+				palette[&ColorKey::Player],
 				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::OBJECT_SPRITES,
 			),
-			ThingData::Object(ObjectData::Box(_)) => {
-				(palette.box_base, default(), layers::OBJECT_SPRITES)
-			}
+			ThingData::Object(ObjectData::Box(_)) => (
+				palette[&ColorKey::BoxBase],
+				default(),
+				layers::OBJECT_SPRITES,
+			),
 			ThingData::Glyph(GlyphData::Flag) => (
-				palette.goal_closed,
+				palette[&ColorKey::GoalClosed],
 				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::GLYPH_SPRITES,
 			),
-			ThingData::Glyph(GlyphData::Button(_)) => {
-				(palette.button_base, default(), layers::GLYPH_SPRITES)
-			}
+			ThingData::Glyph(GlyphData::Button(_)) => (
+				palette[&ColorKey::ButtonBase],
+				default(),
+				layers::GLYPH_SPRITES,
+			),
 		};
 		commands.entity(id).with_children(|children| {
 			children.spawn((
@@ -1075,7 +1079,7 @@ fn create_box_color_markers(
 			create_logical_color_sprite(
 				children,
 				*color,
-				palette.box_base,
+				palette[&ColorKey::BoxBase],
 				&sprite_atlas,
 				&digit_atlas,
 				Transform::from_translation(Vec3::Z * layers::BOX_COLOR_SPRITES),
@@ -1099,15 +1103,15 @@ fn create_button_color_markers(
 	for (id, color, label_appearence) in &query {
 		commands.entity(id).with_children(|children| {
 			let label_mesh = if label_appearence.has_arrow_tip {
-				meshes.arrow_labels.clone()
+				meshes[&MeshKey::ArrowLabels].clone()
 			} else {
-				meshes.square_labels.clone()
+				meshes[&MeshKey::SquareLabels].clone()
 			};
 			let (translation, label_rotation, sprite_rotation) =
 				get_button_color_label_placement(label_appearence);
 
 			children.spawn((
-				MeshMaterial2d(materials.colored_button_labels.clone()),
+				MeshMaterial2d(materials[&MaterialKey::ColoredButtonLabels].clone()),
 				Mesh2d(label_mesh),
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_LABELS))
 					.with_rotation(Quat::from_rotation_z(label_rotation)),
@@ -1116,7 +1120,7 @@ fn create_button_color_markers(
 			create_logical_color_sprite(
 				children,
 				*color,
-				palette.button_base,
+				palette[&ColorKey::ButtonBase],
 				&sprite_atlas,
 				&digit_atlas,
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_SPRITES))

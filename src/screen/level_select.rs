@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	drawing::ThingPalette,
+	drawing::{ColorKey, ThingPalette},
 	game::level::{
 		completion::{CompletionStatus, LevelHubCompletion},
 		list::LevelList,
@@ -133,7 +133,7 @@ fn spawn_screen(
 				},
 				ImageNode {
 					image: images[&image_key].clone(),
-					color: colors.checkmark,
+					color: colors[&ColorKey::Checkmark],
 					image_mode: NodeImageMode::Stretch,
 					..default()
 				},
@@ -179,7 +179,7 @@ fn spawn_screen(
 								},
 								ImageNode {
 									image: images[&ImageKey::Checkmark].clone(),
-									color: colors.checkmark,
+									color: colors[&ColorKey::Checkmark],
 									image_mode: NodeImageMode::Stretch,
 									..default()
 								},

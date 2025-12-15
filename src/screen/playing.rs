@@ -4,7 +4,7 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	drawing::ThingPalette,
+	drawing::{ColorKey, ThingPalette},
 	game::{
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
@@ -254,7 +254,7 @@ fn spawn_game_ui(
 						},
 						ImageNode {
 							image: images[&ImageKey::Checkmark].clone(),
-							color: colors.checkmark,
+							color: colors[&ColorKey::Checkmark],
 							image_mode: NodeImageMode::Stretch,
 							..default()
 						},
@@ -423,7 +423,7 @@ fn start_completion_cue_animation(
 			},
 			ImageNode {
 				image: images[&ImageKey::CheckmarkSolid].clone(),
-				color: colors.checkmark,
+				color: colors[&ColorKey::Checkmark],
 				image_mode: NodeImageMode::Stretch,
 				..default()
 			},

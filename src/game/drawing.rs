@@ -88,15 +88,15 @@ fn goal_unlock_animation_system(
 	palette: Res<ThingPalette>,
 	completion: Res<LevelCompletionConditions>,
 ) {
-	let color = if completion.is_goal_unlocked() {
-		palette.goal_open
+	let color_key = if completion.is_goal_unlocked() {
+		ColorKey::GoalOpen
 	} else {
-		palette.goal_closed
+		ColorKey::GoalClosed
 	};
 	for children in &flags_q {
 		for id in children {
 			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
-				sprite.color = color;
+				sprite.color = palette[&color_key];
 			}
 		}
 	}
@@ -108,15 +108,15 @@ fn button_trigger_animation_system(
 	palette: Res<ThingPalette>,
 ) {
 	for (children, is_triggered) in &buttons_q {
-		let color = if is_triggered.0 {
-			palette.button_trigger
+		let color_key = if is_triggered.0 {
+			ColorKey::ButtonTrigger
 		} else {
-			palette.button_base
+			ColorKey::ButtonBase
 		};
 
 		for id in children {
 			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
-				sprite.color = color;
+				sprite.color = palette[&color_key];
 			}
 		}
 	}
@@ -229,11 +229,12 @@ fn cycle_center_interaction_visuals_update_system(
 			log::warn!("Cycle sprite entity does not have Sprite component");
 			continue;
 		};
-		sprite.color = match status {
-			CycleStatus::Disabled => palette.cycle_disabled,
-			CycleStatus::Ready => palette.cycle_ready,
-			CycleStatus::Selected => palette.cycle_trigger,
+		let color_key = match status {
+			CycleStatus::Disabled => ColorKey::CycleDisabled,
+			CycleStatus::Ready => ColorKey::CycleReady,
+			CycleStatus::Selected => ColorKey::CycleTrigger,
 		};
+		sprite.color = palette[&color_key];
 	}
 
 	for (id, status) in meshes_to_repaint {
@@ -246,15 +247,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RINGS;
-				material.0 = materials.cycle_rings_disabled.clone();
+				material.0 = materials[&MaterialKey::CycleRingsDisabled].clone();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RINGS;
-				material.0 = materials.cycle_rings_ready.clone();
+				material.0 = materials[&MaterialKey::CycleRingsReady].clone();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RINGS;
-				material.0 = materials.cycle_rings_select.clone();
+				material.0 = materials[&MaterialKey::CycleRingsSelect].clone();
 			}
 		}
 	}
@@ -269,15 +270,15 @@ fn cycle_center_interaction_visuals_update_system(
 		match status {
 			CycleStatus::Disabled => {
 				transform.translation.z = layers::DISABLED_CYCLE_RING_OUTLINES;
-				material.0 = materials.cycle_ring_outlines_disabled.clone();
+				material.0 = materials[&MaterialKey::CycleRingOutlinesDisabled].clone();
 			}
 			CycleStatus::Ready => {
 				transform.translation.z = layers::CYCLE_RING_OUTLINES;
-				material.0 = materials.cycle_ring_outlines.clone();
+				material.0 = materials[&MaterialKey::CycleRingOutlines].clone();
 			}
 			CycleStatus::Selected => {
 				transform.translation.z = layers::ACTIVE_CYCLE_RING_OUTLINES;
-				material.0 = materials.cycle_ring_outlines.clone();
+				material.0 = materials[&MaterialKey::CycleRingOutlines].clone();
 			}
 		}
 	}
@@ -345,7 +346,7 @@ fn cycle_blocked_marker_system(
 			Sprite {
 				image: images[&ImageKey::InGameWarning].clone(),
 				custom_size: Some(size),
-				color: palette.warning_sign,
+				color: palette[&ColorKey::WarningSign],
 				..default()
 			},
 			Anchor::BOTTOM_CENTER, // TODO: Check if this is correct behaviour mimicking
@@ -385,7 +386,7 @@ fn wall_blocked_marker_system(
 			Sprite {
 				image: images[&ImageKey::InGameWarning].clone(),
 				custom_size: Some(size),
-				color: palette.warning_sign,
+				color: palette[&ColorKey::WarningSign],
 				..default()
 			},
 			Anchor::BOTTOM_CENTER,
