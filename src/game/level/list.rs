@@ -15,6 +15,13 @@ pub struct LevelList {
 	pub root_hub: usize,
 }
 
+/// Identifier of a level or a hub
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
+pub enum LevelOrHubId {
+	Level(usize),
+	Hub(usize),
+}
+
 /// Information about a single level
 #[derive(Clone, Debug, Reflect)]
 pub struct LevelInfo {
@@ -29,13 +36,26 @@ pub struct LevelInfo {
 	/// Index of the level that comes after this
 	/// in the standard playing order
 	pub next_level: Option<usize>,
+	/// Levels and hubs that must be completed before this is unlocked
+	pub prerequisites: Vec<LevelOrHubId>,
 }
 
 /// Information about a hub and a group of levels it contains
-#[derive(Clone, Debug, Reflect)]
+#[derive(Clone, Debug, Default, Reflect)]
 pub struct HubLevelInfo {
+	/// Display name of the hub
+	pub hub_name: String,
 	/// Index of the hub that this hub logically subdivides
 	pub parent_hub: Option<usize>,
+	/// List of hubs that subdivide this hub
+	pub child_hubs: Vec<usize>,
+	/// List of levels that belong directly to the hub (not transitively)
+	pub levels: Vec<usize>,
+	/// How many children (levels of hubs) need to be completed
+	/// before this is marked as completed
+	pub children_to_complete: usize,
+	/// Levels and hubs that must be completed before this is unlocked
+	pub prerequisites: Vec<LevelOrHubId>,
 }
 
 /// Helper object for construction of a level list
@@ -68,13 +88,23 @@ impl LevelListBuilder {
 				.map_err(|err| LevelListBuildError::BadAssetPath(path.to_owned(), err))?
 				.into_owned(),
 			identifier: path.to_string(),
+			prerequisites: Vec::new(),
 		});
 		self.has_parent_hub.push(false);
 		Ok(self.list.levels.len() - 1)
 	}
 
-	pub fn add_hub(&mut self) -> Result<usize, LevelListBuildError> {
-		self.list.hubs.push(HubLevelInfo { parent_hub: None });
+	pub fn add_hub(
+		&mut self,
+		hub_name: String,
+		children_to_complete: usize,
+	) -> Result<usize, LevelListBuildError> {
+		self.list.hubs.push(HubLevelInfo {
+			hub_name,
+			parent_hub: None,
+			children_to_complete,
+			..default()
+		});
 		Ok(self.list.hubs.len() - 1)
 	}
 
@@ -130,6 +160,24 @@ impl LevelListBuilder {
 		Ok(())
 	}
 
+	pub fn create_prerequisite(
+		&mut self,
+		dependency: LevelOrHubId,
+		dependent: LevelOrHubId,
+	) -> Result<(), LevelListBuildError> {
+		self.check_id_in_range(dependency)?;
+		self.check_id_in_range(dependent)?;
+		match dependent {
+			LevelOrHubId::Level(level_id) => {
+				self.list.levels[level_id].prerequisites.push(dependency);
+			}
+			LevelOrHubId::Hub(hub_id) => {
+				self.list.hubs[hub_id].prerequisites.push(dependency);
+			}
+		}
+		Ok(())
+	}
+
 	pub fn build(
 		mut self,
 		asset_load_context: &mut LoadContext,
@@ -138,8 +186,21 @@ impl LevelListBuilder {
 			return Err(LevelListBuildError::OrphanedLevel(i));
 		}
 		self.find_and_set_root_hub()?;
+		self.fill_hub_child_lists();
 		self.load_level_assets(asset_load_context);
 		Ok(self.list)
+	}
+
+	fn check_id_in_range(&self, id: LevelOrHubId) -> Result<(), LevelListBuildError> {
+		match id {
+			LevelOrHubId::Level(level_id) if level_id >= self.list.levels.len() => {
+				Err(LevelListBuildError::LevelIndexOutOfRange(level_id))
+			}
+			LevelOrHubId::Hub(hub_id) if hub_id >= self.list.hubs.len() => {
+				Err(LevelListBuildError::HubIndexOutOfRange(hub_id))
+			}
+			_ => Ok(()),
+		}
 	}
 
 	/// Checks if `ancestor` is the same as or an ancestor of `successor`
@@ -177,6 +238,20 @@ impl LevelListBuilder {
 		}
 		self.list.root_hub = first_root;
 		Ok(())
+	}
+
+	/// Fills in the child lists of hubs based on parent references
+	///
+	/// Assumes the child lists start off empty
+	fn fill_hub_child_lists(&mut self) {
+		for i in 0..self.list.hubs.len() {
+			if let Some(parent) = self.list.hubs[i].parent_hub {
+				self.list.hubs[parent].child_hubs.push(i);
+			}
+		}
+		for (i, level) in self.list.levels.iter().enumerate() {
+			self.list.hubs[level.parent_hub].levels.push(i);
+		}
 	}
 
 	fn load_level_assets(&mut self, load_context: &mut LoadContext) {

@@ -2,11 +2,12 @@
 
 use super::*;
 use crate::{
-	assets::{GlobalFont, SfxKey},
+	assets::{GlobalFont, SfxKey, UiButtonAtlas},
 	audio::sfx::PlaySfx,
 	settings::Settings,
 	ui::{
 		background::BackgroundMode,
+		consts::*,
 		multistate::{MultiStateButton, MultiStateButtonLabels},
 		prelude::*,
 		slider::Slider,
@@ -51,65 +52,84 @@ const SLIDER_WIDTH: f32 = 200.0;
 /// Number of steps on each slider on the Settings screen
 const SLIDER_STEP_COUNT: u32 = 8;
 
-fn enter_settings(mut commands: Commands, font: Res<GlobalFont>, settings: Res<Settings>) {
-	commands
-		.ui_root()
-		.insert(DespawnOnExit(Screen::Settings))
-		.with_children(|children| {
-			children.header("Settings", font.0.clone());
-			children
-				.spawn(Node {
+fn enter_settings(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	button_sprites: Res<UiButtonAtlas>,
+	settings: Res<Settings>,
+) {
+	commands.spawn((
+		widgets::ui_root(),
+		DespawnOnExit(Screen::Settings),
+		children![
+			widgets::header("Settings", font.0.clone()),
+			(
+				Node {
 					display: Display::Grid,
 					width: Val::Percent(100.0),
-					column_gap: Val::Px(20.0),
-					row_gap: Val::Px(10.0),
-					padding: UiRect::vertical(Val::Px(10.0)),
+					column_gap: WIDE_GAP,
+					row_gap: COMMON_GAP,
+					padding: UiRect::vertical(COMMON_GAP),
 					grid_template_columns: vec![RepeatedGridTrack::auto(2)],
 					..default()
-				})
-				.with_children(|children| {
-					children.text("Music volume", JustifyContent::End, font.0.clone());
-					children.spawn((
+				},
+				children![
+					widgets::text("Music volume", JustifyContent::End, font.0.clone()),
+					(
 						Node {
 							width: Val::Px(SLIDER_WIDTH),
 							..default()
 						},
 						Slider::new_fraction(SLIDER_STEP_COUNT, settings.soundtrack_volume),
 						SettingsSliderControl::MusicVolume,
-					));
-					children.text("Sfx volume", JustifyContent::End, font.0.clone());
-					children.spawn((
+					),
+					widgets::text("Sfx volume", JustifyContent::End, font.0.clone()),
+					(
 						Node {
 							width: Val::Px(SLIDER_WIDTH),
 							..default()
 						},
 						Slider::new_fraction(SLIDER_STEP_COUNT, settings.sfx_volume),
 						SettingsSliderControl::SfxVolume,
-					));
-					children.text("Background", JustifyContent::End, font.0.clone());
-					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.inline_button("", font.0.clone()).insert((
+					),
+					widgets::text("Background", JustifyContent::End, font.0.clone()),
+					(
+						Node::DEFAULT,
+						children![(
+							widgets::inline_button("", font.0.clone()),
 							MultiStateButton::new(
 								3,
 								background_mode_to_option_index(settings.background_mode),
 							),
 							MultiStateButtonLabels::new(["Off", "Static", "Animated"]),
 							SettingsCheckboxControl::Background,
-						));
-					});
-					children.text("Parallax", JustifyContent::End, font.0.clone());
-					children.spawn(Node::DEFAULT).with_children(|children| {
-						children.inline_button("", font.0.clone()).insert((
+						)],
+					),
+					widgets::text("Parallax", JustifyContent::End, font.0.clone()),
+					(
+						Node::DEFAULT,
+						children![(
+							widgets::inline_button("", font.0.clone()),
 							MultiStateButton::new(2, settings.enable_parallax as u32),
 							MultiStateButtonLabels::new(["Off", "On"]),
 							SettingsCheckboxControl::Parallax,
-						));
-					});
-				});
-			children
-				.button("Back", font.0.clone())
-				.insert(SettingsAction::Back);
-		});
+						)],
+					),
+				],
+			),
+		],
+	));
+	commands.spawn((
+		Node {
+			margin: TOOLBAR_MARGIN,
+			..default()
+		},
+		DespawnOnExit(Screen::Settings),
+		children![(
+			widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
+			SettingsAction::Back,
+		)],
+	));
 }
 
 fn background_mode_to_option_index(mode: BackgroundMode) -> u32 {
@@ -121,8 +141,8 @@ fn background_mode_to_option_index(mode: BackgroundMode) -> u32 {
 }
 
 fn handle_settings_action(mut commands: Commands, query: InteractionQuery<&SettingsAction>) {
-	for (interaction, action) in &query {
-		if *interaction == Interaction::Pressed {
+	for (interaction, enabled, action) in &query {
+		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
 			match action {
 				SettingsAction::Back => {
 					commands.do_screen_transition(Screen::Title);

@@ -6,7 +6,10 @@ use crate::{
 	graphics::VERTICAL_PADDING_FRACTION,
 	save::SaveGame,
 	screen::PlayingLevel,
-	ui::{hover::Hoverable, prelude::FadeAnimationBundle},
+	ui::{
+		hover::{HoverHintBoundingCircle, HoverHintBoundingRect},
+		prelude::FadeAnimationBundle,
+	},
 };
 use bevy::{
 	color::palettes,
@@ -29,17 +32,13 @@ pub(super) fn plugin(app: &mut App) {
 			log_transitions::<PlayingLevel>,
 			automatic_reloading.run_if(in_state(Screen::Playing)),
 			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
-			(
-				debug_oneways,
-				debug_detectors,
-				debug_camera_bounds,
-				draw_hover_boxes,
-			)
+			(debug_oneways, debug_camera_bounds, draw_hover_boxes)
 				.run_if(resource_equals(RenderOutlines(true))),
 			toggle_debug_outline_display.run_if(resource_changed::<RenderOutlines>),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
 			toggle_turning_animation_speed.run_if(input_just_pressed(KeyCode::KeyT)),
 			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
+			toggle_fps_diagnostic.run_if(input_just_pressed(KeyCode::KeyF)),
 		),
 	);
 	app.add_systems(Startup, init_viewport_box);
@@ -98,6 +97,11 @@ fn init_viewport_box(mut commands: Commands) {
 		));
 }
 
+fn toggle_fps_diagnostic(mut config: ResMut<FpsOverlayConfig>) {
+	config.enabled = !config.enabled;
+	config.frame_time_graph_config.enabled = config.enabled;
+}
+
 fn toggle_debug_outline_display(
 	mut query: Query<&mut Node, With<IsDebugOutline>>,
 	render_outlines: Res<RenderOutlines>,
@@ -117,33 +121,35 @@ fn toggle_box_outlines(mut render: ResMut<RenderOutlines>, mut ui_debug: ResMut<
 	ui_debug.toggle();
 }
 
-fn draw_hover_boxes(mut gizmos: Gizmos, hoverables: Query<(&Hoverable, &GlobalTransform)>) {
-	for (hover, transform) in hoverables.iter() {
-		if let Some(bounding_box) = hover.hover_bounding_box {
-			let quat = transform.rotation();
-			let rotation = Rot2 {
-				cos: quat.w,
-				sin: quat.z,
-			}
-			.try_normalize()
-			.unwrap_or_default();
-			let rotation = rotation * rotation;
-			gizmos.rect_2d(
-				Isometry2d::new(
-					transform.translation().xy() + bounding_box.center(),
-					rotation,
-				),
-				bounding_box.half_size() * 2.0,
-				palettes::basic::LIME,
-			);
+fn draw_hover_boxes(
+	mut gizmos: Gizmos,
+	rects: Query<(&HoverHintBoundingRect, &GlobalTransform)>,
+	circles: Query<(&HoverHintBoundingCircle, &GlobalTransform)>,
+) {
+	for (bounding_box, transform) in &rects {
+		let quat = transform.rotation();
+		let rotation = Rot2 {
+			cos: quat.w,
+			sin: quat.z,
 		}
-		if let Some(bounding_circle) = hover.hover_bounding_circle {
-			gizmos.circle_2d(
-				transform.translation().xy() + bounding_circle.center,
-				bounding_circle.radius(),
-				palettes::basic::LIME,
-			);
-		}
+		.try_normalize()
+		.unwrap_or_default();
+		let rotation = rotation * rotation;
+		gizmos.rect_2d(
+			Isometry2d::new(
+				transform.translation().xy() + bounding_box.center(),
+				rotation,
+			),
+			bounding_box.half_size() * 2.0,
+			palettes::basic::LIME,
+		);
+	}
+	for (bounding_circle, transform) in &circles {
+		gizmos.circle_2d(
+			transform.translation().xy() + bounding_circle.center,
+			bounding_circle.radius(),
+			palettes::basic::LIME,
+		);
 	}
 }
 
@@ -196,28 +202,6 @@ fn debug_oneways(
 		};
 		let end = end.translation;
 		gizmos.arrow(start, end, bevy::color::palettes::basic::RED);
-	}
-}
-
-fn debug_detectors(mut gizmos: Gizmos, level: PlayingLevelData) {
-	let Ok(level) = level.get() else {
-		return;
-	};
-	for cycle in &level.cycles {
-		let n_vertices = cycle.vertex_indices.len();
-		for &(_, vertex_offset) in &cycle.detector_indices {
-			// Get the path-based [0, 1] position of both neighboring vertices
-			let prev_vertex_position = cycle.vertex_positions[vertex_offset];
-			let mut next_vertex_position = cycle.vertex_positions[(vertex_offset + 1) % n_vertices];
-			if prev_vertex_position < next_vertex_position {
-				// Wrap the position around the zeroth vertex
-				next_vertex_position += 1.0;
-			}
-			// Draw the detector halfway between the vertices
-			let detector_position = (prev_vertex_position + next_vertex_position) / 2.0;
-			let detector_placement = cycle.placement.sample(detector_position);
-			gizmos.rect_2d(detector_placement, Vec2::splat(30.0), palettes::basic::TEAL);
-		}
 	}
 }
 

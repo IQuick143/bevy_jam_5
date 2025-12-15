@@ -150,11 +150,15 @@ fn apply_slider_interaction_palettes(
 	slider_q: InteractionQuery<&SliderChildren>,
 	mut node_q: Query<&mut BackgroundColor>,
 ) {
-	for (interaction, children) in &slider_q {
-		let new_color = match interaction {
-			Interaction::None => SLIDER_FILL,
-			Interaction::Hovered => SLIDER_HOVERED_FILL,
-			Interaction::Pressed => SLIDER_PRESSED_FILL,
+	for (interaction, enabled, children) in &slider_q {
+		let new_color = if enabled.is_none_or(|e| **e) {
+			match interaction {
+				Interaction::None => SLIDER_FILL,
+				Interaction::Hovered => SLIDER_HOVERED_FILL,
+				Interaction::Pressed => SLIDER_PRESSED_FILL,
+			}
+		} else {
+			SLIDER_DISABLED_FILL
 		};
 		for node_id in [children.handle, children.body] {
 			let Ok(mut background_color) = node_q.get_mut(node_id) else {
@@ -174,7 +178,7 @@ fn accept_slider_inputs(
 			&ComputedNode,
 			&RelativeCursorPosition,
 		),
-		Changed<RelativeCursorPosition>,
+		Or<(Changed<RelativeCursorPosition>, Changed<Interaction>)>,
 	>,
 ) {
 	for (mut slider, interaction, node, cursor_pos) in &mut slider_q {
@@ -187,7 +191,7 @@ fn accept_slider_inputs(
 		let node_width = node.size.x * node.inverse_scale_factor;
 		let bar_offset = NODE_RADIUS + RING_OUTLINE_WIDTH;
 		let bar_width = node_width - 2.0 * bar_offset;
-		let corrected_cursor_offset = (cursor_pos.x * node_width - bar_offset) / bar_width;
+		let corrected_cursor_offset = ((cursor_pos.x + 0.5) * node_width - bar_offset) / bar_width;
 		let new_position = (corrected_cursor_offset * slider.step_count as f32)
 			.round()
 			.clamp(0.0, slider.step_count as f32) as u32;

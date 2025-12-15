@@ -19,12 +19,11 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 fn enter_loading(mut commands: Commands, font: Res<GlobalFont>) {
-	commands
-		.ui_root()
-		.insert(DespawnOnExit(Screen::Loading))
-		.with_children(|children| {
-			children.label("Loading...", font.0.clone());
-		});
+	commands.spawn((
+		widgets::ui_root(),
+		DespawnOnExit(Screen::Loading),
+		children![widgets::label("Loading...", font.0.clone())],
+	));
 }
 
 fn all_assets_loaded(

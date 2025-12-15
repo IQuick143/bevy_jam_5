@@ -3,7 +3,10 @@
 use bevy::prelude::*;
 
 use super::*;
-use crate::{assets::GlobalFont, ui::prelude::*};
+use crate::{
+	assets::{GlobalFont, UiButtonAtlas},
+	ui::{consts::*, prelude::*},
+};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::Credits), enter_credits);
@@ -22,57 +25,83 @@ enum CreditsAction {
 	Back,
 }
 
-fn enter_credits(mut commands: Commands, font: Res<GlobalFont>) {
+const MAX_CENTERED_PANEL_WIDTH: f32 = 800.0;
+const AUTHOR_NAME_FIELD_WIDTH: f32 = 290.0;
+const ASSET_NAME_FIELD_WIDTH: f32 = 175.0;
+
+fn enter_credits(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	button_sprites: Res<UiButtonAtlas>,
+) {
 	let mut table_node = Node {
 		display: Display::Grid,
 		width: Val::Percent(100.0),
-		max_width: Val::Px(800.0),
-		column_gap: Val::Px(20.0),
-		row_gap: Val::Px(10.0),
-		grid_template_columns: vec![RepeatedGridTrack::px(1, 290.0), RepeatedGridTrack::auto(1)],
+		max_width: Val::Px(MAX_CENTERED_PANEL_WIDTH),
+		column_gap: WIDE_GAP,
+		row_gap: COMMON_GAP,
+		grid_template_columns: vec![
+			RepeatedGridTrack::px(1, AUTHOR_NAME_FIELD_WIDTH),
+			RepeatedGridTrack::auto(1),
+		],
 		..default()
 	};
-	commands
-		.ui_root()
-		.insert(DespawnOnExit(Screen::Credits))
-		.with_children(|children| {
-			children.header("Made by", font.0.clone());
-			children.spawn(table_node.clone())
-				.with_children(|children| {
-					children.text("IQuick 143", JustifyContent::End, font.0.clone());
-					children.text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone());
-					children.text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone());
-					children.text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone());
-					children.text("SoysCodingCafe", JustifyContent::End, font.0.clone());
-					children.text("Level Design", JustifyContent::Start, font.0.clone());
-					children.text("spilledcereals", JustifyContent::End, font.0.clone());
-					children.text("Music, SFX", JustifyContent::Start, font.0.clone());
-				});
+	commands.spawn(
+		(
+			widgets::ui_root(),
+			DespawnOnExit(Screen::Credits),
+			children![
+				widgets::header("Made by", font.0.clone()),
+				(
+					table_node.clone(),
+					children![
+						widgets::text("IQuick 143", JustifyContent::End, font.0.clone()),
+						widgets::text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone()),
+						widgets::text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone()),
+						widgets::text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone()),
+						widgets::text("SoysCodingCafe", JustifyContent::End, font.0.clone()),
+						widgets::text("Level Design", JustifyContent::Start, font.0.clone()),
+						widgets::text("spilledcereals", JustifyContent::End, font.0.clone()),
+						widgets::text("Music, SFX", JustifyContent::Start, font.0.clone()),
+					]
+				),
 
-			children.header("Assets", font.0.clone());
-			table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, 175.0);
-			children.spawn(table_node)
-				.with_children(|children| {
-					children.text("Bevy logo", JustifyContent::End, font.0.clone());
-					children.text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone());
-					children.text("Comfortaa font", JustifyContent::End, font.0.clone());
-					children.text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone());
-				});
-
-			children.button("Back", font.0.clone()).insert(CreditsAction::Back);
-		});
+				widgets::header("Assets", font.0.clone()),
+				(
+					{
+						table_node.grid_template_columns[0] = RepeatedGridTrack::px(1, ASSET_NAME_FIELD_WIDTH);
+						table_node
+					},
+					children![
+						widgets::text("Bevy logo", JustifyContent::End, font.0.clone()),
+						widgets::text("All rights reserved by the Bevy Foundation. Permission granted for splash screen use when unmodified.", JustifyContent::Start, font.0.clone()),
+						widgets::text("Comfortaa font", JustifyContent::End, font.0.clone()),
+						widgets::text("By Johan Aakerlund, licensed under Open Font License.", JustifyContent::Start, font.0.clone()),
+					],
+				),
+			]
+		)
+	);
+	commands.spawn((
+		Node {
+			margin: TOOLBAR_MARGIN,
+			..default()
+		},
+		DespawnOnExit(Screen::Credits),
+		children![(
+			widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
+			CreditsAction::Back,
+		)],
+	));
 }
 
 fn exit_credits(mut _commands: Commands) {
 	//commands.trigger(PlaySoundtrack::Disable);
 }
 
-fn handle_credits_action(
-	mut commands: Commands,
-	mut button_query: InteractionQuery<&CreditsAction>,
-) {
-	for (interaction, action) in &mut button_query {
-		if matches!(interaction, Interaction::Pressed) {
+fn handle_credits_action(mut commands: Commands, button_query: InteractionQuery<&CreditsAction>) {
+	for (interaction, enabled, action) in &button_query {
+		if enabled.is_none_or(|e| **e) && matches!(interaction, Interaction::Pressed) {
 			match action {
 				CreditsAction::Back => {
 					commands.do_screen_transition(Screen::Title);

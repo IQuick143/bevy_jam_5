@@ -7,7 +7,7 @@ use crate::{
 		primitives::{RoundedPentagonArrow, RoundedRectangle},
 		*,
 	},
-	ui::hover::{self, Hoverable},
+	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority},
 	AppSet,
 };
 use bevy::{
@@ -530,17 +530,13 @@ fn cycle_blocked_marker_system(
 			},
 			Anchor::BOTTOM_CENTER, // TODO: Check if this is correct behaviour mimicking
 			Transform::from_translation(
-				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
+					.with_z(layers::FAIL_MARKERS),
 			),
 			TemporaryMarker,
-			Hoverable {
-				hover_text: hover::BLOCKADE_WARNING,
-				hover_bounding_circle: None,
-				hover_bounding_box: Some(Aabb2d::new(
-					Vec2::new(0.0, SPRITE_LENGTH / 2.0),
-					size / 2.0,
-				)),
-			},
+			HoverHint(hover::BLOCKADE_WARNING),
+			HoverPriority(hover::prio::WORLD_UI),
+			HoverHintBoundingRect(Aabb2d::new(Vec2::new(0.0, SPRITE_LENGTH / 2.0), size / 2.0)),
 			session.get_session(),
 		));
 	}
@@ -574,17 +570,13 @@ fn wall_blocked_marker_system(
 			},
 			Anchor::BOTTOM_CENTER,
 			Transform::from_translation(
-				vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25,
+				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
+					.with_z(layers::FAIL_MARKERS),
 			),
 			TemporaryMarker,
-			Hoverable {
-				hover_text: hover::WALL_HIT_WARNING,
-				hover_bounding_circle: None,
-				hover_bounding_box: Some(Aabb2d::new(
-					Vec2::new(0.0, SPRITE_LENGTH / 2.0),
-					size / 2.0,
-				)),
-			},
+			HoverHint(hover::WALL_HIT_WARNING),
+			HoverHintBoundingRect(Aabb2d::new(Vec2::new(0.0, SPRITE_LENGTH / 2.0), size / 2.0)),
+			HoverPriority(hover::prio::WORLD_UI),
 			session.get_session(),
 		));
 	}

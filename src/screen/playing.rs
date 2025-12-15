@@ -3,14 +3,20 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
-	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList},
+	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	game::{
 		drawing::ThingPalette,
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
 	},
 	send_message,
-	ui::{hover::HoverText, prelude::*},
+	ui::{
+		consts::*,
+		hover::{self, HoverHint, HoverPriority, HoverText, UseHoverFromInteraction},
+		interaction::InteractionEnabled,
+		palette::*,
+		prelude::*,
+	},
 	AppSet,
 };
 
@@ -29,7 +35,10 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				(
-					send_message(GameUiAction::Reset).run_if(char_input_pressed('r')),
+					send_message(GameUiAction::Reset).run_if(
+						char_input_pressed('r')
+							.and(|history: Res<MoveHistory>| !history.is_empty()),
+					),
 					send_message(GameUiAction::NextLevel).run_if(
 						char_input_pressed('n')
 							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
@@ -72,8 +81,9 @@ pub struct PlayingLevel(pub Option<usize>);
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct NextLevelButton;
 
-/// Marker component for the undo button
+/// Marker component for the undo and reset buttons
 #[derive(Component, Clone, Copy, Debug, Default)]
+#[require(InteractionEnabled(false))]
 struct UndoButton;
 
 /// Marker component for the level name label
@@ -133,78 +143,99 @@ impl PlayingLevelListEntry<'_> {
 	}
 }
 
-/// Size of the level title label on the playing screen
-const LEVEL_TITLE_SIZE: f32 = 35.0;
-/// Width of the gap between title label and checkmark indicating completion
-const LEVEL_TITLE_CHECK_GAP: f32 = 15.0;
-
 fn spawn_game_ui(
 	mut commands: Commands,
 	font: Res<GlobalFont>,
 	images: Res<HandleMap<ImageKey>>,
+	button_sprites: Res<UiButtonAtlas>,
 	colors: Res<ThingPalette>,
 ) {
 	commands
-		.ui_root_justified(JustifyContent::Start)
-		.insert(DespawnOnExit(Screen::Playing))
+		.spawn((
+			widgets::ui_root_justified(JustifyContent::Start),
+			DespawnOnExit(Screen::Playing),
+		))
 		.with_children(|parent| {
-			parent
-				.spawn(Node {
-					width: Val::Vw(100.0),
+			parent.spawn((
+				Node {
+					width: Val::Percent(100.0),
 					flex_direction: FlexDirection::Row,
-					column_gap: Val::Px(10.0),
-					padding: UiRect::all(Val::Px(10.0)),
+					column_gap: COMMON_GAP,
+					padding: TOOLBAR_MARGIN,
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::Start,
 					..default()
-				})
-				.with_children(|parent| {
-					parent
-						.tool_button("Back", font.0.clone())
-						.insert(GameUiAction::Back);
-					parent
-						.tool_button("Reset", font.0.clone())
-						.insert(GameUiAction::Reset);
-					parent
-						.tool_button("Undo", font.0.clone())
-						.insert((GameUiAction::Undo, UndoButton));
-				});
+				},
+				children![
+					(
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
+						GameUiAction::Back,
+						HoverHint(hover::UI_EXIT),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
+					),
+					(
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::RESTART),
+						GameUiAction::Reset,
+						UndoButton,
+						HoverHint(hover::UI_RESET),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
+					),
+					(
+						widgets::sprite_button(&button_sprites, UiButtonAtlas::UNDO),
+						GameUiAction::Undo,
+						UndoButton,
+						HoverHint(hover::UI_UNDO),
+						HoverPriority(hover::prio::STATIC_UI),
+						UseHoverFromInteraction,
+					),
+				],
+			));
 			parent
 				.spawn(Node {
-					width: Val::Vw(100.0),
+					width: Val::Percent(100.0),
 					flex_direction: FlexDirection::Row,
-					column_gap: Val::Px(10.0),
-					padding: UiRect::all(Val::Px(10.0)),
+					column_gap: COMMON_GAP,
+					padding: TOOLBAR_MARGIN,
 					align_items: AlignItems::Start,
 					justify_content: JustifyContent::End,
 					position_type: PositionType::Absolute,
 					..default()
 				})
 				.with_children(|parent| {
-					parent.tool_button("Next Level", font.0.clone()).insert((
-						GameUiAction::NextLevel,
-						NextLevelButton,
-						BackgroundColor(ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND),
-						InteractionPalette {
-							none: ui_palette::NEXT_LEVEL_BUTTON_BACKGROUND,
-							hovered: ui_palette::NEXT_LEVEL_BUTTON_HOVER,
-							pressed: ui_palette::NEXT_LEVEL_BUTTON_PRESS,
-						},
-					));
+					parent
+						.spawn(widgets::sprite_button(
+							&button_sprites,
+							UiButtonAtlas::PROCEED,
+						))
+						.insert((
+							GameUiAction::NextLevel,
+							NextLevelButton,
+							InteractionPalette {
+								none: NEXT_LEVEL_BUTTON_BACKGROUND,
+								hovered: NEXT_LEVEL_BUTTON_HOVERED_BACKGROUND,
+								pressed: NEXT_LEVEL_BUTTON_PRESSED_BACKGROUND,
+								disabled: BUTTON_DISABLED_BACKGROUND,
+							},
+							HoverHint(hover::UI_NEXT),
+							HoverPriority(hover::prio::STATIC_UI),
+							UseHoverFromInteraction,
+						));
 				});
-			parent
-				.spawn(Node {
-					width: Val::Vw(100.0),
-					height: Val::Vh(10.0),
-					margin: UiRect::all(Val::Px(10.0)),
+			parent.spawn((
+				Node {
+					width: Val::Percent(100.0),
+					height: LEVEL_TITLE_HEIGHT,
+					margin: UiRect::all(COMMON_GAP),
 					position_type: PositionType::Absolute,
 					justify_content: JustifyContent::Center,
 					align_items: AlignItems::Center,
 					column_gap: Val::Px(LEVEL_TITLE_CHECK_GAP),
 					..default()
-				})
-				.with_children(|parent| {
-					parent.spawn((
+				},
+				children![
+					(
 						LevelNameBox,
 						Text::default(),
 						TextFont {
@@ -213,8 +244,8 @@ fn spawn_game_ui(
 							..default()
 						},
 						TextColor(ui_palette::LABEL_TEXT),
-					));
-					parent.spawn((
+					),
+					(
 						LevelCompletionCheckmarkBox::default(),
 						Node {
 							width: Val::Px(LEVEL_TITLE_SIZE),
@@ -227,43 +258,44 @@ fn spawn_game_ui(
 							image_mode: NodeImageMode::Stretch,
 							..default()
 						},
-					));
-				});
+					),
+				],
+			));
 		});
 
-	commands
-		.ui_root_justified(JustifyContent::End)
-		.insert(DespawnOnExit(Screen::Playing))
-		.with_children(|parent| {
-			parent
-				.spawn(Node {
-					width: Val::Vh(100.0),
-					min_width: Val::Vw(50.0),
-					max_width: Val::Vw(100.0),
-					padding: UiRect::all(Val::Px(10.0)),
-					justify_content: JustifyContent::Center,
+	commands.spawn((
+		widgets::ui_root_justified(JustifyContent::End),
+		DespawnOnExit(Screen::Playing),
+		children![(
+			Node {
+				width: Val::Vh(100.0),
+				min_width: Val::Vw(50.0),
+				max_width: Val::Vw(100.0),
+				padding: UiRect::all(COMMON_GAP),
+				justify_content: JustifyContent::Center,
+				..default()
+			},
+			children![(
+				HoverText,
+				Text::default(),
+				TextFont {
+					font: font.0.clone(),
+					font_size: HOVER_HINT_TEXT_SIZE,
 					..default()
-				})
-				.with_child((
-					HoverText,
-					Text::default(),
-					TextFont {
-						font: font.0.clone(),
-						font_size: 20.0,
-						..default()
-					},
-					TextLayout::new_with_justify(Justify::Center),
-					TextColor(ui_palette::LABEL_TEXT),
-				));
-		});
+				},
+				TextLayout::new_with_justify(Justify::Center),
+				TextColor(ui_palette::LABEL_TEXT),
+			)],
+		)],
+	));
 }
 
 fn game_ui_input_recording_system(
 	query: InteractionQuery<&GameUiAction>,
 	mut events: MessageWriter<GameUiAction>,
 ) {
-	for (interaction, action) in &query {
-		if *interaction == Interaction::Pressed {
+	for (interaction, enabled, action) in &query {
+		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
 			events.write(*action);
 		}
 	}
@@ -431,15 +463,10 @@ fn tick_completion_cue_animation(
 
 fn update_undo_button_display(
 	history: Res<MoveHistory>,
-	mut query: Query<&mut Node, With<UndoButton>>,
+	mut query: Query<&mut InteractionEnabled, With<UndoButton>>,
 ) {
-	let display = if history.is_empty() {
-		Display::None
-	} else {
-		Display::DEFAULT
-	};
-	for mut node in &mut query {
-		node.display = display;
+	for mut enabled in &mut query {
+		enabled.set_if_neq(InteractionEnabled(!history.is_empty()));
 	}
 }
 
