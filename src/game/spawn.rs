@@ -8,7 +8,7 @@ use super::{
 	logic_relay::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
 };
-use crate::{assets::*, graphics::*, AppSet};
+use crate::{assets::*, drawing::*, graphics::*, AppSet};
 use bevy::{ecs::schedule::ScheduleLabel, platform::collections::HashMap, sprite::Anchor};
 use std::f32::consts::{PI, TAU};
 

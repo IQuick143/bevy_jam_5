@@ -4,8 +4,8 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
+	drawing::ThingPalette,
 	game::{
-		drawing::ThingPalette,
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
 	},

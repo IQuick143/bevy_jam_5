@@ -3,13 +3,11 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	game::{
-		drawing::ThingPalette,
-		level::{
-			completion::{CompletionStatus, LevelHubCompletion},
-			list::LevelList,
-			LevelData,
-		},
+	drawing::ThingPalette,
+	game::level::{
+		completion::{CompletionStatus, LevelHubCompletion},
+		list::LevelList,
+		LevelData,
 	},
 	save::SaveGame,
 	ui::{consts::*, palette::*, prelude::*, scrollbox::Scrollbox},
