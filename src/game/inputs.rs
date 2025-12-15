@@ -6,6 +6,7 @@ use super::{
 use crate::{
 	camera::CameraHarness,
 	game::components::Cycle,
+	graphics::RING_SHADOW_BLEED,
 	ui::{freeze::ui_not_frozen, hover::IsHovered},
 	AppSet,
 };
@@ -68,7 +69,7 @@ fn cycle_inputs_system(
 
 			match placement.shape {
 				CycleShape::Circle(radius) => {
-					if d_sq <= radius.powi(2) {
+					if d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {
 						Some((e, d_sq / radius.powi(2), is_turnable))
 					} else {
 						None
