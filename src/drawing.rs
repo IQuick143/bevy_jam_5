@@ -10,11 +10,15 @@ use bevy::{
 pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<ThingPalette>()
 		.init_resource::<GameObjectMaterials>()
-		.init_resource::<GameObjectMeshes>();
+		.init_resource::<GameObjectMeshes>()
+		.add_systems(
+			Update,
+			update_color_keys.run_if(resource_changed::<ThingPalette>),
+		);
 }
 
 /// Identifies a color used somewhere in the game
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum ColorKey {
 	BoxBase,
 	ButtonBase,
@@ -221,5 +225,17 @@ impl Default for ThingPalette {
 			(ColorKey::LinkLines, SLATE_300.into()),
 			(ColorKey::ColoredButtonLabels, Color::BLACK),
 		]))
+	}
+}
+
+fn update_color_keys(
+	palette: Res<ThingPalette>,
+	materials: Res<GameObjectMaterials>,
+	mut material_assets: ResMut<Assets<ColorMaterial>>,
+) {
+	for (material_key, material_handle) in materials.iter() {
+		if let Some(material) = material_assets.get_mut(material_handle) {
+			material.color = palette[&material_key.to_color_key()];
+		}
 	}
 }
