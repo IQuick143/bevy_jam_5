@@ -413,10 +413,10 @@ fn update_current_color_from_key(
 
 fn update_palette_entry(
 	key: Res<State<SelectedColorKey>>,
-	query: Query<&ColorPickerCurrentColor, Changed<ColorPickerCurrentColor>>,
+	query: Query<Ref<ColorPickerCurrentColor>, Changed<ColorPickerCurrentColor>>,
 	mut palette: ResMut<ThingPalette>,
 ) {
-	if let Some(current) = query.iter().last() {
+	if let Some(current) = query.iter().filter(|r| !r.is_added()).last() {
 		let current = current.to_srgba();
 		palette.insert(key.get().0, current.into());
 	}
