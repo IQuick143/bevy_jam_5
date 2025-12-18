@@ -2,7 +2,9 @@
 
 use crate::{
 	drawing::{ColorKey, ThingPalette},
-	ui::{char_input_pressed, interaction::InteractionQuery},
+	ui::{
+		char_input_pressed, interaction::InteractionQuery, palette::NODE_BACKGROUND, slider::Slider,
+	},
 	AppSet,
 };
 use bevy::prelude::*;
@@ -10,14 +12,16 @@ use bevy::prelude::*;
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<SelectedColorKey>()
 		.add_message::<ColorPickerButton>()
+		.init_resource::<ColorPickerClipboard>()
 		.add_systems(Startup, spawn_picker_ui)
 		.add_systems(
 			Update,
 			(
 				toggle_color_picker_display.run_if(char_input_pressed('c')),
 				collect_picker_button_inputs.in_set(AppSet::RecordInput),
-				handle_picker_button_inputs.in_set(AppSet::ExecuteInput),
-				update_picker_preview.in_set(AppSet::UpdateVisuals),
+				(handle_picker_button_inputs, handle_picker_slider_inputs)
+					.in_set(AppSet::ExecuteInput),
+				(update_picker_preview, update_slider_values).in_set(AppSet::UpdateVisuals),
 				update_key_button_colors
 					.run_if(resource_changed::<ThingPalette>)
 					.in_set(AppSet::UpdateVisuals),
@@ -27,18 +31,24 @@ pub(super) fn plugin(app: &mut App) {
 		);
 }
 
+#[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
+struct ColorPickerClipboard(SrgbaU8);
+
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct ColorPickerWidget;
 
-#[derive(Component, Clone, Copy, Debug)]
-struct ColorPickerCurrentColor {
+#[derive(Component, Clone, Copy, Debug, Default, Deref, DerefMut)]
+struct ColorPickerCurrentColor(SrgbaU8);
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct SrgbaU8 {
 	r: u8,
 	g: u8,
 	b: u8,
 	a: u8,
 }
 
-impl Default for ColorPickerCurrentColor {
+impl Default for SrgbaU8 {
 	fn default() -> Self {
 		Self {
 			r: 255,
@@ -49,13 +59,40 @@ impl Default for ColorPickerCurrentColor {
 	}
 }
 
-impl ColorPickerCurrentColor {
+impl SrgbaU8 {
+	fn from_srgba(color: Srgba) -> Self {
+		Self {
+			r: (color.red * 255.0) as u8,
+			g: (color.green * 255.0) as u8,
+			b: (color.blue * 255.0) as u8,
+			a: (color.alpha * 255.0) as u8,
+		}
+	}
+
 	fn to_srgba(self) -> Srgba {
 		Srgba {
 			red: self.r as f32 / 255.0,
 			green: self.g as f32 / 255.0,
 			blue: self.b as f32 / 255.0,
 			alpha: self.a as f32 / 255.0,
+		}
+	}
+
+	fn get_channel(&self, channel: ColorChannel) -> &u8 {
+		match channel {
+			ColorChannel::Red => &self.r,
+			ColorChannel::Green => &self.g,
+			ColorChannel::Blue => &self.b,
+			ColorChannel::Alpha => &self.a,
+		}
+	}
+
+	fn get_channel_mut(&mut self, channel: ColorChannel) -> &mut u8 {
+		match channel {
+			ColorChannel::Red => &mut self.r,
+			ColorChannel::Green => &mut self.g,
+			ColorChannel::Blue => &mut self.b,
+			ColorChannel::Alpha => &mut self.a,
 		}
 	}
 }
@@ -76,7 +113,13 @@ fn contrasting_text_color(background_color: Srgba) -> Color {
 enum ColorPickerButton {
 	EditColor(ColorChannel, i8),
 	ColorKey(ColorKey),
+	Reset,
+	Copy,
+	Paste,
 }
+
+#[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
+struct ColorPickerSlider(ColorChannel);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ColorChannel {
@@ -100,7 +143,9 @@ const KEY_PICKER_FONT_SIZE: f32 = 10.0;
 
 const COLOR_MANIPULATOR_FONT_SIZE: f32 = 15.0;
 
-const COLOR_MANIPULATOR_PADDING: UiRect = UiRect::horizontal(Val::Px(5.0));
+const COLOR_MANIPULATOR_WIDTH: Val = Val::Px(400.0);
+
+const COLOR_MANIPULATOR_PADDING: UiRect = UiRect::all(Val::Px(5.0));
 
 const COLOR_PICKER_PADDING: Val = Val::Px(5.0);
 
@@ -153,36 +198,42 @@ fn spawn_picker_ui(mut commands: Commands, palette: Res<ThingPalette>) {
 	commands.spawn((
 		Node {
 			flex_direction: FlexDirection::Column,
+			width: COLOR_MANIPULATOR_WIDTH,
 			..default()
 		},
 		ChildOf(root),
 		children![
+			color_manipulator_slider(ColorChannel::Red),
+			color_manipulator_slider(ColorChannel::Green),
+			color_manipulator_slider(ColorChannel::Blue),
+			color_manipulator_slider(ColorChannel::Alpha),
 			(
 				Node::default(),
 				children![
-					color_manipulator_button("+", ColorChannel::Red, 1),
-					color_manipulator_button("++", ColorChannel::Red, 16),
-					color_manipulator_button("+", ColorChannel::Green, 1),
-					color_manipulator_button("++", ColorChannel::Green, 16),
-					color_manipulator_button("+", ColorChannel::Blue, 1),
-					color_manipulator_button("++", ColorChannel::Blue, 16),
-					color_manipulator_button("+", ColorChannel::Alpha, 1),
-					color_manipulator_button("++", ColorChannel::Alpha, 16),
-				],
-			),
-			(Text::default(), ColorPickerCurrentColor::default()),
-			(
-				Node::default(),
-				children![
-					color_manipulator_button("-", ColorChannel::Red, -1),
-					color_manipulator_button("--", ColorChannel::Red, -16),
-					color_manipulator_button("-", ColorChannel::Green, -1),
-					color_manipulator_button("--", ColorChannel::Green, -16),
-					color_manipulator_button("-", ColorChannel::Blue, -1),
-					color_manipulator_button("--", ColorChannel::Blue, -16),
-					color_manipulator_button("-", ColorChannel::Alpha, -1),
-					color_manipulator_button("--", ColorChannel::Alpha, -16),
-				],
+					(
+						Node {
+							flex_grow: 1.0,
+							..default()
+						},
+						Text::default(),
+						ColorPickerCurrentColor::default()
+					),
+					(
+						color_manipulator_button_base("R", Color::WHITE),
+						BackgroundColor(NODE_BACKGROUND),
+						ColorPickerButton::Reset,
+					),
+					(
+						color_manipulator_button_base("C", Color::WHITE),
+						BackgroundColor(NODE_BACKGROUND),
+						ColorPickerButton::Copy,
+					),
+					(
+						color_manipulator_button_base("V", Color::WHITE),
+						BackgroundColor(NODE_BACKGROUND),
+						ColorPickerButton::Paste,
+					)
+				]
 			),
 		],
 	));
@@ -200,13 +251,19 @@ fn color_manipulator_button(
 		ColorChannel::Alpha => (Srgba::WHITE.into(), Color::BLACK),
 	};
 	(
+		color_manipulator_button_base(label, text_color),
+		BackgroundColor(color),
+		ColorPickerButton::EditColor(channel, amount),
+	)
+}
+
+fn color_manipulator_button_base(label: impl Into<String>, text_color: Color) -> impl Bundle {
+	(
 		Button,
 		Node {
 			padding: COLOR_MANIPULATOR_PADDING,
 			..default()
 		},
-		BackgroundColor(color),
-		ColorPickerButton::EditColor(channel, amount),
 		children![(
 			Text::new(label),
 			TextColor(text_color),
@@ -215,6 +272,26 @@ fn color_manipulator_button(
 				..default()
 			},
 		)],
+	)
+}
+
+fn color_manipulator_slider(channel: ColorChannel) -> impl Bundle {
+	(
+		Node::default(),
+		children![
+			color_manipulator_button("<", channel, -16),
+			color_manipulator_button("-", channel, -1),
+			(
+				Node {
+					flex_grow: 1.0,
+					..default()
+				},
+				Slider::new(255, 0),
+				ColorPickerSlider(channel),
+			),
+			color_manipulator_button("+", channel, 1),
+			color_manipulator_button(">", channel, 16),
+		],
 	)
 }
 
@@ -241,24 +318,40 @@ fn collect_picker_button_inputs(
 
 fn handle_picker_button_inputs(
 	mut reader: MessageReader<ColorPickerButton>,
+	selected_color: Res<State<SelectedColorKey>>,
 	mut new_selected_color: ResMut<NextState<SelectedColorKey>>,
+	mut clipboard: ResMut<ColorPickerClipboard>,
 	mut current_color: Single<&mut ColorPickerCurrentColor>,
 ) {
 	for action in reader.read() {
 		match action {
 			ColorPickerButton::EditColor(channel, delta) => {
-				let target = match channel {
-					ColorChannel::Red => &mut current_color.r,
-					ColorChannel::Green => &mut current_color.g,
-					ColorChannel::Blue => &mut current_color.b,
-					ColorChannel::Alpha => &mut current_color.a,
-				};
+				let target = current_color.get_channel_mut(*channel);
 				*target = target.saturating_add_signed(*delta);
 			}
 			ColorPickerButton::ColorKey(color_key) => {
 				new_selected_color.set(SelectedColorKey(*color_key))
 			}
+			ColorPickerButton::Reset => {
+				***current_color =
+					SrgbaU8::from_srgba(ThingPalette::default()[&selected_color.0].to_srgba())
+			}
+			ColorPickerButton::Copy => **clipboard = ***current_color,
+			ColorPickerButton::Paste => ***current_color = **clipboard,
 		}
+	}
+}
+
+fn handle_picker_slider_inputs(
+	query: Query<(Ref<Slider>, &ColorPickerSlider), Changed<Slider>>,
+	mut current_color: Single<&mut ColorPickerCurrentColor>,
+) {
+	for (slider, ColorPickerSlider(channel)) in &query {
+		if slider.is_added() {
+			// Do not handle the false input after the slider is created
+			continue;
+		}
+		*current_color.get_channel_mut(*channel) = slider.position as u8;
 	}
 }
 
@@ -294,17 +387,27 @@ fn update_key_button_colors(
 	}
 }
 
+fn update_slider_values(
+	color_q: Query<&ColorPickerCurrentColor, Changed<ColorPickerCurrentColor>>,
+	mut slider_q: Query<(&mut Slider, &ColorPickerSlider)>,
+) {
+	for current in &color_q {
+		for (mut slider, ColorPickerSlider(channel)) in &mut slider_q {
+			let new_value = *current.get_channel(*channel) as u32;
+			if new_value != slider.position {
+				slider.position = new_value;
+			}
+		}
+	}
+}
+
 fn update_current_color_from_key(
 	key: Res<State<SelectedColorKey>>,
 	palette: Res<ThingPalette>,
 	mut query: Query<&mut ColorPickerCurrentColor>,
 ) {
 	for mut color in &mut query {
-		let current = palette[&key.get().0].to_srgba();
-		color.r = (current.red * 255.0) as u8;
-		color.g = (current.green * 255.0) as u8;
-		color.b = (current.blue * 255.0) as u8;
-		color.a = (current.alpha * 255.0) as u8;
+		**color = SrgbaU8::from_srgba(palette[&key.get().0].to_srgba());
 	}
 }
 
