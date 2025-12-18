@@ -684,7 +684,7 @@ fn create_cycle_visuals(
 						image: images[&ImageKey::CycleRotationArrow].clone(),
 						..default()
 					},
-					SpriteColorKey(ColorKey::CycleReady),
+					SpriteColorKey(ColorKey::CycleCentralArrow),
 					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_ARROWS)),
 				))
 				.id();

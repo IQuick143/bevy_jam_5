@@ -35,6 +35,7 @@ pub enum ColorKey {
 	CycleDisabled,
 	CycleReady,
 	CycleTrigger,
+	CycleCentralArrow,
 	LinkMultiplicityLabel,
 	InvertedLinkMultiplicityLabel,
 	WarningSign,
@@ -211,6 +212,7 @@ impl Default for ThingPalette {
 			(ColorKey::CycleDisabled, SLATE_300.into()),
 			(ColorKey::CycleReady, SLATE_300.into()),
 			(ColorKey::CycleTrigger, SLATE_400.into()),
+			(ColorKey::CycleCentralArrow, SLATE_300.into()),
 			(ColorKey::LinkMultiplicityLabel, SLATE_300.into()),
 			(
 				ColorKey::InvertedLinkMultiplicityLabel,
