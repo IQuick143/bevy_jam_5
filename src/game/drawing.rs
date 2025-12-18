@@ -83,9 +83,8 @@ enum CycleStatus {
 }
 
 fn goal_unlock_animation_system(
-	mut sprites_q: Query<&mut Sprite>,
+	mut sprites_q: Query<&mut SpriteColorKey>,
 	flags_q: Query<&Children, With<Goal>>,
-	palette: Res<ThingPalette>,
 	completion: Res<LevelCompletionConditions>,
 ) {
 	let color_key = if completion.is_goal_unlocked() {
@@ -95,17 +94,16 @@ fn goal_unlock_animation_system(
 	};
 	for children in &flags_q {
 		for id in children {
-			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
-				sprite.color = palette[&color_key];
+			if let Ok(mut sprite_key) = sprites_q.get_mut(*id) {
+				**sprite_key = color_key;
 			}
 		}
 	}
 }
 
 fn button_trigger_animation_system(
-	mut sprites_q: Query<&mut Sprite>,
+	mut sprites_q: Query<&mut SpriteColorKey>,
 	buttons_q: Query<(&Children, &IsTriggered), (With<SokoButton>, Changed<IsTriggered>)>,
-	palette: Res<ThingPalette>,
 ) {
 	for (children, is_triggered) in &buttons_q {
 		let color_key = if is_triggered.0 {
@@ -115,8 +113,8 @@ fn button_trigger_animation_system(
 		};
 
 		for id in children {
-			if let Ok(mut sprite) = sprites_q.get_mut(*id) {
-				sprite.color = palette[&color_key];
+			if let Ok(mut sprite_key) = sprites_q.get_mut(*id) {
+				**sprite_key = color_key;
 			}
 		}
 	}
@@ -157,10 +155,9 @@ fn cycle_center_interaction_visuals_update_system(
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,
 	vertices_q: Query<&VertexVisualEntities>,
-	mut sprites_q: Query<&mut Sprite>,
+	mut sprites_q: Query<&mut SpriteColorKey>,
 	mut meshes_q: Query<(&mut Transform, &mut MeshMaterial2d<ColorMaterial>)>,
 	mut visibility_q: Query<&mut Visibility>,
-	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 ) {
 	let Ok(level) = level.get() else {
@@ -225,7 +222,7 @@ fn cycle_center_interaction_visuals_update_system(
 	}
 
 	for (id, status) in sprites_to_repaint {
-		let Ok(mut sprite) = sprites_q.get_mut(id) else {
+		let Ok(mut sprite_key) = sprites_q.get_mut(id) else {
 			log::warn!("Cycle sprite entity does not have Sprite component");
 			continue;
 		};
@@ -234,7 +231,7 @@ fn cycle_center_interaction_visuals_update_system(
 			CycleStatus::Ready => ColorKey::CycleReady,
 			CycleStatus::Selected => ColorKey::CycleTrigger,
 		};
-		sprite.color = palette[&color_key];
+		**sprite_key = color_key;
 	}
 
 	for (id, status) in meshes_to_repaint {
@@ -314,7 +311,6 @@ fn cycle_blocked_marker_system(
 	level: PlayingLevelData,
 	images: Res<HandleMap<ImageKey>>,
 	session: Res<LastLevelSessionId>,
-	palette: Res<ThingPalette>,
 ) {
 	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
@@ -346,9 +342,9 @@ fn cycle_blocked_marker_system(
 			Sprite {
 				image: images[&ImageKey::InGameWarning].clone(),
 				custom_size: Some(size),
-				color: palette[&ColorKey::WarningSign],
 				..default()
 			},
+			SpriteColorKey(ColorKey::WarningSign),
 			Anchor::BOTTOM_CENTER, // TODO: Check if this is correct behaviour mimicking
 			Transform::from_translation(
 				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
@@ -370,7 +366,6 @@ fn wall_blocked_marker_system(
 	entity_index: Res<GameStateEcsIndex>,
 	images: Res<HandleMap<ImageKey>>,
 	session: Res<LastLevelSessionId>,
-	palette: Res<ThingPalette>,
 ) {
 	for event in events.read() {
 		let Some(vertex_transform) = entity_index
@@ -386,9 +381,9 @@ fn wall_blocked_marker_system(
 			Sprite {
 				image: images[&ImageKey::InGameWarning].clone(),
 				custom_size: Some(size),
-				color: palette[&ColorKey::WarningSign],
 				..default()
 			},
+			SpriteColorKey(ColorKey::WarningSign),
 			Anchor::BOTTOM_CENTER,
 			Transform::from_translation(
 				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)

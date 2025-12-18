@@ -1,6 +1,9 @@
 //! Global non-asset graphical repository
 
-use crate::graphics::{primitives::*, *};
+use crate::{
+	graphics::{primitives::*, *},
+	AppSet,
+};
 use bevy::{
 	color::palettes::{self, tailwind::*},
 	platform::collections::HashMap,
@@ -13,7 +16,10 @@ pub(super) fn plugin(app: &mut App) {
 		.init_resource::<GameObjectMeshes>()
 		.add_systems(
 			Update,
-			update_color_keys.run_if(resource_changed::<ThingPalette>),
+			(
+				update_material_colors.run_if(resource_changed::<ThingPalette>),
+				update_sprite_colors.after(AppSet::UpdateVisuals),
+			),
 		);
 }
 
@@ -98,6 +104,10 @@ impl MaterialKey {
 		}
 	}
 }
+
+/// Support component for a [`Sprite`] that has a [`ColorKey`] color
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
+pub struct SpriteColorKey(pub ColorKey);
 
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Deref, DerefMut)]
@@ -228,7 +238,7 @@ impl Default for ThingPalette {
 	}
 }
 
-fn update_color_keys(
+fn update_material_colors(
 	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 	mut material_assets: ResMut<Assets<ColorMaterial>>,
@@ -236,6 +246,17 @@ fn update_color_keys(
 	for (material_key, material_handle) in materials.iter() {
 		if let Some(material) = material_assets.get_mut(material_handle) {
 			material.color = palette[&material_key.to_color_key()];
+		}
+	}
+}
+
+fn update_sprite_colors(
+	palette: Res<ThingPalette>,
+	mut query: Query<(&mut Sprite, Ref<SpriteColorKey>)>,
+) {
+	for (mut sprite, color_key) in &mut query {
+		if palette.is_changed() || color_key.is_changed() {
+			sprite.color = palette[&**color_key]
 		}
 	}
 }
