@@ -18,7 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				update_material_colors.run_if(resource_changed::<ThingPalette>),
-				update_sprite_colors.after(AppSet::UpdateVisuals),
+				(update_sprite_colors, update_node_colors).after(AppSet::UpdateVisuals),
 			),
 		);
 }
@@ -109,6 +109,13 @@ impl MaterialKey {
 /// Support component for a [`Sprite`] that has a [`ColorKey`] color
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
 pub struct SpriteColorKey(pub ColorKey);
+
+/// Support component for a [`Node`] that has a [`ColorKey`] color
+///
+/// The color is applied to the [`Node`]'s [`ImageNode`] if it has one,
+/// [`BackgroundColor`] otherwise
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
+pub struct NodeColorKey(pub ColorKey);
 
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Deref, DerefMut)]
@@ -258,7 +265,26 @@ fn update_sprite_colors(
 ) {
 	for (mut sprite, color_key) in &mut query {
 		if palette.is_changed() || color_key.is_changed() {
-			sprite.color = palette[&**color_key]
+			sprite.color = palette[&**color_key];
+		}
+	}
+}
+
+fn update_node_colors(
+	palette: Res<ThingPalette>,
+	mut query: Query<(
+		Option<&mut ImageNode>,
+		&mut BackgroundColor,
+		Ref<NodeColorKey>,
+	)>,
+) {
+	for (node, mut background, color_key) in &mut query {
+		if palette.is_changed() || color_key.is_changed() {
+			if let Some(mut node) = node {
+				node.color = palette[&**color_key];
+			} else {
+				background.0 = palette[&**color_key];
+			}
 		}
 	}
 }

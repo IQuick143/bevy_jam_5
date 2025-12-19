@@ -4,7 +4,7 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	drawing::{ColorKey, ThingPalette},
+	drawing::{ColorKey, NodeColorKey},
 	game::{
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
@@ -148,7 +148,6 @@ fn spawn_game_ui(
 	font: Res<GlobalFont>,
 	images: Res<HandleMap<ImageKey>>,
 	button_sprites: Res<UiButtonAtlas>,
-	colors: Res<ThingPalette>,
 ) {
 	commands
 		.spawn((
@@ -254,10 +253,10 @@ fn spawn_game_ui(
 						},
 						ImageNode {
 							image: images[&ImageKey::Checkmark].clone(),
-							color: colors[&ColorKey::Checkmark],
 							image_mode: NodeImageMode::Stretch,
 							..default()
 						},
+						NodeColorKey(ColorKey::Checkmark),
 					),
 				],
 			));
@@ -409,7 +408,6 @@ fn checkmark_margin_animation_curve(x: f32) -> f32 {
 fn start_completion_cue_animation(
 	query: Query<Entity, With<LevelCompletionCheckmarkBox>>,
 	images: Res<HandleMap<ImageKey>>,
-	colors: Res<ThingPalette>,
 	mut commands: Commands,
 ) {
 	for node_id in &query {
@@ -423,10 +421,10 @@ fn start_completion_cue_animation(
 			},
 			ImageNode {
 				image: images[&ImageKey::CheckmarkSolid].clone(),
-				color: colors[&ColorKey::Checkmark],
 				image_mode: NodeImageMode::Stretch,
 				..default()
 			},
+			NodeColorKey(ColorKey::Checkmark),
 		));
 	}
 }
