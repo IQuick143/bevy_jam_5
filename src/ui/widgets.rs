@@ -3,11 +3,10 @@
 use super::{
 	consts::*,
 	interaction::{InteractionPalette, InteractionPaletteForChildSprites},
-	palette::*,
 };
 use crate::{
 	assets::UiButtonAtlas,
-	drawing::{ColorKey, NodeColorKey},
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
 };
 use bevy::{prelude::*, ui::Val::*};
 
@@ -107,7 +106,7 @@ pub fn common_button(
 				font,
 				..default()
 			},
-			TextColor(BUTTON_TEXT),
+			TextColorKey(ColorKey::UiButtonText),
 		)],
 	)
 }
@@ -132,7 +131,7 @@ pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 				font,
 				..default()
 			},
-			TextColor(HEADER_TEXT),
+			TextColorKey(ColorKey::HeaderText),
 		)],
 	)
 }
@@ -155,7 +154,7 @@ pub fn label(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 				font,
 				..default()
 			},
-			TextColor(LABEL_TEXT),
+			TextColorKey(ColorKey::UiLabelText),
 		)],
 	)
 }
@@ -177,7 +176,7 @@ pub fn text(text: impl Into<String>, align: JustifyContent, font: Handle<Font>) 
 				font,
 				..default()
 			},
-			TextColor(LABEL_TEXT),
+			TextColorKey(ColorKey::UiLabelText),
 		)],
 	)
 }

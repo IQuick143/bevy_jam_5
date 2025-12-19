@@ -4,7 +4,7 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	drawing::{ColorKey, NodeColorKey},
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::{
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
@@ -236,7 +236,7 @@ fn spawn_game_ui(
 							font_size: LEVEL_TITLE_SIZE,
 							..default()
 						},
-						TextColor(ui_palette::LABEL_TEXT),
+						TextColorKey(ColorKey::UiLabelText),
 					),
 					(
 						LevelCompletionCheckmarkBox::default(),
@@ -277,7 +277,7 @@ fn spawn_game_ui(
 					..default()
 				},
 				TextLayout::new_with_justify(Justify::Center),
-				TextColor(ui_palette::LABEL_TEXT),
+				TextColorKey(ColorKey::UiLabelText),
 			)],
 		)],
 	));

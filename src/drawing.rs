@@ -18,7 +18,13 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				update_material_colors.run_if(resource_changed::<ThingPalette>),
-				(update_sprite_colors, update_node_colors).after(AppSet::UpdateVisuals),
+				(
+					update_sprite_colors,
+					update_node_colors,
+					update_node_text_colors,
+					update_node_border_colors,
+				)
+					.after(AppSet::UpdateVisuals),
 			),
 		);
 }
@@ -69,6 +75,9 @@ pub enum ColorKey {
 	SliderHoveredFill,
 	SliderPressedFill,
 	SliderDisabledFill,
+	UiButtonText,
+	UiLabelText,
+	HeaderText,
 }
 
 /// Identifies a material used somewhere in the game
@@ -135,6 +144,14 @@ pub struct SpriteColorKey(pub ColorKey);
 /// [`BackgroundColor`] otherwise
 #[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
 pub struct NodeColorKey(pub ColorKey);
+
+/// Support component for a [`Text`] that has a [`ColorKey`] [`TextColor`]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
+pub struct TextColorKey(pub ColorKey);
+
+/// Support component for a [`Node`] that has a [`ColorKey`] [`BorderColor`]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
+pub struct BorderColorKey(pub ColorKey);
 
 /// Contains handles to the materials used to render game objects that are visualized by meshes
 #[derive(Resource, Debug, Clone, Deref, DerefMut)]
@@ -289,6 +306,9 @@ impl Default for ThingPalette {
 			(ColorKey::SliderHoveredFill, Color::Srgba(SLATE_400)),
 			(ColorKey::SliderPressedFill, Color::Srgba(SLATE_100)),
 			(ColorKey::SliderDisabledFill, Color::Srgba(SLATE_100)),
+			(ColorKey::UiButtonText, Color::Srgba(SLATE_50)),
+			(ColorKey::UiLabelText, Color::Srgba(SLATE_800)),
+			(ColorKey::HeaderText, Color::Srgba(SLATE_50)),
 		]))
 	}
 }
@@ -332,5 +352,23 @@ fn update_node_colors(
 				background.0 = palette[&**color_key];
 			}
 		}
+	}
+}
+
+fn update_node_text_colors(
+	palette: Res<ThingPalette>,
+	mut query: Query<(&mut TextColor, Ref<TextColorKey>)>,
+) {
+	for (mut text, color_key) in &mut query {
+		**text = palette[&**color_key];
+	}
+}
+
+fn update_node_border_colors(
+	palette: Res<ThingPalette>,
+	mut query: Query<(&mut BorderColor, Ref<BorderColorKey>)>,
+) {
+	for (mut border, color_key) in &mut query {
+		*border = BorderColor::all(palette[&**color_key]);
 	}
 }

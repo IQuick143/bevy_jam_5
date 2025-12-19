@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	drawing::{ColorKey, NodeColorKey},
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::level::{
 		completion::{CompletionStatus, LevelHubCompletion},
 		list::LevelList,
@@ -110,7 +110,7 @@ fn spawn_screen(
 					font: font.0.clone(),
 					..default()
 				},
-				TextColor(ui_palette::LABEL_TEXT),
+				TextColorKey(ColorKey::UiLabelText),
 			)],
 		));
 		let completion_status = hub_completion.hub_completion_status(hub_id);

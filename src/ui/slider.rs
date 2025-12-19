@@ -1,10 +1,9 @@
 //! The slider UI element
 
-use super::{interaction::InteractionQuery, palette::*};
+use super::{freeze::ui_not_frozen, interaction::InteractionQuery};
 use crate::{
-	drawing::{ColorKey, NodeColorKey},
+	drawing::{BorderColorKey, ColorKey, NodeColorKey},
 	graphics::*,
-	ui::freeze::ui_not_frozen,
 };
 use bevy::{prelude::*, ui::RelativeCursorPosition};
 use Val::*;
@@ -101,7 +100,7 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 					box_sizing: BoxSizing::ContentBox,
 					..default()
 				},
-				BorderColor::all(SLIDER_OUTLINE),
+				BorderColorKey(ColorKey::SliderOutline),
 				NodeColorKey(ColorKey::SliderFill),
 				BorderRadius::all(Px(NODE_RADIUS + RING_OUTLINE_WIDTH)),
 				ChildOf(bar_wrapper_id),
