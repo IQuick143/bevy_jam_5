@@ -24,8 +24,10 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// Identifies a color used somewhere in the game
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Default)]
 pub enum ColorKey {
+	#[default]
+	Blank,
 	BoxBase,
 	ButtonBase,
 	ButtonTrigger,
@@ -50,6 +52,23 @@ pub enum ColorKey {
 	CycleHitboxes,
 	LinkLines,
 	ColoredButtonLabels,
+	NodeBackground,
+	UiButtonHovered,
+	UiButtonPressed,
+	UiButtonDisabled,
+	SpriteButton,
+	SpriteButtonHovered,
+	SpriteButtonPressed,
+	SpriteButtonDisabled,
+	NextLevelButton,
+	NextLevelButtonHovered,
+	NextLevelButtonPressed,
+	NewLevelButton,
+	SliderOutline,
+	SliderFill,
+	SliderHoveredFill,
+	SliderPressedFill,
+	SliderDisabledFill,
 }
 
 /// Identifies a material used somewhere in the game
@@ -210,6 +229,7 @@ pub struct ThingPalette(pub HashMap<ColorKey, Color>);
 impl Default for ThingPalette {
 	fn default() -> Self {
 		Self(HashMap::from_iter([
+			(ColorKey::Blank, Color::NONE),
 			(ColorKey::BoxBase, ORANGE_200.into()),
 			(ColorKey::ButtonBase, Srgba::hex("CC5151").unwrap().into()),
 			(ColorKey::ButtonTrigger, GREEN_300.into()),
@@ -243,6 +263,32 @@ impl Default for ThingPalette {
 			),
 			(ColorKey::LinkLines, SLATE_300.into()),
 			(ColorKey::ColoredButtonLabels, Color::BLACK),
+			(
+				ColorKey::NewLevelButton,
+				Color::Srgba(Srgba::rgb(0.4862745, 0.54509807, 0.6313726)),
+			),
+			(ColorKey::UiButtonHovered, Color::Srgba(SLATE_500)),
+			(ColorKey::UiButtonPressed, Color::Srgba(SLATE_300)),
+			(ColorKey::UiButtonDisabled, Color::Srgba(SLATE_300)),
+			(ColorKey::NodeBackground, Color::Srgba(SLATE_400)),
+			(ColorKey::SpriteButton, Color::Srgba(SLATE_200)),
+			(ColorKey::SpriteButtonHovered, Color::Srgba(SLATE_400)),
+			(ColorKey::SpriteButtonPressed, Color::Srgba(SLATE_500)),
+			(
+				ColorKey::SpriteButtonDisabled,
+				Color::Srgba(Srgba {
+					alpha: 0.5,
+					..SLATE_200
+				}),
+			),
+			(ColorKey::NextLevelButton, Color::Srgba(GREEN_400)),
+			(ColorKey::NextLevelButtonHovered, Color::Srgba(GREEN_500)),
+			(ColorKey::NextLevelButtonPressed, Color::Srgba(GREEN_600)),
+			(ColorKey::SliderOutline, Color::Srgba(SLATE_700)),
+			(ColorKey::SliderFill, Color::Srgba(SLATE_200)),
+			(ColorKey::SliderHoveredFill, Color::Srgba(SLATE_400)),
+			(ColorKey::SliderPressedFill, Color::Srgba(SLATE_100)),
+			(ColorKey::SliderDisabledFill, Color::Srgba(SLATE_100)),
 		]))
 	}
 }

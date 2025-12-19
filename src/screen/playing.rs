@@ -14,7 +14,6 @@ use crate::{
 		consts::*,
 		hover::{self, HoverHint, HoverPriority, HoverText, UseHoverFromInteraction},
 		interaction::InteractionEnabled,
-		palette::*,
 		prelude::*,
 	},
 	AppSet,
@@ -211,12 +210,7 @@ fn spawn_game_ui(
 						.insert((
 							GameUiAction::NextLevel,
 							NextLevelButton,
-							InteractionPalette {
-								none: NEXT_LEVEL_BUTTON_BACKGROUND,
-								hovered: NEXT_LEVEL_BUTTON_HOVERED_BACKGROUND,
-								pressed: NEXT_LEVEL_BUTTON_PRESSED_BACKGROUND,
-								disabled: BUTTON_DISABLED_BACKGROUND,
-							},
+							InteractionPalette::NEXT_LEVEL_BUTTON,
 							HoverHint(hover::UI_NEXT),
 							HoverPriority(hover::prio::STATIC_UI),
 							UseHoverFromInteraction,

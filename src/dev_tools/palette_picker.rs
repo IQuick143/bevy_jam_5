@@ -1,10 +1,8 @@
 //! Quick palette editing for developers
 
 use crate::{
-	drawing::{ColorKey, ThingPalette},
-	ui::{
-		char_input_pressed, interaction::InteractionQuery, palette::NODE_BACKGROUND, slider::Slider,
-	},
+	drawing::{ColorKey, NodeColorKey, ThingPalette},
+	ui::{char_input_pressed, interaction::InteractionQuery, slider::Slider},
 	AppSet,
 };
 use bevy::prelude::*;
@@ -129,21 +127,14 @@ enum ColorChannel {
 	Alpha,
 }
 
-#[derive(States, Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(States, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 struct SelectedColorKey(ColorKey);
-
-impl Default for SelectedColorKey {
-	fn default() -> Self {
-		// It can be any key, we just need one
-		Self(ColorKey::BoxBase)
-	}
-}
 
 const KEY_PICKER_FONT_SIZE: f32 = 10.0;
 
 const COLOR_MANIPULATOR_FONT_SIZE: f32 = 15.0;
 
-const COLOR_MANIPULATOR_WIDTH: Val = Val::Px(400.0);
+const COLOR_MANIPULATOR_WIDTH: Val = Val::Px(250.0);
 
 const COLOR_MANIPULATOR_PADDING: UiRect = UiRect::all(Val::Px(5.0));
 
@@ -198,7 +189,7 @@ fn spawn_picker_ui(mut commands: Commands, palette: Res<ThingPalette>) {
 	commands.spawn((
 		Node {
 			flex_direction: FlexDirection::Column,
-			width: COLOR_MANIPULATOR_WIDTH,
+			min_width: COLOR_MANIPULATOR_WIDTH,
 			..default()
 		},
 		ChildOf(root),
@@ -220,17 +211,17 @@ fn spawn_picker_ui(mut commands: Commands, palette: Res<ThingPalette>) {
 					),
 					(
 						color_manipulator_button_base("R", Color::WHITE),
-						BackgroundColor(NODE_BACKGROUND),
+						NodeColorKey(ColorKey::NodeBackground),
 						ColorPickerButton::Reset,
 					),
 					(
 						color_manipulator_button_base("C", Color::WHITE),
-						BackgroundColor(NODE_BACKGROUND),
+						NodeColorKey(ColorKey::NodeBackground),
 						ColorPickerButton::Copy,
 					),
 					(
 						color_manipulator_button_base("V", Color::WHITE),
-						BackgroundColor(NODE_BACKGROUND),
+						NodeColorKey(ColorKey::NodeBackground),
 						ColorPickerButton::Paste,
 					)
 				]
