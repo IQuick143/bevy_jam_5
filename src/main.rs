@@ -81,6 +81,7 @@ impl Plugin for AppPlugin {
 		app.add_plugins((
 			persistent::plugin,
 			save::plugin,
+			drawing::plugin,
 			game::plugin,
 			screen::plugin,
 			audio::plugin,
@@ -89,7 +90,6 @@ impl Plugin for AppPlugin {
 			ui::plugin,
 			settings::plugin,
 			camera::plugin,
-			drawing::plugin,
 		));
 
 		// Enable dev tools for dev builds.

@@ -78,6 +78,10 @@ pub enum ColorKey {
 	UiButtonText,
 	UiLabelText,
 	HeaderText,
+	BackgroundBase,
+	BackgroundDetail,
+	BackgroundSolvedBase,
+	BackgroundSolvedDetail,
 }
 
 /// Identifies a material used somewhere in the game
@@ -309,6 +313,16 @@ impl Default for ThingPalette {
 			(ColorKey::UiButtonText, Color::Srgba(SLATE_50)),
 			(ColorKey::UiLabelText, Color::Srgba(SLATE_800)),
 			(ColorKey::HeaderText, Color::Srgba(SLATE_50)),
+			(
+				ColorKey::BackgroundBase,
+				Srgba::hex("F5F8FB").unwrap().into(),
+			),
+			(ColorKey::BackgroundDetail, Color::WHITE),
+			(ColorKey::BackgroundSolvedBase, SLATE_200.into()),
+			(
+				ColorKey::BackgroundSolvedDetail,
+				Srgba::hex("F5F8FB").unwrap().into(),
+			),
 		]))
 	}
 }
