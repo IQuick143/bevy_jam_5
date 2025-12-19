@@ -6,7 +6,6 @@ pub mod freeze;
 pub mod hover;
 pub mod interaction;
 pub mod multistate;
-pub mod palette;
 pub mod screen_fade;
 pub mod scrollbox;
 pub mod slider;
@@ -18,7 +17,6 @@ pub mod prelude {
 		char_input_pressed,
 		freeze::{ui_not_frozen, FreezeUi},
 		interaction::{InteractionPalette, InteractionQuery},
-		palette as ui_palette,
 		screen_fade::{AddFadeMessage as _, FadeAnimation, FadeAnimationBundle},
 		widgets,
 	};

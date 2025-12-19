@@ -3,9 +3,11 @@
 use super::{
 	consts::*,
 	interaction::{InteractionPalette, InteractionPaletteForChildSprites},
-	palette::*,
 };
-use crate::assets::UiButtonAtlas;
+use crate::{
+	assets::UiButtonAtlas,
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
+};
 use bevy::{prelude::*, ui::Val::*};
 
 /// Largest type of buttons, use for menus
@@ -45,12 +47,7 @@ pub fn sprite_button(sprites: &UiButtonAtlas, sprite_index: usize) -> impl Bundl
 			),
 			..default()
 		},
-		InteractionPalette {
-			none: SPRITE_BUTTON_FILL,
-			hovered: SPRITE_BUTTON_HOVERED,
-			pressed: SPRITE_BUTTON_PRESSED,
-			disabled: SPRITE_BUTTON_DISABLED,
-		},
+		InteractionPalette::SPRITE_BUTTON,
 		InteractionPaletteForChildSprites,
 		children![(
 			Name::new("Button Image"),
@@ -60,9 +57,9 @@ pub fn sprite_button(sprites: &UiButtonAtlas, sprite_index: usize) -> impl Bundl
 					layout: sprites.layout.clone(),
 					index: sprite_index,
 				}),
-				color: SPRITE_BUTTON_FILL,
 				..default()
-			}
+			},
+			NodeColorKey(ColorKey::SpriteButton),
 		)],
 	)
 }
@@ -99,13 +96,8 @@ pub fn common_button(
 			align_items: AlignItems::Center,
 			..default()
 		},
-		BackgroundColor(NODE_BACKGROUND),
-		InteractionPalette {
-			none: NODE_BACKGROUND,
-			hovered: BUTTON_HOVERED_BACKGROUND,
-			pressed: BUTTON_PRESSED_BACKGROUND,
-			disabled: BUTTON_DISABLED_BACKGROUND,
-		},
+		NodeColorKey(ColorKey::NodeBackground),
+		InteractionPalette::COMMON_BUTTON,
 		children![(
 			Name::new("Button Text"),
 			Text::new(text),
@@ -114,7 +106,7 @@ pub fn common_button(
 				font,
 				..default()
 			},
-			TextColor(BUTTON_TEXT),
+			TextColorKey(ColorKey::UiButtonText),
 		)],
 	)
 }
@@ -130,7 +122,7 @@ pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 			align_items: AlignItems::Center,
 			..default()
 		},
-		BackgroundColor(NODE_BACKGROUND),
+		NodeColorKey(ColorKey::NodeBackground),
 		children![(
 			Name::new("Header Text"),
 			Text::new(text),
@@ -139,7 +131,7 @@ pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 				font,
 				..default()
 			},
-			TextColor(HEADER_TEXT),
+			TextColorKey(ColorKey::HeaderText),
 		)],
 	)
 }
@@ -162,7 +154,7 @@ pub fn label(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 				font,
 				..default()
 			},
-			TextColor(LABEL_TEXT),
+			TextColorKey(ColorKey::UiLabelText),
 		)],
 	)
 }
@@ -184,7 +176,7 @@ pub fn text(text: impl Into<String>, align: JustifyContent, font: Handle<Font>) 
 				font,
 				..default()
 			},
-			TextColor(LABEL_TEXT),
+			TextColorKey(ColorKey::UiLabelText),
 		)],
 	)
 }

@@ -1,12 +1,15 @@
 use super::freeze::ui_not_frozen;
-use crate::{assets::SfxKey, audio::sfx::PlaySfx};
+use crate::{
+	assets::SfxKey,
+	audio::sfx::PlaySfx,
+	drawing::{ColorKey, NodeColorKey},
+};
 use bevy::{
 	ecs::{lifecycle::HookContext, world::DeferredWorld},
 	prelude::*,
 };
 
 pub(super) fn plugin(app: &mut App) {
-	app.register_type::<InteractionPalette>();
 	app.add_systems(
 		Update,
 		(
@@ -52,15 +55,42 @@ pub type InteractionQuery<'w, 's, T, F = ()> = Query<
 >;
 
 /// Palette for widget interactions.
-#[derive(Component, Debug, Reflect)]
-#[reflect(Component)]
+#[derive(Component, Debug)]
 #[require(InteractionColor)]
 #[component(on_add = on_add_interaction_palette)]
 pub struct InteractionPalette {
-	pub none: Color,
-	pub hovered: Color,
-	pub pressed: Color,
-	pub disabled: Color,
+	pub none: ColorKey,
+	pub hovered: ColorKey,
+	pub pressed: ColorKey,
+	pub disabled: ColorKey,
+}
+
+impl InteractionPalette {
+	pub const COMMON_BUTTON: Self = Self {
+		none: ColorKey::NodeBackground,
+		hovered: ColorKey::UiButtonHovered,
+		pressed: ColorKey::UiButtonPressed,
+		disabled: ColorKey::UiButtonDisabled,
+	};
+
+	pub const NEW_LEVEL_BUTTON: Self = Self {
+		none: ColorKey::NewLevelButton,
+		..Self::COMMON_BUTTON
+	};
+
+	pub const SPRITE_BUTTON: Self = Self {
+		none: ColorKey::SpriteButton,
+		hovered: ColorKey::SpriteButtonHovered,
+		pressed: ColorKey::SpriteButtonPressed,
+		disabled: ColorKey::SpriteButtonDisabled,
+	};
+
+	pub const NEXT_LEVEL_BUTTON: Self = Self {
+		none: ColorKey::NextLevelButton,
+		hovered: ColorKey::NextLevelButtonHovered,
+		pressed: ColorKey::NextLevelButtonPressed,
+		disabled: ColorKey::NextLevelButton,
+	};
 }
 
 /// Marker for entities whose [`InteractionPalette`] applies to their children
@@ -75,7 +105,7 @@ pub struct InteractionPaletteForChildSprites;
 /// Cache for a color that is applied to an entity
 /// in different ways, depending on presence of other marker components
 #[derive(Component, Clone, Copy, PartialEq, Debug, Default, Deref, DerefMut)]
-struct InteractionColor(Color);
+struct InteractionColor(ColorKey);
 
 /// System set where [`InteractionColor`] is updated
 #[derive(SystemSet, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
@@ -130,15 +160,15 @@ fn apply_enable_disable_interaction_palette(
 
 fn propagate_interaction_color_to_node_widgets(
 	mut query: Query<
-		(&InteractionColor, &mut BackgroundColor),
+		(&InteractionColor, &mut NodeColorKey),
 		(
 			Changed<InteractionColor>,
 			Without<InteractionPaletteForChildSprites>,
 		),
 	>,
 ) {
-	for (color, mut background_color) in &mut query {
-		background_color.0 = **color;
+	for (color, mut node_color) in &mut query {
+		**node_color = **color;
 	}
 }
 
@@ -150,12 +180,12 @@ fn propagate_interaction_color_to_sprite_widgets(
 			With<InteractionPaletteForChildSprites>,
 		),
 	>,
-	mut sprite_q: Query<&mut ImageNode>,
+	mut sprite_q: Query<&mut NodeColorKey>,
 ) {
 	for (color, children) in &widget_q {
 		for child_id in children {
-			if let Ok(mut image) = sprite_q.get_mut(*child_id) {
-				image.color = **color;
+			if let Ok(mut node_color) = sprite_q.get_mut(*child_id) {
+				**node_color = **color;
 			}
 		}
 	}

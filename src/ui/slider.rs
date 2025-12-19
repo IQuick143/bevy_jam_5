@@ -1,7 +1,10 @@
 //! The slider UI element
 
-use super::{interaction::InteractionQuery, palette::*};
-use crate::{graphics::*, ui::freeze::ui_not_frozen};
+use super::{freeze::ui_not_frozen, interaction::InteractionQuery};
+use crate::{
+	drawing::{BorderColorKey, ColorKey, NodeColorKey},
+	graphics::*,
+};
 use bevy::{prelude::*, ui::RelativeCursorPosition};
 use Val::*;
 
@@ -79,7 +82,7 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 				..default()
 			},
 			BorderRadius::all(Px((RING_HALF_WIDTH + RING_OUTLINE_WIDTH) * 2.0)),
-			BackgroundColor(SLIDER_OUTLINE),
+			NodeColorKey(ColorKey::SliderOutline),
 			ChildOf(bar_wrapper_id),
 		));
 
@@ -97,8 +100,8 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 					box_sizing: BoxSizing::ContentBox,
 					..default()
 				},
-				BorderColor::all(SLIDER_OUTLINE),
-				BackgroundColor(SLIDER_FILL),
+				BorderColorKey(ColorKey::SliderOutline),
+				NodeColorKey(ColorKey::SliderFill),
 				BorderRadius::all(Px(NODE_RADIUS + RING_OUTLINE_WIDTH)),
 				ChildOf(bar_wrapper_id),
 			))
@@ -132,7 +135,7 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 					..default()
 				},
 				BorderRadius::all(Px(RING_HALF_WIDTH * 2.0)),
-				BackgroundColor(SLIDER_FILL),
+				NodeColorKey(ColorKey::SliderFill),
 				ChildOf(body_wrapper_id),
 			))
 			.id();
@@ -148,24 +151,24 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 
 fn apply_slider_interaction_palettes(
 	slider_q: InteractionQuery<&SliderChildren>,
-	mut node_q: Query<&mut BackgroundColor>,
+	mut node_q: Query<&mut NodeColorKey>,
 ) {
 	for (interaction, enabled, children) in &slider_q {
 		let new_color = if enabled.is_none_or(|e| **e) {
 			match interaction {
-				Interaction::None => SLIDER_FILL,
-				Interaction::Hovered => SLIDER_HOVERED_FILL,
-				Interaction::Pressed => SLIDER_PRESSED_FILL,
+				Interaction::None => ColorKey::SliderFill,
+				Interaction::Hovered => ColorKey::SliderHoveredFill,
+				Interaction::Pressed => ColorKey::SliderPressedFill,
 			}
 		} else {
-			SLIDER_DISABLED_FILL
+			ColorKey::SliderDisabledFill
 		};
 		for node_id in [children.handle, children.body] {
 			let Ok(mut background_color) = node_q.get_mut(node_id) else {
 				warn!("Entity referenced by SliderChildren does not have a background color");
 				continue;
 			};
-			background_color.0 = new_color;
+			**background_color = new_color;
 		}
 	}
 }
