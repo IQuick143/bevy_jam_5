@@ -128,8 +128,20 @@ mod utils {
 		cycle_count
 	}
 
-	fn turn_system(In(event): In<RotateCycleGroup>, mut events: MessageWriter<RotateCycleGroup>) {
-		events.write(event);
+	fn turn_system(
+		In(event): In<RotateCycleGroup>,
+		level: PlayingLevelData,
+		state: Res<GameState>,
+		mut events: MessageWriter<RotateCycleGroup>,
+	) {
+		let level = level.get().expect("Level data must exist");
+
+		match state.is_cycle_turnable(level, event.rotation.target_cycle) {
+			Ok(true) => {
+				events.write(event);
+			}
+			_ => {}
+		}
 	}
 
 	fn undo_system(mut events: MessageWriter<AlterHistory>) {
