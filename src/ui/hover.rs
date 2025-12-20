@@ -17,6 +17,7 @@ pub const DETECTOR: &str = "A detector, triggers oneways when something goes thr
 pub const UI_EXIT: &str = "Exit [Esc]";
 pub const UI_RESET: &str = "Reset [R]";
 pub const UI_UNDO: &str = "Undo [Z]";
+pub const UI_REDO: &str = "Redo [Y]";
 pub const UI_NEXT: &str = "Next level [N]";
 
 pub const BLOCKADE_WARNING: &str =
