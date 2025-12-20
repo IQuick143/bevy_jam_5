@@ -136,11 +136,11 @@ mod utils {
 	) {
 		let level = level.get().expect("Level data must exist");
 
-		match state.is_cycle_turnable(level, event.rotation.target_cycle) {
-			Ok(true) => {
-				events.write(event);
-			}
-			_ => {}
+		if state
+			.is_cycle_turnable(level, event.rotation.target_cycle)
+			.unwrap()
+		{
+			events.write(event);
 		}
 	}
 
@@ -954,7 +954,7 @@ circle(cycle(wall() box() _ _ _); 0 0 100);
 
 	let state_b3 = app.read_vertices();
 
-	app.turn_cycle(1, 135);
+	app.turn_cycle(0, 135);
 	app.update();
 
 	let state_b4 = app.read_vertices();
