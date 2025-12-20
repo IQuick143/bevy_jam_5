@@ -128,23 +128,24 @@ mod utils {
 		cycle_count
 	}
 
-	fn turn_system(
-		In((id, amount)): In<(usize, i32)>,
-		mut events: MessageWriter<RotateCycleGroup>,
-	) {
-		events.write(RotateCycleGroup {
-			rotation: RotateCycle {
-				target_cycle: id,
-				amount: amount as i64,
-			},
-			cause: RotationCause::Manual,
-		});
+	fn turn_system(In(event): In<RotateCycleGroup>, mut events: MessageWriter<RotateCycleGroup>) {
+		events.write(event);
+	}
+
+	fn undo_system(mut events: MessageWriter<AlterHistory>) {
+		events.write(AlterHistory::Undo);
+	}
+
+	fn has_undo_system(history: Res<MoveHistory>) -> bool {
+		history.has_undoable_move()
 	}
 
 	pub trait GameLogicAppExt {
 		fn read_vertices(&mut self) -> VertexDebugData;
-		fn conut_cycles(&mut self) -> usize;
+		fn count_cycles(&mut self) -> usize;
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32);
+		fn has_undo(&mut self) -> bool;
+		fn undo(&mut self);
 	}
 
 	impl GameLogicAppExt for App {
@@ -154,7 +155,7 @@ mod utils {
 				.expect("System should have all necessary objects.")
 		}
 
-		fn conut_cycles(&mut self) -> usize {
+		fn count_cycles(&mut self) -> usize {
 			self.world_mut()
 				.run_system_once(count_cycles_system)
 				.expect("System should have all necessary objects.")
@@ -162,7 +163,28 @@ mod utils {
 
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) {
 			self.world_mut()
-				.run_system_once_with(turn_system, (cycle_id, amount))
+				.run_system_once_with(
+					turn_system,
+					RotateCycleGroup {
+						rotation: RotateCycle {
+							target_cycle: cycle_id,
+							amount: amount as i64,
+						},
+						cause: RotationCause::Manual,
+					},
+				)
+				.expect("System should have all necessary objects.")
+		}
+
+		fn has_undo(&mut self) -> bool {
+			self.world_mut()
+				.run_system_once(has_undo_system)
+				.expect("System should have all necessary objects.")
+		}
+
+		fn undo(&mut self) {
+			self.world_mut()
+				.run_system_once(undo_system)
 				.expect("System should have all necessary objects.")
 		}
 	}
@@ -1001,7 +1023,7 @@ fn generate_random_returning_cycle_walk(
 /// ## Notes:
 /// Does not take into account blocked moves and will not work correctly with them.
 fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
-	let n_cycles = app.conut_cycles();
+	let n_cycles = app.count_cycles();
 	let intial_state = app.read_vertices();
 	let n_boxes = intial_state.count_objects();
 	// Perform many moves
@@ -1016,6 +1038,40 @@ fn move_fuzz(app: &mut App, n_steps: usize, seed: u64) {
 			total_boxes, n_boxes,
 			"The number of boxes should not change."
 		)
+	}
+	assert_eq!(
+		intial_state,
+		app.read_vertices(),
+		"Moves should've been undone."
+	);
+}
+
+/// Perform a large amount of random moves and then undoes them using the built-in undo mechanism.
+///
+/// ## ASSERTS:
+/// That the amount of objects is invariant.
+///
+/// That after doing all moves in reverse the state has returned to the starting position.
+fn move_fuzz_undo(app: &mut App, n_steps: usize, seed: u64) {
+	let n_cycles = app.count_cycles();
+	let intial_state = app.read_vertices();
+	let n_boxes = intial_state.count_objects();
+	// Perform many moves
+	let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+	for (cycle, turn) in generate_random_cycle_walk(n_cycles, n_steps, &mut rng) {
+		app.turn_cycle(cycle, turn);
+		app.update();
+		let state = app.read_vertices();
+		// TODO: Redo for Horocycles or other mechanics violating object conservation laws.
+		let total_boxes = state.count_objects();
+		assert_eq!(
+			total_boxes, n_boxes,
+			"The number of boxes should not change."
+		)
+	}
+	while app.has_undo() {
+		app.undo();
+		app.update();
 	}
 	assert_eq!(
 		intial_state,
@@ -1097,7 +1153,7 @@ circle(green; 87 50 130);
 	);
 	let intial_state = app.read_vertices();
 
-	let n_cycles = app.conut_cycles();
+	let n_cycles = app.count_cycles();
 	for i in 0..n_cycles {
 		app.turn_cycle(i, 1);
 		app.update();
@@ -1214,11 +1270,30 @@ fn stress_test_random_levels() {
 		include_str!("../../epilang/tests/6_sync2.txt"),
 		include_str!("../../epilang/tests/send.txt"),
 		include_str!("../../epilang/tests/linked_sort.txt"),
-		//include_str!("../../epilang/tests/detectors/two_rails.txt"), // TODO: Verify non-group levels. // This level is here specifically because it failed layouting once.
 	];
 	for level in levels {
 		println!("{level}");
 		let mut app = app_with_level(level);
 		move_fuzz(&mut app, 4096, 1337133713371337);
+	}
+}
+
+#[test]
+fn stress_test_undo_invertibility() {
+	let levels = [
+		include_str!("../../epilang/tests/1_intro.txt"),
+		include_str!("../../epilang/tests/send.txt"),
+		// Verify non-group levels.
+		include_str!("../../epilang/tests/detectors/clash.txt"),
+		include_str!("../../epilang/tests/detectors/wall.txt"),
+		include_str!("../../epilang/tests/detectors/two_rails.txt"), // This level is here specifically because it failed layouting once.
+	];
+	for level in levels {
+		println!("{level}");
+		for i in 0..5 {
+			println!("Round {i}");
+			let mut app = app_with_level(level);
+			move_fuzz_undo(&mut app, 4096, 1337133713371337 + i);
+		}
 	}
 }
