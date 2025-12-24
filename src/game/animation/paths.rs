@@ -262,14 +262,6 @@ impl AnimationPathSegmentMeasurements {
 		}
 	}
 
-	fn cut_tail(&self, progress: f32) -> Self {
-		Self {
-			start_pos: self.start_pos,
-			end_pos: self.sample_t(progress),
-			length: self.length * (1.0 - progress),
-		}
-	}
-
 	fn reverse(&self) -> Self {
 		Self {
 			start_pos: self.end_pos,
@@ -389,6 +381,7 @@ impl TurnCycleResult {
 				continue;
 			}
 			let vertex_count = cycle_data.vertex_indices.len();
+			let is_clockwise = rotate_by > 0;
 			let rotate_amount = if is_cycle_jammed[cycle_id] {
 				1 // If there is a jam, do not move anything more than one space
 			} else {
@@ -396,7 +389,7 @@ impl TurnCycleResult {
 			};
 			let full_rotations = rotate_amount / vertex_count;
 			let absolute_movement_offset = rotate_amount % vertex_count;
-			let movement_offset = if rotate_by > 0 {
+			let movement_offset = if is_clockwise {
 				vertex_count - absolute_movement_offset
 			} else {
 				absolute_movement_offset
@@ -419,7 +412,6 @@ impl TurnCycleResult {
 							- 1 - (vertex_count - start_index + movement_offset - 1) % vertex_count;
 					// Cut the path earlier if there is a wall to hit
 					for &wall_position in &wall_hits_by_cycle[cycle_id] {
-						let is_clockwise = rotate_by > 0;
 						let start_and_end_swapped =
 							(start_index > proposed_end_index) == is_clockwise;
 						let wall_after_start = (wall_position >= start_index) == is_clockwise;
@@ -446,11 +438,26 @@ impl TurnCycleResult {
 				}
 				// Start and end positions along the cycle, [0, 1]
 				let start_position = cycle_data.vertex_positions[start_index];
-				let end_position = cycle_data.vertex_positions[end_index];
+				let end_position = if self.blocked() {
+					// For a blocked turn, set the end position
+					// half a step before the end vertex
+					let pre_end_index = (end_index + vertex_count - (is_clockwise as usize)
+						+ (!is_clockwise as usize))
+						% vertex_count;
+					let mut pre_end_position = cycle_data.vertex_positions[pre_end_index];
+					let past_end_position = cycle_data.vertex_positions[end_index];
+					let pre_and_post_are_swapped =
+						(pre_end_position < past_end_position) == is_clockwise;
+					if pre_and_post_are_swapped || vertex_count == 1 {
+						pre_end_position += if is_clockwise { 1.0 } else { -1.0 };
+					};
+					(pre_end_position + past_end_position) / 2.0
+				} else {
+					cycle_data.vertex_positions[end_index]
+				};
 				// Adjust the end position so that it accurately reflects
 				// the direction and number of full turns relative to starting position
 				let adjusted_end_position = {
-					let is_clockwise = rotate_by > 0;
 					let mut full_rotations = full_rotations;
 					if self.blocked() {
 						// Never make a full rotation when the turn is blocked
@@ -468,16 +475,10 @@ impl TurnCycleResult {
 				};
 				let cycle_length = cycle_data.placement.shape.length();
 				let path_length = (start_position - adjusted_end_position).abs() * cycle_length;
-				let base_measurements = AnimationPathSegmentMeasurements {
+				let measurements = AnimationPathSegmentMeasurements {
 					start_pos: start_position,
 					end_pos: adjusted_end_position,
 					length: path_length,
-				};
-				let measurements = if self.blocked() {
-					// Play only half of the animation if the turn is blocked
-					base_measurements.cut_tail(0.5)
-				} else {
-					base_measurements
 				};
 				vertex_paths[vertex_id] = Some(AnimationPathSegment {
 					owner_cycle: cycle_id,
