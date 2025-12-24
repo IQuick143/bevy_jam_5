@@ -128,28 +128,31 @@ impl PathAnimation {
 	}
 
 	/// Adds a path segment to current animation sequence
-	fn append_segment(&mut self, segment: AnimationPathSegment, allow_splice: bool) {
+	fn append_segment(&mut self, mut segment: AnimationPathSegment, allow_splice: bool) {
 		if allow_splice {
-			if let Some(last_segment) = self.segments.pop_back() {
+			// Try to splice the new segment into the head of the path first
+			// Splice multiple segments at once if possible,
+			// because some may have been inserted into the path with splicing disabled
+			while let Some(last_segment) = self.segments.pop_back() {
 				if let Some(new_last_segment) = segment.splice(&last_segment) {
 					// Splice into the last segment if possible
 					let last_segment_length = last_segment.length;
-					let new_last_segment_length = new_last_segment.length;
-					self.total_length += new_last_segment_length - last_segment_length;
-					if new_last_segment_length >= Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
-						self.segments.push_back(new_last_segment);
-					}
-					return;
+					self.total_length -= last_segment_length;
+					// Put the combined segment aside and try again
+					segment = new_last_segment;
 				} else {
-					// Put the segment back
+					// Put the segment back and insert the new one normally
 					self.segments.push_back(last_segment);
+					break;
 				}
 			}
 		}
 		// Insert the new segment as stand-alone
 		let added_length = segment.length;
-		self.total_length += added_length;
-		self.segments.push_back(segment);
+		if added_length >= Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
+			self.total_length += added_length;
+			self.segments.push_back(segment);
+		}
 	}
 
 	/// How long a path segment has to be in order to not be skipped
