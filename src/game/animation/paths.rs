@@ -1,5 +1,7 @@
 //! Animation of movement of objects along cycles
 
+use smallvec::SmallVec;
+
 use super::{animation_easing_function, TurnAnimationLength};
 use crate::{
 	game::{
@@ -367,6 +369,9 @@ impl TurnCycleResult {
 	/// This is the starting vertex of the path if the turn is blocked, the ending
 	/// vertex if it is not.
 	fn get_vertex_paths(&self, level_data: &LevelData) -> Vec<Option<AnimationPathSegment>> {
+		let is_vertex_blocked = self.jammed_vertex_mask(level_data);
+		let is_cycle_jammed = self.jammed_cycle_mask(level_data);
+		let wall_hits_by_cycle = self.wall_hits_by_cycle(level_data);
 		let mut vertex_paths = vec![None; level_data.vertices.len()];
 		for (cycle_id, rotate_by) in self.cycles_turned_by(level_data) {
 			if rotate_by == 0 {
@@ -381,7 +386,11 @@ impl TurnCycleResult {
 				continue;
 			}
 			let vertex_count = cycle_data.vertex_indices.len();
-			let rotate_amount = rotate_by.unsigned_abs() as usize;
+			let rotate_amount = if is_cycle_jammed[cycle_id] {
+				1 // If there is a jam, do not move anything more than one space
+			} else {
+				rotate_by.unsigned_abs() as usize
+			};
 			let full_rotations = rotate_amount / vertex_count;
 			let absolute_movement_offset = rotate_amount % vertex_count;
 			let movement_offset = if rotate_by > 0 {
@@ -390,6 +399,10 @@ impl TurnCycleResult {
 				absolute_movement_offset
 			};
 			for (terminal_index, &vertex_id) in cycle_data.vertex_indices.iter().enumerate() {
+				// Vertices where a clash occurred do not get any path ever
+				if is_vertex_blocked[vertex_id] {
+					continue;
+				}
 				// Index [0,n) of the vertices where the animation starts and ends
 				let start_index;
 				let end_index;
@@ -398,9 +411,31 @@ impl TurnCycleResult {
 					start_index = terminal_index;
 					// end_index = (start_index - movement_offset) % vertex_count
 					// but be careful not to underflow
-					end_index = vertex_count
-						- 1 - (vertex_count - start_index + movement_offset - 1)
-						% vertex_count;
+					let mut proposed_end_index =
+						vertex_count
+							- 1 - (vertex_count - start_index + movement_offset - 1) % vertex_count;
+					// Cut the path earlier if there is a wall to hit
+					for &wall_position in &wall_hits_by_cycle[cycle_id] {
+						let is_clockwise = rotate_by > 0;
+						let start_and_end_swapped =
+							(start_index > proposed_end_index) == is_clockwise;
+						let wall_after_start = (wall_position >= start_index) == is_clockwise;
+						let wall_before_end = (wall_position < proposed_end_index) == is_clockwise;
+						let wall_hit = full_rotations > 0 // The wall would be hit on a full rotation
+							|| wall_after_start && wall_before_end // Or if the wall is between start and end
+							|| start_and_end_swapped && (wall_after_start || wall_before_end); // If the indices wrapped, also count it as "between"
+						if wall_hit {
+							// Cut the rotation at the wall
+							proposed_end_index = if is_clockwise {
+								// One tile after the wall
+								(wall_position + 1) % vertex_count
+							} else {
+								// One tile before the wall
+								wall_position
+							};
+						}
+					}
+					end_index = proposed_end_index;
 				} else {
 					// The object will end up at its end vertex
 					end_index = terminal_index;
@@ -414,6 +449,12 @@ impl TurnCycleResult {
 				let adjusted_end_position = {
 					let is_clockwise = rotate_by > 0;
 					let mut full_rotations = full_rotations;
+					if self.blocked() {
+						// Never make a full rotation when the turn is blocked
+						// (the end index is past-the-end, so ending there would count
+						// as a full rotation)
+						full_rotations = (start_index == end_index) as usize;
+					}
 					let is_integer_multiple_of_full_rotation = start_index == end_index;
 					let start_and_end_are_swapped = (start_position < end_position) == is_clockwise;
 					if !is_integer_multiple_of_full_rotation && start_and_end_are_swapped {
@@ -442,5 +483,39 @@ impl TurnCycleResult {
 			}
 		}
 		vertex_paths
+	}
+
+	/// Calculates for each vertex whether objects on it should remain static
+	/// because it participates in a clash
+	fn jammed_vertex_mask(&self, level_data: &LevelData) -> Vec<bool> {
+		let mut is_vertex_blocked = vec![false; level_data.vertices.len()];
+		for &clash_index in &self.clashes {
+			let (_, _, vertices) = &level_data.forbidden_group_pairs[clash_index];
+			for &vertex_index in vertices {
+				is_vertex_blocked[vertex_index] = true;
+			}
+		}
+		is_vertex_blocked
+	}
+
+	fn jammed_cycle_mask(&self, level_data: &LevelData) -> Vec<bool> {
+		let mut is_cycle_blocked = vec![false; level_data.cycles.len()];
+		for &clash_index in &self.clashes {
+			let &(a, b, _) = &level_data.forbidden_group_pairs[clash_index];
+			for group_id in [a, b] {
+				for &(cycle_id, _) in &level_data.groups[group_id].cycles {
+					is_cycle_blocked[cycle_id] = true;
+				}
+			}
+		}
+		is_cycle_blocked
+	}
+
+	fn wall_hits_by_cycle(&self, level_data: &LevelData) -> Vec<SmallVec<[usize; 1]>> {
+		let mut hits_by_cycle = vec![SmallVec::new(); level_data.cycles.len()];
+		for &(cycle_id, offset) in &self.wall_hits {
+			hits_by_cycle[cycle_id].push(offset);
+		}
+		hits_by_cycle
 	}
 }
