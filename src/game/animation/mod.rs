@@ -2,14 +2,18 @@
 
 mod jump_turn;
 mod paths;
+mod popup;
 mod spin;
 
 use bevy::prelude::*;
+
+pub use popup::PopupAnimation;
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<TurnAnimationLength>().add_plugins((
 		jump_turn::plugin,
 		paths::plugin,
+		popup::plugin,
 		spin::plugin,
 	));
 }
