@@ -394,6 +394,8 @@ impl TurnCycleResult {
 			} else {
 				absolute_movement_offset
 			};
+			let turn_blocked_on_this_cycle =
+				is_cycle_jammed[cycle_id] || !wall_hits_by_cycle[cycle_id].is_empty();
 			for (terminal_index, &vertex_id) in cycle_data.vertex_indices.iter().enumerate() {
 				// Vertices where a clash occurred do not get any path ever
 				if is_vertex_blocked[vertex_id] {
@@ -459,8 +461,8 @@ impl TurnCycleResult {
 				// the direction and number of full turns relative to starting position
 				let adjusted_end_position = {
 					let mut full_rotations = full_rotations;
-					if self.blocked() {
-						// Never make a full rotation when the turn is blocked
+					if turn_blocked_on_this_cycle {
+						// Never make a full rotation when the cycle is blocked
 						// (the end index is past-the-end, so ending there would count
 						// as a full rotation)
 						full_rotations = (start_index == end_index) as usize;
