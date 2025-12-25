@@ -13,6 +13,7 @@ use crate::{
 };
 use bevy::{
 	color::palettes,
+	ecs::system::SystemParam,
 	math::bounding::Aabb2d,
 	platform::collections::{HashMap, HashSet},
 };
@@ -485,6 +486,34 @@ fn cycle_center_interaction_visuals_update_system(
 const ERROR_POPUP_TIME: f32 = 0.2;
 const ERROR_POPUP_INITIAL_SCALE: f32 = 0.6;
 
+#[derive(SystemParam)]
+struct BlockMarkerFactory<'w, 's> {
+	commands: Commands<'w, 's>,
+	images: Res<'w, HandleMap<ImageKey>>,
+	palette: Res<'w, ThingPalette>,
+	session: Res<'w, LastLevelSessionId>,
+}
+
+impl BlockMarkerFactory<'_, '_> {
+	fn spawn(&mut self, position: Vec2, hover_hint: &'static str) {
+		self.commands.spawn((
+			Sprite {
+				image: self.images[&ImageKey::ErrorX].clone(),
+				custom_size: Some(SPRITE_SIZE),
+				color: self.palette.warning_sign,
+				..default()
+			},
+			PopupAnimation::new(ERROR_POPUP_TIME, ERROR_POPUP_INITIAL_SCALE),
+			Transform::from_translation(position.extend(layers::FAIL_MARKERS)),
+			TemporaryMarker,
+			HoverHint(hover_hint),
+			HoverHintBoundingRect(Aabb2d::new(Vec2::ZERO, SPRITE_SIZE * 0.4)),
+			HoverPriority(hover::prio::WORLD_UI),
+			self.session.get_session(),
+		));
+	}
+}
+
 /// Hides entities with [`TemporaryMarker`] during the start of a turn.
 fn marker_popdown_system(mut query: Query<&mut PopupAnimation, With<TemporaryMarker>>) {
 	for mut animation in &mut query {
@@ -505,14 +534,11 @@ fn marker_despawn_system(
 }
 
 fn cycle_blocked_marker_system(
-	mut commands: Commands,
+	mut markers: BlockMarkerFactory,
 	mut events: MessageReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,
-	images: Res<HandleMap<ImageKey>>,
-	session: Res<LastLevelSessionId>,
-	palette: Res<ThingPalette>,
 ) {
 	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
@@ -539,32 +565,15 @@ fn cycle_blocked_marker_system(
 			log::warn!("Nonexistent vertex!");
 			continue;
 		};
-		commands.spawn((
-			Sprite {
-				image: images[&ImageKey::ErrorX].clone(),
-				custom_size: Some(SPRITE_SIZE),
-				color: palette.warning_sign,
-				..default()
-			},
-			PopupAnimation::new(ERROR_POPUP_TIME, ERROR_POPUP_INITIAL_SCALE),
-			Transform::from_translation(vertex_transform.translation.with_z(layers::FAIL_MARKERS)),
-			TemporaryMarker,
-			HoverHint(hover::BLOCKADE_WARNING),
-			HoverHintBoundingRect(Aabb2d::new(Vec2::ZERO, SPRITE_SIZE * 0.2)),
-			HoverPriority(hover::prio::WORLD_UI),
-			session.get_session(),
-		));
+		markers.spawn(vertex_transform.translation.xy(), hover::BLOCKADE_WARNING);
 	}
 }
 
 fn wall_blocked_marker_system(
-	mut commands: Commands,
+	mut markers: BlockMarkerFactory,
 	mut events: MessageReader<TurnBlockedByWallHit>,
 	walls_q: Query<&Transform, With<Wall>>,
 	entity_index: Res<GameStateEcsIndex>,
-	images: Res<HandleMap<ImageKey>>,
-	session: Res<LastLevelSessionId>,
-	palette: Res<ThingPalette>,
 ) {
 	for event in events.read() {
 		let Some(vertex_transform) = entity_index
@@ -575,20 +584,6 @@ fn wall_blocked_marker_system(
 			log::warn!("Nonexistent wall!");
 			continue;
 		};
-		commands.spawn((
-			Sprite {
-				image: images[&ImageKey::ErrorX].clone(),
-				custom_size: Some(SPRITE_SIZE),
-				color: palette.warning_sign,
-				..default()
-			},
-			PopupAnimation::new(ERROR_POPUP_TIME, ERROR_POPUP_INITIAL_SCALE),
-			Transform::from_translation(vertex_transform.translation.with_z(layers::FAIL_MARKERS)),
-			TemporaryMarker,
-			HoverHint(hover::WALL_HIT_WARNING),
-			HoverHintBoundingRect(Aabb2d::new(Vec2::ZERO, SPRITE_SIZE * 0.2)),
-			HoverPriority(hover::prio::WORLD_UI),
-			session.get_session(),
-		));
+		markers.spawn(vertex_transform.translation.xy(), hover::WALL_HIT_WARNING);
 	}
 }
