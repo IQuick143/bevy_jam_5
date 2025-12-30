@@ -10,7 +10,6 @@ pub fn plugin(app: &mut App) {
 		.add_message::<RotateCycleGroupWithResult>()
 		.add_message::<GameLayoutChanged>()
 		.add_message::<RotateCycleGroup>()
-		.add_message::<RotateSingleCycle>()
 		.add_message::<TurnBlockedByGroupConflict>()
 		.add_message::<TurnBlockedByWallHit>()
 		.add_systems(
@@ -67,13 +66,6 @@ pub enum RotationCause {
 	Undo,
 }
 
-/// Internal message sent to a cycle entity to rotate [`super::components::Object`]
-/// entities that lie on the cycle, ignores linkages.
-///
-/// Signals a rotation of a cycle occuring.
-#[derive(Message, Clone, Copy, Debug)]
-pub struct RotateSingleCycle(pub RotateCycle);
-
 /// Message sent to a cycle entity to rotate [`super::components::Object`]
 /// entities that lie on the cycle and all cycles linked to it
 /// Should be sent only if it is valid to rotate the given cycle.
@@ -122,7 +114,6 @@ pub struct IsLevelCompleted(pub bool);
 /// Rotates cycles in game state and sends out events to other systems
 fn cycle_group_rotation_system(
 	mut group_events: MessageReader<RotateCycleGroup>,
-	mut single_events: MessageWriter<RotateSingleCycle>,
 	mut update_event: MessageWriter<GameLayoutChanged>,
 	mut blocked_event: MessageWriter<TurnBlockedByGroupConflict>,
 	mut wall_hit_event: MessageWriter<TurnBlockedByWallHit>,
@@ -150,12 +141,6 @@ fn cycle_group_rotation_system(
 				// TODO: Events?
 				if !result.blocked() && result.layout_changed() {
 					update_event.write(GameLayoutChanged);
-					for (target_cycle, amount) in result.cycles_turned_by(level) {
-						single_events.write(RotateSingleCycle(RotateCycle {
-							target_cycle,
-							amount,
-						}));
-					}
 					result.reorder_sequence_by_all_cycle_turns(level, &mut entity_index.objects)?;
 				}
 				turn_events.write(RotateCycleGroupWithResult {

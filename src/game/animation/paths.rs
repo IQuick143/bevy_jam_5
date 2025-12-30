@@ -1,5 +1,7 @@
 //! Animation of movement of objects along cycles
 
+use smallvec::SmallVec;
+
 use super::{animation_easing_function, TurnAnimationLength};
 use crate::{
 	game::{
@@ -96,13 +98,18 @@ impl PathAnimation {
 	/// This resets animation progress to zero.
 	/// If possible, the new segment is spliced into the last
 	/// existing segment.
-	fn add_segment(&mut self, segment: AnimationPathSegment, new_static_pos: Vec2) {
+	fn add_segment(
+		&mut self,
+		segment: AnimationPathSegment,
+		new_static_pos: Vec2,
+		allow_splice: bool,
+	) {
 		if segment.length < Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
 			return;
 		}
 		self.static_position = new_static_pos;
 		self.reset_progress();
-		self.append_segment(segment);
+		self.append_segment(segment, allow_splice);
 	}
 
 	/// Restarts the remaining path as a new animation sequence
@@ -121,23 +128,28 @@ impl PathAnimation {
 	}
 
 	/// Adds a path segment to current animation sequence
-	fn append_segment(&mut self, segment: AnimationPathSegment) {
-		if let Some(last_segment) = self.segments.pop_back() {
-			if let Some(new_last_segment) = segment.splice(&last_segment) {
-				let last_segment_length = last_segment.length;
-				let new_last_segment_length = new_last_segment.length;
-				self.total_length += new_last_segment_length - last_segment_length;
-				if new_last_segment_length >= Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
-					self.segments.push_back(new_last_segment);
+	fn append_segment(&mut self, mut segment: AnimationPathSegment, allow_splice: bool) {
+		if allow_splice {
+			// Try to splice the new segment into the head of the path first
+			// Splice multiple segments at once if possible,
+			// because some may have been inserted into the path with splicing disabled
+			while let Some(last_segment) = self.segments.pop_back() {
+				if let Some(new_last_segment) = segment.splice(&last_segment) {
+					// Splice into the last segment if possible
+					let last_segment_length = last_segment.length;
+					self.total_length -= last_segment_length;
+					// Put the combined segment aside and try again
+					segment = new_last_segment;
+				} else {
+					// Put the segment back and insert the new one normally
+					self.segments.push_back(last_segment);
+					break;
 				}
-			} else {
-				self.segments.push_back(last_segment);
-				let added_length = segment.length;
-				self.total_length += added_length;
-				self.segments.push_back(segment);
 			}
-		} else {
-			let added_length = segment.length;
+		}
+		// Insert the new segment as stand-alone
+		let added_length = segment.length;
+		if added_length >= Self::SKIP_SEGMENT_LENGTH_THRESHOLD {
 			self.total_length += added_length;
 			self.segments.push_back(segment);
 		}
@@ -158,6 +170,10 @@ struct AnimationPathSegment {
 }
 
 impl AnimationPathSegment {
+	fn start_position(&self, level_data: &LevelData) -> Vec2 {
+		self.sample(0.0, level_data)
+	}
+
 	fn end_position(&self, level_data: &LevelData) -> Vec2 {
 		self.sample(1.0, level_data)
 	}
@@ -173,6 +189,14 @@ impl AnimationPathSegment {
 		Self {
 			owner_cycle: self.owner_cycle,
 			measurements: self.measurements.cut(progress),
+		}
+	}
+
+	/// Constructs a new path segment that is this segment played backwards
+	fn reverse(&self) -> Self {
+		Self {
+			owner_cycle: self.owner_cycle,
+			measurements: self.measurements.reverse(),
 		}
 	}
 
@@ -238,6 +262,14 @@ impl AnimationPathSegmentMeasurements {
 		}
 	}
 
+	fn reverse(&self) -> Self {
+		Self {
+			start_pos: self.end_pos,
+			end_pos: self.start_pos,
+			length: self.length,
+		}
+	}
+
 	fn sample(&self, placement: &CyclePlacement, progress: f32) -> Vec2 {
 		placement.sample(self.sample_t(progress))
 	}
@@ -261,10 +293,6 @@ fn listen_for_moves(
 		}
 	};
 	for event in rotation_events.read() {
-		if event.result.blocked() {
-			continue;
-		}
-
 		// Maps vertices that have been affected to the path segments taken by the objects on them
 		let vertex_paths = event.result.get_vertex_paths(level_data);
 
@@ -280,8 +308,13 @@ fn listen_for_moves(
 			};
 			let end_position = path.end_position(level_data);
 			if let Some(mut animation) = animation {
-				animation.add_segment(path, end_position);
-			} else {
+				animation.add_segment(path, end_position, true);
+				// If the move got blocked, play the animation back without splicing
+				if event.result.blocked() {
+					let start_position = path.start_position(level_data);
+					animation.add_segment(path.reverse(), start_position, false);
+				}
+			} else if !event.result.blocked() {
 				// Object is not animated, so we just set the translation to the desired place.
 				transform.translation.x = end_position.x;
 				transform.translation.y = end_position.y;
@@ -326,7 +359,14 @@ fn init_thing_animation(mut commands: Commands, query: Query<Entity, Added<Thing
 
 impl TurnCycleResult {
 	/// Calculates the paths taken by objects that lie on each individual vertex
+	///
+	/// The paths apply to the object that ends up on a particular vertex.
+	/// This is the starting vertex of the path if the turn is blocked, the ending
+	/// vertex if it is not.
 	fn get_vertex_paths(&self, level_data: &LevelData) -> Vec<Option<AnimationPathSegment>> {
+		let is_vertex_blocked = self.jammed_vertex_mask(level_data);
+		let is_cycle_jammed = self.jammed_cycle_mask(level_data);
+		let wall_hits_by_cycle = self.wall_hits_by_cycle(level_data);
 		let mut vertex_paths = vec![None; level_data.vertices.len()];
 		for (cycle_id, rotate_by) in self.cycles_turned_by(level_data) {
 			if rotate_by == 0 {
@@ -341,21 +381,92 @@ impl TurnCycleResult {
 				continue;
 			}
 			let vertex_count = cycle_data.vertex_indices.len();
-			let rotate_amount = rotate_by.unsigned_abs() as usize;
+			let is_clockwise = rotate_by > 0;
+			let rotate_amount = if is_cycle_jammed[cycle_id] {
+				1 // If there is a jam, do not move anything more than one space
+			} else {
+				rotate_by.unsigned_abs() as usize
+			};
 			let full_rotations = rotate_amount / vertex_count;
 			let absolute_movement_offset = rotate_amount % vertex_count;
-			let movement_offset = if rotate_by > 0 {
+			let movement_offset = if is_clockwise {
 				vertex_count - absolute_movement_offset
 			} else {
 				absolute_movement_offset
 			};
-			for (end_index, &vertex_id) in cycle_data.vertex_indices.iter().enumerate() {
-				let start_index = (end_index + movement_offset) % vertex_count;
+			let turn_blocked_on_this_cycle =
+				is_cycle_jammed[cycle_id] || !wall_hits_by_cycle[cycle_id].is_empty();
+			for (terminal_index, &vertex_id) in cycle_data.vertex_indices.iter().enumerate() {
+				// Vertices where a clash occurred do not get any path ever
+				if is_vertex_blocked[vertex_id] {
+					continue;
+				}
+				// Index [0,n) of the vertices where the animation starts and ends
+				let start_index;
+				let end_index;
+				if self.blocked() {
+					// The turn is blocked, so the object will return to its starting vertex
+					start_index = terminal_index;
+					// end_index = (start_index - movement_offset) % vertex_count
+					// but be careful not to underflow
+					let mut proposed_end_index =
+						vertex_count
+							- 1 - (vertex_count - start_index + movement_offset - 1) % vertex_count;
+					// Cut the path earlier if there is a wall to hit
+					for &wall_position in &wall_hits_by_cycle[cycle_id] {
+						let start_and_end_swapped =
+							(start_index > proposed_end_index) == is_clockwise;
+						let wall_after_start = (wall_position >= start_index) == is_clockwise;
+						let wall_before_end = (wall_position < proposed_end_index) == is_clockwise;
+						let wall_hit = full_rotations > 0 // The wall would be hit on a full rotation
+							|| wall_after_start && wall_before_end // Or if the wall is between start and end
+							|| start_and_end_swapped && (wall_after_start || wall_before_end); // If the indices wrapped, also count it as "between"
+						if wall_hit {
+							// Cut the rotation at the wall
+							proposed_end_index = if is_clockwise {
+								// One tile after the wall
+								(wall_position + 1) % vertex_count
+							} else {
+								// One tile before the wall
+								wall_position
+							};
+						}
+					}
+					end_index = proposed_end_index;
+				} else {
+					// The object will end up at its end vertex
+					end_index = terminal_index;
+					start_index = (end_index + movement_offset) % vertex_count;
+				}
+				// Start and end positions along the cycle, [0, 1]
 				let start_position = cycle_data.vertex_positions[start_index];
-				let end_position = cycle_data.vertex_positions[end_index];
+				let end_position = if self.blocked() {
+					// For a blocked turn, set the end position
+					// half a step before the end vertex
+					let pre_end_index = (end_index + vertex_count - (is_clockwise as usize)
+						+ (!is_clockwise as usize))
+						% vertex_count;
+					let mut pre_end_position = cycle_data.vertex_positions[pre_end_index];
+					let past_end_position = cycle_data.vertex_positions[end_index];
+					let pre_and_post_are_swapped =
+						(pre_end_position < past_end_position) == is_clockwise;
+					if pre_and_post_are_swapped || vertex_count == 1 {
+						pre_end_position += if is_clockwise { 1.0 } else { -1.0 };
+					};
+					(pre_end_position + past_end_position) / 2.0
+				} else {
+					cycle_data.vertex_positions[end_index]
+				};
+				// Adjust the end position so that it accurately reflects
+				// the direction and number of full turns relative to starting position
 				let adjusted_end_position = {
-					let is_clockwise = rotate_by > 0;
 					let mut full_rotations = full_rotations;
+					if turn_blocked_on_this_cycle {
+						// Never make a full rotation when the cycle is blocked
+						// (the end index is past-the-end, so ending there would count
+						// as a full rotation)
+						full_rotations = (start_index == end_index) as usize;
+					}
 					let is_integer_multiple_of_full_rotation = start_index == end_index;
 					let start_and_end_are_swapped = (start_position < end_position) == is_clockwise;
 					if !is_integer_multiple_of_full_rotation && start_and_end_are_swapped {
@@ -366,16 +477,51 @@ impl TurnCycleResult {
 				};
 				let cycle_length = cycle_data.placement.shape.length();
 				let path_length = (start_position - adjusted_end_position).abs() * cycle_length;
+				let measurements = AnimationPathSegmentMeasurements {
+					start_pos: start_position,
+					end_pos: adjusted_end_position,
+					length: path_length,
+				};
 				vertex_paths[vertex_id] = Some(AnimationPathSegment {
 					owner_cycle: cycle_id,
-					measurements: AnimationPathSegmentMeasurements {
-						start_pos: start_position,
-						end_pos: adjusted_end_position,
-						length: path_length,
-					},
+					measurements,
 				});
 			}
 		}
 		vertex_paths
+	}
+
+	/// Calculates for each vertex whether objects on it should remain static
+	/// because it participates in a clash
+	fn jammed_vertex_mask(&self, level_data: &LevelData) -> Vec<bool> {
+		let mut is_vertex_blocked = vec![false; level_data.vertices.len()];
+		for &clash_index in &self.clashes {
+			let (_, _, vertices) = &level_data.forbidden_group_pairs[clash_index];
+			for &vertex_index in vertices {
+				is_vertex_blocked[vertex_index] = true;
+			}
+		}
+		is_vertex_blocked
+	}
+
+	fn jammed_cycle_mask(&self, level_data: &LevelData) -> Vec<bool> {
+		let mut is_cycle_blocked = vec![false; level_data.cycles.len()];
+		for &clash_index in &self.clashes {
+			let &(a, b, _) = &level_data.forbidden_group_pairs[clash_index];
+			for group_id in [a, b] {
+				for &(cycle_id, _) in &level_data.groups[group_id].cycles {
+					is_cycle_blocked[cycle_id] = true;
+				}
+			}
+		}
+		is_cycle_blocked
+	}
+
+	fn wall_hits_by_cycle(&self, level_data: &LevelData) -> Vec<SmallVec<[usize; 1]>> {
+		let mut hits_by_cycle = vec![SmallVec::new(); level_data.cycles.len()];
+		for &(cycle_id, offset) in &self.wall_hits {
+			hits_by_cycle[cycle_id].push(offset);
+		}
+		hits_by_cycle
 	}
 }
