@@ -107,9 +107,9 @@ fn record_moves(
 	mut events: MessageReader<RotateCycleGroupWithResult>,
 ) {
 	// Zip the events, they should match eventually
-	for event in events.read() {
-		if event.action.cause == RotationCause::Manual && !event.result.blocked() {
-			history.push(event.action.rotation);
+	for RotateCycleGroupWithResult { action, result } in events.read() {
+		if action.cause == RotationCause::Manual && !result.blocked() && result.objects_moved {
+			history.push(action.rotation);
 		}
 	}
 }
