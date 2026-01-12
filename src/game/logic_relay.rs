@@ -47,7 +47,7 @@ pub struct ComputedCycleTurnability(pub bool);
 #[derive(Component, Clone, Copy, PartialEq, Eq, Default, Debug, Reflect)]
 pub struct IsTriggered(pub bool);
 
-/// Common data for [`RotateSingleCycle`] and [`RotateCycleGroup`]
+/// Common data for [`RotateCycleGroup`] and the like
 #[derive(Clone, Copy, Debug)]
 pub struct RotateCycle {
 	/// Index of the cycle to rotate
