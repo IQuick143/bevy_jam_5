@@ -1,5 +1,6 @@
 use super::{
-	components::*, inputs::CycleInteraction, logic_relay::*, prelude::*, spawn::LastLevelSessionId,
+	animation::PopupAnimation, components::*, inputs::CycleInteraction, logic_relay::*, prelude::*,
+	spawn::LastLevelSessionId,
 };
 use crate::{
 	assets::{HandleMap, ImageKey},
@@ -9,33 +10,40 @@ use crate::{
 	AppSet,
 };
 use bevy::{
+	ecs::system::SystemParam,
 	math::bounding::Aabb2d,
 	platform::collections::{HashMap, HashSet},
-	sprite::Anchor,
 };
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			goal_unlock_animation_system
-				.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
 			(
-				button_trigger_animation_system,
-				cycle_center_turnability_visuals_update_system
-					.before(cycle_center_interaction_visuals_update_system),
+				goal_unlock_animation_system
+					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
+				(
+					button_trigger_animation_system,
+					cycle_center_turnability_visuals_update_system
+						.before(cycle_center_interaction_visuals_update_system),
+				)
+					.run_if(on_message::<GameLayoutChanged>),
+				cycle_center_interaction_visuals_update_system
+					.run_if(cycle_interaction_visuals_changed),
 			)
-				.run_if(on_message::<GameLayoutChanged>),
+				.in_set(AppSet::UpdateVisuals),
 			(
-				marker_despawn_system.run_if(on_message::<RotateCycleGroup>),
 				cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
 				wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
+				marker_popdown_system
+					.run_if(on_message::<RotateCycleGroup>)
+					.before(cycle_blocked_marker_system)
+					.before(wall_blocked_marker_system),
+				marker_despawn_system,
 			)
-				.chain(),
-			cycle_center_interaction_visuals_update_system
-				.run_if(cycle_interaction_visuals_changed),
-		)
-			.in_set(AppSet::UpdateVisuals),
+				.after(AppSet::GameLogic)
+				.before(AppSet::UpdateVisuals),
+		),
 	);
 }
 
@@ -293,24 +301,61 @@ fn cycle_center_interaction_visuals_update_system(
 	}
 }
 
-/// Despawns entities with [`TemporaryMarker`] during the start of a turn.
+const ERROR_POPUP_TIME: f32 = 0.2;
+const ERROR_POPUP_INITIAL_SCALE: f32 = 0.6;
+
+#[derive(SystemParam)]
+struct BlockMarkerFactory<'w, 's> {
+	commands: Commands<'w, 's>,
+	images: Res<'w, HandleMap<ImageKey>>,
+	session: Res<'w, LastLevelSessionId>,
+}
+
+impl BlockMarkerFactory<'_, '_> {
+	fn spawn(&mut self, position: Vec2, hover_hint: &'static str) {
+		self.commands.spawn((
+			Sprite {
+				image: self.images[&ImageKey::ErrorX].clone(),
+				custom_size: Some(SPRITE_SIZE),
+				..default()
+			},
+			SpriteColorKey(ColorKey::WarningSign),
+			PopupAnimation::new(ERROR_POPUP_TIME, ERROR_POPUP_INITIAL_SCALE),
+			Transform::from_translation(position.extend(layers::FAIL_MARKERS)),
+			TemporaryMarker,
+			HoverHint(hover_hint),
+			HoverHintBoundingRect(Aabb2d::new(Vec2::ZERO, SPRITE_SIZE * 0.4)),
+			HoverPriority(hover::prio::WORLD_UI),
+			self.session.get_session(),
+		));
+	}
+}
+
+/// Hides entities with [`TemporaryMarker`] during the start of a turn.
+fn marker_popdown_system(mut query: Query<&mut PopupAnimation, With<TemporaryMarker>>) {
+	for mut animation in &mut query {
+		animation.set_reversed(true);
+	}
+}
+
+/// Despawns entities with [`TemporaryMarker`] once their [`PopupAnimation`] is finished
 fn marker_despawn_system(
+	query: Query<(Entity, &PopupAnimation), With<TemporaryMarker>>,
 	mut commands: Commands,
-	marker_entities: Query<Entity, With<TemporaryMarker>>,
 ) {
-	for entity in marker_entities.iter() {
-		commands.entity(entity).despawn();
+	for (id, animation) in &query {
+		if animation.is_reversed() && animation.is_finished() {
+			commands.entity(id).despawn();
+		}
 	}
 }
 
 fn cycle_blocked_marker_system(
-	mut commands: Commands,
+	mut markers: BlockMarkerFactory,
 	mut events: MessageReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,
-	images: Res<HandleMap<ImageKey>>,
-	session: Res<LastLevelSessionId>,
 ) {
 	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
@@ -337,35 +382,15 @@ fn cycle_blocked_marker_system(
 			log::warn!("Nonexistent vertex!");
 			continue;
 		};
-		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
-		commands.spawn((
-			Sprite {
-				image: images[&ImageKey::InGameWarning].clone(),
-				custom_size: Some(size),
-				..default()
-			},
-			SpriteColorKey(ColorKey::WarningSign),
-			Anchor::BOTTOM_CENTER, // TODO: Check if this is correct behaviour mimicking
-			Transform::from_translation(
-				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
-					.with_z(layers::FAIL_MARKERS),
-			),
-			TemporaryMarker,
-			HoverHint(hover::BLOCKADE_WARNING),
-			HoverPriority(hover::prio::WORLD_UI),
-			HoverHintBoundingRect(Aabb2d::new(Vec2::new(0.0, SPRITE_LENGTH / 2.0), size / 2.0)),
-			session.get_session(),
-		));
+		markers.spawn(vertex_transform.translation.xy(), hover::BLOCKADE_WARNING);
 	}
 }
 
 fn wall_blocked_marker_system(
-	mut commands: Commands,
+	mut markers: BlockMarkerFactory,
 	mut events: MessageReader<TurnBlockedByWallHit>,
 	walls_q: Query<&Transform, With<Wall>>,
 	entity_index: Res<GameStateEcsIndex>,
-	images: Res<HandleMap<ImageKey>>,
-	session: Res<LastLevelSessionId>,
 ) {
 	for event in events.read() {
 		let Some(vertex_transform) = entity_index
@@ -376,24 +401,6 @@ fn wall_blocked_marker_system(
 			log::warn!("Nonexistent wall!");
 			continue;
 		};
-		let size = Vec2::new(SPRITE_LENGTH / 3.0, SPRITE_LENGTH);
-		commands.spawn((
-			Sprite {
-				image: images[&ImageKey::InGameWarning].clone(),
-				custom_size: Some(size),
-				..default()
-			},
-			SpriteColorKey(ColorKey::WarningSign),
-			Anchor::BOTTOM_CENTER,
-			Transform::from_translation(
-				(vertex_transform.translation + Vec3::Y * SPRITE_LENGTH * 0.25)
-					.with_z(layers::FAIL_MARKERS),
-			),
-			TemporaryMarker,
-			HoverHint(hover::WALL_HIT_WARNING),
-			HoverHintBoundingRect(Aabb2d::new(Vec2::new(0.0, SPRITE_LENGTH / 2.0), size / 2.0)),
-			HoverPriority(hover::prio::WORLD_UI),
-			session.get_session(),
-		));
+		markers.spawn(vertex_transform.translation.xy(), hover::WALL_HIT_WARNING);
 	}
 }
