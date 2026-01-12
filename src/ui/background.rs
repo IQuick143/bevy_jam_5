@@ -3,18 +3,22 @@
 use crate::{
 	assets::{HandleMap, ImageKey},
 	camera::parallax::Parallax,
+	drawing::{ColorKey, ThingPalette},
 	game::logic_relay::IsLevelCompleted,
 	graphics::*,
 	screen::Screen,
 };
-use bevy::color::palettes;
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(Startup, spawn_background)
 		.add_systems(
 			Update,
-			(flip_background_on_level_completion, update_background_sweep),
+			(
+				flip_background_on_level_completion,
+				update_background_sweep,
+				update_background_colors.run_if(resource_changed::<ThingPalette>),
+			),
 		)
 		.add_observer(set_background_mode)
 		.init_resource::<BackgroundMaterialHandle>()
@@ -43,6 +47,10 @@ impl FromWorld for BackgroundMaterialHandle {
 	fn from_world(world: &mut World) -> Self {
 		let images = world.resource::<HandleMap<ImageKey>>();
 		let texture = images[&ImageKey::Background].clone();
+
+		let palette = world.resource::<ThingPalette>();
+		let colors = background_colors_from_palette(palette);
+
 		let mut materials = world.resource_mut::<Assets<BackgroundMaterial>>();
 		let handle = materials.add(BackgroundMaterial {
 			texture,
@@ -50,12 +58,7 @@ impl FromWorld for BackgroundMaterialHandle {
 				scale: Vec2::splat(MESH_SIZE / BACKGROUND_TILING),
 				speed: Vec2::from_angle(BACKGROUND_ROTATION)
 					.rotate(BACKGROUND_VELOCITY / BACKGROUND_TILING),
-				colors: [
-					Srgba::hex("F5F8FB").unwrap().into(),
-					LinearRgba::WHITE,
-					palettes::tailwind::SLATE_200.into(),
-					Srgba::hex("F5F8FB").unwrap().into(),
-				],
+				colors,
 				sweep_origin: Vec2::new(0.0, MESH_SIZE / BACKGROUND_TILING),
 				sweep_direction: Vec2::from_angle(BACKGROUND_ROTATION).rotate(-Vec2::Y),
 				sweep_position: 0.0,
@@ -187,4 +190,24 @@ fn update_background_sweep(
 			material.params.sweep_position = 0.0;
 		}
 	}
+}
+
+fn update_background_colors(
+	palette: Res<ThingPalette>,
+	handle: Res<BackgroundMaterialHandle>,
+	mut materials: ResMut<Assets<BackgroundMaterial>>,
+) {
+	if let Some(material) = materials.get_mut(&**handle) {
+		material.params.colors = background_colors_from_palette(&palette)
+	}
+}
+
+fn background_colors_from_palette(palette: &ThingPalette) -> [LinearRgba; 4] {
+	[
+		ColorKey::BackgroundBase,
+		ColorKey::BackgroundDetail,
+		ColorKey::BackgroundSolvedBase,
+		ColorKey::BackgroundSolvedDetail,
+	]
+	.map(|key| palette[&key].to_linear())
 }

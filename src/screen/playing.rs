@@ -4,8 +4,8 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::{
-		drawing::ThingPalette,
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
 	},
@@ -14,7 +14,6 @@ use crate::{
 		consts::*,
 		hover::{self, HoverHint, HoverPriority, HoverText, UseHoverFromInteraction},
 		interaction::InteractionEnabled,
-		palette::*,
 		prelude::*,
 	},
 	AppSet,
@@ -148,7 +147,6 @@ fn spawn_game_ui(
 	font: Res<GlobalFont>,
 	images: Res<HandleMap<ImageKey>>,
 	button_sprites: Res<UiButtonAtlas>,
-	colors: Res<ThingPalette>,
 ) {
 	commands
 		.spawn((
@@ -212,12 +210,7 @@ fn spawn_game_ui(
 						.insert((
 							GameUiAction::NextLevel,
 							NextLevelButton,
-							InteractionPalette {
-								none: NEXT_LEVEL_BUTTON_BACKGROUND,
-								hovered: NEXT_LEVEL_BUTTON_HOVERED_BACKGROUND,
-								pressed: NEXT_LEVEL_BUTTON_PRESSED_BACKGROUND,
-								disabled: BUTTON_DISABLED_BACKGROUND,
-							},
+							InteractionPalette::NEXT_LEVEL_BUTTON,
 							HoverHint(hover::UI_NEXT),
 							HoverPriority(hover::prio::STATIC_UI),
 							UseHoverFromInteraction,
@@ -243,7 +236,7 @@ fn spawn_game_ui(
 							font_size: LEVEL_TITLE_SIZE,
 							..default()
 						},
-						TextColor(ui_palette::LABEL_TEXT),
+						TextColorKey(ColorKey::UiLabelText),
 					),
 					(
 						LevelCompletionCheckmarkBox::default(),
@@ -254,10 +247,10 @@ fn spawn_game_ui(
 						},
 						ImageNode {
 							image: images[&ImageKey::Checkmark].clone(),
-							color: colors.checkmark,
 							image_mode: NodeImageMode::Stretch,
 							..default()
 						},
+						NodeColorKey(ColorKey::Checkmark),
 					),
 				],
 			));
@@ -284,7 +277,7 @@ fn spawn_game_ui(
 					..default()
 				},
 				TextLayout::new_with_justify(Justify::Center),
-				TextColor(ui_palette::LABEL_TEXT),
+				TextColorKey(ColorKey::UiLabelText),
 			)],
 		)],
 	));
@@ -409,7 +402,6 @@ fn checkmark_margin_animation_curve(x: f32) -> f32 {
 fn start_completion_cue_animation(
 	query: Query<Entity, With<LevelCompletionCheckmarkBox>>,
 	images: Res<HandleMap<ImageKey>>,
-	colors: Res<ThingPalette>,
 	mut commands: Commands,
 ) {
 	for node_id in &query {
@@ -423,10 +415,10 @@ fn start_completion_cue_animation(
 			},
 			ImageNode {
 				image: images[&ImageKey::CheckmarkSolid].clone(),
-				color: colors.checkmark,
 				image_mode: NodeImageMode::Stretch,
 				..default()
 			},
+			NodeColorKey(ColorKey::Checkmark),
 		));
 	}
 }

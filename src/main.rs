@@ -6,6 +6,7 @@ mod audio;
 mod camera;
 #[cfg(feature = "dev")]
 mod dev_tools;
+mod drawing;
 mod epilang;
 pub mod explorer;
 mod game;
@@ -80,6 +81,7 @@ impl Plugin for AppPlugin {
 		app.add_plugins((
 			persistent::plugin,
 			save::plugin,
+			drawing::plugin,
 			game::plugin,
 			screen::plugin,
 			audio::plugin,
