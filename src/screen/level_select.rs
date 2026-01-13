@@ -3,16 +3,14 @@ use bevy::prelude::*;
 use super::*;
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
-	game::{
-		drawing::ThingPalette,
-		level::{
-			completion::{CompletionStatus, LevelHubCompletion},
-			list::LevelList,
-			LevelData,
-		},
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
+	game::level::{
+		completion::{CompletionStatus, LevelHubCompletion},
+		list::LevelList,
+		LevelData,
 	},
 	save::SaveGame,
-	ui::{consts::*, palette::*, prelude::*, scrollbox::Scrollbox},
+	ui::{consts::*, prelude::*, scrollbox::Scrollbox},
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -38,7 +36,6 @@ fn spawn_screen(
 	level_list_asset: Res<Assets<LevelList>>,
 	save: Res<SaveGame>,
 	images: Res<HandleMap<ImageKey>>,
-	colors: Res<ThingPalette>,
 	button_sprites: Res<UiButtonAtlas>,
 ) {
 	let levels = level_list_asset
@@ -113,7 +110,7 @@ fn spawn_screen(
 					font: font.0.clone(),
 					..default()
 				},
-				TextColor(ui_palette::LABEL_TEXT),
+				TextColorKey(ColorKey::UiLabelText),
 			)],
 		));
 		let completion_status = hub_completion.hub_completion_status(hub_id);
@@ -135,10 +132,10 @@ fn spawn_screen(
 				},
 				ImageNode {
 					image: images[&image_key].clone(),
-					color: colors.checkmark,
 					image_mode: NodeImageMode::Stretch,
 					..default()
 				},
+				NodeColorKey(ColorKey::Checkmark),
 			));
 		}
 
@@ -181,19 +178,14 @@ fn spawn_screen(
 								},
 								ImageNode {
 									image: images[&ImageKey::Checkmark].clone(),
-									color: colors.checkmark,
 									image_mode: NodeImageMode::Stretch,
 									..default()
 								},
+								NodeColorKey(ColorKey::Checkmark),
 							));
 						} else {
 							// Make the button a different color to indicate it's new
-							button.insert(InteractionPalette {
-								none: NEW_LEVEL_BUTTON_BACKGROUND,
-								hovered: BUTTON_HOVERED_BACKGROUND,
-								pressed: BUTTON_PRESSED_BACKGROUND,
-								disabled: BUTTON_DISABLED_BACKGROUND,
-							});
+							button.insert(InteractionPalette::NEW_LEVEL_BUTTON);
 						}
 					} else {
 						log::warn!("Invalid level asset handle");

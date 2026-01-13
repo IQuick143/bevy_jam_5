@@ -1,5 +1,7 @@
 //! Development tools for the game. This plugin is only enabled in dev builds.
 
+mod palette_picker;
+
 use crate::{
 	camera::CameraHarness,
 	game::{animation::TurnAnimationLength, components::*, prelude::*},
@@ -54,7 +56,8 @@ pub(super) fn plugin(app: &mut App) {
 			},
 			..default()
 		},
-	});
+	})
+	.add_plugins(palette_picker::plugin);
 }
 
 /// Whether hover and layout boxes should be drawn

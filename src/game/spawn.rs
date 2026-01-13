@@ -8,7 +8,7 @@ use super::{
 	logic_relay::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
 };
-use crate::{assets::*, graphics::*, AppSet};
+use crate::{assets::*, drawing::*, graphics::*, AppSet};
 use bevy::{ecs::schedule::ScheduleLabel, platform::collections::HashMap, sprite::Anchor};
 use std::f32::consts::{PI, TAU};
 
@@ -543,15 +543,15 @@ fn create_vertex_visuals(
 	for id in &query {
 		let node = commands
 			.spawn((
-				Mesh2d(meshes.vertices.clone()),
-				MeshMaterial2d(materials.cycle_rings_ready.clone()),
+				Mesh2d(meshes[&MeshKey::Vertices].clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingsReady].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 			))
 			.id();
 		let outline = commands
 			.spawn((
-				Mesh2d(meshes.vertex_outlines.clone()),
-				MeshMaterial2d(materials.cycle_ring_outlines.clone()),
+				Mesh2d(meshes[&MeshKey::VertexOutlines].clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingOutlines].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
@@ -567,23 +567,26 @@ fn create_detector_and_wall_visuals(
 	detector_query: Query<Entity, Added<Detector>>,
 	wall_query: Query<Entity, Added<Wall>>,
 	images: Res<HandleMap<ImageKey>>,
-	colors: Res<ThingPalette>,
 ) {
 	for id in &detector_query {
-		commands.entity(id).insert(Sprite {
-			image: images[&ImageKey::Detector].clone(),
-			color: colors.detector,
-			custom_size: Some(SPRITE_SIZE),
-			..default()
-		});
+		commands.entity(id).insert((
+			Sprite {
+				image: images[&ImageKey::Detector].clone(),
+				custom_size: Some(SPRITE_SIZE),
+				..default()
+			},
+			SpriteColorKey(ColorKey::Detector),
+		));
 	}
 	for id in &wall_query {
-		commands.entity(id).insert(Sprite {
-			image: images[&ImageKey::Wall].clone(),
-			color: colors.wall,
-			custom_size: Some(SPRITE_SIZE),
-			..default()
-		});
+		commands.entity(id).insert((
+			Sprite {
+				image: images[&ImageKey::Wall].clone(),
+				custom_size: Some(SPRITE_SIZE),
+				..default()
+			},
+			SpriteColorKey(ColorKey::Wall),
+		));
 	}
 }
 
@@ -598,7 +601,6 @@ fn create_cycle_visuals(
 		),
 		Added<CyclePlacement>,
 	>,
-	palette: Res<ThingPalette>,
 	materials: Res<GameObjectMaterials>,
 	images: Res<HandleMap<ImageKey>>,
 	mut meshes: ResMut<Assets<Mesh>>,
@@ -632,14 +634,14 @@ fn create_cycle_visuals(
 		let ring = commands
 			.spawn((
 				Mesh2d(meshes.add(mesh)),
-				MeshMaterial2d(materials.cycle_rings_ready.clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingsReady].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
 			))
 			.id();
 		let outline = commands
 			.spawn((
 				Mesh2d(meshes.add(outline_mesh)),
-				MeshMaterial2d(materials.cycle_ring_outlines.clone()),
+				MeshMaterial2d(materials[&MaterialKey::CycleRingOutlines].clone()),
 				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
 			))
 			.id();
@@ -652,7 +654,7 @@ fn create_cycle_visuals(
 			let hitbox = commands
 				.spawn((
 					Mesh2d(meshes.add(hitbox_mesh)),
-					MeshMaterial2d(materials.cycle_hitboxes.clone()),
+					MeshMaterial2d(materials[&MaterialKey::CycleHitboxes].clone()),
 					Transform::from_translation(Vec3::Z * layers::CYCLE_SHADOWS),
 					Visibility::Hidden,
 				))
@@ -669,9 +671,9 @@ fn create_cycle_visuals(
 					Sprite {
 						custom_size: Some(SPRITE_SIZE),
 						image: images[&ImageKey::CycleCenter(*turnability)].clone(),
-						color: palette.cycle_ready,
 						..default()
 					},
+					SpriteColorKey(ColorKey::CycleReady),
 					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_SPRITES)),
 				))
 				.id();
@@ -680,9 +682,9 @@ fn create_cycle_visuals(
 					Sprite {
 						custom_size: Some(SPRITE_SIZE * 2.0),
 						image: images[&ImageKey::CycleRotationArrow].clone(),
-						color: palette.cycle_ready,
 						..default()
 					},
+					SpriteColorKey(ColorKey::CycleCentralArrow),
 					Transform::from_translation(offset.extend(layers::CYCLE_CENTER_ARROWS)),
 				))
 				.id();
@@ -723,7 +725,7 @@ fn create_hard_link_visuals(
 				b,
 				declared_link.direction,
 				&mut meshes,
-				materials.link_lines.clone(),
+				materials[&MaterialKey::LinkLines].clone(),
 			);
 		});
 	}
@@ -735,7 +737,6 @@ fn create_one_way_link_visuals(
 	materials: Res<GameObjectMaterials>,
 	standard_meshes: Res<GameObjectMeshes>,
 	digit_atlas: Res<DigitAtlas>,
-	palette: Res<ThingPalette>,
 	links_q: Query<(Entity, &DeclaredOneWayLink), Added<DeclaredOneWayLink>>,
 	level: PlayingLevelData,
 ) {
@@ -770,12 +771,10 @@ fn create_one_way_link_visuals(
 				multiplicity,
 				center_sprite,
 				&mut meshes,
-				materials.link_lines.clone(),
-				standard_meshes.one_way_link_tips.clone(),
-				standard_meshes.one_way_link_backheads.clone(),
+				materials[&MaterialKey::LinkLines].clone(),
+				standard_meshes[&MeshKey::OneWayLinkTips].clone(),
+				standard_meshes[&MeshKey::OneWayLinkBackheads].clone(),
 				&digit_atlas,
-				palette.link_multiplicity_label,
-				palette.inverted_link_multiplicity_label,
 			);
 		});
 	}
@@ -862,8 +861,6 @@ fn create_one_way_link_visual(
 	tip_mesh: Handle<Mesh>,
 	backhead_mesh: Handle<Mesh>,
 	digit_atlas: &DigitAtlas,
-	label_color: Color,
-	invert_label_color: Color,
 ) {
 	if multiplicity == 0 {
 		log::warn!("Skipped drawing a cycle link with zero multiplicity");
@@ -994,9 +991,9 @@ fn create_one_way_link_visual(
 		));
 
 		// Use the color corresponding to the direction
-		let color = match direction {
-			LinkedCycleDirection::Coincident => label_color,
-			LinkedCycleDirection::Inverse => invert_label_color,
+		let color_key = match direction {
+			LinkedCycleDirection::Coincident => ColorKey::LinkMultiplicityLabel,
+			LinkedCycleDirection::Inverse => ColorKey::InvertedLinkMultiplicityLabel,
 		};
 		// Distance to the caret, i.e. where the most signuficant digit starts
 		let caret_distance_from_a;
@@ -1017,7 +1014,7 @@ fn create_one_way_link_visual(
 			children,
 			caret_transform,
 			digit_atlas,
-			color,
+			color_key,
 			ONEWAY_MULTILINK_DIGIT_SIZE,
 		);
 	}
@@ -1026,26 +1023,25 @@ fn create_one_way_link_visual(
 fn create_thing_sprites(
 	mut commands: Commands,
 	query: Query<(Entity, &ThingData), Added<ThingData>>,
-	palette: Res<ThingPalette>,
 	sprites: Res<HandleMap<ImageKey>>,
 ) {
 	for (id, thing) in &query {
-		let (color, anchor, z_depth) = match thing {
+		let (color_key, anchor, z_depth) = match thing {
 			ThingData::Object(ObjectData::Player) => (
-				palette.player,
+				ColorKey::Player,
 				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::OBJECT_SPRITES,
 			),
 			ThingData::Object(ObjectData::Box(_)) => {
-				(palette.box_base, default(), layers::OBJECT_SPRITES)
+				(ColorKey::BoxBase, default(), layers::OBJECT_SPRITES)
 			}
 			ThingData::Glyph(GlyphData::Flag) => (
-				palette.goal_closed,
+				ColorKey::GoalClosed,
 				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
 				layers::GLYPH_SPRITES,
 			),
 			ThingData::Glyph(GlyphData::Button(_)) => {
-				(palette.button_base, default(), layers::GLYPH_SPRITES)
+				(ColorKey::ButtonBase, default(), layers::GLYPH_SPRITES)
 			}
 		};
 		commands.entity(id).with_children(|children| {
@@ -1053,9 +1049,9 @@ fn create_thing_sprites(
 				Sprite {
 					image: sprites[&ImageKey::Object(ThingType::from(*thing))].clone(),
 					custom_size: Some(SPRITE_SIZE),
-					color,
 					..default()
 				},
+				SpriteColorKey(color_key),
 				anchor,
 				Transform::from_translation(Vec3::Z * z_depth),
 			));
@@ -1067,7 +1063,6 @@ fn create_box_color_markers(
 	mut commands: Commands,
 	sprite_atlas: Res<BoxColorSpriteAtlas>,
 	digit_atlas: Res<DigitAtlas>,
-	palette: Res<ThingPalette>,
 	query: Query<(Entity, &LogicalColor), (With<SokoBox>, Added<LogicalColor>)>,
 ) {
 	for (id, color) in &query {
@@ -1075,7 +1070,7 @@ fn create_box_color_markers(
 			create_logical_color_sprite(
 				children,
 				*color,
-				palette.box_base,
+				ColorKey::BoxBase,
 				&sprite_atlas,
 				&digit_atlas,
 				Transform::from_translation(Vec3::Z * layers::BOX_COLOR_SPRITES),
@@ -1090,7 +1085,6 @@ fn create_button_color_markers(
 	digit_atlas: Res<DigitAtlas>,
 	meshes: Res<GameObjectMeshes>,
 	materials: Res<GameObjectMaterials>,
-	palette: Res<ThingPalette>,
 	query: Query<
 		(Entity, &LogicalColor, &ButtonColorLabelAppearence),
 		(With<SokoButton>, Added<LogicalColor>),
@@ -1099,15 +1093,15 @@ fn create_button_color_markers(
 	for (id, color, label_appearence) in &query {
 		commands.entity(id).with_children(|children| {
 			let label_mesh = if label_appearence.has_arrow_tip {
-				meshes.arrow_labels.clone()
+				meshes[&MeshKey::ArrowLabels].clone()
 			} else {
-				meshes.square_labels.clone()
+				meshes[&MeshKey::SquareLabels].clone()
 			};
 			let (translation, label_rotation, sprite_rotation) =
 				get_button_color_label_placement(label_appearence);
 
 			children.spawn((
-				MeshMaterial2d(materials.colored_button_labels.clone()),
+				MeshMaterial2d(materials[&MaterialKey::ColoredButtonLabels].clone()),
 				Mesh2d(label_mesh),
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_LABELS))
 					.with_rotation(Quat::from_rotation_z(label_rotation)),
@@ -1116,7 +1110,7 @@ fn create_button_color_markers(
 			create_logical_color_sprite(
 				children,
 				*color,
-				palette.button_base,
+				ColorKey::ButtonBase,
 				&sprite_atlas,
 				&digit_atlas,
 				Transform::from_translation(translation.extend(layers::BUTTON_COLOR_SPRITES))
@@ -1129,7 +1123,7 @@ fn create_button_color_markers(
 fn create_logical_color_sprite(
 	children: &mut ChildSpawnerCommands,
 	logical_color: LogicalColor,
-	sprite_color: Color,
+	sprite_color: ColorKey,
 	sprite_atlas: &BoxColorSpriteAtlas,
 	digit_atlas: &DigitAtlas,
 	transform: Transform,
@@ -1140,13 +1134,13 @@ fn create_logical_color_sprite(
 			Sprite {
 				custom_size: Some(COLOR_SPRITE_SIZE),
 				image: sprite_atlas.image.clone(),
-				color: sprite_color,
 				texture_atlas: Some(TextureAtlas {
 					layout: sprite_atlas.layout.clone(),
 					index: logical_color.color_index,
 				}),
 				..default()
 			},
+			SpriteColorKey(sprite_color),
 		));
 	} else {
 		let index_str = logical_color.color_index.to_string();
@@ -1224,7 +1218,7 @@ fn typeset_number(
 	children: &mut ChildSpawnerCommands,
 	start_transform: Transform,
 	digit_atlas: &DigitAtlas,
-	color: Color,
+	color_key: ColorKey,
 	digit_sprite_size: Vec2,
 ) {
 	// How far from `start_transform` the next digit should start,
@@ -1249,13 +1243,13 @@ fn typeset_number(
 			Sprite {
 				custom_size: Some(digit_sprite_size),
 				image: digit_atlas.image.clone(),
-				color,
 				texture_atlas: Some(TextureAtlas {
 					layout: digit_atlas.layout.clone(),
 					index: sprite_index,
 				}),
 				..default()
 			},
+			SpriteColorKey(color_key),
 		));
 	}
 }
