@@ -41,9 +41,16 @@ impl MoveHistory {
 	}
 
 	fn push(&mut self, rotation: RotateCycle) {
-		// Drop everything from the old history branch
-		self.moves.truncate(self.cursor);
-		self.moves.push(rotation);
+		let history_diverged = self
+			.moves
+			.get(self.cursor)
+			.is_none_or(|m| !m.equivalent(&rotation));
+		if history_diverged {
+			// Drop everything from the old history branch
+			// if the new one diverges
+			self.moves.truncate(self.cursor);
+			self.moves.push(rotation);
+		}
 		self.cursor += 1;
 	}
 
@@ -149,14 +156,17 @@ mod test {
 		let mut history = MoveHistory::default();
 		history.push(RotateCycle {
 			target_cycle: 0,
+			target_group: 0,
 			amount: 1,
 		});
 		history.push(RotateCycle {
 			target_cycle: 1,
+			target_group: 1,
 			amount: 2,
 		});
 		history.push(RotateCycle {
 			target_cycle: 2,
+			target_group: 2,
 			amount: -4,
 		});
 
@@ -168,21 +178,24 @@ mod test {
 			history.undo(),
 			Some(RotateCycle {
 				target_cycle: 2,
-				amount: 4
+				target_group: 2,
+				amount: 4,
 			})
 		);
 		assert_eq!(
 			history.undo(),
 			Some(RotateCycle {
 				target_cycle: 1,
-				amount: -2
+				target_group: 1,
+				amount: -2,
 			})
 		);
 		assert_eq!(
 			history.undo(),
 			Some(RotateCycle {
 				target_cycle: 0,
-				amount: -1
+				target_group: 0,
+				amount: -1,
 			})
 		);
 		assert_eq!(history.undo(), None);
@@ -193,6 +206,7 @@ mod test {
 		let mut history = MoveHistory::default();
 		history.push(RotateCycle {
 			target_cycle: 0,
+			target_group: 0,
 			amount: 1,
 		});
 		assert!(history.undo().is_some());
@@ -202,7 +216,8 @@ mod test {
 			history.redo(),
 			Some(RotateCycle {
 				target_cycle: 0,
-				amount: 1
+				target_group: 0,
+				amount: 1,
 			})
 		);
 
@@ -212,7 +227,8 @@ mod test {
 			history.undo(),
 			Some(RotateCycle {
 				target_cycle: 0,
-				amount: -1
+				target_group: 0,
+				amount: -1,
 			})
 		);
 	}
@@ -222,10 +238,12 @@ mod test {
 		let mut history = MoveHistory::default();
 		history.push(RotateCycle {
 			target_cycle: 0,
+			target_group: 0,
 			amount: 1,
 		});
 		history.push(RotateCycle {
 			target_cycle: 1,
+			target_group: 1,
 			amount: 2,
 		});
 		assert!(history.undo().is_some());
@@ -233,10 +251,44 @@ mod test {
 
 		history.push(RotateCycle {
 			target_cycle: 2,
+			target_group: 2,
 			amount: 1,
 		});
 
 		assert!(!history.has_redoable_move());
 		assert!(history.redo().is_none());
+	}
+
+	#[test]
+	fn keep_history_on_manual_redo() {
+		let mut history = MoveHistory::default();
+		history.push(RotateCycle {
+			target_cycle: 0,
+			target_group: 0,
+			amount: 1,
+		});
+		history.push(RotateCycle {
+			target_cycle: 1,
+			target_group: 1,
+			amount: 2,
+		});
+		assert!(history.undo().is_some());
+		assert!(history.undo().is_some());
+
+		history.push(RotateCycle {
+			target_cycle: 0,
+			target_group: 0,
+			amount: 1,
+		});
+
+		assert!(history.has_redoable_move());
+		assert_eq!(
+			history.redo(),
+			Some(RotateCycle {
+				target_cycle: 1,
+				target_group: 1,
+				amount: 2,
+			})
+		);
 	}
 }

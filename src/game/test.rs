@@ -174,12 +174,17 @@ mod utils {
 		}
 
 		fn turn_cycle(&mut self, cycle_id: usize, amount: i32) {
+			let group_id = self
+				.world_mut()
+				.run_system_once(move |l: PlayingLevelData| l.get().unwrap().cycles[cycle_id].group)
+				.unwrap();
 			self.world_mut()
 				.run_system_once_with(
 					turn_system,
 					RotateCycleGroup {
 						rotation: RotateCycle {
 							target_cycle: cycle_id,
+							target_group: group_id,
 							amount: amount as i64,
 						},
 						cause: RotationCause::Manual,

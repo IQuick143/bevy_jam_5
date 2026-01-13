@@ -52,8 +52,20 @@ pub struct IsTriggered(pub bool);
 pub struct RotateCycle {
 	/// Index of the cycle to rotate
 	pub target_cycle: usize,
+	/// Index of the group that is rotated
+	pub target_group: usize,
 	/// How many steps the cycle should rotate by
 	pub amount: i64,
+}
+
+impl RotateCycle {
+	/// Whether two rotations represent equivalent actions
+	///
+	/// Actions are equivalent if the same cycle group turns
+	/// the same number of times, regardless of which cycle triggered it
+	pub fn equivalent(&self, other: &Self) -> bool {
+		(self.target_group, self.amount) == (other.target_group, other.amount)
+	}
 }
 
 /// Enumerates the possible causes of a rotation action
