@@ -123,8 +123,8 @@ fn invalid_escape_sequences() {
 		.unwrap_err(),
 		LexerError {
 			error_code: LexerErrorCode::Generic,
-			slice: r#""abc"#.to_owned(),
-			loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 8),
+			slice: r#""abc\"#.to_owned(),
+			loc: SourceLocation::new(0, 4)..SourceLocation::new(0, 9),
 		}
 		.into()
 	);
