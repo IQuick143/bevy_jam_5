@@ -30,6 +30,7 @@ bevy = { version = "0.18.0", default-features=false, features = [
     "bevy_window",                  # Windowing layer
     "bevy_winit",                   # winit window and input backend
     "critical-section",             # `critical-section` provides the building blocks for synchronization primitives on all platforms, including `no_std`.
+    "default_font",                 # Include a default font, containing only ASCII characters, at the cost of a 20kB binary size increase
     # "force_disable_dlss",         # Forcibly disable DLSS so that cargo build --all-features works without the DLSS SDK being installed. Not meant for users.
     # "hotpatching",                # Enable hotpatching of Bevy systems
     "jpeg",                         # JPEG image format support
