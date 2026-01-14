@@ -12,7 +12,7 @@ pub fn plugin(app: &mut App) {
 	app.init_asset_loader::<LevelListLoader>();
 }
 
-#[derive(Default)]
+#[derive(Default, Reflect)]
 struct LevelListLoader;
 
 #[derive(Debug)]
@@ -83,7 +83,7 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 				InterpreterEndState::Halted(result) => result?,
 			}
 			for warning in interpreter.get_warnings() {
-				log::warn!("{}: {warning}", load_context.asset_path());
+				log::warn!("{}: {warning}", load_context.path());
 			}
 			Ok(interpreter.backend.build(load_context)?)
 		}

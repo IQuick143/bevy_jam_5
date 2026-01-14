@@ -967,8 +967,8 @@ fn generate_random_cycle_walk(
 ) -> impl Iterator<Item = (usize, i32)> + '_ {
 	(0..n_steps).map(move |_| {
 		(
-			rng.gen_range(0..n_cycles),
-			if rng.gen_bool(0.5) { 1 } else { -1 },
+			rng.random_range(0..n_cycles),
+			if rng.random_bool(0.5) { 1 } else { -1 },
 		)
 	})
 }
