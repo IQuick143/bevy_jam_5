@@ -53,7 +53,7 @@ fn init_cycle_spin_animation(
 ) {
 	for visuals in &query {
 		commands.entity(visuals.arrow).insert(SpinAnimation {
-			current_phase: rand::thread_rng().gen_range(0.0..TAU),
+			current_phase: rand::rng().random_range(0.0..TAU),
 			..default()
 		});
 	}
