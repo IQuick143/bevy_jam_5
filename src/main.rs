@@ -12,6 +12,8 @@ pub mod explorer;
 mod game;
 mod graphics;
 mod persistent;
+#[cfg(feature = "playtest")]
+mod playtest;
 mod save;
 mod screen;
 mod settings;
@@ -95,6 +97,10 @@ impl Plugin for AppPlugin {
 		// Enable dev tools for dev builds.
 		#[cfg(feature = "dev")]
 		app.add_plugins(dev_tools::plugin);
+
+		// Enable playtest support for test builds
+		#[cfg(feature = "playtest")]
+		app.add_plugins(playtest::plugin);
 	}
 }
 
