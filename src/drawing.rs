@@ -82,6 +82,8 @@ pub enum ColorKey {
 	BackgroundDetail,
 	BackgroundSolvedBase,
 	BackgroundSolvedDetail,
+	#[cfg(feature = "playtest")]
+	PlaytestMarker,
 }
 
 /// Identifies a material used somewhere in the game
@@ -323,6 +325,7 @@ impl Default for ThingPalette {
 				ColorKey::BackgroundSolvedDetail,
 				Srgba::hex("F5F8FB").unwrap().into(),
 			),
+			(ColorKey::PlaytestMarker, YELLOW_500.into()),
 		]))
 	}
 }

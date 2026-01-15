@@ -40,6 +40,8 @@ pub enum ImageKey {
 	Wall,
 	Detector,
 	ErrorX,
+	#[cfg(feature = "playtest")]
+	PlaytestMarker,
 }
 
 impl AssetKey for ImageKey {
@@ -103,6 +105,11 @@ impl FromWorld for HandleMap<ImageKey> {
 			(ImageKey::Wall, asset_server.load("images/wall.png")),
 			(ImageKey::Detector, asset_server.load("images/detector.png")),
 			(ImageKey::ErrorX, asset_server.load("images/x.png")),
+			#[cfg(feature = "playtest")]
+			(
+				ImageKey::PlaytestMarker,
+				asset_server.load("images/playtest.png"),
+			),
 		]
 		.into()
 	}
