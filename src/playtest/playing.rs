@@ -1,5 +1,6 @@
 //! Extension to the playing screen in playtesting builds
 
+use super::stars::star_rating_widget;
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::ColorKey,
@@ -170,9 +171,14 @@ fn spawn_feedback_form(
 				(
 					Node {
 						padding: FEEDBACK_FORM_BODY_PADDING,
+						flex_direction: FlexDirection::Column,
+						align_items: AlignItems::Center,
 						..default()
 					},
-					children![(widgets::label("How did you like this level?", font.0.clone())),],
+					children![
+						(widgets::label("How did you like this level?", font.0.clone())),
+						star_rating_widget(5, 0),
+					],
 				),
 			],
 		)],
