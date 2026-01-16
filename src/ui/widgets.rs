@@ -34,32 +34,44 @@ pub fn grid_button(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	)
 }
 
-/// Button rendered by a pair of sprites
+/// Button rendered by sprite from the UI sprite atlas
 pub fn sprite_button(sprites: &UiButtonAtlas, sprite_index: usize) -> impl Bundle {
+	common_sprite_button(
+		sprites.image.clone(),
+		InteractionPalette::SPRITE_BUTTON,
+		UiButtonAtlas::TILE_SIZE.x as f32 / UiButtonAtlas::TILE_SIZE.y as f32,
+		Some(TextureAtlas {
+			layout: sprites.layout.clone(),
+			index: sprite_index,
+		}),
+	)
+}
+
+/// Button rendered by sprite
+pub fn common_sprite_button(
+	image: Handle<Image>,
+	palette: InteractionPalette,
+	aspect_ratio: f32,
+	texture_atlas: Option<TextureAtlas>,
+) -> impl Bundle {
 	(
 		Name::new("Button"),
 		Button,
 		Node {
 			height: Val::Px(SPRITE_BUTTON_HEIGHT),
-			width: Val::Px(
-				SPRITE_BUTTON_HEIGHT * UiButtonAtlas::TILE_SIZE.x as f32
-					/ UiButtonAtlas::TILE_SIZE.y as f32,
-			),
+			width: Val::Px(SPRITE_BUTTON_HEIGHT * aspect_ratio),
 			..default()
 		},
-		InteractionPalette::SPRITE_BUTTON,
+		palette,
 		InteractionPaletteForChildSprites,
 		children![(
 			Name::new("Button Image"),
 			ImageNode {
-				image: sprites.image.clone(),
-				texture_atlas: Some(TextureAtlas {
-					layout: sprites.layout.clone(),
-					index: sprite_index,
-				}),
+				image,
+				texture_atlas,
 				..default()
 			},
-			NodeColorKey(ColorKey::SpriteButton),
+			NodeColorKey(palette.none),
 		)],
 	)
 }

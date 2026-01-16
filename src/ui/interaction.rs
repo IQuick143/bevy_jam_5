@@ -55,7 +55,7 @@ pub type InteractionQuery<'w, 's, T, F = ()> = Query<
 >;
 
 /// Palette for widget interactions.
-#[derive(Component, Debug)]
+#[derive(Component, Clone, Copy, Debug)]
 #[require(InteractionColor)]
 #[component(on_add = on_add_interaction_palette)]
 pub struct InteractionPalette {
