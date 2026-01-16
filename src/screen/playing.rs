@@ -25,6 +25,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_state::<PlayingLevel>()
 		.add_message::<GameUiAction>()
 		.add_fade_message::<LoadLevel>()
+		.add_fade_message::<GotoNextLevel>()
 		.add_systems(
 			OnEnter(Screen::Playing),
 			(spawn_game_ui, send_message(LoadLevel)),
@@ -51,9 +52,12 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
+				proceed_to_next_level.run_if(on_message::<GotoNextLevel>),
 				(load_level, update_level_name_display)
 					.chain()
-					.run_if(on_message::<LoadLevel>),
+					.run_if(on_message::<LoadLevel>)
+					// Run them in this order to ensure the states propagate
+					.before(proceed_to_next_level),
 				(
 					update_next_level_button_display,
 					update_checkmark_display.before(update_checkmark_margin),
@@ -114,6 +118,10 @@ enum GameUiAction {
 /// Message that is sent to signal that the currently selected level should be (re)loaded
 #[derive(Message, Component, Clone, Copy, Debug, Default)]
 pub struct LoadLevel;
+
+/// Message that is sent to switch to the next level
+#[derive(Message, Component, Clone, Copy, Debug, Default)]
+pub struct GotoNextLevel;
 
 /// [`SystemParam`] that provides a reference to the entry
 /// of the level list that describes the level being played
@@ -296,9 +304,7 @@ fn game_ui_input_recording_system(
 
 fn game_ui_input_processing_system(
 	mut events: MessageReader<GameUiAction>,
-	playing_level: PlayingLevelListEntry,
 	mut commands: Commands,
-	mut next_level: ResMut<NextState<PlayingLevel>>,
 	mut undo_commands: MessageWriter<UndoMove>,
 ) {
 	if let Some(action) = events.read().last() {
@@ -310,18 +316,26 @@ fn game_ui_input_processing_system(
 				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
 			}
 			GameUiAction::NextLevel => {
-				let next_level_id = playing_level.get().ok().and_then(|l| l.next_level);
-				if next_level_id.is_none() {
-					log::warn!("Received a Next level action on a level without a successor");
-				} else {
-					next_level.set(PlayingLevel(next_level_id));
-					commands.spawn((FadeAnimationBundle::default(), LoadLevel));
-				}
+				commands.spawn((FadeAnimationBundle::default(), GotoNextLevel));
 			}
 			GameUiAction::Undo => {
 				undo_commands.write(UndoMove);
 			}
 		}
+	}
+}
+
+fn proceed_to_next_level(
+	mut events: MessageWriter<LoadLevel>,
+	playing_level: PlayingLevelListEntry,
+	mut next_level: ResMut<NextState<PlayingLevel>>,
+) {
+	let next_level_id = playing_level.get().ok().and_then(|l| l.next_level);
+	if next_level_id.is_none() {
+		log::warn!("Received a Next level action on a level without a successor");
+	} else {
+		next_level.set(PlayingLevel(next_level_id));
+		events.write(LoadLevel);
 	}
 }
 
