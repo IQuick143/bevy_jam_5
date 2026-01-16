@@ -1,4 +1,4 @@
-use super::freeze::ui_not_frozen;
+use super::freeze::IsUiFrozen;
 use crate::{
 	assets::SfxKey,
 	audio::sfx::PlaySfx,
@@ -13,15 +13,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			(
-				apply_interaction_palette.in_set(ApplyInteractionPaletteSystems),
-				trigger_interaction_sfx,
-			)
-				.run_if(ui_not_frozen),
-			// If the UI is frozen, update only based on a limited set of triggers (enable/disable)
-			apply_enable_disable_interaction_palette
-				.in_set(ApplyInteractionPaletteSystems)
-				.run_if(not(ui_not_frozen)),
+			apply_interaction_palette.in_set(ApplyInteractionPaletteSystems),
+			trigger_interaction_sfx,
 			(
 				propagate_interaction_color_to_node_widgets,
 				propagate_interaction_color_to_sprite_widgets,
@@ -122,11 +115,32 @@ fn on_add_interaction_palette(mut world: DeferredWorld, context: HookContext) {
 }
 
 fn apply_interaction_palette(
-	mut palette_query: InteractionQuery<(&InteractionPalette, &mut InteractionColor)>,
+	mut palette_query: Query<(
+		Ref<Interaction>,
+		Option<Ref<InteractionEnabled>>,
+		&InteractionPalette,
+		&mut InteractionColor,
+	)>,
+	is_frozen: IsUiFrozen,
 ) {
-	for (interaction, enabled, (palette, mut color)) in &mut palette_query {
+	let freeze_changed = is_frozen.changed();
+	let is_frozen = is_frozen.get();
+
+	for (interaction, enabled, palette, mut color) in &mut palette_query {
+		let enabled_changed = enabled.as_ref().is_some_and(Ref::is_changed);
+		// Can't use a query filter because there is no option to bypass
+		// it when the UI freeze status just changed, so we must use this
+		if !interaction.is_changed() && !enabled_changed && !freeze_changed {
+			continue;
+		}
+		// If the UI is frozen, do not repaint unless the change is enable/disable
+		// or the entity is being initialized
+		if is_frozen && !enabled_changed && !interaction.is_added() {
+			continue;
+		}
+
 		let new_color = if enabled.is_none_or(|e| **e) {
-			match interaction {
+			match *interaction {
 				Interaction::None => palette.none,
 				Interaction::Hovered => palette.hovered,
 				Interaction::Pressed => palette.pressed,
@@ -134,26 +148,7 @@ fn apply_interaction_palette(
 		} else {
 			palette.disabled
 		};
-		color.set_if_neq(InteractionColor(new_color));
-	}
-}
 
-fn apply_enable_disable_interaction_palette(
-	mut palette_query: Query<
-		(
-			&InteractionEnabled,
-			&InteractionPalette,
-			&mut InteractionColor,
-		),
-		Changed<InteractionEnabled>,
-	>,
-) {
-	for (enabled, palette, mut color) in &mut palette_query {
-		let new_color = if **enabled {
-			palette.none
-		} else {
-			palette.disabled
-		};
 		color.set_if_neq(InteractionColor(new_color));
 	}
 }
@@ -194,9 +189,12 @@ fn propagate_interaction_color_to_sprite_widgets(
 fn trigger_interaction_sfx(
 	mut interactions: Query<(&Interaction, Option<&InteractionEnabled>), Changed<Interaction>>,
 	mut commands: Commands,
+	is_frozen: IsUiFrozen,
 ) {
+	let is_frozen = is_frozen.get();
+
 	for (interaction, enabled) in &mut interactions {
-		if enabled.is_none_or(|e| **e) {
+		if enabled.is_none_or(|e| **e) && !is_frozen {
 			match interaction {
 				Interaction::Hovered => commands.trigger(PlaySfx::Effect(SfxKey::ButtonHover)),
 				Interaction::Pressed => commands.trigger(PlaySfx::Effect(SfxKey::ButtonPress)),
