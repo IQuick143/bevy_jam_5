@@ -8,6 +8,7 @@ use crate::{
 	ui::{
 		consts::*,
 		hover::{self, *},
+		interaction::Unfreeze,
 		prelude::*,
 	},
 	AppSet,
@@ -130,6 +131,7 @@ fn spawn_feedback_form(
 						(
 							widgets::sprite_button(&ui_button_atlas, UiButtonAtlas::EXIT),
 							ExitFeedbackForm,
+							Unfreeze,
 						),
 						Node {
 							flex_grow: 1.0,
@@ -143,6 +145,7 @@ fn spawn_feedback_form(
 								None,
 							),
 							ExitFeedbackForm,
+							Unfreeze,
 						),
 					],
 				),
