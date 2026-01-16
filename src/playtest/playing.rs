@@ -4,7 +4,7 @@ use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::ColorKey,
 	graphics,
-	screen::Screen,
+	screen::{DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, Screen},
 	ui::{
 		consts::*,
 		hover::{self, *},
@@ -25,9 +25,13 @@ pub(super) fn plugin(app: &mut App) {
 				record_playing_screen_input.in_set(AppSet::RecordInput),
 				(
 					spawn_feedback_form.run_if(on_message::<OpenFeedbackForm>),
-					close_feedback_form.run_if(on_message::<ExitFeedbackForm>),
+					(close_feedback_form, do_action_after_close_form)
+						.run_if(on_message::<ExitFeedbackForm>),
 				)
 					.in_set(AppSet::ExecuteInput),
+				intercept_exit_from_level
+					.after(AppSet::ExecuteInput)
+					.run_if(in_state(Screen::Playing)),
 			),
 		);
 }
@@ -37,10 +41,19 @@ pub(super) fn plugin(app: &mut App) {
 struct FeedbackForm;
 
 #[derive(Component, Message, Clone, Copy, Debug, Default)]
-struct OpenFeedbackForm;
+struct OpenFeedbackForm(AfterExitFeedbackForm);
 
 #[derive(Component, Message, Clone, Copy, Debug, Default)]
-struct ExitFeedbackForm;
+struct ExitFeedbackForm(AfterExitFeedbackForm);
+
+/// Action to take after the tester completes the feedback form
+#[derive(Component, Clone, Copy, Debug, Default)]
+enum AfterExitFeedbackForm {
+	#[default]
+	Stay,
+	ChangeScreen(Screen),
+	NextLevel,
+}
 
 impl InteractionPalette {
 	const PLAYTEST_BUTTON: Self = Self {
@@ -81,7 +94,7 @@ fn spawn_playtest_playing_ui(mut commands: Commands, image_handles: Res<HandleMa
 					1.0,
 					None,
 				),
-				OpenFeedbackForm,
+				OpenFeedbackForm(AfterExitFeedbackForm::Stay),
 				HoverHint(PLAYTEST_BUTTON_HOVER_HINT),
 				HoverPriority(hover::prio::STATIC_UI),
 				UseHoverFromInteraction,
@@ -98,6 +111,7 @@ const FEEDBACK_FORM_PADDING: UiRect = UiRect::axes(COMMON_GAP, Val::Px(5.0));
 const FEEDBACK_FORM_BODY_PADDING: UiRect = UiRect::axes(Val::Px(40.0), Val::Px(15.0));
 
 fn spawn_feedback_form(
+	mut messages: MessageReader<OpenFeedbackForm>,
 	mut commands: Commands,
 	ui_button_atlas: Res<UiButtonAtlas>,
 	image_handles: Res<HandleMap<ImageKey>>,
@@ -108,6 +122,10 @@ fn spawn_feedback_form(
 		warn!("Attempting to open feedback form when one is already open");
 		return;
 	}
+
+	let Some(&OpenFeedbackForm(after_close)) = messages.read().last() else {
+		return;
+	};
 
 	commands.spawn((
 		widgets::ui_root(),
@@ -130,7 +148,7 @@ fn spawn_feedback_form(
 					children![
 						(
 							widgets::sprite_button(&ui_button_atlas, UiButtonAtlas::EXIT),
-							ExitFeedbackForm,
+							ExitFeedbackForm(AfterExitFeedbackForm::Stay),
 							Unfreeze,
 						),
 						Node {
@@ -144,7 +162,7 @@ fn spawn_feedback_form(
 								1.0,
 								None,
 							),
-							ExitFeedbackForm,
+							ExitFeedbackForm(after_close),
 							Unfreeze,
 						),
 					],
@@ -167,6 +185,27 @@ fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<Feedbac
 	}
 }
 
+/// This system resubmits the transition thas was intercepted
+/// by [`intercept_exit_from_level`] once the feedback form
+/// is closed
+fn do_action_after_close_form(
+	mut messages: MessageReader<ExitFeedbackForm>,
+	mut commands: Commands,
+) {
+	let Some(ExitFeedbackForm(action)) = messages.read().last() else {
+		return;
+	};
+	match action {
+		AfterExitFeedbackForm::Stay => {}
+		AfterExitFeedbackForm::ChangeScreen(screen) => {
+			commands.do_screen_transition(*screen);
+		}
+		AfterExitFeedbackForm::NextLevel => {
+			commands.spawn((FadeAnimationBundle::default(), GotoNextLevel));
+		}
+	}
+}
+
 fn record_playing_screen_input(
 	query: InteractionQuery<AnyOf<(&OpenFeedbackForm, &ExitFeedbackForm)>>,
 	mut open_events: MessageWriter<OpenFeedbackForm>,
@@ -181,12 +220,43 @@ fn record_playing_screen_input(
 				} else {
 					// If a form is already open, close it when the tester
 					// clicks the button instead
-					close_events.write(ExitFeedbackForm);
+					close_events.write(ExitFeedbackForm(AfterExitFeedbackForm::Stay));
 				}
 			}
 			if let Some(e) = close {
 				close_events.write(*e);
 			}
 		}
+	}
+}
+
+/// This systsm intercepts the player if they attempt
+/// to leave a level in any way,
+/// and opens the feedback form instead
+/// if it seems like it should be filled out
+///
+/// Once the tester fills in the feedback form,
+/// the intercepted action is resubmited
+/// by [`do_action_after_close_form`]
+fn intercept_exit_from_level(
+	query: Query<(Entity, AnyOf<(&DoScreenTransition, &GotoNextLevel)>)>,
+	mut commands: Commands,
+	mut messgaes: MessageWriter<OpenFeedbackForm>,
+) {
+	for (id, (next_screen, _)) in &query {
+		// This means we are entering the level, so we should let it happen
+		if next_screen.is_some_and(|DoScreenTransition(next)| *next == Screen::Playing) {
+			continue;
+		}
+		// Cancel the transition by despawning it
+		commands.entity(id).despawn();
+		// Proceed to the player's selected action after closing the form
+		let after_close = if let Some(DoScreenTransition(screen)) = next_screen {
+			AfterExitFeedbackForm::ChangeScreen(*screen)
+		} else {
+			AfterExitFeedbackForm::NextLevel
+		};
+		// Open the form before letting the player proceed
+		messgaes.write(OpenFeedbackForm(after_close));
 	}
 }
