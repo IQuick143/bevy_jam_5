@@ -7,10 +7,12 @@ use super::{
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::ColorKey,
+	game::logic_relay::{RotateCycleGroup, RotationCause},
 	graphics,
+	save::SaveGame,
 	screen::{
-		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevelListEntry,
-		Screen,
+		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevel,
+		PlayingLevelListEntry, Screen,
 	},
 	send_message,
 	ui::{
@@ -26,6 +28,7 @@ use bevy::{color::palettes::tailwind, input::common_conditions::input_just_press
 pub(super) fn plugin(app: &mut App) {
 	app.add_message::<OpenFeedbackForm>()
 		.add_message::<ExitFeedbackForm>()
+		.init_resource::<MoveCounter>()
 		.add_systems(OnEnter(Screen::Playing), spawn_playtest_playing_ui)
 		.add_systems(
 			Update,
@@ -49,9 +52,11 @@ pub(super) fn plugin(app: &mut App) {
 					.in_set(AppSet::ExecuteInput),
 				intercept_exit_from_level
 					.after(AppSet::ExecuteInput)
-					.run_if(in_state(Screen::Playing)),
+					.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
 				synchronize_level_feedback,
 				update_submit_enable_disable,
+				increment_move_counter.run_if(on_message::<RotateCycleGroup>),
+				reset_move_counter.run_if(state_changed::<PlayingLevel>),
 			),
 		);
 }
@@ -73,6 +78,17 @@ enum AfterExitFeedbackForm {
 	Stay,
 	ChangeScreen(Screen),
 	NextLevel,
+}
+
+/// Counts the number of forward moves made on a level
+/// in a single session, but even through resets
+#[derive(Resource, Clone, Copy, Debug, Default, Deref, DerefMut)]
+struct MoveCounter(u32);
+
+impl MoveCounter {
+	/// When [`MoveCounter`] reaches this value, open the feedback form
+	/// before letting the tester click away
+	const MOVES_BEFORE_ASKING_FOR_FEEDBACK: u32 = 20;
 }
 
 impl InteractionPalette {
@@ -301,22 +317,9 @@ fn intercept_exit_from_level(
 		&FadeAnimation,
 		AnyOf<(&DoScreenTransition, &GotoNextLevel)>,
 	)>,
-	playing_level: PlayingLevelListEntry,
-	playtest_log: Res<PlaytestLog>,
 	mut commands: Commands,
 	mut messgaes: MessageWriter<OpenFeedbackForm>,
-) -> Result {
-	// Skip the setup if we know there will be nothing to evaluate
-	if query.is_empty() {
-		return Ok(());
-	}
-
-	// Do not intercept if the user has already rated this level
-	let level_key = &playing_level.get()?.identifier;
-	if playtest_log.is_level_rated(level_key) {
-		return Ok(());
-	}
-
+) {
 	for (id, animation, (next_screen, _)) in &query {
 		// This means we are entering the level, so we should let it finish on its own
 		if animation.is_past_peak() {
@@ -333,8 +336,34 @@ fn intercept_exit_from_level(
 		// Open the form before letting the player proceed
 		messgaes.write(OpenFeedbackForm(after_close));
 	}
+}
 
-	Ok(())
+fn level_exit_should_be_intercepted(
+	playing_level: PlayingLevelListEntry,
+	playtest_log: Res<PlaytestLog>,
+	save: Res<SaveGame>,
+	move_count: Res<MoveCounter>,
+) -> Result<bool> {
+	// Do not intercept if the user has already rated this level
+	let level_key = &playing_level.get()?.identifier;
+	let is_rated = playtest_log.is_level_rated(level_key);
+	if is_rated {
+		return Ok(false);
+	}
+
+	// Do intercept if the level has been completed
+	let is_completed = save.is_level_completed(level_key);
+	if is_completed {
+		return Ok(true);
+	}
+
+	// Intercept if the tester has tried and failed to solve
+	// for a significant number of moves
+	if **move_count >= MoveCounter::MOVES_BEFORE_ASKING_FOR_FEEDBACK {
+		return Ok(true);
+	}
+
+	Ok(false)
 }
 
 fn synchronize_level_feedback(
@@ -371,4 +400,19 @@ fn update_submit_enable_disable(
 			enabled.set_if_neq(InteractionEnabled(true));
 		}
 	}
+}
+
+fn increment_move_counter(
+	mut messages: MessageReader<RotateCycleGroup>,
+	mut move_count: ResMut<MoveCounter>,
+) {
+	for message in messages.read() {
+		if message.cause == RotationCause::Manual {
+			**move_count += 1;
+		}
+	}
+}
+
+fn reset_move_counter(mut move_count: ResMut<MoveCounter>) {
+	**move_count = 0;
 }
