@@ -12,6 +12,7 @@ use crate::{
 		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevelListEntry,
 		Screen,
 	},
+	send_message,
 	ui::{
 		consts::*,
 		hover::{self, *},
@@ -20,7 +21,7 @@ use crate::{
 	},
 	AppSet,
 };
-use bevy::{color::palettes::tailwind, prelude::*};
+use bevy::{color::palettes::tailwind, input::common_conditions::input_just_pressed, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_message::<OpenFeedbackForm>()
@@ -29,7 +30,17 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				record_playing_screen_input.in_set(AppSet::RecordInput),
+				(
+					record_playing_screen_input,
+					send_message(ExitFeedbackForm(AfterExitFeedbackForm::Stay))
+						.run_if(input_just_pressed(KeyCode::Escape).and(feedback_form_is_open)),
+					emit_confirm_for_current_form.run_if(
+						input_just_pressed(KeyCode::Enter)
+							.and(feedback_form_is_open)
+							.and(is_current_level_rated),
+					),
+				)
+					.in_set(AppSet::RecordInput),
 				(
 					spawn_feedback_form.run_if(on_message::<OpenFeedbackForm>),
 					(close_feedback_form, do_action_after_close_form)
@@ -47,7 +58,7 @@ pub(super) fn plugin(app: &mut App) {
 
 /// Marker component for the root of the feedback form
 #[derive(Component, Clone, Copy, Debug, Default)]
-struct FeedbackForm;
+struct FeedbackForm(AfterExitFeedbackForm);
 
 #[derive(Component, Message, Clone, Copy, Debug, Default)]
 struct OpenFeedbackForm(AfterExitFeedbackForm);
@@ -145,7 +156,7 @@ fn spawn_feedback_form(
 
 	commands.spawn((
 		widgets::ui_root(),
-		FeedbackForm,
+		FeedbackForm(after_close),
 		FreezeUi, // Modal dialog; block all other UI while active
 		children![(
 			Node {
@@ -202,6 +213,27 @@ fn spawn_feedback_form(
 	));
 
 	Ok(())
+}
+
+fn feedback_form_is_open(query: Query<(), With<FeedbackForm>>) -> bool {
+	!query.is_empty()
+}
+
+fn is_current_level_rated(
+	playing_level: PlayingLevelListEntry,
+	playtest_log: Res<PlaytestLog>,
+) -> Result<bool> {
+	let level_key = &playing_level.get()?.identifier;
+	let is_rated = playtest_log.is_level_rated(level_key);
+	Ok(is_rated)
+}
+
+fn emit_confirm_for_current_form(
+	form: Single<&FeedbackForm>,
+	mut messages: MessageWriter<ExitFeedbackForm>,
+) {
+	let FeedbackForm(after_close) = *form;
+	messages.write(ExitFeedbackForm(*after_close));
 }
 
 fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<FeedbackForm>>) {
