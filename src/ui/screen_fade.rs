@@ -60,6 +60,14 @@ impl FadeAnimation {
 	pub fn is_completed(&self) -> bool {
 		self.time_elapsed >= self.total_time
 	}
+
+	pub fn is_past_peak(&self) -> bool {
+		self.progress() >= PEAK_OFFSET
+	}
+
+	pub fn is_just_past_peak(&self) -> bool {
+		self.is_past_peak() && self.prev_progress() < PEAK_OFFSET
+	}
 }
 
 impl Default for FadeAnimation {
@@ -152,7 +160,7 @@ fn send_delayed_fade_messages<E: Message + Component + Clone>(
 	query: Query<(&FadeAnimation, &E)>,
 ) {
 	for (animation, message) in &query {
-		if animation.prev_progress() < PEAK_OFFSET && animation.progress() >= PEAK_OFFSET {
+		if animation.is_just_past_peak() {
 			messages.write(message.clone());
 		}
 	}

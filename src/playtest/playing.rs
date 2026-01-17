@@ -1,11 +1,17 @@
 //! Extension to the playing screen in playtesting builds
 
-use super::stars::star_rating_widget;
+use super::{
+	log::PlaytestLog,
+	stars::{StarRating, StarRatingValue},
+};
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::ColorKey,
 	graphics,
-	screen::{DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, Screen},
+	screen::{
+		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevelListEntry,
+		Screen,
+	},
 	ui::{
 		consts::*,
 		hover::{self, *},
@@ -33,6 +39,7 @@ pub(super) fn plugin(app: &mut App) {
 				intercept_exit_from_level
 					.after(AppSet::ExecuteInput)
 					.run_if(in_state(Screen::Playing)),
+				synchronize_level_feedback,
 			),
 		);
 }
@@ -114,19 +121,26 @@ const FEEDBACK_FORM_BODY_PADDING: UiRect = UiRect::axes(Val::Px(40.0), Val::Px(1
 fn spawn_feedback_form(
 	mut messages: MessageReader<OpenFeedbackForm>,
 	mut commands: Commands,
+	playing_level: PlayingLevelListEntry,
+	playtest_log: Res<PlaytestLog>,
 	ui_button_atlas: Res<UiButtonAtlas>,
 	image_handles: Res<HandleMap<ImageKey>>,
 	font: Res<GlobalFont>,
 	existing_form: Query<(), With<FeedbackForm>>,
-) {
+) -> Result {
 	if !existing_form.is_empty() {
-		warn!("Attempting to open feedback form when one is already open");
-		return;
+		return Err("Attempting to open feedback form when one is already open".into());
 	}
 
 	let Some(&OpenFeedbackForm(after_close)) = messages.read().last() else {
-		return;
+		return Ok(());
 	};
+
+	let level_key = &playing_level.get()?.identifier;
+	let current_rating = playtest_log
+		.get_level(level_key)
+		.map(|l| l.stars)
+		.unwrap_or_default() as u32;
 
 	commands.spawn((
 		widgets::ui_root(),
@@ -177,12 +191,14 @@ fn spawn_feedback_form(
 					},
 					children![
 						(widgets::label("How did you like this level?", font.0.clone())),
-						star_rating_widget(5, 0),
+						(StarRating::new(5), StarRatingValue(current_rating)),
 					],
 				),
 			],
 		)],
 	));
+
+	Ok(())
 }
 
 fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<FeedbackForm>>) {
@@ -245,13 +261,30 @@ fn record_playing_screen_input(
 /// the intercepted action is resubmited
 /// by [`do_action_after_close_form`]
 fn intercept_exit_from_level(
-	query: Query<(Entity, AnyOf<(&DoScreenTransition, &GotoNextLevel)>)>,
+	query: Query<(
+		Entity,
+		&FadeAnimation,
+		AnyOf<(&DoScreenTransition, &GotoNextLevel)>,
+	)>,
+	playing_level: PlayingLevelListEntry,
+	playtest_log: Res<PlaytestLog>,
 	mut commands: Commands,
 	mut messgaes: MessageWriter<OpenFeedbackForm>,
-) {
-	for (id, (next_screen, _)) in &query {
-		// This means we are entering the level, so we should let it happen
-		if next_screen.is_some_and(|DoScreenTransition(next)| *next == Screen::Playing) {
+) -> Result {
+	// Skip the setup if we know there will be nothing to evaluate
+	if query.is_empty() {
+		return Ok(());
+	}
+
+	// Do not intercept if the user has already rated this level
+	let level_key = &playing_level.get()?.identifier;
+	if playtest_log.is_level_rated(level_key) {
+		return Ok(());
+	}
+
+	for (id, animation, (next_screen, _)) in &query {
+		// This means we are entering the level, so we should let it finish on its own
+		if animation.is_past_peak() {
 			continue;
 		}
 		// Cancel the transition by despawning it
@@ -265,4 +298,30 @@ fn intercept_exit_from_level(
 		// Open the form before letting the player proceed
 		messgaes.write(OpenFeedbackForm(after_close));
 	}
+
+	Ok(())
+}
+
+fn synchronize_level_feedback(
+	query: Query<Ref<StarRatingValue>, Changed<StarRatingValue>>,
+	playing_level: PlayingLevelListEntry,
+	mut playtest_log: ResMut<PlaytestLog>,
+) -> Result {
+	if query.is_empty() {
+		return Ok(());
+	}
+
+	let level_key = &playing_level.get()?.identifier;
+
+	for value in &query {
+		// Do not respond to initialization, that is always a false signal
+		// Do not respond when value is zero, it should not even be possible
+		// to set it to zero
+		if value.is_added() || **value == 0 {
+			continue;
+		}
+
+		playtest_log.level_mut(level_key.clone()).stars = **value as u8;
+	}
+	Ok(())
 }

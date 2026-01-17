@@ -1,5 +1,7 @@
 //! Extension for more concise parsing of jsons
 
+use serde_json::{Map, Value};
+
 pub trait MapExt {
 	fn get_bool(&self, key: &str) -> Option<bool>;
 	fn get_float(&self, key: &str) -> Option<f64>;
@@ -28,6 +30,9 @@ pub trait MapExt {
 	fn read_from<T>(&self, key: &str, destination: &mut T)
 	where
 		for<'a> &'a serde_json::Value: TryInto<T>;
+	/// If the provided key does not contain an object,
+	/// places an object there and returns it
+	fn put_object_at(&mut self, key: &str) -> &mut Map<String, Value>;
 }
 
 impl MapExt for serde_json::Map<String, serde_json::Value> {
@@ -52,5 +57,12 @@ impl MapExt for serde_json::Map<String, serde_json::Value> {
 				*destination = value;
 			}
 		}
+	}
+
+	fn put_object_at(&mut self, key: &str) -> &mut Map<String, Value> {
+		if !self.get(key).is_some_and(Value::is_object) {
+			self.insert(key.to_owned(), Map::new().into());
+		}
+		self[key].as_object_mut().unwrap()
 	}
 }
