@@ -41,7 +41,8 @@ pub(super) fn plugin(app: &mut App) {
 					),
 					send_message(GameUiAction::NextLevel).run_if(
 						char_input_pressed('n')
-							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
+							.and(resource_equals(IsLevelPersistentlyCompleted(true)))
+							.and(next_level_exists),
 					),
 					send_message(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
@@ -323,6 +324,10 @@ fn game_ui_input_processing_system(
 			}
 		}
 	}
+}
+
+fn next_level_exists(playing_level: PlayingLevelListEntry) -> bool {
+	playing_level.get().is_ok_and(|l| l.next_level.is_some())
 }
 
 fn proceed_to_next_level(
