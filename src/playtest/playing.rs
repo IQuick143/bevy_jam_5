@@ -15,7 +15,7 @@ use crate::{
 	ui::{
 		consts::*,
 		hover::{self, *},
-		interaction::Unfreeze,
+		interaction::{InteractionEnabled, Unfreeze},
 		prelude::*,
 	},
 	AppSet,
@@ -40,6 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 					.after(AppSet::ExecuteInput)
 					.run_if(in_state(Screen::Playing)),
 				synchronize_level_feedback,
+				update_submit_enable_disable,
 			),
 		);
 }
@@ -179,6 +180,8 @@ fn spawn_feedback_form(
 							),
 							ExitFeedbackForm(after_close),
 							Unfreeze,
+							// Allow the player to submit if a rating has been given
+							InteractionEnabled(current_rating > 0),
 						),
 					],
 				),
@@ -324,4 +327,16 @@ fn synchronize_level_feedback(
 		playtest_log.level_mut(level_key.clone()).stars = **value as u8;
 	}
 	Ok(())
+}
+
+fn update_submit_enable_disable(
+	rating_q: Query<&StarRatingValue, Changed<StarRatingValue>>,
+	mut submit_q: Query<&mut InteractionEnabled, With<ExitFeedbackForm>>,
+) {
+	let is_submitable = rating_q.iter().any(|&StarRatingValue(rating)| rating > 0);
+	for mut enabled in &mut submit_q {
+		if is_submitable {
+			enabled.set_if_neq(InteractionEnabled(true));
+		}
+	}
 }

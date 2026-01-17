@@ -82,7 +82,7 @@ impl InteractionPalette {
 		none: ColorKey::NextLevelButton,
 		hovered: ColorKey::NextLevelButtonHovered,
 		pressed: ColorKey::NextLevelButtonPressed,
-		disabled: ColorKey::NextLevelButton,
+		disabled: ColorKey::SpriteButtonDisabled,
 	};
 }
 
