@@ -20,6 +20,7 @@ pub fn text_input(value: impl Into<String>, font: Handle<Font>, extra: impl Bund
 			..default()
 		},
 		BorderColor::all(FEEDBACK_FORM_FRAME_COLOR),
+		BackgroundColor(TEXT_INPUT_BACKGROUND),
 		children![(
 			TextInputNode::default(),
 			TextInputContents::default(),

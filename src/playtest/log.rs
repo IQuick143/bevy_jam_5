@@ -19,6 +19,9 @@ pub struct PlaytestLog {
 	session_index: u32,
 	/// Information about playthrough and feedback on individual levels
 	levels: HashMap<String, LevelPlaytestLog>,
+	/// General feedback given by the tester,
+	/// per question mapped by text key
+	pub global_feedback: HashMap<String, String>,
 }
 
 /// Play log and feedback to a particular level
@@ -49,6 +52,13 @@ impl Saveable for PlaytestLog {
 		for (key, level) in &self.levels {
 			level.write_json(levels.put_object_at(key));
 		}
+
+		let global = m.put_object_at(Self::GLOBAL_FEEDBACK);
+		for (key, answer) in &self.global_feedback {
+			if !answer.is_empty() {
+				global.write(key, answer.clone());
+			}
+		}
 	}
 
 	fn read_json(&mut self, store: &serde_json::Value) {
@@ -75,6 +85,14 @@ impl Saveable for PlaytestLog {
 				self.level_mut(key.clone()).read_json(level);
 			}
 		}
+		if let Some(global) = m.get(Self::GLOBAL_FEEDBACK).and_then(Value::as_object) {
+			for (key, answer) in global {
+				if let Some(answer) = answer.as_str() {
+					self.global_feedback
+						.insert(key.to_owned(), answer.to_owned());
+				}
+			}
+		}
 	}
 }
 
@@ -82,6 +100,7 @@ impl PlaytestLog {
 	const TESTER_ID: &str = "tester_id";
 	const SESSION_INDEX: &str = "session";
 	const LEVELS: &str = "levels";
+	const GLOBAL_FEEDBACK: &str = "feedback";
 
 	/// Initialization to be run immediately after
 	/// the resource is loaded

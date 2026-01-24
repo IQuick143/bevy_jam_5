@@ -27,3 +27,5 @@ pub const INPUT_TEXT_SIZE: f32 = 18.0;
 pub const TEXT_INPUT_FRAME_WIDTH: Val = FEEDBACK_FORM_FRAME_WIDTH;
 pub const TEXT_INPUT_PADDING: Val = Val::Px(10.0);
 pub const TEXT_INPUT_MIN_HEIGHT: Val = Val::Px(INPUT_TEXT_SIZE * 4.0);
+pub const TEXT_INPUT_BACKGROUND: Color = Color::WHITE;
+pub const GLOBAL_FEEDBACK_FORM_MAX_WIDTH: Val = Val::Px(800.0);
