@@ -3,13 +3,20 @@
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey},
 	drawing::{ColorKey, NodeColorKey},
-	screen::Screen,
-	ui::widgets,
+	screen::{DoScreenTransitionCommands as _, Screen},
+	ui::{prelude::*, widgets},
+	AppSet,
 };
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(OnEnter(Screen::Title), spawn_playtest_title_ui);
+	app.add_systems(OnEnter(Screen::Title), spawn_playtest_title_ui)
+		.add_systems(
+			Update,
+			enter_playtest_screen
+				.run_if(ui_not_frozen)
+				.in_set(AppSet::RecordInput),
+		);
 }
 
 /// Marker component for the playtest panel button on title screen
@@ -48,4 +55,15 @@ fn spawn_playtest_title_ui(
 					NodeColorKey(ColorKey::PlaytestMarker),
 				));
 		});
+}
+
+fn enter_playtest_screen(
+	query: InteractionQuery<(), With<TitlePlaytestPanelButton>>,
+	mut commands: Commands,
+) {
+	for (interaction, enabled, ()) in &query {
+		if *interaction == Interaction::Pressed && enabled.is_none_or(|e| **e) {
+			commands.do_screen_transition(Screen::Playtest);
+		}
+	}
 }

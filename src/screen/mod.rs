@@ -85,6 +85,9 @@ pub enum Screen {
 	LevelSelect,
 	/// The actual playing screen of the game.
 	Playing,
+	/// Global playtest feedback form
+	#[cfg(feature = "playtest")]
+	Playtest,
 }
 
 impl Screen {
@@ -95,6 +98,8 @@ impl Screen {
 			Self::Credits => Some(Self::Title),
 			Self::LevelSelect => Some(Self::Title),
 			Self::Playing => Some(Self::LevelSelect),
+			#[cfg(feature = "playtest")]
+			Self::Playtest => Some(Self::Title),
 			_ => None,
 		}
 	}

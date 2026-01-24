@@ -91,6 +91,10 @@ impl MoveCounter {
 	const MOVES_BEFORE_ASKING_FOR_FEEDBACK: u32 = 20;
 }
 
+/// Marker component for rating widgets for in-level feedback
+#[derive(Component, Clone, Copy, Debug, Default)]
+struct LevelStarRating;
+
 impl InteractionPalette {
 	const PLAYTEST_BUTTON: Self = Self {
 		none: ColorKey::PlaytestMarker,
@@ -221,7 +225,11 @@ fn spawn_feedback_form(
 					},
 					children![
 						(widgets::label("How did you like this level?", font.0.clone())),
-						(StarRating::new(5), StarRatingValue(current_rating)),
+						(
+							StarRating::new(5),
+							StarRatingValue(current_rating),
+							LevelStarRating,
+						),
 					],
 				),
 			],
@@ -367,7 +375,7 @@ fn level_exit_should_be_intercepted(
 }
 
 fn synchronize_level_feedback(
-	query: Query<Ref<StarRatingValue>, Changed<StarRatingValue>>,
+	query: Query<Ref<StarRatingValue>, (Changed<StarRatingValue>, With<LevelStarRating>)>,
 	playing_level: PlayingLevelListEntry,
 	mut playtest_log: ResMut<PlaytestLog>,
 ) -> Result {
