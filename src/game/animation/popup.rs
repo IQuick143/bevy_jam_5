@@ -1,7 +1,10 @@
 //! Popup/down animation
 
 use super::animation_easing_function;
-use crate::AppSet;
+use crate::{
+	drawing::{ColorKey, ThingPalette},
+	AppSet,
+};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -45,6 +48,7 @@ impl PopupAnimation {
 
 fn tick_popup_animation(
 	mut query: Query<(&mut PopupAnimation, &mut Transform, &mut Sprite)>,
+	palette: Res<ThingPalette>,
 	time: Res<Time>,
 ) {
 	for (mut animation, mut transform, mut sprite) in &mut query {
@@ -63,6 +67,8 @@ fn tick_popup_animation(
 		let adjusted_progress = animation_easing_function(animation.progress);
 		let current_scale = animation.starting_scale.lerp(1.0, adjusted_progress);
 		transform.scale = Vec3::splat(current_scale);
-		sprite.color.set_alpha(adjusted_progress);
+		let pure_color = palette[&ColorKey::WarningSign];
+		let alpha = adjusted_progress * pure_color.alpha();
+		sprite.color = pure_color.with_alpha(alpha);
 	}
 }
