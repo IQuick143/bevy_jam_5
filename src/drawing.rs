@@ -325,6 +325,7 @@ impl Default for ThingPalette {
 				ColorKey::BackgroundSolvedDetail,
 				Srgba::hex("F5F8FB").unwrap().into(),
 			),
+			#[cfg(feature = "playtest")]
 			(ColorKey::PlaytestMarker, YELLOW_500.into()),
 		]))
 	}
