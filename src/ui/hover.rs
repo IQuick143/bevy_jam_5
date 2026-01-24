@@ -226,7 +226,7 @@ fn update_hover_text(
 	};
 	for (mut text, mut visibility) in text_query.iter_mut() {
 		*visibility = match should_be_visible {
-			true => Visibility::Visible,
+			true => Visibility::Inherited,
 			false => Visibility::Hidden,
 		};
 		text.0.clone_from(&chosen_text);

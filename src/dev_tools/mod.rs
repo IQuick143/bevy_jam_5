@@ -21,6 +21,7 @@ use bevy::{
 	},
 	input::common_conditions::input_just_pressed,
 	math::bounding::BoundingVolume,
+	window::WindowMode,
 };
 
 use crate::screen::Screen;
@@ -41,12 +42,15 @@ pub(super) fn plugin(app: &mut App) {
 			toggle_turning_animation_speed.run_if(input_just_pressed(KeyCode::KeyT)),
 			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
 			toggle_fps_diagnostic.run_if(input_just_pressed(KeyCode::KeyF)),
+			toggle_ui_display.run_if(input_just_pressed(KeyCode::F1)),
+			toggle_full_screen.run_if(input_just_pressed(KeyCode::F11)),
 		),
 	);
 	app.add_systems(Startup, init_viewport_box);
 	app.init_resource::<RenderOutlines>();
 	app.init_resource::<AutoReload>();
 	app.init_resource::<TurnAnimationSpeedState>();
+	app.init_resource::<HideUi>();
 	app.add_plugins(FpsOverlayPlugin {
 		config: FpsOverlayConfig {
 			text_color: Color::BLACK,
@@ -70,6 +74,10 @@ struct AutoReload(pub bool);
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Deref, DerefMut, Debug, Default, Reflect)]
 struct TurnAnimationSpeedState(pub usize);
+
+/// Whether the UI should hide itself so we can see the world
+#[derive(Resource, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
+struct HideUi(pub bool);
 
 /// Marks a [`Node`] as a debug outline, only making it visible
 /// when [`RenderOutlines`] is set to true
@@ -222,4 +230,27 @@ fn toggle_turning_animation_speed(
 	const OPTIONS: [f32; 6] = [TurnAnimationLength::DEFAULT.0, 1.0, 2.0, 3.0, 5.0, 10.0];
 	**current_setting = (**current_setting + 1) % OPTIONS.len();
 	**animation_time = OPTIONS[**current_setting];
+}
+
+fn toggle_ui_display(
+	mut is_hidden: ResMut<HideUi>,
+	mut query: Query<&mut Visibility, (With<Node>, Without<ChildOf>)>,
+) {
+	**is_hidden = !**is_hidden;
+	let new_visibility = if **is_hidden {
+		Visibility::Hidden
+	} else {
+		Visibility::Inherited
+	};
+	for mut visibility in &mut query {
+		*visibility = new_visibility;
+	}
+}
+
+fn toggle_full_screen(mut window: Single<&mut Window>) {
+	if window.mode == WindowMode::Windowed {
+		window.mode = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
+	} else {
+		window.mode = WindowMode::Windowed;
+	}
 }
