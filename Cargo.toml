@@ -73,6 +73,8 @@ serde = "*"
 serde_json = "*"
 directories = "6.0.0"
 
+bevy_ui_text_input = { git = "https://github.com/Elekrisk/bevy_ui_text_input", branch = "bevy-0.18", optional = true }
+
 [features]
 default = [
     # Default to a native dev build.
@@ -101,7 +103,9 @@ hotpatching = [
     "dev_native",
     "bevy/hotpatching",
 ]
-playtest = []
+playtest = [
+    "dep:bevy_ui_text_input",
+]
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.
 # In some cases they may still signal poor code quality however, so consider commenting out these lines.

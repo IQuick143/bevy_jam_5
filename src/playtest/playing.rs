@@ -1,14 +1,13 @@
 //! Extension to the playing screen in playtesting builds
 
 use super::{
+	consts::*,
 	log::PlaytestLog,
 	stars::{StarRating, StarRatingValue},
 };
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
-	drawing::ColorKey,
 	game::logic_relay::{RotateCycleGroup, RotationCause},
-	graphics,
 	save::SaveGame,
 	screen::{
 		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevel,
@@ -23,7 +22,8 @@ use crate::{
 	},
 	AppSet,
 };
-use bevy::{color::palettes::tailwind, input::common_conditions::input_just_pressed, prelude::*};
+use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy_ui_text_input::TextInputContents;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_message::<OpenFeedbackForm>()
@@ -53,7 +53,8 @@ pub(super) fn plugin(app: &mut App) {
 				intercept_exit_from_level
 					.after(AppSet::ExecuteInput)
 					.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
-				synchronize_level_feedback,
+				synchronize_star_feedback,
+				synchronize_text_feedback,
 				update_submit_enable_disable,
 				increment_move_counter.run_if(on_message::<RotateCycleGroup>),
 				reset_move_counter.run_if(state_changed::<PlayingLevel>),
@@ -92,17 +93,17 @@ impl MoveCounter {
 }
 
 /// Marker component for rating widgets for in-level feedback
-#[derive(Component, Clone, Copy, Debug, Default)]
-struct LevelStarRating;
-
-impl InteractionPalette {
-	const PLAYTEST_BUTTON: Self = Self {
-		none: ColorKey::PlaytestMarker,
-		..Self::SPRITE_BUTTON
-	};
-
-	const CONFIRM_BUTTON: Self = Self::NEXT_LEVEL_BUTTON;
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+enum LevelStarRating {
+	/// General level quality rating
+	General,
+	/// Subjective difficulty rating
+	Difficulty,
 }
+
+/// Marker component for text input widgets for in-level feedback
+#[derive(Component, Clone, Copy, Debug)]
+struct LevelTextInput;
 
 const PLAYTEST_BUTTON_HOVER_HINT: &str = "Playtest feedback form";
 
@@ -143,13 +144,6 @@ fn spawn_playtest_playing_ui(mut commands: Commands, image_handles: Res<HandleMa
 	));
 }
 
-const FEEDBACK_FORM_WIDTH: Val = Val::Px(600.0);
-const FEEDBACK_FORM_BG_COLOR: Color = Color::WHITE;
-const FEEDBACK_FORM_FRAME_COLOR: Color = Color::Srgba(tailwind::SLATE_500);
-const FEEDBACK_FORM_FRAME_WIDTH: Val = Val::Px(graphics::RING_OUTLINE_WIDTH);
-const FEEDBACK_FORM_PADDING: UiRect = UiRect::axes(COMMON_GAP, Val::Px(5.0));
-const FEEDBACK_FORM_BODY_PADDING: UiRect = UiRect::axes(Val::Px(40.0), Val::Px(15.0));
-
 fn spawn_feedback_form(
 	mut messages: MessageReader<OpenFeedbackForm>,
 	mut commands: Commands,
@@ -169,10 +163,10 @@ fn spawn_feedback_form(
 	};
 
 	let level_key = &playing_level.get()?.identifier;
-	let current_rating = playtest_log
-		.get_level(level_key)
-		.map(|l| l.stars)
-		.unwrap_or_default() as u32;
+	let level_data = playtest_log.get_level(level_key);
+	let current_rating = level_data.map(|l| l.stars).unwrap_or_default() as u32;
+	let current_difficulty = level_data.map(|l| l.difficulty).unwrap_or_default() as u32;
+	let current_comment = level_data.map(|l| l.comment.as_str()).unwrap_or_default();
 
 	commands.spawn((
 		widgets::ui_root(),
@@ -219,17 +213,26 @@ fn spawn_feedback_form(
 				(
 					Node {
 						padding: FEEDBACK_FORM_BODY_PADDING,
+						row_gap: FEEDBACK_FORM_BODY_GAP,
 						flex_direction: FlexDirection::Column,
 						align_items: AlignItems::Center,
 						..default()
 					},
 					children![
-						(widgets::label("How did you like this level?", font.0.clone())),
+						widgets::label("How did you like this level?", font.0.clone()),
 						(
 							StarRating::new(5),
 							StarRatingValue(current_rating),
-							LevelStarRating,
+							LevelStarRating::General,
 						),
+						widgets::label("Subjective difficulty?", font.0.clone()),
+						(
+							StarRating::new(5),
+							StarRatingValue(current_difficulty),
+							LevelStarRating::Difficulty,
+						),
+						widgets::label("Any other comments?", font.0.clone()),
+						super::widgets::text_input(current_comment, font.0.clone(), LevelTextInput),
 					],
 				),
 			],
@@ -374,8 +377,37 @@ fn level_exit_should_be_intercepted(
 	Ok(false)
 }
 
-fn synchronize_level_feedback(
-	query: Query<Ref<StarRatingValue>, (Changed<StarRatingValue>, With<LevelStarRating>)>,
+fn synchronize_star_feedback(
+	query: Query<(Ref<StarRatingValue>, &LevelStarRating), Changed<StarRatingValue>>,
+	playing_level: PlayingLevelListEntry,
+	mut playtest_log: ResMut<PlaytestLog>,
+) -> Result {
+	if query.is_empty() {
+		return Ok(());
+	}
+
+	let level_key = &playing_level.get()?.identifier;
+
+	for (value, rating) in &query {
+		// Do not respond to initialization, that is always a false signal
+		// Do not respond when value is zero, it should not even be possible
+		// to set it to zero
+		if value.is_added() || **value == 0 {
+			continue;
+		}
+
+		let value = **value as u8;
+		let level_data = playtest_log.level_mut(level_key.clone());
+		match rating {
+			LevelStarRating::General => level_data.stars = value,
+			LevelStarRating::Difficulty => level_data.difficulty = value,
+		}
+	}
+	Ok(())
+}
+
+fn synchronize_text_feedback(
+	query: Query<Ref<TextInputContents>, (Changed<TextInputContents>, With<LevelTextInput>)>,
 	playing_level: PlayingLevelListEntry,
 	mut playtest_log: ResMut<PlaytestLog>,
 ) -> Result {
@@ -387,13 +419,12 @@ fn synchronize_level_feedback(
 
 	for value in &query {
 		// Do not respond to initialization, that is always a false signal
-		// Do not respond when value is zero, it should not even be possible
-		// to set it to zero
-		if value.is_added() || **value == 0 {
+		if value.is_added() {
 			continue;
 		}
 
-		playtest_log.level_mut(level_key.clone()).stars = **value as u8;
+		let level_data = playtest_log.level_mut(level_key.clone());
+		level_data.comment = value.get().to_owned();
 	}
 	Ok(())
 }

@@ -26,6 +26,10 @@ pub struct PlaytestLog {
 pub struct LevelPlaytestLog {
 	/// Star rating given by the user
 	pub stars: u8,
+	/// Subjective difficulty given by the user
+	pub difficulty: u8,
+	/// Additional comments left by the user
+	pub comment: String,
 }
 
 impl Saveable for PlaytestLog {
@@ -119,11 +123,19 @@ impl PlaytestLog {
 
 impl LevelPlaytestLog {
 	const STAR_RATING: &str = "stars";
+	const DIFFICULTY_RATING: &str = "difficulty";
+	const EXTRA_FEEDBACK: &str = "comment";
 
 	fn write_json(&self, m: &mut serde_json::Map<String, serde_json::Value>) {
 		// Zero means the field is unfilled
 		if self.stars != 0 {
 			m.write(Self::STAR_RATING, self.stars);
+		}
+		if self.difficulty != 0 {
+			m.write(Self::DIFFICULTY_RATING, self.difficulty);
+		}
+		if !self.comment.is_empty() {
+			m.write(Self::EXTRA_FEEDBACK, self.comment.as_str());
 		}
 	}
 
@@ -139,6 +151,18 @@ impl LevelPlaytestLog {
 			.and_then(|i| u8::try_from(i).ok())
 		{
 			self.stars = stars;
+		}
+
+		if let Some(difficulty) = m
+			.get(Self::DIFFICULTY_RATING)
+			.and_then(Value::as_u64)
+			.and_then(|i| u8::try_from(i).ok())
+		{
+			self.difficulty = difficulty;
+		}
+
+		if let Some(comment) = m.get(Self::EXTRA_FEEDBACK).and_then(Value::as_str) {
+			self.comment = comment.to_owned();
 		}
 	}
 
