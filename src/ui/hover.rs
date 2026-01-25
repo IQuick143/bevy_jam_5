@@ -1,3 +1,4 @@
+use super::freeze::ui_not_frozen;
 use crate::{camera::CameraHarness, screen::Screen};
 use bevy::{
 	math::bounding::{Aabb2d, BoundingCircle, BoundingVolume},
@@ -46,7 +47,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			update_hover_state,
-			update_hover_state_from_interaction,
+			update_hover_state_from_interaction.run_if(ui_not_frozen),
 			update_hover_text_cache,
 			update_hover_text.run_if(resource_changed::<HintText>),
 		),
