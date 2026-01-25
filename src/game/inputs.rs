@@ -61,7 +61,7 @@ fn cycle_inputs_system(
 		return;
 	};
 
-	let (nearest_cycle, _, is_turnable) = cycles_q
+	let (nearest_cycle, _, _, is_turnable) = cycles_q
 		.iter()
 		.filter_map(|(e, placement, transform, turnability, _, _)| {
 			let is_turnable = turnability.0;
@@ -70,7 +70,7 @@ fn cycle_inputs_system(
 			match placement.shape {
 				CycleShape::Circle(radius) => {
 					if d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {
-						Some((e, d_sq / radius.powi(2), is_turnable))
+						Some((e, d_sq, radius.powi(2), is_turnable))
 					} else {
 						None
 					}
@@ -79,15 +79,15 @@ fn cycle_inputs_system(
 		})
 		// Cannot just call min, because IEEE754
 		.fold(
-			(None, f32::INFINITY, false),
-			|(e1, d_sq_1, t1), (e2, d_sq_2, t2)| {
+			(None, f32::INFINITY, -1.0, false),
+			|(e1, d_sq_1, r_sq_1, t1), (e2, d_sq_2, r_sq_2, t2)| {
 				// Sort by turnability first, because we want to select a turnable
 				// cycle if at all possible, even if it is overlapped by locked ones
 				// that would otherwise be a better match
-				if (!t1, d_sq_1) > (!t2, d_sq_2) {
-					(Some(e2), d_sq_2, t2)
+				if (!t1, r_sq_1 < d_sq_1, r_sq_1, d_sq_1) > (!t2, r_sq_2 < d_sq_2, r_sq_2, d_sq_2) {
+					(Some(e2), d_sq_2, r_sq_2, t2)
 				} else {
-					(e1, d_sq_1, t1)
+					(e1, d_sq_1, r_sq_1, t1)
 				}
 			},
 		);
