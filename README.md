@@ -1,6 +1,6 @@
 _Brought to you by a bunch of nerds._
 
-# Ptolemy's Epicycles
+# Epicycles
 
 A puzzle game about rotating cycles to move objects into the correct spots.
 
