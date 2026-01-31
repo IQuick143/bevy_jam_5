@@ -73,10 +73,12 @@ impl GameState {
 		let (groups_turned_by, wall_hits) =
 			self.calculate_rotation_tables_for_cycle_turn(level, cycle_index, rotate_by)?;
 		let clashes = self.find_cycle_clashes(level, &groups_turned_by);
+		let objects_moved = self.any_object_moved(level, &groups_turned_by);
 		Ok(TurnCycleResult {
 			groups_turned_by,
 			clashes,
 			wall_hits,
+			objects_moved,
 		})
 	}
 
@@ -316,6 +318,22 @@ impl GameState {
 		}
 		clashes
 	}
+
+	/// Checks whether any object lies on any of the cycles that have turned
+	fn any_object_moved(&self, level: &LevelData, group_rotations: &[i64]) -> bool {
+		for (group, rotate_by) in level.groups.iter().zip(group_rotations) {
+			if *rotate_by != 0 {
+				for (cycle_id, _) in &group.cycles {
+					for vertex_id in &level.cycles[*cycle_id].vertex_indices {
+						if self.objects.get(*vertex_id).is_some_and(Option::is_some) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+		false
+	}
 }
 
 /// Information about a cycle turning action that took place
@@ -340,6 +358,8 @@ pub struct TurnCycleResult {
 	/// Elements can be used to index [`LevelData::cycles`]
 	/// and the resulting [`CycleData::wall_indices`](crate::game::level::CycleData::wall_indices)
 	pub wall_hits: Vec<(usize, usize)>,
+	/// True if any object has moved (or would have) in the turn
+	pub objects_moved: bool,
 }
 
 impl TurnCycleResult {

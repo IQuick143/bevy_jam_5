@@ -1,0 +1,37 @@
+name = 'Two Rails';
+hint = '';
+
+bb_top = -100;
+bb_bottom = 100;
+bb_left = -60;
+bb_right = 110;
+
+d1 = detector();
+d2 = detector();
+
+ra1 = vertex(box() flag());
+ra2 = vertex(box() flag());
+ra3 = vertex();
+ra4 = vertex();
+
+rb1 = vertex();
+rb2 = vertex();
+rb3 = vertex(player() button());
+rb4 = vertex(player() button());
+
+# wij vertices are used to nicely arrange the walls, a single wall would suffice
+circle(rail1 = cycle(wall(), w1a=vertex(), w1b=vertex(), wall() ra1 ra2 d1 ra3 ra4); -550, 0, 550);
+circle(rail2 = cycle(wall(), w2a=vertex(), w2b=vertex(), wall() rb1 rb2 d2 rb3 rb4); -500, 0, 600);
+
+link(rail1, rail2);
+
+circle(cycle(ra2 ra1 rb1 rb2); 50, +60, 60);
+circle(cycle(ra4 ra3 rb3 rb4); 50, -60, 60);
+
+bl_vert = vertex();
+
+circle(block1 = cycle("still"; bl_vert); -50, -10, 10);
+circle(block2 = cycle("still"; bl_vert); -50, +10, 10);
+
+oneway(+1; d1 block1);
+oneway(+1; d2 block2);
