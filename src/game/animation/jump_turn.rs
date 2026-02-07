@@ -49,7 +49,7 @@ impl JumpTurnAnimation {
 			{
 				self.bounce_midway = false;
 				self.jump_animation_magitude *= -1.0;
-				self.current_phase -= self.jump_animation_magitude;
+				self.current_phase += self.jump_animation_magitude;
 			}
 		}
 	}
