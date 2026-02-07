@@ -114,6 +114,7 @@ enum ColorPickerButton {
 	Reset,
 	Copy,
 	Paste,
+	Print,
 }
 
 #[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
@@ -223,8 +224,13 @@ fn spawn_picker_ui(mut commands: Commands, palette: Res<ThingPalette>) {
 						color_manipulator_button_base("V", Color::WHITE),
 						NodeColorKey(ColorKey::NodeBackground),
 						ColorPickerButton::Paste,
-					)
-				]
+					),
+					(
+						color_manipulator_button_base("P", Color::WHITE),
+						NodeColorKey(ColorKey::NodeBackground),
+						ColorPickerButton::Print,
+					),
+				],
 			),
 		],
 	));
@@ -313,6 +319,7 @@ fn handle_picker_button_inputs(
 	mut new_selected_color: ResMut<NextState<SelectedColorKey>>,
 	mut clipboard: ResMut<ColorPickerClipboard>,
 	mut current_color: Single<&mut ColorPickerCurrentColor>,
+	palette: Res<ThingPalette>,
 ) {
 	for action in reader.read() {
 		match action {
@@ -329,6 +336,7 @@ fn handle_picker_button_inputs(
 			}
 			ColorPickerButton::Copy => **clipboard = ***current_color,
 			ColorPickerButton::Paste => ***current_color = **clipboard,
+			ColorPickerButton::Print => eprintln!("{palette:?}"),
 		}
 	}
 }
