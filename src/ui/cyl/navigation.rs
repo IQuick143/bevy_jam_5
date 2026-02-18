@@ -1,9 +1,9 @@
-use crate::ui::cyl::{CylParentWidget, CylWidgetData};
+///! Navigation design:
+///! Entities that can be navigated by Cyl must be [`CylWidget`]'s
+///! and should be structured in a hiearchy of [``]
 
+use crate::ui::cyl::{CylParentWidget, CylWidgetData};
 use super::prelude::*;
-/// Navigation design:
-/// Entities that can be navigated by Cyl must be [`CylWidget`]'s and should be structured in a hiearchy of [``]
-///
 use bevy::prelude::*;
 
 pub fn plugin(app: &mut App) {
@@ -164,7 +164,7 @@ impl NavigationDirection {
 	}
 
 	pub fn going_up(&self) -> bool {
-		matches!(self.navigation_direction, NavigationDirection::Up)
+		matches!(self, NavigationDirection::Up)
 	}
 }
 

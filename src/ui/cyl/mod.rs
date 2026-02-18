@@ -1,35 +1,62 @@
-//! Cyl UI - A UI widget framework focusing on simple UI structures that can be fully navigated by keyboards and gamepads.
+//! Cyl UI - A UI widget framework focusing on simple UI structures
+//! that can be fully navigated by keyboards and gamepads.
 //!
 //! # Core design:
-//! UI should be structured into a tree of widgets (via the relations [`CylSubWidget`], [`CylParentWidget`]).
-//! One of these widgets may have focus and events will be dispatched to that widget. Events from constituents of a widget may bubble upwards.
+//! UI should be structured into a tree of widgets (via the relations
+//! [`CylSubWidget`], [`CylParentWidget`]). One of these widgets may have
+//! focus and events will be dispatched to that widget. Events from constituents
+//! of a widget may bubble upwards.
 //!
 //! # Input:
 //! There are two kinds of base input events:
 //! Pointer Events
 //!  - Pointer hover is automatically converted into navigation focus
-//!  - Pointer click on widgets labelled with [`CylClickable`] is converted into [`CylInteract`]
+//!  - Pointer click on widgets labelled with [`CylClickable`]
+//!    is converted into [`CylInteract`]
+//!
 //! Non-pointing Events, which include:
 //!  - [`NavigationInput`] - Directional input (4 cardinal directions, think WASD or arrow keys)
-//!  - [`InteractInput`] - Interaction (one input, think enter key), dispatches to [`CylInteract`] on a focused widget.
-//!  - These events are input agnostic, the user is responsible for emitting them based on whatever input schema they support
-//!  - These are automatically dispatched to the focused entity or they change which entity is being focused.
+//!  - [`InteractInput`] - Interaction (one input, think enter key),
+//!    dispatches to [`CylInteract`] on a focused widget.
+//!  - These events are input agnostic, the user is responsible for emitting
+//!    them based on whatever input schema they support
+//!  - These are automatically dispatched to the focused entity or they change
+//!    which entity is being focused.
 //!
 //! # Navigation tree:
-//! Widgets that contain subwidgets by default are treated as a list of widgets that should be navigated through via up/down navigation.
-//! You can change this behaviour via [`CylSubwidgetNavigationOverride`], which in strict mode can avoid navigation falling from this widget down to subwidgets, or only to a selected subwidget.
-//! Note: Pointer hover can still set navigation to a subwidget bypassing the override. Widgets may use [`CylChangeFocus`] events to address this however they like.
+//! Widgets that contain subwidgets by default are treated as a list of widgets
+//! that should be navigated through via up/down navigation.
+//! You can change this behaviour via [`CylSubwidgetNavigationOverride`],
+//! which in strict mode can avoid navigation falling from this widget down
+//! to subwidgets, or only to a selected subwidget.
+//!
+//! Note: Pointer hover can still set navigation to a subwidget bypassing the override.
+//! Widgets may use [`CylChangeFocus`] events to address this however they like.
 //!
 //! # Widgets:
-//!  - [`CylButton`] - a simple button that responds to clicks and interactions, emits [`CylInteract`]
-//!  - [`CylCheckbox`] - a checkbox that behaves similarly to the button, but keeps toggle state
-//!  - [`CylSelector`] - a selector base widget that uses subnavigation (left/right) to change a selected variant
-//!    - [`CylSubmenuSelector`] - a selector that allows for changing between a preset amount of submenus TODO!
+//!  - [`CylButton`] - a simple button that responds to clicks and interactions,
+//!    emits [`CylInteract`]
+//!  - [`CylCheckbox`] - a checkbox that behaves similarly to the button,
+//!    but keeps toggle state
+//!  - [`CylSelector`] - a selector base widget that uses subnavigation
+//!    (left/right) to change a selected variant
+//!    - [`CylSubmenuSelector`] - a selector that allows for changing between
+//!      a preset amount of submenus TODO!
+//!
+//! [`CylButton`]: widgets::CylButton
+//! [`CylCheckbox`]: widgets::CylCheckbox
+//! [`CylSelector`]: widgets::CylSelector
+//! [`CylInteract`]: events::CylInteract
+//! [`NavigationInput`]: input::NavigationInput
+//! [`InteractInput`]: input::InteractInput
+//! [`CylChangeFocus`]: navigation::CylChangeFocus
+
 pub mod events;
 pub mod input;
 pub mod navigation;
 pub mod widgets;
 
+#[allow(unused_imports)]
 pub mod prelude {
 	pub use super::events::*;
 	pub use super::input::*;
