@@ -2,6 +2,7 @@
 
 pub mod background;
 pub mod consts;
+pub mod cyl;
 pub mod freeze;
 pub mod hover;
 pub mod interaction;
@@ -39,6 +40,7 @@ pub fn char_input_pressed(c: char) -> impl Fn(MessageReader<KeyboardInput>) -> b
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((
+		cyl::plugin,
 		interaction::plugin,
 		screen_fade::plugin,
 		hover::plugin,
