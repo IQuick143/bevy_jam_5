@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
+	drawing::{ColorKey, TextColorKey},
 	game::logic_relay::{RotateCycleGroup, RotationCause},
 	save::SaveGame,
 	screen::{
@@ -37,11 +38,6 @@ pub(super) fn plugin(app: &mut App) {
 					record_playing_screen_input,
 					send_message(ExitFeedbackForm(AfterExitFeedbackForm::Stay))
 						.run_if(input_just_pressed(KeyCode::Escape).and(feedback_form_is_open)),
-					emit_confirm_for_current_form.run_if(
-						input_just_pressed(KeyCode::Enter)
-							.and(feedback_form_is_open)
-							.and(is_current_level_rated),
-					),
 				)
 					.in_set(AppSet::RecordInput),
 				(
@@ -64,7 +60,7 @@ pub(super) fn plugin(app: &mut App) {
 
 /// Marker component for the root of the feedback form
 #[derive(Component, Clone, Copy, Debug, Default)]
-struct FeedbackForm(AfterExitFeedbackForm);
+struct FeedbackForm;
 
 #[derive(Component, Message, Clone, Copy, Debug, Default)]
 struct OpenFeedbackForm(AfterExitFeedbackForm);
@@ -170,7 +166,7 @@ fn spawn_feedback_form(
 
 	commands.spawn((
 		widgets::ui_root(),
-		FeedbackForm(after_close),
+		FeedbackForm,
 		FreezeUi, // Modal dialog; block all other UI while active
 		children![(
 			Node {
@@ -286,23 +282,6 @@ fn spawn_feedback_form(
 
 fn feedback_form_is_open(query: Query<(), With<FeedbackForm>>) -> bool {
 	!query.is_empty()
-}
-
-fn is_current_level_rated(
-	playing_level: PlayingLevelListEntry,
-	playtest_log: Res<PlaytestLog>,
-) -> Result<bool> {
-	let level_key = &playing_level.get()?.identifier;
-	let is_rated = playtest_log.is_level_rated(level_key);
-	Ok(is_rated)
-}
-
-fn emit_confirm_for_current_form(
-	form: Single<&FeedbackForm>,
-	mut messages: MessageWriter<ExitFeedbackForm>,
-) {
-	let FeedbackForm(after_close) = *form;
-	messages.write(ExitFeedbackForm(*after_close));
 }
 
 fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<FeedbackForm>>) {
