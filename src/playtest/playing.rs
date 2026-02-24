@@ -232,7 +232,12 @@ fn spawn_feedback_form(
 							LevelStarRating::Difficulty,
 						),
 						widgets::label("Any other comments?", font.0.clone()),
-						super::widgets::text_input(current_comment, font.0.clone(), LevelTextInput),
+						super::widgets::text_input(
+							current_comment,
+							font.0.clone(),
+							3.0,
+							LevelTextInput
+						),
 					],
 				),
 			],

@@ -36,13 +36,14 @@ enum FeedbackFormAction {
 #[derive(Component, Clone, Copy, Debug)]
 struct FeedbackTextQuestion(&'static str);
 
-const FEEDBACK_QUESTIONS: [(&str, &str); 3] = [
+const FEEDBACK_QUESTIONS: [(&str, &str, f32); 3] = [
 	(
 		"favorites",
 		"Which parts of the game did you enjoy the most?",
+		3.0,
 	),
-	("confusing", "Which parts of the game were confusing?"),
-	("price", "How much do you think the game should cost?"),
+	("confusing", "Which parts of the game were confusing?", 3.0),
+	("price", "How much do you think the game should cost?", 1.0),
 ];
 
 fn spawn_feedback_form_screen(
@@ -51,52 +52,6 @@ fn spawn_feedback_form_screen(
 	font: Res<GlobalFont>,
 	playtest: Res<PlaytestLog>,
 ) {
-	let id = commands
-		.spawn((
-			widgets::ui_root(),
-			DespawnOnExit(Screen::Playtest),
-			Scrollbox {
-				step: COMMON_TEXT_SIZE,
-			},
-		))
-		.id();
-	commands.spawn((
-		widgets::header("Playtest feedback form", font.0.clone()),
-		ChildOf(id),
-	));
-
-	for (key, question) in FEEDBACK_QUESTIONS {
-		let current_answer = playtest
-			.global_feedback
-			.get(key)
-			.map(String::as_str)
-			.unwrap_or_default();
-		commands.spawn((
-			widgets::text(question, JustifyContent::Center, font.0.clone()),
-			ChildOf(id),
-		));
-		commands.spawn((
-			Node {
-				max_width: Val::Percent(100.0),
-				padding: UiRect::horizontal(COMMON_GAP),
-				width: GLOBAL_FEEDBACK_FORM_MAX_WIDTH,
-				..default()
-			},
-			ChildOf(id),
-			children![super::widgets::text_input(
-				current_answer,
-				font.0.clone(),
-				FeedbackTextQuestion(key),
-			)],
-		));
-	}
-
-	commands.spawn((
-		widgets::menu_button("Submit", font.0.clone()),
-		FeedbackFormAction::Submit,
-		ChildOf(id),
-	));
-
 	commands.spawn((
 		Node {
 			margin: TOOLBAR_MARGIN,
@@ -107,6 +62,71 @@ fn spawn_feedback_form_screen(
 			widgets::sprite_button(&button_sprites, UiButtonAtlas::EXIT),
 			FeedbackFormAction::Back,
 		)],
+	));
+
+	let id = commands
+		.spawn((
+			widgets::ui_root(),
+			DespawnOnExit(Screen::Playtest),
+			Scrollbox {
+				step: COMMON_TEXT_SIZE,
+			},
+		))
+		.id();
+	let main = commands
+		.spawn((
+			Scrollbox {
+				step: COMMON_TEXT_SIZE,
+			},
+			Node {
+				flex_direction: FlexDirection::Column,
+				justify_content: JustifyContent::Start,
+				align_items: AlignItems::Center,
+				padding: UiRect::vertical(Val::Percent(5.0)),
+				row_gap: COMMON_GAP,
+				overflow: Overflow::scroll_y(),
+				..default()
+			},
+			ChildOf(id),
+		))
+		.id();
+
+	commands.spawn((
+		widgets::header("Playtest feedback form", font.0.clone()),
+		ChildOf(main),
+	));
+
+	for (key, question, base_height) in FEEDBACK_QUESTIONS {
+		let current_answer = playtest
+			.global_feedback
+			.get(key)
+			.map(String::as_str)
+			.unwrap_or_default();
+		commands.spawn((
+			widgets::text(question, JustifyContent::Center, font.0.clone()),
+			ChildOf(main),
+		));
+		commands.spawn((
+			Node {
+				max_width: Val::Percent(100.0),
+				padding: UiRect::horizontal(COMMON_GAP),
+				width: GLOBAL_FEEDBACK_FORM_MAX_WIDTH,
+				..default()
+			},
+			ChildOf(main),
+			children![super::widgets::text_input(
+				current_answer,
+				font.0.clone(),
+				base_height,
+				FeedbackTextQuestion(key),
+			)],
+		));
+	}
+
+	commands.spawn((
+		widgets::menu_button("Submit", font.0.clone()),
+		FeedbackFormAction::Submit,
+		ChildOf(main),
 	));
 }
 
