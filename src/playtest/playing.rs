@@ -227,9 +227,46 @@ fn spawn_feedback_form(
 						),
 						widgets::label("Subjective difficulty?", font.0.clone()),
 						(
-							StarRating::new(5),
-							StarRatingValue(current_difficulty),
-							LevelStarRating::Difficulty,
+							Node {
+								justify_content: JustifyContent::Center,
+								align_items: AlignItems::Center,
+								column_gap: COMMON_GAP,
+								..default()
+							},
+							children![
+								(
+									Node {
+										width: STAR_LABEL_WIDTH,
+										..default()
+									},
+									Text::new("Too easy"),
+									TextColorKey(ColorKey::UiLabelText),
+									TextFont {
+										font: font.0.clone(),
+										font_size: STAR_LABEL_TEXT_SIZE,
+										..default()
+									},
+									TextLayout::new_with_justify(Justify::Right),
+								),
+								(
+									StarRating::new(5),
+									StarRatingValue(current_difficulty),
+									LevelStarRating::Difficulty,
+								),
+								(
+									Node {
+										width: STAR_LABEL_WIDTH,
+										..default()
+									},
+									Text::new("Too hard"),
+									TextColorKey(ColorKey::UiLabelText),
+									TextFont {
+										font: font.0.clone(),
+										font_size: STAR_LABEL_TEXT_SIZE,
+										..default()
+									},
+								),
+							],
 						),
 						widgets::label("Any other comments?", font.0.clone()),
 						super::widgets::text_input(
