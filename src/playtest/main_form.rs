@@ -65,13 +65,7 @@ fn spawn_feedback_form_screen(
 	));
 
 	let id = commands
-		.spawn((
-			widgets::ui_root(),
-			DespawnOnExit(Screen::Playtest),
-			Scrollbox {
-				step: COMMON_TEXT_SIZE,
-			},
-		))
+		.spawn((widgets::ui_root(), DespawnOnExit(Screen::Playtest)))
 		.id();
 	let main = commands
 		.spawn((
