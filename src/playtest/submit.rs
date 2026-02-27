@@ -98,8 +98,6 @@ fn submit_playtest_log(
 ) -> impl Future<Output = Result<(), ureq::Error>> + Send + Sync {
 	let mut body = serde_json::Map::new().into();
 	playtest.write_json(&mut body);
-
-	let tester_id = 42;
-
+	let tester_id = playtest.tester_id();
 	async move { send_request_with_playtest_log(tester_id, &body.to_string()) }
 }

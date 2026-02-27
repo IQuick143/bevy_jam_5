@@ -7,8 +7,8 @@ use crate::{
 	},
 	persistent::*,
 };
-use bevy::{asset::uuid::Uuid, platform::collections::HashMap, prelude::*};
-use rand::RngCore as _;
+use bevy::{platform::collections::HashMap, prelude::*};
+use rand::Rng;
 use serde_json::{Map, Value};
 
 pub(super) fn plugin(app: &mut App) {
@@ -21,7 +21,7 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Resource, Debug, Default)]
 pub struct PlaytestLog {
 	/// Randomly generated and hopefully unique identifier of a playtester
-	tester_id: Uuid,
+	tester_id: u64,
 	/// How many sessions has the tester opened before this one
 	session_index: u32,
 	/// Information about playthrough and feedback on individual levels
@@ -74,7 +74,7 @@ impl Saveable for PlaytestLog {
 		}
 		let m = store.as_object_mut().unwrap();
 
-		m.write(Self::TESTER_ID, self.tester_id.to_string());
+		m.write(Self::TESTER_ID, self.tester_id);
 		m.write(Self::SESSION_INDEX, self.session_index);
 
 		let levels = m.put_object_at(Self::LEVELS);
@@ -94,11 +94,7 @@ impl Saveable for PlaytestLog {
 		let Value::Object(m) = store else {
 			return;
 		};
-		if let Some(tester_id) = m
-			.get(Self::TESTER_ID)
-			.and_then(Value::as_str)
-			.and_then(|s| Uuid::parse_str(s).ok())
-		{
+		if let Some(tester_id) = m.get(Self::TESTER_ID).and_then(Value::as_u64) {
 			self.tester_id = tester_id;
 		}
 		if let Some(session_index) = m
@@ -133,7 +129,7 @@ impl PlaytestLog {
 	/// Initialization to be run immediately after
 	/// the resource is loaded
 	pub fn after_load(&mut self) {
-		if self.tester_id.is_nil() {
+		if self.tester_id == 0 {
 			self.first_initialize();
 		} else {
 			self.after_reload();
@@ -142,6 +138,10 @@ impl PlaytestLog {
 
 	pub fn session_index(&self) -> u32 {
 		self.session_index
+	}
+
+	pub fn tester_id(&self) -> u64 {
+		self.tester_id
 	}
 
 	fn first_initialize(&mut self) {
@@ -154,9 +154,8 @@ impl PlaytestLog {
 	}
 
 	fn initialize_tester_id(&mut self) {
-		let mut uuid_bytes = [0u8; 16];
-		rand::rng().fill_bytes(&mut uuid_bytes);
-		self.tester_id = Uuid::from_bytes(uuid_bytes);
+		// Leave the top bit zero
+		self.tester_id = rand::rng().random::<u64>() & !(1 << 63);
 	}
 
 	pub fn get_level(&self, key: &str) -> Option<&LevelPlaytestLog> {
