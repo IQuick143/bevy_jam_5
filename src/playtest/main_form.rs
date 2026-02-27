@@ -1,8 +1,9 @@
 //! Global feedback form screen
 
-use super::{consts::*, log::PlaytestLog};
+use super::{consts::*, log::PlaytestLog, submit::*};
 use crate::{
 	assets::{GlobalFont, UiButtonAtlas},
+	drawing::{ColorKey, TextColorKey},
 	screen::{DoScreenTransitionCommands as _, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
 	AppSet,
@@ -22,6 +23,7 @@ pub(super) fn plugin(app: &mut App) {
 				)
 					.in_set(AppSet::RecordInput),
 				handle_feedback_screen_input.in_set(AppSet::ExecuteInput),
+				display_submission_status.in_set(SubmissionSystems),
 			),
 		);
 }
@@ -35,6 +37,11 @@ enum FeedbackFormAction {
 /// Marker for a text input linked to a text question identified by a key
 #[derive(Component, Clone, Copy, Debug)]
 struct FeedbackTextQuestion(&'static str);
+
+/// Marker component for the node that displays the status of a submission
+#[derive(Component, Clone, Copy, Debug, Default)]
+#[require(Text)]
+struct SubmitResultNode;
 
 const FEEDBACK_QUESTIONS: [(&str, &str, f32); 3] = [
 	(
@@ -122,6 +129,16 @@ fn spawn_feedback_form_screen(
 		FeedbackFormAction::Submit,
 		ChildOf(main),
 	));
+	commands.spawn((
+		TextFont {
+			font_size: COMMON_TEXT_SIZE,
+			font: font.0.clone(),
+			..default()
+		},
+		TextColorKey(ColorKey::UiLabelText),
+		SubmitResultNode,
+		ChildOf(main),
+	));
 }
 
 fn read_feedback_screen_input(
@@ -141,8 +158,12 @@ fn handle_feedback_screen_input(
 ) {
 	for message in messages.read() {
 		match message {
-			FeedbackFormAction::Back => commands.do_screen_transition(Screen::Title),
-			FeedbackFormAction::Submit => todo!(),
+			FeedbackFormAction::Back => {
+				commands.do_screen_transition(Screen::Title);
+			}
+			FeedbackFormAction::Submit => {
+				commands.spawn((SubmissionTask::default(), FreezeUi));
+			}
 		}
 	}
 }
@@ -155,5 +176,23 @@ fn synchronize_text_feedback(
 		playtest
 			.global_feedback
 			.insert(key.to_string(), value.get().to_string());
+	}
+}
+
+fn display_submission_status(
+	mut node: Single<&mut Text, With<SubmitResultNode>>,
+	query: Query<&SubmissionTask, Changed<SubmissionTask>>,
+) {
+	if let Some(task) = query.iter().last() {
+		let status_message = match task.get_result() {
+			None => "Submitting...",
+			Some(Ok(())) => "Response accepted!",
+			Some(Err(ureq::Error::Timeout(_))) => "Request timed out",
+			Some(Err(ureq::Error::StatusCode(413))) => "Sorry, your response is too large. Consider submitting without game log or email the raw file to us",
+			Some(Err(ureq::Error::StatusCode(429))) => "You have submitted too many times recently, try again later",
+			Some(Err(ureq::Error::StatusCode(500..))) => "Internal server error",
+			Some(Err(_)) => "Could not process response",
+		};
+		***node = status_message.to_owned();
 	}
 }

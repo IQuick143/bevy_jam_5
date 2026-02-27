@@ -74,6 +74,8 @@ serde_json = "*"
 directories = "6.0.0"
 
 bevy_ui_text_input = { git = "https://github.com/Elekrisk/bevy_ui_text_input", branch = "bevy-0.18", optional = true }
+ureq = { version = "3.2", optional = true }
+futures = { version = "0.3", features = ["alloc"], optional = true }
 
 [features]
 default = [
@@ -105,6 +107,8 @@ hotpatching = [
 ]
 playtest = [
     "dep:bevy_ui_text_input",
+    "dep:ureq",
+    "dep:futures",
 ]
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.

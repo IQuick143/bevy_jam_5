@@ -6,6 +6,7 @@ mod main_form;
 mod playing;
 mod recording;
 mod stars;
+mod submit;
 mod title;
 mod widgets;
 
@@ -19,6 +20,7 @@ pub(super) fn plugin(app: &mut App) {
 		playing::plugin,
 		recording::plugin,
 		stars::plugin,
+		submit::plugin,
 		title::plugin,
 	));
 }
