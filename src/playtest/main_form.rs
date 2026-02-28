@@ -2,8 +2,8 @@
 
 use super::{consts::*, log::PlaytestLog, submit::*};
 use crate::{
-	assets::{GlobalFont, UiButtonAtlas},
-	drawing::{ColorKey, TextColorKey},
+	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
+	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	screen::{DoScreenTransitionCommands as _, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
 	AppSet,
@@ -40,7 +40,6 @@ struct FeedbackTextQuestion(&'static str);
 
 /// Marker component for the node that displays the status of a submission
 #[derive(Component, Clone, Copy, Debug, Default)]
-#[require(Text)]
 struct SubmitResultNode;
 
 const FEEDBACK_QUESTIONS: [(&str, &str, f32); 3] = [
@@ -130,14 +129,33 @@ fn spawn_feedback_form_screen(
 		ChildOf(main),
 	));
 	commands.spawn((
-		TextFont {
-			font_size: COMMON_TEXT_SIZE,
-			font: font.0.clone(),
+		Node {
+			column_gap: COMMON_GAP,
 			..default()
 		},
-		TextColorKey(ColorKey::UiLabelText),
-		SubmitResultNode,
 		ChildOf(main),
+		children![
+			(
+				ImageNode::default(),
+				Node {
+					width: Val::Px(COMMON_TEXT_SIZE),
+					height: Val::Px(COMMON_TEXT_SIZE),
+					..default()
+				},
+				NodeColorKey(default()),
+				SubmitResultNode,
+			),
+			(
+				Text::default(),
+				TextFont {
+					font_size: COMMON_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
+				SubmitResultNode,
+			),
+		],
 	));
 }
 
@@ -180,9 +198,12 @@ fn synchronize_text_feedback(
 }
 
 fn display_submission_status(
-	mut node: Single<&mut Text, With<SubmitResultNode>>,
+	mut text_node: Single<&mut Text, With<SubmitResultNode>>,
+	image_node: Single<(&mut ImageNode, &mut NodeColorKey), With<SubmitResultNode>>,
 	query: Query<&SubmissionTask, Changed<SubmissionTask>>,
+	images: Res<HandleMap<ImageKey>>,
 ) {
+	let (mut image_node, mut image_color) = image_node.into_inner();
 	if let Some(task) = query.iter().last() {
 		let status_message = match task.get_result() {
 			None => "Submitting...",
@@ -193,6 +214,13 @@ fn display_submission_status(
 			Some(Err(ureq::Error::StatusCode(500..))) => "Internal server error",
 			Some(Err(_)) => "Could not process response",
 		};
-		***node = status_message.to_owned();
+		let (icon_key, icon_color) = match task.get_result() {
+			None => (None, ColorKey::Blank),
+			Some(Ok(())) => (Some(ImageKey::Checkmark), ColorKey::Checkmark),
+			Some(Err(_)) => (Some(ImageKey::ErrorX), ColorKey::WarningSign),
+		};
+		***text_node = status_message.to_owned();
+		image_node.image = icon_key.map(|k| images[&k].clone()).unwrap_or_default();
+		**image_color = icon_color;
 	}
 }
