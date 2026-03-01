@@ -4,7 +4,7 @@ use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey},
 	drawing::{ColorKey, NodeColorKey},
 	screen::{DoScreenTransitionCommands as _, Screen},
-	ui::{prelude::*, widgets},
+	ui::{consts::COMMON_GAP, prelude::*, widgets},
 	AppSet,
 };
 use bevy::prelude::*;
@@ -20,8 +20,8 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// Marker component for the playtest panel button on title screen
-#[derive(Clone, Copy, Debug, Default, Component)]
-struct TitlePlaytestPanelButton;
+#[derive(Clone, Copy, Debug, Component)]
+struct TitlePlaytestPanelButton(Screen);
 
 fn spawn_playtest_title_ui(
 	mut commands: Commands,
@@ -35,35 +35,46 @@ fn spawn_playtest_title_ui(
 		))
 		.with_children(|children| {
 			children
-				.spawn((
-					widgets::grid_button("Playtester panel", font.0.clone()),
-					TitlePlaytestPanelButton,
-				))
-				.with_child((
-					Node {
-						position_type: PositionType::Absolute,
-						left: Val::Px(0.0),
-						top: Val::Px(2.5),
-						width: Val::Px(40.0),
-						height: Val::Px(40.0),
-						..default()
-					},
-					ImageNode {
-						image: image_handles[&ImageKey::PlaytestMarker].clone(),
-						..default()
-					},
-					NodeColorKey(ColorKey::PlaytestMarker),
-				));
+				.spawn(Node {
+					column_gap: COMMON_GAP,
+					..default()
+				})
+				.with_children(|children| {
+					children
+						.spawn((
+							widgets::grid_button("Playtester panel", font.0.clone()),
+							TitlePlaytestPanelButton(Screen::Playtest),
+						))
+						.with_child((
+							Node {
+								position_type: PositionType::Absolute,
+								left: Val::Px(0.0),
+								top: Val::Px(2.5),
+								width: Val::Px(40.0),
+								height: Val::Px(40.0),
+								..default()
+							},
+							ImageNode {
+								image: image_handles[&ImageKey::PlaytestMarker].clone(),
+								..default()
+							},
+							NodeColorKey(ColorKey::PlaytestMarker),
+						));
+					children.spawn((
+						widgets::grid_button("Privacy policy", font.0.clone()),
+						TitlePlaytestPanelButton(Screen::PlaytestPrivacyStatement),
+					));
+				});
 		});
 }
 
 fn enter_playtest_screen(
-	query: InteractionQuery<(), With<TitlePlaytestPanelButton>>,
+	query: InteractionQuery<&TitlePlaytestPanelButton>,
 	mut commands: Commands,
 ) {
-	for (interaction, enabled, ()) in &query {
+	for (interaction, enabled, TitlePlaytestPanelButton(target_screen)) in &query {
 		if *interaction == Interaction::Pressed && enabled.is_none_or(|e| **e) {
-			commands.do_screen_transition(Screen::Playtest);
+			commands.do_screen_transition(*target_screen);
 		}
 	}
 }

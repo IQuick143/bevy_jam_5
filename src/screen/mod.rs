@@ -88,6 +88,8 @@ pub enum Screen {
 	/// Global playtest feedback form
 	#[cfg(feature = "playtest")]
 	Playtest,
+	#[cfg(feature = "playtest")]
+	PlaytestPrivacyStatement,
 }
 
 impl Screen {

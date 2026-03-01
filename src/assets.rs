@@ -414,3 +414,19 @@ impl<K: AssetKey> HandleMap<K> {
 			.all(|x| asset_server.is_loaded_with_dependencies(x))
 	}
 }
+
+pub fn all_assets_loaded(
+	asset_server: Res<AssetServer>,
+	image_handles: Res<HandleMap<ImageKey>>,
+	sfx_handles: Res<HandleMap<SfxKey>>,
+	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
+	font: Res<GlobalFont>,
+	// This resource gets initialized later, so it needs to be optional
+	level_list: Option<Res<LoadedLevelList>>,
+) -> bool {
+	image_handles.all_loaded(&asset_server)
+		&& sfx_handles.all_loaded(&asset_server)
+		&& soundtrack_handles.all_loaded(&asset_server)
+		&& asset_server.is_loaded_with_dependencies(font.0.id())
+		&& level_list.is_some_and(|list| list.all_loaded(&asset_server))
+}

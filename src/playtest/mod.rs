@@ -4,6 +4,7 @@ mod consts;
 mod log;
 mod main_form;
 mod playing;
+mod privacy;
 mod recording;
 mod stars;
 mod submit;
@@ -18,6 +19,7 @@ pub(super) fn plugin(app: &mut App) {
 		log::plugin,
 		main_form::plugin,
 		playing::plugin,
+		privacy::plugin,
 		recording::plugin,
 		stars::plugin,
 		submit::plugin,
