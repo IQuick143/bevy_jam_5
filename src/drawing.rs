@@ -84,6 +84,10 @@ pub enum ColorKey {
 	BackgroundSolvedDetail,
 	#[cfg(feature = "playtest")]
 	PlaytestMarker,
+	#[cfg(feature = "playtest")]
+	StarWidgetHovered,
+	#[cfg(feature = "playtest")]
+	StarWidgetSelected,
 }
 
 /// Identifies a material used somewhere in the game
@@ -327,6 +331,10 @@ impl Default for ThingPalette {
 			),
 			#[cfg(feature = "playtest")]
 			(ColorKey::PlaytestMarker, YELLOW_500.into()),
+			#[cfg(feature = "playtest")]
+			(ColorKey::StarWidgetSelected, YELLOW_500.into()),
+			#[cfg(feature = "playtest")]
+			(ColorKey::StarWidgetHovered, YELLOW_200.into()),
 		]))
 	}
 }

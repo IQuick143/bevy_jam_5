@@ -2,7 +2,7 @@
 
 use crate::{
 	assets::{HandleMap, ImageKey},
-	drawing::NodeColorKey,
+	drawing::{ColorKey, NodeColorKey},
 	ui::{consts::*, interaction::Unfreeze, prelude::InteractionPalette},
 	AppSet,
 };
@@ -19,6 +19,15 @@ pub(super) fn plugin(app: &mut App) {
 	);
 }
 
+impl InteractionPalette {
+	const STAR_WIDGET: Self = Self {
+		none: ColorKey::SpriteButton,
+		hovered: ColorKey::StarWidgetHovered,
+		pressed: ColorKey::StarWidgetSelected,
+		disabled: ColorKey::SpriteButtonDisabled,
+	};
+}
+
 /// Component that marks a star rating UI widget
 #[derive(Component, Clone, Copy, Debug)]
 #[component(immutable)]
@@ -31,7 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 	},
 	StarRatingValue,
 	StarRatingTentativeValue,
-	InteractionPalette::SPRITE_BUTTON,
+	InteractionPalette::STAR_WIDGET,
 )]
 pub struct StarRating {
 	max_value: u32,
@@ -56,7 +65,7 @@ struct StarRatingTentativeValue(u32);
 		height: STAR_SIZE,
 		..default()
 	},
-	NodeColorKey(InteractionPalette::SPRITE_BUTTON.none),
+	NodeColorKey(InteractionPalette::STAR_WIDGET.none),
 )]
 struct Star {
 	index: u32,
