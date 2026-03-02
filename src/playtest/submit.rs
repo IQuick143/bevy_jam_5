@@ -1,10 +1,8 @@
 //! Handles sending playtest logs to the server
 
 use super::log::{LogSerializationScope, PlaytestLog};
-use bevy::{
-	prelude::*,
-	tasks::{block_on, poll_once, IoTaskPool, Task},
-};
+use bevy::{prelude::*, tasks::IoTaskPool};
+use futures::channel::oneshot::{channel, Receiver, Sender};
 use std::{future::Future, time::Duration};
 
 pub(super) fn plugin(app: &mut App) {
@@ -40,7 +38,7 @@ impl SubmissionTask {
 
 enum SubmissionStatus {
 	New(LogSerializationScope),
-	Sent(Task<Result<(), ureq::Error>>),
+	Sent(Receiver<Result<(), ureq::Error>>),
 	Completed(Result<(), ureq::Error>),
 }
 
@@ -52,12 +50,18 @@ fn submit_handling(
 	for (id, mut task) in &mut query {
 		match &mut task.status {
 			SubmissionStatus::New(scope) => {
+				let (promise, future) = channel();
 				let task_pool = IoTaskPool::get();
-				let new_task = task_pool.spawn(submit_playtest_log(&playtest, *scope));
-				task.status = SubmissionStatus::Sent(new_task);
+				task_pool
+					.spawn(submit_playtest_log(&playtest, *scope, promise))
+					.detach();
+				task.status = SubmissionStatus::Sent(future);
 			}
 			SubmissionStatus::Sent(future) => {
-				let poll_result = block_on(poll_once(future));
+				let poll_result = future.try_recv().unwrap_or_else(|_| {
+					// Error here means the task was dropped before it could finish
+					Some(Err(ureq::Error::Io(std::io::ErrorKind::Interrupted.into())))
+				});
 				if let Some(result) = poll_result {
 					match &result {
 						Ok(()) => info!("Playtest log submitted successfully"),
@@ -98,9 +102,15 @@ fn send_request_with_playtest_log(tester_id: u64, body: &str) -> Result<(), ureq
 fn submit_playtest_log(
 	playtest: &PlaytestLog,
 	scope: LogSerializationScope,
-) -> impl Future<Output = Result<(), ureq::Error>> + Send + Sync {
+	promise: Sender<Result<(), ureq::Error>>,
+) -> impl Future<Output = ()> + Send + Sync {
 	let mut body = serde_json::Map::new().into();
 	playtest.write_json(&mut body, scope);
 	let tester_id = playtest.tester_id();
-	async move { send_request_with_playtest_log(tester_id, &body.to_string()) }
+	async move {
+		let result = send_request_with_playtest_log(tester_id, &body.to_string());
+		// If this operation fails, somebody must have shut down the ECS,
+		// so we can leave it without response
+		let _ = promise.send(result);
+	}
 }
