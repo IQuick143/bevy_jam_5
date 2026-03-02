@@ -46,13 +46,14 @@ struct FeedbackTextQuestion(&'static str);
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct SubmitResultNode;
 
-const FEEDBACK_QUESTIONS: [(&str, &str, f32); 3] = [
+const FEEDBACK_QUESTIONS: [(&str, &str, f32); 4] = [
 	(
 		"favorites",
 		"Which parts of the game did you enjoy the most?",
 		3.0,
 	),
 	("confusing", "Which parts of the game were confusing?", 3.0),
+	("comment", "Any other comments?", 3.0),
 	("price", "How much do you think the game should cost?", 1.0),
 ];
 
