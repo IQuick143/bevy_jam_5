@@ -1,7 +1,6 @@
 //! Handles sending playtest logs to the server
 
-use super::log::PlaytestLog;
-use crate::persistent::Saveable as _;
+use super::log::{LogSerializationScope, PlaytestLog};
 use bevy::{
 	prelude::*,
 	tasks::{block_on, poll_once, IoTaskPool, Task},
@@ -20,12 +19,17 @@ pub struct SubmissionSystems;
 /// sending data to the server.
 ///
 /// The entity is despawned once completed
-#[derive(Component, Default)]
+#[derive(Component)]
 pub struct SubmissionTask {
 	status: SubmissionStatus,
 }
 
 impl SubmissionTask {
+	pub fn new(scope: LogSerializationScope) -> Self {
+		Self {
+			status: SubmissionStatus::New(scope),
+		}
+	}
 	pub fn get_result(&self) -> Option<&Result<(), ureq::Error>> {
 		match &self.status {
 			SubmissionStatus::Completed(result) => Some(result),
@@ -34,10 +38,8 @@ impl SubmissionTask {
 	}
 }
 
-#[derive(Default)]
 enum SubmissionStatus {
-	#[default]
-	New,
+	New(LogSerializationScope),
 	Sent(Task<Result<(), ureq::Error>>),
 	Completed(Result<(), ureq::Error>),
 }
@@ -49,9 +51,9 @@ fn submit_handling(
 ) {
 	for (id, mut task) in &mut query {
 		match &mut task.status {
-			SubmissionStatus::New => {
+			SubmissionStatus::New(scope) => {
 				let task_pool = IoTaskPool::get();
-				let new_task = task_pool.spawn(submit_playtest_log(&playtest));
+				let new_task = task_pool.spawn(submit_playtest_log(&playtest, *scope));
 				task.status = SubmissionStatus::Sent(new_task);
 			}
 			SubmissionStatus::Sent(future) => {
@@ -95,9 +97,10 @@ fn send_request_with_playtest_log(tester_id: u64, body: &str) -> Result<(), ureq
 
 fn submit_playtest_log(
 	playtest: &PlaytestLog,
+	scope: LogSerializationScope,
 ) -> impl Future<Output = Result<(), ureq::Error>> + Send + Sync {
 	let mut body = serde_json::Map::new().into();
-	playtest.write_json(&mut body);
+	playtest.write_json(&mut body, scope);
 	let tester_id = playtest.tester_id();
 	async move { send_request_with_playtest_log(tester_id, &body.to_string()) }
 }

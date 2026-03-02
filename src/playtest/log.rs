@@ -67,33 +67,26 @@ pub struct PlaytestMoveLog {
 	pub succeeded: bool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
+pub enum LogSerializationScope {
+	/// Serialize nothing except the tester ID.
+	/// Intended to wipe data server-side if the tester decides so
+	Clear,
+	/// Serialize only the testers' feedback
+	FeedbackOnly,
+	/// Serialize all data except technical metadata needed
+	/// for testers' experience
+	Full,
+	/// Serialize the data completely. Intended for persistent storage
+	#[default]
+	Persistent,
+}
+
 impl Saveable for PlaytestLog {
 	const FILENAME: &'static str = "playtest_log";
 
 	fn write_json(&self, store: &mut serde_json::Value) {
-		if !store.is_object() {
-			*store = Map::new().into();
-		}
-		let m = store.as_object_mut().unwrap();
-
-		m.write(Self::TESTER_ID, self.tester_id);
-		m.write(Self::SESSION_INDEX, self.session_index);
-		m.write(
-			Self::TESTER_CLICKED_THROUGH,
-			self.has_seen_privacy_statement,
-		);
-
-		let levels = m.put_object_at(Self::LEVELS);
-		for (key, level) in &self.levels {
-			level.write_json(levels.put_object_at(key));
-		}
-
-		let global = m.put_object_at(Self::GLOBAL_FEEDBACK);
-		for (key, answer) in &self.global_feedback {
-			if !answer.is_empty() {
-				global.write(key, answer.clone());
-			}
-		}
+		self.write_json(store, LogSerializationScope::Persistent);
 	}
 
 	fn read_json(&mut self, store: &serde_json::Value) {
@@ -136,6 +129,44 @@ impl PlaytestLog {
 	const LEVELS: &str = "levels";
 	const GLOBAL_FEEDBACK: &str = "feedback";
 	const TESTER_CLICKED_THROUGH: &str = "opened";
+
+	pub fn write_json(&self, store: &mut serde_json::Value, scope: LogSerializationScope) {
+		if !store.is_object() {
+			*store = Map::new().into();
+		}
+		let m = store.as_object_mut().unwrap();
+
+		m.write(Self::TESTER_ID, self.tester_id);
+
+		// If the tester wants to delete their response, stop here
+		if scope <= LogSerializationScope::Clear {
+			return;
+		}
+
+		let include_logs = scope >= LogSerializationScope::Full;
+		let levels = m.put_object_at(Self::LEVELS);
+		for (key, level) in &self.levels {
+			level.write_json(levels.put_object_at(key), include_logs);
+		}
+
+		let global = m.put_object_at(Self::GLOBAL_FEEDBACK);
+		for (key, answer) in &self.global_feedback {
+			if !answer.is_empty() {
+				global.write(key, answer.clone());
+			}
+		}
+
+		// Only save these when saving locally,
+		// we do not care about it server-side
+		if scope < LogSerializationScope::Persistent {
+			return;
+		}
+		m.write(Self::SESSION_INDEX, self.session_index);
+		m.write(
+			Self::TESTER_CLICKED_THROUGH,
+			self.has_seen_privacy_statement,
+		);
+	}
 
 	/// Initialization to be run immediately after
 	/// the resource is loaded
@@ -188,7 +219,11 @@ impl LevelPlaytestLog {
 	const EXTRA_FEEDBACK: &str = "comment";
 	const PLAY_LOG: &str = "sessions";
 
-	fn write_json(&self, m: &mut serde_json::Map<String, serde_json::Value>) {
+	fn write_json(
+		&self,
+		m: &mut serde_json::Map<String, serde_json::Value>,
+		include_game_log: bool,
+	) {
 		// Zero means the field is unfilled
 		if self.stars != 0 {
 			m.write(Self::STAR_RATING, self.stars);
@@ -199,7 +234,7 @@ impl LevelPlaytestLog {
 		if !self.comment.is_empty() {
 			m.write(Self::EXTRA_FEEDBACK, self.comment.as_str());
 		}
-		if !self.sessions.is_empty() {
+		if include_game_log && !self.sessions.is_empty() {
 			let list = self
 				.sessions
 				.iter()

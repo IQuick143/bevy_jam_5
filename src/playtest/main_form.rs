@@ -1,6 +1,10 @@
 //! Global feedback form screen
 
-use super::{consts::*, log::PlaytestLog, submit::*};
+use super::{
+	consts::*,
+	log::{LogSerializationScope, PlaytestLog},
+	submit::*,
+};
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
@@ -31,7 +35,7 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
 enum FeedbackFormAction {
 	Back,
-	Submit,
+	Submit(LogSerializationScope),
 }
 
 /// Marker for a text input linked to a text question identified by a key
@@ -124,8 +128,18 @@ fn spawn_feedback_form_screen(
 	}
 
 	commands.spawn((
-		widgets::menu_button("Submit", font.0.clone()),
-		FeedbackFormAction::Submit,
+		widgets::grid_button("Submit feedback", font.0.clone()),
+		FeedbackFormAction::Submit(LogSerializationScope::Full),
+		ChildOf(main),
+	));
+	commands.spawn((
+		widgets::grid_button("Submit feedback and logs", font.0.clone()),
+		FeedbackFormAction::Submit(LogSerializationScope::FeedbackOnly),
+		ChildOf(main),
+	));
+	commands.spawn((
+		widgets::grid_button("Delete submission", font.0.clone()),
+		FeedbackFormAction::Submit(LogSerializationScope::Clear),
 		ChildOf(main),
 	));
 	commands.spawn((
@@ -179,8 +193,8 @@ fn handle_feedback_screen_input(
 			FeedbackFormAction::Back => {
 				commands.do_screen_transition(Screen::Title);
 			}
-			FeedbackFormAction::Submit => {
-				commands.spawn((SubmissionTask::default(), FreezeUi));
+			FeedbackFormAction::Submit(scope) => {
+				commands.spawn((SubmissionTask::new(*scope), FreezeUi));
 			}
 		}
 	}
