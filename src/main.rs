@@ -24,7 +24,7 @@ use bevy::{
 	prelude::*,
 };
 
-use crate::explorer::{run_state_explorer, StateExplorerOptions};
+use explorer::{run_state_explorer, StateExplorerOptions};
 
 pub struct AppPlugin;
 
@@ -167,6 +167,9 @@ fn parse_command_line(
 					return Err("expected number after --max-depth");
 				};
 				options.max_depth = Some(max_depth);
+			}
+			"--reduce" => {
+				options.reduce = true;
 			}
 			_ => {
 				if level_file.is_some() {
