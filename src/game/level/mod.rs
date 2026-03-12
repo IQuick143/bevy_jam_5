@@ -44,6 +44,10 @@ pub struct LevelData {
 	pub initial_zoom: f32,
 	/// Camera position that should be set when entering the level
 	pub initial_camera_pos: Vec2,
+	/// If true, the level will be excluded from requesting
+	/// feedback from the tester. Intended for simple/tutorial levels.
+	#[cfg(feature = "playtest")]
+	pub ignore_in_playtest: bool,
 }
 
 /// Either the index of a detector or a group

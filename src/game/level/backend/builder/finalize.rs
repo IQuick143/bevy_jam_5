@@ -93,6 +93,15 @@ fn read_variables_before_finalize(
 		builder.explicit_initial_camera_pos().y = Some(init_cam_y);
 	}
 
+	#[cfg(feature = "playtest")]
+	if variable_pool
+		.load_as::<bool>("playtest_norequire")
+		.transpose()?
+		== Some(true)
+	{
+		builder.ignore_in_playtest();
+	}
+
 	Ok(())
 }
 

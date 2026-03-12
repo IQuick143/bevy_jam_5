@@ -39,6 +39,9 @@ pub struct LevelBuilder {
 	/// How camera position should be initialized when entering the level
 	/// (in the builder's coordinate space)
 	initial_camera_pos: PartialVec2,
+	/// [`LevelData::ignore_in_playtest`]
+	#[cfg(feature = "playtest")]
+	ignore_in_playtest: bool,
 }
 
 /// Enumerates the possible sets of positions

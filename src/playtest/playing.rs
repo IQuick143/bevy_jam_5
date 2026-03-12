@@ -8,7 +8,10 @@ use super::{
 use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::{ColorKey, TextColorKey},
-	game::logic_relay::{RotateCycleGroup, RotationCause},
+	game::{
+		level::LevelData,
+		logic_relay::{RotateCycleGroup, RotationCause},
+	},
 	save::SaveGame,
 	screen::{
 		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevel,
@@ -375,9 +378,20 @@ fn level_exit_should_be_intercepted(
 	playtest_log: Res<PlaytestLog>,
 	save: Res<SaveGame>,
 	move_count: Res<MoveCounter>,
+	level_data: Res<Assets<LevelData>>,
 ) -> Result<bool> {
+	let level = playing_level.get()?;
+
+	// Do not intercept if the level explicitly disallows it
+	if level_data
+		.get(&level.data_handle)
+		.is_some_and(|l| l.ignore_in_playtest)
+	{
+		return Ok(false);
+	}
+
 	// Do not intercept if the user has already rated this level
-	let level_key = &playing_level.get()?.identifier;
+	let level_key = &level.identifier;
 	let is_rated = playtest_log.is_level_rated(level_key);
 	if is_rated {
 		return Ok(false);
