@@ -51,6 +51,14 @@ pub struct GameStateAttributes {
 	pub is_closed: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub enum ExplorerStopReason {
+	#[default]
+	Exhaustive,
+	DepthLimit,
+	StateLimit,
+}
+
 /// Graph of the state space of a level
 #[derive(Clone, Debug, Default)]
 pub struct StateGraph {
@@ -60,6 +68,10 @@ pub struct StateGraph {
 	/// Pairs of states that are connected by a valid move
 	/// and index of the group that turns to make that move
 	pub moves: Vec<([GameState; 2], usize)>,
+	/// Number of moves to reach the nearest solution
+	pub first_solution: Option<usize>,
+	/// What caused the explorer to stop
+	pub stop_reason: ExplorerStopReason,
 }
 
 impl StateGraph {
@@ -83,6 +95,9 @@ impl StateGraph {
 				is_closed: false,
 			},
 		);
+		if is_solution {
+			graph.first_solution = Some(0);
+		}
 		queue.push_back((initial_state, 0));
 
 		let mut iterations = 0;
@@ -121,6 +136,9 @@ impl StateGraph {
 							graph
 								.moves
 								.push(([state.clone(), next_state.clone()], cycle.group));
+							if is_solution {
+								graph.first_solution = Some(depth + 1);
+							}
 						}
 					}
 					// Do not do anything with the state until next turn
@@ -129,6 +147,8 @@ impl StateGraph {
 					// Resolve the state later
 					if options.max_depth.is_none_or(|max_depth| depth < max_depth) {
 						queue.push_back((next_state, depth + 1));
+					} else {
+						graph.stop_reason = ExplorerStopReason::DepthLimit;
 					}
 				}
 			}
@@ -138,6 +158,7 @@ impl StateGraph {
 			// Break early if the iteration limit has been reached
 			iterations += 1;
 			if options.max_node_count.is_some_and(|i| iterations > i) {
+				graph.stop_reason = ExplorerStopReason::StateLimit;
 				break;
 			}
 		}
