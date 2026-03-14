@@ -136,7 +136,7 @@ impl StateGraph {
 							graph
 								.moves
 								.push(([state.clone(), next_state.clone()], cycle.group));
-							if is_solution {
+							if is_solution && graph.first_solution.is_none() {
 								graph.first_solution = Some(depth + 1);
 							}
 						}
