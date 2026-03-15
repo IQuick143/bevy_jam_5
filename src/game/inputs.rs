@@ -124,7 +124,6 @@ fn cycle_rotation_with_inputs_system(
 			target_cycle: cycle.id,
 			amount,
 		};
-		eprintln!("Input");
 		rot_events.write(RotateCycleGroup {
 			rotation,
 			cause: RotationCause::Manual,

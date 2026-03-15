@@ -52,7 +52,6 @@ fn undo_moves(
 	for _ in events.read() {
 		if let Some(mut rotation) = history.pop() {
 			rotation.amount *= -1;
-			eprintln!("Undo");
 			rotations.write(RotateCycleGroup {
 				rotation,
 				cause: RotationCause::Undo,
