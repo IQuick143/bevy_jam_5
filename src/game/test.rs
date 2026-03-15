@@ -5,7 +5,7 @@ mod utils {
 		logic_relay::{RotateCycleGroup, RotationCause},
 		prelude::*,
 	};
-	use bevy::{ecs::system::RunSystemOnce, prelude::*};
+	use bevy::{ecs::system::RunSystemOnce as _, prelude::*};
 
 	pub fn setup_app() -> App {
 		let mut app = App::new();
@@ -168,6 +168,7 @@ mod utils {
 	}
 }
 
+use bevy::ecs::system::RunSystemOnce;
 #[allow(unused_imports)]
 use bevy::prelude::*;
 use itertools::Itertools;
@@ -176,7 +177,9 @@ use rand::{Rng, SeedableRng};
 #[allow(unused_imports)]
 use utils::*;
 
-use crate::game::level::ObjectData;
+use crate::game::{
+	components::GameStateEcsIndex, history::UndoMove, inputs::CycleInteraction, level::ObjectData,
+};
 
 /// Metatest for asserting that running the headless game works.
 #[test]
@@ -1221,4 +1224,67 @@ fn stress_test_random_levels() {
 		let mut app = app_with_level(level);
 		move_fuzz(&mut app, 4096, 1337133713371337);
 	}
+}
+
+#[test]
+fn turn_ordering_consistency_test() {
+	let level = "
+name = 'OrderingConsistencyTest';
+hint = 'A player should not be reading this message!';
+
+u = vertex();
+v = vertex();
+a = cycle(box() player() u v);
+b = cycle(v u _ box());
+
+circle(a; 0 0 1);
+circle(b; 0 1 1);
+";
+	let mut app = app_with_level(level);
+
+	// Make a move
+	app.turn_cycle(0, 1);
+	app.update();
+
+	// Undo the move and make a new one in the same frame
+	// Make the new move using the actual input systems
+	// so their ordering is applied properly
+	app.world_mut()
+		.run_system_once(
+			|mut undo: MessageWriter<UndoMove>,
+			 mut cycles: Query<&mut CycleInteraction>,
+			 index: Res<GameStateEcsIndex>| {
+				undo.write(UndoMove);
+				let mut interaction = cycles
+					.get_mut(index.cycles[1])
+					.expect("This cycle should exist");
+				*interaction = CycleInteraction::LeftClick;
+			},
+		)
+		.expect("All necessary objects should be available");
+	app.update();
+
+	// First move got undone, then second executed
+	let expected_result_a = [
+		None,
+		None,
+		Some(ObjectData::Box(None)),
+		Some(ObjectData::Player),
+		None,
+		Some(ObjectData::Box(None)),
+	];
+	// Second move got executed and undone
+	let expected_result_b = [
+		Some(ObjectData::Player),
+		None,
+		None,
+		Some(ObjectData::Box(None)),
+		None,
+		Some(ObjectData::Box(None)),
+	];
+
+	// Unless there is a race condition, the game
+	// should be in one of the consistent states
+	let final_state = app.read_vertices();
+	assert!(final_state.objects == expected_result_a || final_state.objects == expected_result_b);
 }

@@ -16,7 +16,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			cycle_inputs_system.in_set(AppSet::RecordInput),
-			cycle_rotation_with_inputs_system.in_set(AppSet::ExecuteInput),
+			cycle_rotation_with_inputs_system.in_set(AppSet::PreGameLogic),
 		)
 			.run_if(ui_not_frozen),
 	);
@@ -124,6 +124,7 @@ fn cycle_rotation_with_inputs_system(
 			target_cycle: cycle.id,
 			amount,
 		};
+		eprintln!("Input");
 		rot_events.write(RotateCycleGroup {
 			rotation,
 			cause: RotationCause::Manual,

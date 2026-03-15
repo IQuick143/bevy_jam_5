@@ -33,14 +33,16 @@ impl Plugin for AppPlugin {
 		// Configure the ECS error handler to not explode, hopefully.
 		app.set_error_handler(warn);
 
-		// Order new `AppStep` variants by adding them here:
+		// Order new `AppSet` variants by adding them here:
 		app.configure_sets(
 			Update,
 			(
 				AppSet::TickTimers,
 				AppSet::RecordInput,
 				AppSet::ExecuteInput,
+				AppSet::PreGameLogic,
 				AppSet::GameLogic,
+				AppSet::PostGameLogic,
 				AppSet::UpdateVisuals,
 			)
 				.chain(),
@@ -110,8 +112,12 @@ enum AppSet {
 	/// Process inputs that correspond to one-shot actions rather than lasting state
 	/// (that should be pretty much all inputs in this particular game)
 	ExecuteInput,
+	/// Evaluate setup before the main in-game logic
+	PreGameLogic,
 	/// Evaluate in-game logic
 	GameLogic,
+	/// Evaluate fallback after the main in-game logic
+	PostGameLogic,
 	/// Update visual representation of internal state
 	UpdateVisuals,
 }
