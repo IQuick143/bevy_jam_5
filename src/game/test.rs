@@ -169,12 +169,9 @@ mod utils {
 }
 
 use bevy::ecs::system::RunSystemOnce;
-#[allow(unused_imports)]
 use bevy::prelude::*;
 use itertools::Itertools;
-#[allow(unused_imports)]
 use rand::{Rng, SeedableRng};
-#[allow(unused_imports)]
 use utils::*;
 
 use crate::game::{
