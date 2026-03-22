@@ -24,7 +24,8 @@ fn record_level_enter(
 	playing_level: PlayingLevelListEntry,
 ) -> Result {
 	let level_key = playing_level.get()?.identifier.clone();
-	let new_log = LevelSessionPlaytestLog::new(log.session_index(), time.elapsed_secs());
+	let elapsed = (time.elapsed_secs() * 100.0) as u32;
+	let new_log = LevelSessionPlaytestLog::new(log.session_index(), elapsed);
 	log.level_mut(level_key).sessions.push(new_log);
 	Ok(())
 }
@@ -36,10 +37,11 @@ fn record_moves(
 	playing_level: PlayingLevelListEntry,
 ) -> Result {
 	let level_key = playing_level.get()?.identifier.clone();
+	let elapsed = (time.elapsed_secs() * 100.0) as u32;
 	if let Some(session_log) = log.level_mut(level_key).sessions.last_mut() {
 		for action in moves.read() {
 			let entry = PlaytestMoveLog {
-				time: time.elapsed_secs(),
+				time: elapsed,
 				succeeded: !action.result.blocked(),
 				rotation: action.action,
 			};
