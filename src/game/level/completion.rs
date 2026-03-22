@@ -112,11 +112,13 @@ impl LevelHubCompletion {
 	}
 
 	pub fn is_level_unlocked(&self, level_list: &LevelList, level_id: usize) -> bool {
-		self.is_prerequisite_satisfied(&level_list.levels[level_id].prerequisites)
+		cfg!(feature = "playtest")
+			|| self.is_prerequisite_satisfied(&level_list.levels[level_id].prerequisites)
 	}
 
 	pub fn is_hub_unlocked(&self, level_list: &LevelList, hub_id: usize) -> bool {
-		self.is_prerequisite_satisfied(&level_list.hubs[hub_id].prerequisites)
+		cfg!(feature = "playtest")
+			|| self.is_prerequisite_satisfied(&level_list.hubs[hub_id].prerequisites)
 	}
 
 	fn is_prerequisite_satisfied(&self, prerequisites: &[LevelOrHubId]) -> bool {
