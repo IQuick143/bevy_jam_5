@@ -131,6 +131,12 @@ impl PlaytestLog {
 	const LEVELS: &str = "levels";
 	const GLOBAL_FEEDBACK: &str = "feedback";
 	const TESTER_CLICKED_THROUGH: &str = "opened";
+	const VERSION: &str = "version";
+
+	/// Version of the serialization format
+	///
+	/// Will increase if a breaking change is made
+	const PERSISTENCE_VERSION: u32 = 1;
 
 	pub fn write_json(&self, store: &mut serde_json::Value, scope: LogSerializationScope) {
 		if !store.is_object() {
@@ -138,6 +144,7 @@ impl PlaytestLog {
 		}
 		let m = store.as_object_mut().unwrap();
 
+		m.write(Self::VERSION, Self::PERSISTENCE_VERSION);
 		m.write(Self::TESTER_ID, self.tester_id);
 
 		// If the tester wants to delete their response, stop here
