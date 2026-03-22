@@ -19,15 +19,22 @@ pub struct SubmissionSystems;
 /// The entity is despawned once completed
 #[derive(Component)]
 pub struct SubmissionTask {
+	scope: LogSerializationScope,
 	status: SubmissionStatus,
 }
 
 impl SubmissionTask {
 	pub fn new(scope: LogSerializationScope) -> Self {
 		Self {
-			status: SubmissionStatus::New(scope),
+			scope,
+			status: SubmissionStatus::New,
 		}
 	}
+
+	pub fn scope(&self) -> LogSerializationScope {
+		self.scope
+	}
+
 	pub fn get_result(&self) -> Option<&Result<(), ureq::Error>> {
 		match &self.status {
 			SubmissionStatus::Completed(result) => Some(result),
@@ -37,7 +44,7 @@ impl SubmissionTask {
 }
 
 enum SubmissionStatus {
-	New(LogSerializationScope),
+	New,
 	Sent(Receiver<Result<(), ureq::Error>>),
 	Completed(Result<(), ureq::Error>),
 }
@@ -49,11 +56,11 @@ fn submit_handling(
 ) {
 	for (id, mut task) in &mut query {
 		match &mut task.status {
-			SubmissionStatus::New(scope) => {
+			SubmissionStatus::New => {
 				let (promise, future) = channel();
 				let task_pool = IoTaskPool::get();
 				task_pool
-					.spawn(submit_playtest_log(&playtest, *scope, promise))
+					.spawn(submit_playtest_log(&playtest, task.scope, promise))
 					.detach();
 				task.status = SubmissionStatus::Sent(future);
 			}

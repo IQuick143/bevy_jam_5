@@ -129,20 +129,73 @@ fn spawn_feedback_form_screen(
 	}
 
 	commands.spawn((
-		widgets::grid_button("Submit feedback", font.0.clone()),
-		FeedbackFormAction::Submit(LogSerializationScope::Full),
+		Node {
+			padding: UiRect::top(WIDE_GAP),
+			flex_direction: FlexDirection::Column,
+			max_width: GLOBAL_FEEDBACK_FORM_MAX_WIDTH,
+			row_gap: COMMON_GAP,
+			align_items: AlignItems::Center,
+			..default()
+		},
 		ChildOf(main),
+		children![
+			(
+				widgets::grid_button("Submit feedback", font.0.clone()),
+				FeedbackFormAction::Submit(LogSerializationScope::Full),
+			),
+			(
+				Node {
+					padding: UiRect::bottom(WIDE_GAP),
+					..default()
+				},
+				Text::new("Send us all your feedback"),
+				TextLayout::new_with_justify(Justify::Center),
+				TextFont {
+					font_size: SMALL_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
+			),
+			(
+				widgets::grid_button("Submit feedback and logs", font.0.clone()),
+				FeedbackFormAction::Submit(LogSerializationScope::FeedbackOnly),
+			),
+			(
+				Node {
+					padding: UiRect::bottom(WIDE_GAP),
+					..default()
+				},
+				Text::new("Send us your feedback and game logs (please do! it helps us understand how you approached the puzzles and what you struggled with)"),
+				TextLayout::new_with_justify(Justify::Center),
+				TextFont {
+					font_size: SMALL_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
+			),
+			(
+				widgets::grid_button("Delete submission", font.0.clone()),
+				FeedbackFormAction::Submit(LogSerializationScope::Clear),
+			),
+			(
+				Node {
+					padding: UiRect::bottom(WIDE_GAP),
+					..default()
+				},
+				Text::new("Delete your response from our server. All data stays on your machine, so you can resubmit if you change your mind."),
+				TextLayout::new_with_justify(Justify::Center),
+				TextFont {
+					font_size: SMALL_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
+			),
+		],
 	));
-	commands.spawn((
-		widgets::grid_button("Submit feedback and logs", font.0.clone()),
-		FeedbackFormAction::Submit(LogSerializationScope::FeedbackOnly),
-		ChildOf(main),
-	));
-	commands.spawn((
-		widgets::grid_button("Delete submission", font.0.clone()),
-		FeedbackFormAction::Submit(LogSerializationScope::Clear),
-		ChildOf(main),
-	));
+
 	commands.spawn((
 		Node {
 			column_gap: COMMON_GAP,
@@ -222,7 +275,10 @@ fn display_submission_status(
 	if let Some(task) = query.iter().last() {
 		let status_message = match task.get_result() {
 			None => "Submitting...",
-			Some(Ok(())) => "Response accepted!",
+			Some(Ok(())) => match task.scope() {
+				LogSerializationScope::Clear => "Response deleted!",
+				_ => "Response accepted!",
+			}
 			Some(Err(ureq::Error::Timeout(_))) => "Request timed out",
 			Some(Err(ureq::Error::StatusCode(413))) => "Sorry, your response is too large. Consider submitting without game log or email the raw file to us",
 			Some(Err(ureq::Error::StatusCode(429))) => "You have submitted too many times recently, try again later",
