@@ -78,7 +78,7 @@ fn spawn_screen(
 	));
 
 	let hub_completion = LevelHubCompletion::from_save(levels, &save);
-	for (hub_id, hub) in levels.hubs.iter().enumerate() {
+	for (hub_id, hub) in levels.walk_hub_tree() {
 		if hub.levels.is_empty() || !hub_completion.is_hub_unlocked(levels, hub_id) {
 			continue;
 		}
