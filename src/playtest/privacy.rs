@@ -47,7 +47,7 @@ struct ExitPrivacyScreen;
 /// Switches to this screen, or the title screen
 /// if the tester has already seen this one
 fn proceed_to_entry_screen(mut next_screen: ResMut<NextState<Screen>>, playtest: Res<PlaytestLog>) {
-	let target_screen = if !playtest.has_seen_privacy_statement {
+	let target_screen = if !playtest.has_ackd_privacy_statement {
 		Screen::PlaytestPrivacyStatement
 	} else {
 		Screen::Title
@@ -63,7 +63,7 @@ fn spawn_statement_screen(
 	playtest: Res<PlaytestLog>,
 ) {
 	// Give the user a conspicuous exit button only if they already clicked through
-	if playtest.has_seen_privacy_statement {
+	if playtest.has_ackd_privacy_statement {
 		commands.spawn((
 			Node {
 				margin: TOOLBAR_MARGIN,
@@ -121,13 +121,13 @@ fn record_button_inputs(
 
 fn exit_privacy_screen(mut commands: Commands, mut playtest: ResMut<PlaytestLog>) {
 	// Mark it as seen, so it does not pop up the next time
-	if !playtest.has_seen_privacy_statement {
-		playtest.has_seen_privacy_statement = true;
+	if !playtest.has_ackd_privacy_statement {
+		playtest.has_ackd_privacy_statement = true;
 	}
 
 	commands.do_screen_transition(Screen::Title);
 }
 
 fn has_seen_privacy_statement(playtest: Res<PlaytestLog>) -> bool {
-	playtest.has_seen_privacy_statement
+	playtest.has_ackd_privacy_statement
 }

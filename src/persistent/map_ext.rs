@@ -17,7 +17,7 @@ pub trait MapExt {
 		if let Some(value) = self.get_float(key) {
 			// Clamp to both ensure that the result is in a valid range,
 			// but also to deal with NaN and +-inf
-			#[allow(
+			#[expect(
 				clippy::manual_clamp,
 				reason = "standard clamp does not take care of NaN"
 			)]

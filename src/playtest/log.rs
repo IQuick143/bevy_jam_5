@@ -32,7 +32,7 @@ pub struct PlaytestLog {
 	/// per question mapped by text key
 	pub global_feedback: HashMap<String, String>,
 	/// Whether the tester has clicked through the privacy statement page
-	pub has_seen_privacy_statement: bool,
+	pub has_ackd_privacy_statement: bool,
 }
 
 /// Play log and feedback to a particular level
@@ -120,7 +120,7 @@ impl Saveable for PlaytestLog {
 		}
 		if let Some(clicked_through) = m.get(Self::TESTER_CLICKED_THROUGH).and_then(Value::as_bool)
 		{
-			self.has_seen_privacy_statement = clicked_through;
+			self.has_ackd_privacy_statement = clicked_through;
 		}
 	}
 }
@@ -173,7 +173,7 @@ impl PlaytestLog {
 		m.write(Self::SESSION_INDEX, self.session_index);
 		m.write(
 			Self::TESTER_CLICKED_THROUGH,
-			self.has_seen_privacy_statement,
+			self.has_ackd_privacy_statement,
 		);
 	}
 
