@@ -111,7 +111,7 @@ struct StoragePath(pub PathBuf);
 impl StoragePath {
 	pub fn new() -> Self {
 		StoragePath(
-			directories::ProjectDirs::from("", "debug_corporation", "PtolemysEpicycles")
+			directories::ProjectDirs::from("", "lidajatus", "Epicycles")
 				.map(|project_dir| project_dir.data_dir().to_path_buf())
 				.unwrap_or_else(|| {
 					log::error!("COULD NOT RESOLVE DATA DIRECTORY, DEFAULTING TO LOCAL FOLDER");

@@ -79,9 +79,9 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 			Node {
 				height: Px((RING_HALF_WIDTH + RING_OUTLINE_WIDTH) * 2.0),
 				flex_grow: 1.0,
+				border_radius: BorderRadius::all(Px((RING_HALF_WIDTH + RING_OUTLINE_WIDTH) * 2.0)),
 				..default()
 			},
-			BorderRadius::all(Px((RING_HALF_WIDTH + RING_OUTLINE_WIDTH) * 2.0)),
 			NodeColorKey(ColorKey::SliderOutline),
 			ChildOf(bar_wrapper_id),
 		));
@@ -98,11 +98,11 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 					height: Px(NODE_RADIUS * 2.0),
 					border: UiRect::all(Px(RING_OUTLINE_WIDTH)),
 					box_sizing: BoxSizing::ContentBox,
+					border_radius: BorderRadius::all(Px(NODE_RADIUS + RING_OUTLINE_WIDTH)),
 					..default()
 				},
 				BorderColorKey(ColorKey::SliderOutline),
 				NodeColorKey(ColorKey::SliderFill),
-				BorderRadius::all(Px(NODE_RADIUS + RING_OUTLINE_WIDTH)),
 				ChildOf(bar_wrapper_id),
 			))
 			.id();
@@ -132,9 +132,9 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 				Node {
 					height: Px(RING_HALF_WIDTH * 2.0),
 					flex_grow: 1.0,
+					border_radius: BorderRadius::all(Px(RING_HALF_WIDTH * 2.0)),
 					..default()
 				},
-				BorderRadius::all(Px(RING_HALF_WIDTH * 2.0)),
 				NodeColorKey(ColorKey::SliderFill),
 				ChildOf(body_wrapper_id),
 			))

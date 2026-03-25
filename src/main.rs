@@ -24,7 +24,7 @@ use bevy::{
 	prelude::*,
 };
 
-use crate::explorer::{run_state_explorer, StateExplorerOptions};
+use explorer::{run_state_explorer, StateExplorerOptions};
 
 pub struct AppPlugin;
 
@@ -33,14 +33,16 @@ impl Plugin for AppPlugin {
 		// Configure the ECS error handler to not explode, hopefully.
 		app.set_error_handler(warn);
 
-		// Order new `AppStep` variants by adding them here:
+		// Order new `AppSet` variants by adding them here:
 		app.configure_sets(
 			Update,
 			(
 				AppSet::TickTimers,
 				AppSet::RecordInput,
 				AppSet::ExecuteInput,
+				AppSet::PreGameLogic,
 				AppSet::GameLogic,
+				AppSet::PostGameLogic,
 				AppSet::UpdateVisuals,
 			)
 				.chain(),
@@ -60,7 +62,7 @@ impl Plugin for AppPlugin {
 				})
 				.set(WindowPlugin {
 					primary_window: Window {
-						title: "Ptolemy's Epicycles".to_string(),
+						title: "Epicycles".to_string(),
 						canvas: Some("#bevy".to_string()),
 						fit_canvas_to_parent: true,
 						prevent_default_event_handling: true,
@@ -110,8 +112,12 @@ enum AppSet {
 	/// Process inputs that correspond to one-shot actions rather than lasting state
 	/// (that should be pretty much all inputs in this particular game)
 	ExecuteInput,
+	/// Evaluate setup before the main in-game logic
+	PreGameLogic,
 	/// Evaluate in-game logic
 	GameLogic,
+	/// Evaluate fallback after the main in-game logic
+	PostGameLogic,
 	/// Update visual representation of internal state
 	UpdateVisuals,
 }
@@ -167,6 +173,9 @@ fn parse_command_line(
 					return Err("expected number after --max-depth");
 				};
 				options.max_depth = Some(max_depth);
+			}
+			"--reduce" => {
+				options.reduce = true;
 			}
 			_ => {
 				if level_file.is_some() {

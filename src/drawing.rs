@@ -266,7 +266,10 @@ impl Default for ThingPalette {
 				ColorKey::InvertedLinkMultiplicityLabel,
 				Srgba::hex("F29FA7").unwrap().into(),
 			),
-			(ColorKey::WarningSign, RED_400.into()),
+			(
+				ColorKey::WarningSign,
+				Srgba::hex("CC4141B7").unwrap().into(),
+			),
 			(ColorKey::Checkmark, GREEN_300.into()),
 			(ColorKey::Wall, Srgba::hex("DBACAB").unwrap().into()),
 			(ColorKey::Detector, palettes::css::ORANGE.into()),

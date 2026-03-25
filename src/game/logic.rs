@@ -70,6 +70,9 @@ impl GameState {
 		cycle_index: usize,
 		rotate_by: i64,
 	) -> Result<TurnCycleResult, GameStateActionError> {
+		if !self.is_cycle_turnable(level, cycle_index)? {
+			return Err(GameStateActionError::TargetCycleNotTurnable(cycle_index));
+		}
 		let (groups_turned_by, wall_hits) =
 			self.calculate_rotation_tables_for_cycle_turn(level, cycle_index, rotate_by)?;
 		let clashes = self.find_cycle_clashes(level, &groups_turned_by);
@@ -471,6 +474,7 @@ impl TurnCycleResult {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameStateActionError {
 	CycleIndexOutOfRange(usize),
+	TargetCycleNotTurnable(usize),
 	MismatchedLevelData,
 	BrokenLevelData(&'static str),
 }
@@ -484,6 +488,9 @@ impl std::fmt::Display for GameStateActionError {
 				f,
 				"attempted to access cycle {i}, but there are not that many cycles"
 			),
+			Self::TargetCycleNotTurnable(i) => {
+				write!(f, "cycle {i} cannot be turned at this moment")
+			}
 			Self::MismatchedLevelData => write!(
 				f,
 				"game state method got different LevelData than it was created with"

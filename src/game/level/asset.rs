@@ -9,7 +9,7 @@ pub fn plugin(app: &mut App) {
 	app.init_asset::<LevelData>();
 }
 
-#[derive(Default)]
+#[derive(Default, Reflect)]
 struct LevelLoader;
 
 #[derive(Debug)]
@@ -61,12 +61,12 @@ impl bevy::asset::AssetLoader for LevelLoader {
 		async {
 			let mut s = String::new();
 			reader.read_to_string(&mut s).await?;
-			parse_and_run(&s, |w| warn!("{}: {w}", load_context.asset_path()))
+			parse_and_run(&s, |w| warn!("{}: {w}", load_context.path()))
 				.map_err(LevelLoadingError::Parsing)
 				.map(|result| {
 					result
 						.errors
-						.log_with_bevy(&load_context.asset_path().to_string());
+						.log_with_bevy(&load_context.path().to_string());
 					result.level
 				})
 		}

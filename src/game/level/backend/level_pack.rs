@@ -64,6 +64,7 @@ impl LevelListBuilder {
 		let mut child_hubs = Vec::new();
 		while let Some(arg) = args.read_until_end_or_separator() {
 			match arg {
+				Blank => {} // Accept a blank as dummy, to allow conditional inclusion
 				Domain(Level(LevelId(level_id))) => child_levels.push(*level_id),
 				Domain(Hub(HubId(other_id))) => child_hubs.push(*other_id),
 				_ => return Err(TypeError(arg.get_type()).into()),

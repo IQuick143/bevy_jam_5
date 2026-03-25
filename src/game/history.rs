@@ -16,12 +16,10 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				record_moves
-					.after(AppSet::ExecuteInput)
-					.before(AppSet::UpdateVisuals),
+				record_moves.in_set(AppSet::PostGameLogic),
 				undo_moves
 					.after(AppSet::ExecuteInput)
-					.before(AppSet::GameLogic),
+					.before(AppSet::PreGameLogic),
 			),
 		);
 }

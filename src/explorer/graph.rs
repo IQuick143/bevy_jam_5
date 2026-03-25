@@ -1,6 +1,9 @@
 //! Explores the state graph by simulating moves in a level
 
-use crate::game::{level::LevelData, logic::GameState};
+use crate::game::{
+	level::{CycleTurnability, LevelData, ObjectData},
+	logic::GameState,
+};
 use bevy::platform::collections::{hash_map::Entry, HashMap, HashSet};
 use std::collections::VecDeque;
 
@@ -8,6 +11,7 @@ use std::collections::VecDeque;
 pub struct StateExplorerOptions {
 	pub max_node_count: Option<usize>,
 	pub max_depth: Option<usize>,
+	pub reduce: bool,
 }
 
 impl Default for StateExplorerOptions {
@@ -15,8 +19,24 @@ impl Default for StateExplorerOptions {
 		Self {
 			max_depth: None,
 			max_node_count: Some(10000),
+			reduce: false,
 		}
 	}
+}
+
+/// Describes predefined equivalences that can be used
+/// to reduce a state graph
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+enum StateExplorerReduction {
+	/// No reduction is applied
+	#[default]
+	None,
+	/// Disregard colors of boxes
+	BoxColors,
+	/// Disregard the existence of boxes entirely
+	Boxes,
+	/// All is one
+	Singularity,
 }
 
 /// Special attributes of game states
@@ -31,6 +51,14 @@ pub struct GameStateAttributes {
 	pub is_closed: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub enum ExplorerStopReason {
+	#[default]
+	Exhaustive,
+	DepthLimit,
+	StateLimit,
+}
+
 /// Graph of the state space of a level
 #[derive(Clone, Debug, Default)]
 pub struct StateGraph {
@@ -40,14 +68,24 @@ pub struct StateGraph {
 	/// Pairs of states that are connected by a valid move
 	/// and index of the group that turns to make that move
 	pub moves: Vec<([GameState; 2], usize)>,
+	/// Number of moves to reach the nearest solution
+	pub first_solution: Option<usize>,
+	/// What caused the explorer to stop
+	pub stop_reason: ExplorerStopReason,
 }
 
 impl StateGraph {
 	pub fn traverse_state_graph(level: &LevelData, options: StateExplorerOptions) -> Self {
+		let reduction = if options.reduce {
+			level.get_max_lossless_reduction()
+		} else {
+			StateExplorerReduction::None
+		};
+
 		let mut graph = Self::default();
 		let mut queue = VecDeque::new();
 
-		let initial_state = GameState::new(level);
+		let initial_state = GameState::new(level).canonical_under_reduction(reduction);
 		let is_solution = initial_state.get_completion(level).is_level_completed();
 		graph.reachable_states.insert(
 			initial_state.clone(),
@@ -57,6 +95,9 @@ impl StateGraph {
 				is_closed: false,
 			},
 		);
+		if is_solution {
+			graph.first_solution = Some(0);
+		}
 		queue.push_back((initial_state, 0));
 
 		let mut iterations = 0;
@@ -95,6 +136,9 @@ impl StateGraph {
 							graph
 								.moves
 								.push(([state.clone(), next_state.clone()], cycle.group));
+							if is_solution && graph.first_solution.is_none() {
+								graph.first_solution = Some(depth + 1);
+							}
 						}
 					}
 					// Do not do anything with the state until next turn
@@ -103,6 +147,8 @@ impl StateGraph {
 					// Resolve the state later
 					if options.max_depth.is_none_or(|max_depth| depth < max_depth) {
 						queue.push_back((next_state, depth + 1));
+					} else {
+						graph.stop_reason = ExplorerStopReason::DepthLimit;
 					}
 				}
 			}
@@ -112,10 +158,61 @@ impl StateGraph {
 			// Break early if the iteration limit has been reached
 			iterations += 1;
 			if options.max_node_count.is_some_and(|i| iterations > i) {
+				graph.stop_reason = ExplorerStopReason::StateLimit;
 				break;
 			}
 		}
 
 		graph
+	}
+}
+
+impl LevelData {
+	fn get_max_lossless_reduction(&self) -> StateExplorerReduction {
+		let has_detectors = self
+			.cycles
+			.iter()
+			.any(|c| !c.detector_indices.is_empty() || !c.wall_indices.is_empty());
+		if has_detectors {
+			return StateExplorerReduction::BoxColors;
+		}
+
+		let has_player_cycles = self
+			.cycles
+			.iter()
+			.any(|c| c.turnability == CycleTurnability::WithPlayer);
+		if has_player_cycles {
+			return StateExplorerReduction::Boxes;
+		}
+
+		StateExplorerReduction::Singularity
+	}
+}
+
+impl GameState {
+	fn canonical_under_reduction(mut self, reduction: StateExplorerReduction) -> Self {
+		for object in &mut self.objects {
+			*object = match reduction {
+				StateExplorerReduction::None => *object,
+				StateExplorerReduction::BoxColors => {
+					// Turn all boxes into wildcard boxes
+					if matches!(object, Some(ObjectData::Box(_))) {
+						Some(ObjectData::Box(None))
+					} else {
+						*object
+					}
+				}
+				StateExplorerReduction::Boxes => {
+					// Turn everything that is not player into boxes
+					if *object == Some(ObjectData::Player) {
+						*object
+					} else {
+						Some(ObjectData::Box(None))
+					}
+				}
+				StateExplorerReduction::Singularity => None,
+			}
+		}
+		self
 	}
 }

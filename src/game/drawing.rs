@@ -319,9 +319,9 @@ impl BlockMarkerFactory<'_, '_> {
 				custom_size: Some(SPRITE_SIZE),
 				..default()
 			},
-			SpriteColorKey(ColorKey::WarningSign),
 			PopupAnimation::new(ERROR_POPUP_TIME, ERROR_POPUP_INITIAL_SCALE),
-			Transform::from_translation(position.extend(layers::FAIL_MARKERS)),
+			Transform::from_translation(position.extend(layers::FAIL_MARKERS))
+				.with_scale(Vec3::splat(ERROR_POPUP_INITIAL_SCALE)),
 			TemporaryMarker,
 			HoverHint(hover_hint),
 			HoverHintBoundingRect(Aabb2d::new(Vec2::ZERO, SPRITE_SIZE * 0.4)),

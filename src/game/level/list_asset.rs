@@ -5,14 +5,14 @@ use super::{
 	list::*,
 	*,
 };
-use crate::epilang::*;
+use crate::epilang::{interpreter::VariablePool, *};
 
 pub fn plugin(app: &mut App) {
 	app.init_asset::<LevelList>();
 	app.init_asset_loader::<LevelListLoader>();
 }
 
-#[derive(Default)]
+#[derive(Default, Reflect)]
 struct LevelListLoader;
 
 #[derive(Debug)]
@@ -78,12 +78,14 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 			reader.read_to_string(&mut s).await?;
 			let module = compile(&s)?;
 			let mut interpreter = Interpreter::new(&module, LevelListBuilder::new());
+			let builtin_variables = [("cfg_dev", cfg!(feature = "dev").into())];
+			interpreter.variable_pool = VariablePool::from_iter(builtin_variables);
 			match interpreter.run(backend::MAX_INTERPRETER_ITERATIONS) {
 				InterpreterEndState::Timeout => return Err(LevelListLoadError::Timeout),
 				InterpreterEndState::Halted(result) => result?,
 			}
 			for warning in interpreter.get_warnings() {
-				log::warn!("{}: {warning}", load_context.asset_path());
+				log::warn!("{}: {warning}", load_context.path());
 			}
 			Ok(interpreter.backend.build(load_context)?)
 		}
