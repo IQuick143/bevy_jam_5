@@ -16,12 +16,10 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				record_moves
-					.after(AppSet::ExecuteInput)
-					.before(AppSet::UpdateVisuals),
+				record_moves.in_set(AppSet::PostGameLogic),
 				undo_moves
 					.after(AppSet::ExecuteInput)
-					.before(AppSet::GameLogic),
+					.before(AppSet::PreGameLogic),
 			),
 		);
 }
@@ -31,7 +29,7 @@ pub(super) fn plugin(app: &mut App) {
 pub struct MoveHistory(pub Vec<RotateCycle>);
 
 /// Message that is sent to signal that a move should be rewound
-#[derive(Message, Debug)]
+#[derive(Message, Clone, Copy, Debug)]
 pub struct UndoMove;
 
 fn record_moves(
