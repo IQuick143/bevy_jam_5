@@ -251,6 +251,8 @@ impl UiButtonAtlas {
 	pub const UNDO: usize = 2;
 	/// Index of the sprite for the next level button
 	pub const PROCEED: usize = 3;
+	/// Index of the sprite for the redo button
+	pub const REDO: usize = 4;
 
 	/// Path to the sprite sheet image
 	const IMAGE_ASSET_PATH: &'static str = "images/ui-buttons.png";
@@ -261,7 +263,7 @@ impl UiButtonAtlas {
 	/// of the sheet, in pixels
 	const PADDING_WIDTH: u32 = 15;
 	/// How many sprites there are (rows and columns)
-	const SPRITE_COUNTS: UVec2 = UVec2::new(4, 1);
+	const SPRITE_COUNTS: UVec2 = UVec2::new(5, 1);
 
 	/// Constructs a [`TextureAtlasLayout`] for the sprite sheet
 	fn construct_atlas_layout() -> TextureAtlasLayout {

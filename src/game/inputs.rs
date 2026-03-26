@@ -122,6 +122,7 @@ fn cycle_rotation_with_inputs_system(
 		};
 		let rotation = RotateCycle {
 			target_cycle: cycle.id,
+			target_group: cycle.group_id,
 			amount,
 		};
 		rot_events.write(RotateCycleGroup {

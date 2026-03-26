@@ -1,0 +1,7 @@
+name = 'Clash test';
+
+d = detector();
+v = vertex();
+circle(a = cycle(_ _ _ _ box() d v); 0,0,10);
+circle(b = cycle(_ _ _ _ v); 0,0,10);
+oneway(d b);
