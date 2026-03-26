@@ -43,7 +43,10 @@ fn record_moves(
 			let entry = PlaytestMoveLog {
 				time: elapsed,
 				succeeded: !action.result.blocked(),
-				rotation: action.action,
+				target_cycle: action.action.rotation.target_cycle,
+				// Amount is going to be small for user inputs
+				amount: action.action.rotation.amount as i32,
+				cause: action.action.cause,
 			};
 			session_log.moves.push(entry);
 		}

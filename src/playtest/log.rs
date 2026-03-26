@@ -1,12 +1,6 @@
 //! Persistent storage of the tester's feedback and playthrough log
 
-use crate::{
-	game::{
-		logic_relay::{RotateCycleGroup, RotationCause},
-		prelude::RotateCycle,
-	},
-	persistent::*,
-};
+use crate::{game::logic_relay::RotationCause, persistent::*};
 use bevy::{platform::collections::HashMap, prelude::*};
 use logos::Logos;
 use pomelo::pomelo;
@@ -63,8 +57,12 @@ pub struct LevelSessionPlaytestLog {
 pub struct PlaytestMoveLog {
 	/// Timestamp of the move, in 100ths of second
 	pub time: u32,
-	/// Action that the player has attempted
-	pub rotation: RotateCycleGroup,
+	/// Index of cycle that the player has attempted to move
+	pub target_cycle: usize,
+	/// How much the player tried to move the cycle
+	pub amount: i32,
+	/// What kind of input from the player translated into the move
+	pub cause: RotationCause,
 	/// Whether the move actually went through
 	pub succeeded: bool,
 }
@@ -350,20 +348,16 @@ impl LevelSessionPlaytestLog {
 
 impl std::fmt::Display for PlaytestMoveLog {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let amount = self.rotation.rotation.amount;
-		let cause = self.rotation.cause;
-		let cycle = self.rotation.rotation.target_cycle;
-
 		write!(f, "{}", self.time)?;
-		write!(f, "{}", if amount > 0 { '+' } else { '-' })?;
-		if amount.abs() != 1 {
-			write!(f, "{}:", amount.abs())?;
+		write!(f, "{}", if self.amount > 0 { '+' } else { '-' })?;
+		if self.amount.abs() != 1 {
+			write!(f, "{}:", self.amount.abs())?;
 		}
-		write!(f, "{cycle}")?;
+		write!(f, "{}", self.target_cycle)?;
 		if !self.succeeded {
 			write!(f, "F")?;
 		}
-		match cause {
+		match self.cause {
 			RotationCause::Manual => {}
 			RotationCause::Undo => write!(f, "u")?,
 			RotationCause::Redo => write!(f, "r")?,
@@ -436,7 +430,7 @@ pomelo! {
 	%type output Vec<PlaytestMoveLog>;
 	%type list   Vec<PlaytestMoveLog>;
 	%type entry  PlaytestMoveLog;
-	%type rot    RotateCycle;
+	%type rot    (usize, i32);
 
 	output ::= { Vec::new() }
 	output ::= list;
@@ -445,32 +439,18 @@ pomelo! {
 	list ::= list error;
 	list ::= list(mut l) Semi entry(m) { l.push(m); l }
 
-	entry ::= Int(time) rot(rotation) Fail?(f) Cause?(cause) {
+	entry ::= Int(time) rot((target_cycle, amount)) Fail?(f) Cause?(cause) {
 		PlaytestMoveLog {
 			time,
 			succeeded: f.is_none(),
-			rotation: RotateCycleGroup {
-				rotation,
-				cause: cause.unwrap_or_default()
-			}
+			target_cycle,
+			amount,
+			cause: cause.unwrap_or_default(),
 		}
 	}
 
-	rot ::= Sign(s) Int(cycle) {
-		RotateCycle {
-			target_cycle: cycle as usize,
-			target_group: 0,
-			amount: s as i64,
-		}
-	}
-
-	rot ::= Sign(s) Int(abs) Colon Int(cycle) {
-		RotateCycle {
-			target_cycle: cycle as usize,
-			target_group: 0,
-			amount: s as i64 * abs as i64,
-		}
-	}
+	rot ::= Sign(s) Int(cycle) { (cycle as usize, s) }
+	rot ::= Sign(s) Int(abs) Colon Int(cycle) { (cycle as usize, s * abs as i32) }
 }
 
 #[cfg(test)]
