@@ -48,12 +48,24 @@ pub struct ComputedCycleTurnability(pub bool);
 pub struct IsTriggered(pub bool);
 
 /// Common data for [`RotateCycleGroup`] and the like
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RotateCycle {
 	/// Index of the cycle to rotate
 	pub target_cycle: usize,
+	/// Index of the group that is rotated
+	pub target_group: usize,
 	/// How many steps the cycle should rotate by
 	pub amount: i64,
+}
+
+impl RotateCycle {
+	/// Whether two rotations represent equivalent actions
+	///
+	/// Actions are equivalent if the same cycle group turns
+	/// the same number of times, regardless of which cycle triggered it
+	pub fn equivalent(&self, other: &Self) -> bool {
+		(self.target_group, self.amount) == (other.target_group, other.amount)
+	}
 }
 
 /// Enumerates the possible causes of a rotation action
@@ -64,6 +76,8 @@ pub enum RotationCause {
 	Manual,
 	/// Rotation command issued to undo a previous action
 	Undo,
+	/// Rotation command issued to replay a previously undone action
+	Redo,
 }
 
 /// Message sent to a cycle entity to rotate [`super::components::Object`]

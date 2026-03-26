@@ -1,0 +1,3 @@
+name = 'Wall test';
+
+circle(cycle(_ box() _ _ _ _ wall()); 0,0,10);

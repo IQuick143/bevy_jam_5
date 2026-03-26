@@ -366,6 +366,7 @@ impl std::fmt::Display for PlaytestMoveLog {
 		match cause {
 			RotationCause::Manual => {}
 			RotationCause::Undo => write!(f, "u")?,
+			RotationCause::Redo => write!(f, "r")?,
 		}
 		Ok(())
 	}
@@ -416,6 +417,7 @@ pomelo! {
 
 	%type
 	#[token("u", |_| RotationCause::Undo)]
+	#[token("r", |_| RotationCause::Redo)]
 	Cause RotationCause;
 
 	%type
@@ -457,6 +459,7 @@ pomelo! {
 	rot ::= Sign(s) Int(cycle) {
 		RotateCycle {
 			target_cycle: cycle as usize,
+			target_group: 0,
 			amount: s as i64,
 		}
 	}
@@ -464,6 +467,7 @@ pomelo! {
 	rot ::= Sign(s) Int(abs) Colon Int(cycle) {
 		RotateCycle {
 			target_cycle: cycle as usize,
+			target_group: 0,
 			amount: s as i64 * abs as i64,
 		}
 	}

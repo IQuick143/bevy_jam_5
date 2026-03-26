@@ -39,7 +39,7 @@ impl StateGraph {
                 graph.linkOpacity(0.5);
                 graph.graphData("#;
 
-	const PAGE_FOOTER: &str = r#");
+	const PAGE_CENTER: &str = r#");
             });
         </script>
         <style>
@@ -49,9 +49,20 @@ impl StateGraph {
             #main {
                 height: 100%;
             }
+			#meta {
+				position: absolute;
+				color: #aaa;
+				z-index: 1;
+				font-family: sans-serif;
+				font-size: small;
+			}
         </style>
     </head>
     <body>
+		<div id="meta">"#;
+
+	const PAGE_FOOTER: &str = r#"
+		</div>
         <div id="main"></div>
     </body>
 </html>"#;
@@ -76,7 +87,22 @@ impl StateGraph {
 				group_index_to_color(*group)
 			)?;
 		}
-		writeln!(writer, "\t]\n}}{}", Self::PAGE_FOOTER)?;
+		writeln!(writer, "\t]\n}}{}", Self::PAGE_CENTER)?;
+
+		let state_count = self.reachable_states.len();
+		let move_count = self.moves.len();
+		let first_solution = self.first_solution.as_ref().map(usize::to_string);
+		let first_solution = first_solution.as_deref().unwrap_or("(none)");
+		let stop_reason = self.stop_reason;
+		writeln!(
+			writer,
+			r#"
+			<div>States: {state_count}</div>
+			<div>Moves: {move_count}</div>
+			<div>Nearest solution: {first_solution}</div>
+			<div>End: {stop_reason:?}</div>"#
+		)?;
+		writeln!(writer, "{}", Self::PAGE_FOOTER)?;
 		Ok(())
 	}
 }

@@ -19,7 +19,7 @@ pub mod prelude {
 	#[allow(unused_imports)]
 	pub use super::{
 		components::{GameStateEcsIndex, LevelHandle, PlayingLevelData},
-		history::{MoveHistory, UndoMove},
+		history::{AlterHistory, MoveHistory},
 		level::LevelData,
 		logic::{GameState, LevelCompletionConditions, TurnCycleResult},
 		logic_relay::{GameLayoutChanged, IsLevelCompleted, RotateCycle},

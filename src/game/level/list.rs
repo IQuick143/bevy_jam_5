@@ -15,6 +15,12 @@ pub struct LevelList {
 	pub root_hub: usize,
 }
 
+impl LevelList {
+	pub fn walk_hub_tree(&self) -> impl Iterator<Item = (usize, &HubLevelInfo)> {
+		HubTreeIterator::new(self)
+	}
+}
+
 /// Identifier of a level or a hub
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Reflect)]
 pub enum LevelOrHubId {
@@ -119,8 +125,16 @@ impl LevelListBuilder {
 		if parent_index >= self.list.hubs.len() {
 			return Err(LevelListBuildError::HubIndexOutOfRange(parent_index));
 		}
+		if self.has_parent_hub[level_index] {
+			let current_parent = self.list.levels[level_index].parent_hub;
+			return Err(LevelListBuildError::LevelParentReassignment(
+				level_index,
+				current_parent,
+			));
+		}
 		self.list.levels[level_index].parent_hub = parent_index;
 		self.has_parent_hub[level_index] = true;
+		self.list.hubs[parent_index].levels.push(level_index);
 		Ok(())
 	}
 
@@ -135,6 +149,11 @@ impl LevelListBuilder {
 		if parent_index >= self.list.hubs.len() {
 			return Err(LevelListBuildError::HubIndexOutOfRange(parent_index));
 		}
+		if let Some(parent) = self.list.hubs[hub_index].parent_hub {
+			return Err(LevelListBuildError::HubParentReassignment(
+				hub_index, parent,
+			));
+		}
 		if self.is_hub_ancestor_of(hub_index, parent_index) {
 			return Err(LevelListBuildError::CycleInHubHierarchy(
 				hub_index,
@@ -142,6 +161,7 @@ impl LevelListBuilder {
 			));
 		}
 		self.list.hubs[hub_index].parent_hub = Some(parent_index);
+		self.list.hubs[parent_index].child_hubs.push(hub_index);
 		Ok(())
 	}
 
@@ -186,7 +206,6 @@ impl LevelListBuilder {
 			return Err(LevelListBuildError::OrphanedLevel(i));
 		}
 		self.find_and_set_root_hub()?;
-		self.fill_hub_child_lists();
 		self.load_level_assets(asset_load_context);
 		Ok(self.list)
 	}
@@ -240,20 +259,6 @@ impl LevelListBuilder {
 		Ok(())
 	}
 
-	/// Fills in the child lists of hubs based on parent references
-	///
-	/// Assumes the child lists start off empty
-	fn fill_hub_child_lists(&mut self) {
-		for i in 0..self.list.hubs.len() {
-			if let Some(parent) = self.list.hubs[i].parent_hub {
-				self.list.hubs[parent].child_hubs.push(i);
-			}
-		}
-		for (i, level) in self.list.levels.iter().enumerate() {
-			self.list.hubs[level.parent_hub].levels.push(i);
-		}
-	}
-
 	fn load_level_assets(&mut self, load_context: &mut LoadContext) {
 		for level in &mut self.list.levels {
 			level.data_handle = load_context.load(&level.path);
@@ -278,6 +283,10 @@ pub enum LevelListBuildError {
 	MultipleRootHubs([usize; 2]),
 	/// A level does not have a parent set by build time
 	OrphanedLevel(usize),
+	/// Level is assigned to a parent but it already has one
+	LevelParentReassignment(usize, usize),
+	/// Level is assigned to a parent but it already has one
+	HubParentReassignment(usize, usize),
 }
 
 impl std::error::Error for LevelListBuildError {}
@@ -292,6 +301,57 @@ impl std::fmt::Display for LevelListBuildError {
 			Self::NoHub => f.write_str("level list is missing a hub"),
 			Self::MultipleRootHubs([first, second]) => write!(f, "only one root hub can exist, but hubs {first} and {second} are both in root position"),
 			Self::OrphanedLevel(i) => write!(f, "level {i} does not have a parent set"),
+			Self::LevelParentReassignment(l, p) => write!(f, "level {l} is already a child of hub {p}"),
+			Self::HubParentReassignment(h, p) => write!(f, "hub {h} is already a child of hub {p}"),
 		}
+	}
+}
+
+struct HubTreeIterator<'a> {
+	list: &'a LevelList,
+	current: Option<usize>,
+}
+
+impl<'a> HubTreeIterator<'a> {
+	fn new(list: &'a LevelList) -> Self {
+		Self {
+			list,
+			current: Some(list.root_hub),
+		}
+	}
+
+	fn get_next_child(hub: &HubLevelInfo, current_child: usize) -> Option<usize> {
+		hub.child_hubs
+			.iter()
+			.tuple_windows()
+			.find(|(c, _)| **c == current_child)
+			.map(|(_, n)| *n)
+	}
+
+	fn get_successor(&self) -> Option<usize> {
+		let mut current = self.current?;
+		let mut last_child = None;
+		loop {
+			let current_hub = &self.list.hubs[current];
+			let following_child = match last_child {
+				Some(c) => Self::get_next_child(current_hub, c),
+				None => current_hub.child_hubs.first().copied(),
+			};
+			if following_child.is_some() {
+				return following_child;
+			}
+			last_child = Some(current);
+			current = current_hub.parent_hub?;
+		}
+	}
+}
+
+impl<'a> Iterator for HubTreeIterator<'a> {
+	type Item = (usize, &'a HubLevelInfo);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		let current_hub = self.current?;
+		self.current = self.get_successor();
+		Some((current_hub, &self.list.hubs[current_hub]))
 	}
 }

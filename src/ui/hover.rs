@@ -18,6 +18,7 @@ pub const DETECTOR: &str = "A detector, triggers oneways when something goes thr
 pub const UI_EXIT: &str = "Exit [Esc]";
 pub const UI_RESET: &str = "Reset [R]";
 pub const UI_UNDO: &str = "Undo [Z]";
+pub const UI_REDO: &str = "Redo [Y]";
 pub const UI_NEXT: &str = "Next level [N]";
 
 pub const BLOCKADE_WARNING: &str =
@@ -227,7 +228,7 @@ fn update_hover_text(
 	};
 	for (mut text, mut visibility) in text_query.iter_mut() {
 		*visibility = match should_be_visible {
-			true => Visibility::Visible,
+			true => Visibility::Inherited,
 			false => Visibility::Hidden,
 		};
 		text.0.clone_from(&chosen_text);

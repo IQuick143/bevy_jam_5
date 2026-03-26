@@ -49,7 +49,7 @@ impl JumpTurnAnimation {
 			{
 				self.bounce_midway = false;
 				self.jump_animation_magitude *= -1.0;
-				self.current_phase -= self.jump_animation_magitude;
+				self.current_phase += self.jump_animation_magitude;
 			}
 		}
 	}
@@ -132,7 +132,7 @@ fn cycle_turning_animation_system(
 					continue;
 				};
 				let Ok(visuals) = cycles_q.get(*target_cycle) else {
-					warn!("RotateSingleCycle event does not target a cycle entity");
+					// Can happen with a cycle that does not have a visible center
 					continue;
 				};
 				let Ok(mut animation) = jump_q.get_mut(visuals.sprite) else {
