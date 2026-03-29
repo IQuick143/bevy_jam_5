@@ -52,10 +52,10 @@ impl MapExt for serde_json::Map<String, serde_json::Value> {
 	where
 		for<'a> &'a serde_json::Value: TryInto<T>,
 	{
-		if let Some(value) = self.get(key) {
-			if let Ok(value) = value.try_into() {
-				*destination = value;
-			}
+		if let Some(value) = self.get(key)
+			&& let Ok(value) = value.try_into()
+		{
+			*destination = value;
 		}
 	}
 

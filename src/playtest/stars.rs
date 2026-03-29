@@ -105,10 +105,10 @@ fn propagate_star_inputs(
 ) {
 	// Zero out hover values first
 	for (_, &ChildOf(parent), &interaction) in &stars_q {
-		if interaction == Interaction::None {
-			if let Ok((_, mut tentative)) = widgets_q.get_mut(parent) {
-				**tentative = 0;
-			}
+		if interaction == Interaction::None
+			&& let Ok((_, mut tentative)) = widgets_q.get_mut(parent)
+		{
+			**tentative = 0;
 		}
 	}
 	// Do a second pass for other values
@@ -116,13 +116,13 @@ fn propagate_star_inputs(
 	// when the cursor moves from one star to another
 	// in a single frame
 	for (&Star { index }, &ChildOf(parent), &interaction) in &stars_q {
-		if interaction != Interaction::None {
-			if let Ok((mut value, mut tentative)) = widgets_q.get_mut(parent) {
-				match interaction {
-					Interaction::Pressed => **value = index + 1,
-					Interaction::Hovered => **tentative = index + 1,
-					Interaction::None => unreachable!(),
-				}
+		if interaction != Interaction::None
+			&& let Ok((mut value, mut tentative)) = widgets_q.get_mut(parent)
+		{
+			match interaction {
+				Interaction::Pressed => **value = index + 1,
+				Interaction::Hovered => **tentative = index + 1,
+				Interaction::None => unreachable!(),
 			}
 		}
 	}

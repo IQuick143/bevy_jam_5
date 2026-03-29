@@ -307,10 +307,10 @@ impl LevelSessionPlaytestLog {
 		let mut m = Map::new();
 		m.write(Self::SESSION_INDEX, self.game_session);
 		m.write(Self::ENTER_TIME, self.time_entered);
-		if let Ok(move_log) = serialize_move_list(&self.moves) {
-			if !move_log.is_empty() {
-				m.write(Self::MOVE_LOG, move_log);
-			}
+		if let Ok(move_log) = serialize_move_list(&self.moves)
+			&& !move_log.is_empty()
+		{
+			m.write(Self::MOVE_LOG, move_log);
 		}
 		m
 	}

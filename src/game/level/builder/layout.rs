@@ -138,63 +138,62 @@ impl LevelBuilder {
 	/// This method expects all vertices to be materialized when it is called.
 	pub(super) fn apply_color_label_appearences_to_buttons(&mut self) {
 		for vertex in &mut self.vertices {
-			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph {
-				if let Some(p) = vertex.color_label_appearence {
-					let Some(vertex_position) = vertex.position.get_fixed() else {
-						continue;
-					};
-					let Some(placement) = self.cycles[p.owner_cycle].placement else {
-						continue;
-					};
-					let owner_cycle_position = placement.position;
-					let angle_from_owner =
-						-Vec2::Y.angle_to(vertex_position - owner_cycle_position);
-					// Flip target angle if we want the labels inside the cycle
-					let target_angle = if p.place_outside_cycle {
-						angle_from_owner
-					} else {
-						angle_from_owner + PI
-					}
-					.rem_euclid(2.0 * PI);
-					let position = match p.positions {
-						CycleBoundColorLabelPositionSet::LeftRight => {
-							ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
-								0.0..1.0 => PI * 0.5,
-								1.0..=2.0 => PI * 1.5,
-								// Theoretically unreachable but just in case (because floats) we use a default value
-								_ => PI * 0.5,
-							})
-						}
-						CycleBoundColorLabelPositionSet::AboveBelow => {
-							ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
-								0.0..0.5 | 1.5..=2.0 => 0.0,
-								0.5..1.5 => PI,
-								// Theoretically unreachable but just in case (because floats) we use a default value
-								_ => 0.0,
-							})
-						}
-						CycleBoundColorLabelPositionSet::CardinalDirections => {
-							ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
-								0.0..0.25 | 1.75..=2.0 => 0.0,
-								0.25..0.75 => PI * 0.5,
-								0.75..1.25 => PI,
-								1.25..1.75 => PI * 1.5,
-								// Theoretically unreachable but just in case (because floats) we use a default value
-								_ => 0.0,
-							})
-						}
-						CycleBoundColorLabelPositionSet::AllDirections => {
-							ButtonColorLabelPosition::AnglePlaced(target_angle)
-						}
-						CycleBoundColorLabelPositionSet::AllDirectionsRotated => {
-							ButtonColorLabelPosition::AngleRotated(target_angle)
-						}
-					};
-					*appearence = ButtonColorLabelAppearence {
-						position,
-						has_arrow_tip: p.has_arrow_tip,
-					};
+			if let Some(GlyphData::Button(Some((_, appearence)))) = &mut vertex.glyph
+				&& let Some(p) = vertex.color_label_appearence
+			{
+				let Some(vertex_position) = vertex.position.get_fixed() else {
+					continue;
+				};
+				let Some(placement) = self.cycles[p.owner_cycle].placement else {
+					continue;
+				};
+				let owner_cycle_position = placement.position;
+				let angle_from_owner = -Vec2::Y.angle_to(vertex_position - owner_cycle_position);
+				// Flip target angle if we want the labels inside the cycle
+				let target_angle = if p.place_outside_cycle {
+					angle_from_owner
+				} else {
+					angle_from_owner + PI
 				}
+				.rem_euclid(2.0 * PI);
+				let position = match p.positions {
+					CycleBoundColorLabelPositionSet::LeftRight => {
+						ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
+							0.0..1.0 => PI * 0.5,
+							1.0..=2.0 => PI * 1.5,
+							// Theoretically unreachable but just in case (because floats) we use a default value
+							_ => PI * 0.5,
+						})
+					}
+					CycleBoundColorLabelPositionSet::AboveBelow => {
+						ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
+							0.0..0.5 | 1.5..=2.0 => 0.0,
+							0.5..1.5 => PI,
+							// Theoretically unreachable but just in case (because floats) we use a default value
+							_ => 0.0,
+						})
+					}
+					CycleBoundColorLabelPositionSet::CardinalDirections => {
+						ButtonColorLabelPosition::AnglePlaced(match target_angle / PI {
+							0.0..0.25 | 1.75..=2.0 => 0.0,
+							0.25..0.75 => PI * 0.5,
+							0.75..1.25 => PI,
+							1.25..1.75 => PI * 1.5,
+							// Theoretically unreachable but just in case (because floats) we use a default value
+							_ => 0.0,
+						})
+					}
+					CycleBoundColorLabelPositionSet::AllDirections => {
+						ButtonColorLabelPosition::AnglePlaced(target_angle)
+					}
+					CycleBoundColorLabelPositionSet::AllDirectionsRotated => {
+						ButtonColorLabelPosition::AngleRotated(target_angle)
+					}
+				};
+				*appearence = ButtonColorLabelAppearence {
+					position,
+					has_arrow_tip: p.has_arrow_tip,
+				};
 			}
 		}
 	}

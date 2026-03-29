@@ -163,17 +163,16 @@ fn update_hover_state(
 					distance = distance.min(circle_distance);
 				}
 			}
-			if let Some(bounding_box) = bounding_rect {
-				if Vec2::cmplt(bounding_box.min, transformed_cursor).all()
-					&& Vec2::cmpgt(bounding_box.max, transformed_cursor).all()
-				{
-					hovered = true;
-					// Evil hack approximation, does not actually compute the box inside distance
-					let box_distance = (transformed_cursor - bounding_box.center())
-						.abs()
-						.max_element();
-					distance = distance.min(box_distance);
-				}
+			if let Some(bounding_box) = bounding_rect
+				&& Vec2::cmplt(bounding_box.min, transformed_cursor).all()
+				&& Vec2::cmpgt(bounding_box.max, transformed_cursor).all()
+			{
+				hovered = true;
+				// Evil hack approximation, does not actually compute the box inside distance
+				let box_distance = (transformed_cursor - bounding_box.center())
+					.abs()
+					.max_element();
+				distance = distance.min(box_distance);
 			}
 
 			if hovered && (priority, distance) < closest_priority_and_distance {

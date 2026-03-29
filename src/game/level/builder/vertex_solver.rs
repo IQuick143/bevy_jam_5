@@ -233,13 +233,13 @@ impl CyclePoints {
 			self.first_decided_vertex = Some(index);
 		}
 		// Update [`Self::first_undecided_vertex`]
-		if let Some(first_pair) = self.first_undecided_vertex {
-			if first_pair >= index {
-				if next_pair > index {
-					self.first_undecided_vertex = Some(next_pair);
-				} else {
-					self.first_undecided_vertex = None;
-				}
+		if let Some(first_pair) = self.first_undecided_vertex
+			&& first_pair >= index
+		{
+			if next_pair > index {
+				self.first_undecided_vertex = Some(next_pair);
+			} else {
+				self.first_undecided_vertex = None;
 			}
 		}
 	}
@@ -542,12 +542,10 @@ impl PointData {
 						}) {
 					if let IntersectionPointSet::Pair(point_a2, point_b2) =
 						self.vertex_constraints[potential_vertex]
+						&& ((point_a == point_a2 && point_b == point_b2)
+							|| (point_a == point_b2 && point_b == point_a2))
 					{
-						if (point_a == point_a2 && point_b == point_b2)
-							|| (point_a == point_b2 && point_b == point_a2)
-						{
-							return Some(potential_vertex);
-						}
+						return Some(potential_vertex);
 					}
 				}
 				None
@@ -675,17 +673,17 @@ impl LevelBuilder {
 					);
 					for &cycle in cycles.iter() {
 						points_on_cycle[cycle].push(point);
-						if let Some(placement) = self.cycles[cycle].placement {
-							if !point_lies_on_cycle(placement, position) {
-								errors.push(VertexSolverError::CycleDoesNotContainVertex(
-									CycleDoesNotContainVertexError {
-										vertex,
-										cycle,
-										position,
-										placement,
-									},
-								));
-							}
+						if let Some(placement) = self.cycles[cycle].placement
+							&& !point_lies_on_cycle(placement, position)
+						{
+							errors.push(VertexSolverError::CycleDoesNotContainVertex(
+								CycleDoesNotContainVertexError {
+									vertex,
+									cycle,
+									position,
+									placement,
+								},
+							));
 						}
 					}
 					IntersectionPointSet::Single(point)
