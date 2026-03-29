@@ -1,4 +1,4 @@
-use super::{lex::*, parser::*, Module};
+use super::{Module, lex::*, parser::*};
 
 /// Compiles a source program into a module
 pub fn compile(source: &str) -> Result<Module, CompileError> {

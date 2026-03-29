@@ -510,7 +510,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_cycle_permutation_puzzle"
+name = "epicycles"
 version = "0.1.0"
 dependencies = [
  "bevy",

@@ -3,6 +3,7 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
+	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::{
@@ -16,7 +17,6 @@ use crate::{
 		interaction::InteractionEnabled,
 		prelude::*,
 	},
-	AppSet,
 };
 
 use super::*;

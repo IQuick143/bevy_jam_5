@@ -4,11 +4,6 @@ _Brought to you by a bunch of nerds._
 
 A puzzle game about rotating cycles to move objects into the correct spots.
 
-## Installation
-
-You can get compiled binaries over at the [itch page](https://iquick143.itch.io/ptolemys-epicycles).
-Alternatively, clone the repository and run it with `cargo run` resp. `trunk serve` for the web build.
-
 ## Controls
 
 Point at & Click on the cycle centers to rotate them.

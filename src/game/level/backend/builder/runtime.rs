@@ -5,7 +5,7 @@
 
 use super::super::{
 	super::{
-		builder::{error::LevelBuilderError, CycleBoundColorLabelPositionSet, LevelBuilder},
+		builder::{CycleBoundColorLabelPositionSet, LevelBuilder, error::LevelBuilderError},
 		*,
 	},
 	domain::*,

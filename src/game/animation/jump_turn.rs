@@ -1,7 +1,8 @@
 //! One-off rotation animations of cycle centers
 
-use super::{animation_easing_function, TurnAnimationLength};
+use super::{TurnAnimationLength, animation_easing_function};
 use crate::{
+	AppSet,
 	game::{
 		components::GameStateEcsIndex,
 		drawing::CycleCenterVisualEntities,
@@ -9,7 +10,6 @@ use crate::{
 		prelude::PlayingLevelData,
 		spawn::{LevelInitialization, LevelInitializationSet},
 	},
-	AppSet,
 };
 use bevy::prelude::*;
 

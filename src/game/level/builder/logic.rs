@@ -358,7 +358,9 @@ impl LevelBuilder {
 			let IntermediateLinkStatus::Group(group, direction_2) =
 				self.cycles[root_cycle].linked_cycle
 			else {
-				unreachable!("Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)");
+				unreachable!(
+					"Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)"
+				);
 			};
 			let direction = direction_1 * direction_2;
 			groups[group]
@@ -696,7 +698,10 @@ impl LevelBuilder {
 			IntermediateCycleCenterSpritePosition::Placed(pos) => Some(pos),
 			IntermediateCycleCenterSpritePosition::Disabled => None,
 			IntermediateCycleCenterSpritePosition::Unspecified => {
-				debug_assert!(false, "Unplaced cycle center sprite in build phase, should have been materialized earlier");
+				debug_assert!(
+					false,
+					"Unplaced cycle center sprite in build phase, should have been materialized earlier"
+				);
 				None
 			}
 		};

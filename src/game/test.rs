@@ -1,7 +1,7 @@
 mod utils {
 	use crate::game::{
 		components::{Cycle, GameStateEcsIndex, Vertex},
-		level::{backend::builder as parser, GlyphData, ObjectData},
+		level::{GlyphData, ObjectData, backend::builder as parser},
 		logic_relay::{RotateCycleGroup, RotationCause},
 		prelude::*,
 	};

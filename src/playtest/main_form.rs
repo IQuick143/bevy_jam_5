@@ -6,11 +6,11 @@ use super::{
 	submit::*,
 };
 use crate::{
+	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	screen::{DoScreenTransitionCommands as _, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
-	AppSet,
 };
 use bevy::prelude::*;
 use bevy_ui_text_input::TextInputContents;
@@ -278,10 +278,14 @@ fn display_submission_status(
 			Some(Ok(())) => match task.scope() {
 				LogSerializationScope::Clear => "Response deleted!",
 				_ => "Response accepted!",
-			}
+			},
 			Some(Err(ureq::Error::Timeout(_))) => "Request timed out",
-			Some(Err(ureq::Error::StatusCode(413))) => "Sorry, your response is too large. Consider submitting without game log or email the raw file to us",
-			Some(Err(ureq::Error::StatusCode(429))) => "You have submitted too many times recently, try again later",
+			Some(Err(ureq::Error::StatusCode(413))) => {
+				"Sorry, your response is too large. Consider submitting without game log or email the raw file to us"
+			}
+			Some(Err(ureq::Error::StatusCode(429))) => {
+				"You have submitted too many times recently, try again later"
+			}
 			Some(Err(ureq::Error::StatusCode(500..))) => "Internal server error",
 			Some(Err(_)) => "Could not process response",
 		};

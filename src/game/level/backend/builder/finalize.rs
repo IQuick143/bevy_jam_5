@@ -2,7 +2,7 @@
 
 use super::super::{
 	super::{
-		builder::{error::LevelBuilderError, LevelBuildResult, LevelBuilder},
+		builder::{LevelBuildResult, LevelBuilder, error::LevelBuilderError},
 		*,
 	},
 	domain::*,

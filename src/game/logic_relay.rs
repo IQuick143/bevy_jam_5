@@ -1,7 +1,7 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
 use super::{components::*, logic::TurnCycleResult, prelude::*};
-use crate::{send_message, AppSet};
+use crate::{AppSet, send_message};
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()

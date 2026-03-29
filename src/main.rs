@@ -26,7 +26,7 @@ use bevy::{
 	prelude::*,
 };
 
-use explorer::{run_state_explorer, StateExplorerOptions};
+use explorer::{StateExplorerOptions, run_state_explorer};
 
 pub struct AppPlugin;
 

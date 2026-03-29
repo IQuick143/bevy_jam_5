@@ -198,7 +198,9 @@ impl GameState {
 						let n_detectors = detector_cycle.detector_indices.len();
 						let n_walls = detector_cycle.wall_indices.len();
 						if n_vertices == 0 || (n_detectors == 0 && n_walls == 0) {
-							return Err(GameStateActionError::BrokenLevelData("cycle with no vertices or no detectors and no walls is somehow in the outgoing_detector_cycles list."));
+							return Err(GameStateActionError::BrokenLevelData(
+								"cycle with no vertices or no detectors and no walls is somehow in the outgoing_detector_cycles list.",
+							));
 						}
 						// Grab vertex occupancy data from state
 						let vertex_occupation = detector_cycle

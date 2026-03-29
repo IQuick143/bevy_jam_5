@@ -15,7 +15,7 @@ pub mod widgets;
 pub mod prelude {
 	pub use super::{
 		char_input_pressed,
-		freeze::{ui_not_frozen, FreezeUi, IsUiFrozen},
+		freeze::{FreezeUi, IsUiFrozen, ui_not_frozen},
 		interaction::{InteractionPalette, InteractionQuery},
 		screen_fade::{AddFadeMessage as _, FadeAnimation, FadeAnimationBundle},
 		widgets,

@@ -1,11 +1,11 @@
 //! Extensions to title screen for playtesting builds
 
 use crate::{
+	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey},
 	drawing::{ColorKey, NodeColorKey},
 	screen::{DoScreenTransitionCommands as _, Screen},
 	ui::{consts::COMMON_GAP, prelude::*, widgets},
-	AppSet,
 };
 use bevy::prelude::*;
 

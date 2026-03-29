@@ -1,7 +1,7 @@
 [package]
-name = "bevy_cycle_permutation_puzzle"
+name = "epicycles"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 bevy = { version = "0.18.0", default-features=false, features = [
@@ -54,7 +54,7 @@ bevy = { version = "0.18.0", default-features=false, features = [
     # "track_location",             # Enables source location tracking for change detection and spawning/despawning, which can assist with debugging
     "ui_picking",                   # Provides an implementation for picking UI
     "vorbis",                       # OGG/VORBIS audio format support
-    # "wayland",                    # Wayland display server support
+    "wayland",                      # Wayland display server support
     "x11",                          # X11 display server support
 ] }
 

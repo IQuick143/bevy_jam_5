@@ -7,8 +7,8 @@ mod test;
 
 use super::{
 	super::builder::{LevelBuildResult, LevelBuilder},
-	domain::DomainType,
 	MAX_INTERPRETER_ITERATIONS,
+	domain::DomainType,
 };
 use crate::epilang::{interpreter::InterpreterWarning, *};
 

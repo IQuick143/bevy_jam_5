@@ -1,7 +1,7 @@
 //! Parallax effect on camera movement
 
-use super::movement::CameraPositionUpdate;
 use super::CameraHarness;
+use super::movement::CameraPositionUpdate;
 use bevy::{
 	ecs::{lifecycle::HookContext, world::DeferredWorld},
 	prelude::*,

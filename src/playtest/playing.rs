@@ -6,6 +6,7 @@ use super::{
 	stars::{StarRating, StarRatingValue},
 };
 use crate::{
+	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::{ColorKey, TextColorKey},
 	game::{
@@ -24,7 +25,6 @@ use crate::{
 		interaction::{InteractionEnabled, Unfreeze},
 		prelude::*,
 	},
-	AppSet,
 };
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use bevy_ui_text_input::TextInputContents;

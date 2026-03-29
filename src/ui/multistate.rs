@@ -1,6 +1,6 @@
 //! Checkbox-like UI elements
 
-use crate::{ui::prelude::InteractionQuery, AppSet};
+use crate::{AppSet, ui::prelude::InteractionQuery};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {

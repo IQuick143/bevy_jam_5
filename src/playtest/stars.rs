@@ -1,10 +1,10 @@
 //! Star rating UI element for playtesters
 
 use crate::{
+	AppSet,
 	assets::{HandleMap, ImageKey},
 	drawing::{ColorKey, NodeColorKey},
 	ui::{consts::*, interaction::Unfreeze, prelude::InteractionPalette},
-	AppSet,
 };
 use bevy::prelude::*;
 

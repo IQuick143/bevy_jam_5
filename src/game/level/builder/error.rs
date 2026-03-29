@@ -145,7 +145,10 @@ impl std::fmt::Display for VertexSolverError {
 				write!(f, "there is no valid position to place vertex {vertex}")
 			}
 			Self::TwoVerticesCollide { vertex_a, vertex_b } => {
-				write!(f, "vertices {vertex_a} and {vertex_b} require placement at the same position")
+				write!(
+					f,
+					"vertices {vertex_a} and {vertex_b} require placement at the same position"
+				)
 			}
 			Self::VertexIsUnconstrained { vertex } => {
 				write!(f, "position of vertex {vertex} has not been set")
@@ -154,18 +157,30 @@ impl std::fmt::Display for VertexSolverError {
 				write!(f, "position of vertex {vertex} is ambiguous")
 			}
 			Self::VertexHasNoCycle(i) => write!(f, "vertex {i} does not lie on any cycle"),
-			Self::CannotPinTwinPair([a, b, c]) => write!(f, "vertices {a}, {b}, and {c} could not be pinned heuristically because they lie on the same cycle"),
-			Self::CannotPinUnsaturatedPair(i) => write!(f, "vertex {i} could not be pinned heuristically because its owner cycle is intersected between its possible positions"),
-			Self::VerticesNotClockwise { cycle, vertices: [a, b, c] } => write!(f, "vertices {a}, {b}, and {c} on cycle {cycle} do not appear in clockwise order"),
+			Self::CannotPinTwinPair([a, b, c]) => write!(
+				f,
+				"vertices {a}, {b}, and {c} could not be pinned heuristically because they lie on the same cycle"
+			),
+			Self::CannotPinUnsaturatedPair(i) => write!(
+				f,
+				"vertex {i} could not be pinned heuristically because its owner cycle is intersected between its possible positions"
+			),
+			Self::VerticesNotClockwise {
+				cycle,
+				vertices: [a, b, c],
+			} => write!(
+				f,
+				"vertices {a}, {b}, and {c} on cycle {cycle} do not appear in clockwise order"
+			),
 			Self::CycleDoesNotContainVertex(e) => write!(
 				f,
 				"vertex {} has been explicitly placed at position {} which does not lie on cycle {} at {:?}",
-				e.cycle,
-				e.placement,
-				e.vertex,
-				e.position
+				e.cycle, e.placement, e.vertex, e.position
 			),
-			Self::UnnecessaryHint(i) => write!(f, "placement hint on vertex {i} did not affect its position"),
+			Self::UnnecessaryHint(i) => write!(
+				f,
+				"placement hint on vertex {i} did not affect its position"
+			),
 		}
 	}
 }
@@ -177,18 +192,54 @@ impl std::fmt::Display for LevelBuilderError {
 		match self {
 			Self::LevelNameAlreadySet => write!(f, "Level name has been set multiple times."),
 			Self::LevelHintAlreadySet => write!(f, "Level hint has been set multiple times."),
-			Self::VertexIndexOutOfRange(i) => write!(f, "Vertex {i} has been referenced, but there are not that many vertices."),
-			Self::DetectorIndexOutOfRange(i) => write!(f, "Detector {i} has been referenced, but there are not that many detectors."),
-			Self::CycleIndexOutOfRange(i) => write!(f, "Cycle {i} has been referenced, but there are not that many cycles."),
-			Self::RepeatingVertexInCycle(i) => write!(f, "Cannot create cycle that contains vertex {i} multiple times."),
-			Self::DetectorOnEmptyCycle => write!(f, "Cannot create cycle that contains no vertices and nonzero amount of detectors."),
-			Self::WallOnEmptyCycle => write!(f, "Cannot create cycle that contains no vertices and nonzero amount of walls."),
-			Self::CycleRadiusNotPositive(i, r) => write!(f, "Radius of cycle {i} is not positive ({r})"),
-			Self::UnplacedCycle(i) => write!(f, "Cannot finish layout because cycle {i} has not yet been placed."),
-			Self::CycleAlreadyPlaced(i) => write!(f, "Cannot place cycle {i} because it has already been placed."),
-			Self::VertexAlreadyPlaced(i) => write!(f, "Cannot place vertex {i} because it has already been (possibly implicitly) placed."),
-			Self::OverlappedLinkedCycles(e) => write!(f, "Cycles {} and {} cannot be linked because they share vertex {}.", e.source_cycle, e.dest_cycle, e.shared_vertex),
-			Self::CycleLinkageConflict(a, b) => write!(f, "Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."),
+			Self::VertexIndexOutOfRange(i) => write!(
+				f,
+				"Vertex {i} has been referenced, but there are not that many vertices."
+			),
+			Self::DetectorIndexOutOfRange(i) => write!(
+				f,
+				"Detector {i} has been referenced, but there are not that many detectors."
+			),
+			Self::CycleIndexOutOfRange(i) => write!(
+				f,
+				"Cycle {i} has been referenced, but there are not that many cycles."
+			),
+			Self::RepeatingVertexInCycle(i) => write!(
+				f,
+				"Cannot create cycle that contains vertex {i} multiple times."
+			),
+			Self::DetectorOnEmptyCycle => write!(
+				f,
+				"Cannot create cycle that contains no vertices and nonzero amount of detectors."
+			),
+			Self::WallOnEmptyCycle => write!(
+				f,
+				"Cannot create cycle that contains no vertices and nonzero amount of walls."
+			),
+			Self::CycleRadiusNotPositive(i, r) => {
+				write!(f, "Radius of cycle {i} is not positive ({r})")
+			}
+			Self::UnplacedCycle(i) => write!(
+				f,
+				"Cannot finish layout because cycle {i} has not yet been placed."
+			),
+			Self::CycleAlreadyPlaced(i) => write!(
+				f,
+				"Cannot place cycle {i} because it has already been placed."
+			),
+			Self::VertexAlreadyPlaced(i) => write!(
+				f,
+				"Cannot place vertex {i} because it has already been (possibly implicitly) placed."
+			),
+			Self::OverlappedLinkedCycles(e) => write!(
+				f,
+				"Cycles {} and {} cannot be linked because they share vertex {}.",
+				e.source_cycle, e.dest_cycle, e.shared_vertex
+			),
+			Self::CycleLinkageConflict(a, b) => write!(
+				f,
+				"Cycles {a} and {b} cannot be linked because they are already linked in the opposite direction."
+			),
 			Self::OneWayLinkLoop(e) => e.fmt(f),
 			Self::VertexSolverError(e) => e.fmt(f),
 		}

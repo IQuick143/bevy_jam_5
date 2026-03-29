@@ -2,7 +2,7 @@
 
 use super::log::{LogSerializationScope, PlaytestLog};
 use bevy::{prelude::*, tasks::IoTaskPool};
-use futures::channel::oneshot::{channel, Receiver, Sender};
+use futures::channel::oneshot::{Receiver, Sender, channel};
 use std::{future::Future, time::Duration};
 
 pub(super) fn plugin(app: &mut App) {

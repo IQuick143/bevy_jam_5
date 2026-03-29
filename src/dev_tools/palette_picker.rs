@@ -1,9 +1,9 @@
 //! Quick palette editing for developers
 
 use crate::{
+	AppSet,
 	drawing::{ColorKey, NodeColorKey, ThingPalette},
 	ui::{char_input_pressed, interaction::InteractionQuery, slider::Slider},
-	AppSet,
 };
 use bevy::prelude::*;
 

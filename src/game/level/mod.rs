@@ -185,10 +185,10 @@ impl OneWayLinkData {
 		match (self.direction, other.direction) {
 			(LinkedCycleDirection::Coincident, LinkedCycleDirection::Coincident) => {}
 			(LinkedCycleDirection::Coincident, LinkedCycleDirection::Inverse) => {
-				return std::cmp::Ordering::Greater
+				return std::cmp::Ordering::Greater;
 			}
 			(LinkedCycleDirection::Inverse, LinkedCycleDirection::Coincident) => {
-				return std::cmp::Ordering::Less
+				return std::cmp::Ordering::Less;
 			}
 			(LinkedCycleDirection::Inverse, LinkedCycleDirection::Inverse) => {}
 		}

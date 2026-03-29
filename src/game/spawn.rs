@@ -8,7 +8,7 @@ use super::{
 	logic_relay::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
 };
-use crate::{assets::*, drawing::*, graphics::*, AppSet};
+use crate::{AppSet, assets::*, drawing::*, graphics::*};
 use bevy::{ecs::schedule::ScheduleLabel, platform::collections::HashMap, sprite::Anchor};
 use std::f32::consts::{PI, TAU};
 
@@ -128,7 +128,7 @@ fn handle_enter_level(
 					None
 				};
 				*game_state = GameState::new(level);
-				last_session_id.0 .0 += 1;
+				last_session_id.0.0 += 1;
 				spawn_events.write(SpawnLevel(level_handle.clone(), last_session_id.0));
 			} else {
 				log::warn!("Got an invalid level handle");
@@ -808,7 +808,10 @@ fn create_hard_link_visual(
 	let d_sq = a.distance_squared(b);
 	if d_sq <= CYCLE_LINK_SPACING.powi(2) {
 		// The link cannot be rendered if the cycles are too close
-		log::warn!("Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}", d_sq.sqrt());
+		log::warn!(
+			"Skipped drawing a cycle link because the cycles are {} units apart, need at least {CYCLE_LINK_SPACING}",
+			d_sq.sqrt()
+		);
 		return;
 	}
 	let connector_length = match direction {
@@ -1259,8 +1262,8 @@ fn typeset_number(
 /// The position of the center of the label, rotation of the label marker
 /// and rotation of the color sprite
 fn get_button_color_label_placement(style: &ButtonColorLabelAppearence) -> (Vec2, f32, f32) {
-	use color_labels::*;
 	use ButtonColorLabelPosition::*;
+	use color_labels::*;
 	let secondary_offset = if style.has_arrow_tip {
 		OFFSET_SECONDARY_ARROW
 	} else {

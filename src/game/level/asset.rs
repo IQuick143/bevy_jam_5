@@ -1,4 +1,4 @@
-use backend::builder::{parse_and_run, Error as LevelParsingError};
+use backend::builder::{Error as LevelParsingError, parse_and_run};
 
 use bevy::asset::AsyncReadExt;
 

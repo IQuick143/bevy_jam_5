@@ -114,18 +114,20 @@ impl CyclePoints {
 				self.vertices[index].inner,
 				LogicalVertexVariant::Single { .. }
 			));
-			assert!(self
-				.first_decided_vertex
-				.is_some_and(|first_single| { first_single <= index }));
+			assert!(
+				self.first_decided_vertex
+					.is_some_and(|first_single| { first_single <= index })
+			);
 		};
 		let assert_pair = |index: usize| {
 			assert!(matches!(
 				self.vertices[index].inner,
 				LogicalVertexVariant::Pair { .. }
 			));
-			assert!(self
-				.first_undecided_vertex
-				.is_some_and(|first_single| { first_single <= index }));
+			assert!(
+				self.first_undecided_vertex
+					.is_some_and(|first_single| { first_single <= index })
+			);
 		};
 		for value in self.vertices.iter() {
 			match value.inner {
@@ -350,7 +352,10 @@ impl PointData {
 					match self.vertex_constraints[vertex] {
 						IntersectionPointSet::Pair(a, b) => {
 							if a == b {
-								debug_assert!(false, "Vertex has a Pair placement, but both options in the pair are the same point");
+								debug_assert!(
+									false,
+									"Vertex has a Pair placement, but both options in the pair are the same point"
+								);
 								continue;
 							}
 							let other_point;
@@ -359,7 +364,10 @@ impl PointData {
 							} else if b == point {
 								other_point = a;
 							} else {
-								debug_assert!(false, "vertices_interested_in_point contains a vertex not interested in that point");
+								debug_assert!(
+									false,
+									"vertices_interested_in_point contains a vertex not interested in that point"
+								);
 								continue;
 							}
 							self.place_vertex_internal(vertex, other_point);
@@ -396,7 +404,10 @@ impl PointData {
 		) {
 			(IntersectionPointSet::Pair(a1, b1), IntersectionPointSet::Pair(a2, b2)) => {
 				if (a1 == b1) || !((a1 == a2 && b1 == b2) || (a1 == b2 && b1 == a2)) {
-					debug_assert!(false, "`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1} -> {a1},{b1}) v2:({vertex_2} -> {a2},{b2})")
+					debug_assert!(
+						false,
+						"`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1} -> {a1},{b1}) v2:({vertex_2} -> {a2},{b2})"
+					)
 				}
 				// All vertices that are no longer eligible for poinst `a1` and `b2`
 				// This is all vertices that target those points except the twins
@@ -427,7 +438,10 @@ impl PointData {
 									self.place_vertex(vertex, option_a, errors);
 								}
 								(false, false) => {
-									debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in a point ({a1} or {b1}) which it actually wasn't. Desired points: ({option_a}, {option_b}).");
+									debug_assert!(
+										false,
+										"`propagate_twin_constraint` encountered vertex {vertex} interested in a point ({a1} or {b1}) which it actually wasn't. Desired points: ({option_a}, {option_b})."
+									);
 								}
 							}
 						}
@@ -440,14 +454,20 @@ impl PointData {
 						_ => {
 							// Unreachable, points with placements other than Single and Pair
 							// cannot be targeting points by definition
-							debug_assert!(false, "`propagate_twin_constraint` encountered vertex {vertex} interested in points which weren't actually constrained to points");
+							debug_assert!(
+								false,
+								"`propagate_twin_constraint` encountered vertex {vertex} interested in points which weren't actually constrained to points"
+							);
 						}
 					}
 				}
 			}
 			_ => {
 				// this shouldn't really happen
-				debug_assert!(false, "`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1}) v2:({vertex_2})");
+				debug_assert!(
+					false,
+					"`propagate_twin_constraint` called on a twin pair that is not actually a twin pair v1:({vertex_1}) v2:({vertex_2})"
+				);
 			}
 		}
 	}

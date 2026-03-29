@@ -4,11 +4,11 @@ use super::{
 	prelude::*,
 };
 use crate::{
+	AppSet,
 	camera::CameraHarness,
 	game::components::Cycle,
 	graphics::RING_SHADOW_BLEED,
 	ui::{freeze::ui_not_frozen, hover::IsHovered},
-	AppSet,
 };
 
 pub(super) fn plugin(app: &mut App) {

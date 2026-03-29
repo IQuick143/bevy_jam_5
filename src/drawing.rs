@@ -1,8 +1,8 @@
 //! Global non-asset graphical repository
 
 use crate::{
-	graphics::{primitives::*, *},
 	AppSet,
+	graphics::{primitives::*, *},
 };
 use bevy::{
 	color::palettes::{self, tailwind::*},

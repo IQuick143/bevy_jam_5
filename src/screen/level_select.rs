@@ -5,9 +5,9 @@ use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::level::{
+		LevelData,
 		completion::{CompletionStatus, LevelHubCompletion},
 		list::LevelList,
-		LevelData,
 	},
 	save::SaveGame,
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox},

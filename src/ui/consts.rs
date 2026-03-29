@@ -1,7 +1,7 @@
 //! Global UI measurements
 
-use bevy::prelude::*;
 use Val::*;
+use bevy::prelude::*;
 
 // Common
 pub const HEADING_HEIGHT: Val = Px(65.0);

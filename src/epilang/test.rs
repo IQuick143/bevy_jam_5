@@ -1,4 +1,4 @@
-use super::{builtins::*, compile, interpreter::*, values::*, SourceLocation};
+use super::{SourceLocation, builtins::*, compile, interpreter::*, values::*};
 
 /// Testing interpreter backend that provides no functions
 #[derive(Clone, Copy, Debug, Default)]
@@ -727,5 +727,5 @@ fn overwritte_builtin_warning() {
 fn comment_on_last_line() {
 	let program = "# test comment";
 	let module = compile(program).unwrap();
-	assert!(module.0 .0.is_empty());
+	assert!(module.0.0.is_empty());
 }

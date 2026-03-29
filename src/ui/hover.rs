@@ -21,8 +21,7 @@ pub const UI_UNDO: &str = "Undo [Z]";
 pub const UI_REDO: &str = "Redo [Y]";
 pub const UI_NEXT: &str = "Next level [N]";
 
-pub const BLOCKADE_WARNING: &str =
-	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
+pub const BLOCKADE_WARNING: &str = "The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
 pub const WALL_HIT_WARNING: &str =
 	"The last turn did not execute because this wall would've been hit by an object on this cycle.";
 

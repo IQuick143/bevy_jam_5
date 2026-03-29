@@ -1,6 +1,6 @@
 #![allow(clippy::let_unit_value)]
 
-use super::{ast::*, lex::*, SourceLocation};
+use super::{SourceLocation, ast::*, lex::*};
 use pomelo::pomelo;
 use std::ops::Range;
 

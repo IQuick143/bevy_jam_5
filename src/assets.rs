@@ -1,9 +1,8 @@
 use bevy::{image::ImageLoaderSettings, platform::collections::HashMap, prelude::*};
 
 use crate::game::level::{
-	asset::plugin as level_asset_plugin, list::LevelList,
-	list_asset::plugin as level_list_asset_plugin, CycleTurnability, GlyphType, ObjectType,
-	ThingType,
+	CycleTurnability, GlyphType, ObjectType, ThingType, asset::plugin as level_asset_plugin,
+	list::LevelList, list_asset::plugin as level_list_asset_plugin,
 };
 
 pub(super) fn plugin(app: &mut App) {

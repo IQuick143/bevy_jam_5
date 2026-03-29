@@ -4,8 +4,8 @@ use super::consts::*;
 use crate::drawing::{ColorKey, TextColorKey};
 use bevy::prelude::*;
 use bevy_ui_text_input::{
-	actions::{TextInputAction, TextInputEdit},
 	TextInputContents, TextInputNode, TextInputQueue,
+	actions::{TextInputAction, TextInputEdit},
 };
 
 pub fn text_input(

@@ -2,11 +2,11 @@
 
 use super::log::PlaytestLog;
 use crate::{
-	assets::{all_assets_loaded, GlobalFont, UiButtonAtlas},
+	AppSet,
+	assets::{GlobalFont, UiButtonAtlas, all_assets_loaded},
 	screen::{DoScreenTransitionCommands as _, Screen},
 	send_message,
 	ui::{consts::*, interaction::InteractionQuery, scrollbox::Scrollbox, widgets},
-	AppSet,
 };
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
