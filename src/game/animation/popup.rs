@@ -20,9 +20,9 @@ pub struct PopupAnimation {
 }
 
 impl PopupAnimation {
-	pub fn new(animation_time: f32, starting_scale: f32) -> Self {
+	pub fn new(animation_time: f32, starting_scale: f32, wait_before_start: f32) -> Self {
 		Self {
-			progress: 0.0,
+			progress: -wait_before_start / animation_time,
 			animation_time,
 			starting_scale,
 			is_reversed: false,
@@ -39,9 +39,9 @@ impl PopupAnimation {
 
 	pub fn is_finished(&self) -> bool {
 		if self.is_reversed {
-			self.progress == 0.0
+			self.progress <= 0.0
 		} else {
-			self.progress == 1.0
+			self.progress >= 1.0
 		}
 	}
 }
@@ -58,13 +58,16 @@ fn tick_popup_animation(
 
 		let delta = time.delta_secs() / animation.animation_time;
 		if animation.is_reversed {
-			animation.progress -= delta;
+			animation.progress = (animation.progress - delta).max(0.0);
 		} else {
-			animation.progress += delta;
+			animation.progress = (animation.progress + delta).min(1.0);
 		}
-		animation.progress = animation.progress.clamp(0.0, 1.0);
 
-		let adjusted_progress = animation_easing_function(animation.progress);
+		// If the progress is out of range, the animation is waiting out
+		// delay before start. Animate it as if it were at the end of range
+		let progress = animation.progress.clamp(0.0, 1.0);
+
+		let adjusted_progress = animation_easing_function(progress);
 		let current_scale = animation.starting_scale.lerp(1.0, adjusted_progress);
 		transform.scale = Vec3::splat(current_scale);
 		let pure_color = palette[&ColorKey::WarningSign];

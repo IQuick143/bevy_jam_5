@@ -1,5 +1,9 @@
 use super::{
-	animation::PopupAnimation, components::*, inputs::CycleInteraction, logic_relay::*, prelude::*,
+	animation::{PopupAnimation, TurnAnimationLength},
+	components::*,
+	inputs::CycleInteraction,
+	logic_relay::*,
+	prelude::*,
 	spawn::LastLevelSessionId,
 };
 use crate::{
@@ -309,6 +313,7 @@ struct BlockMarkerFactory<'w, 's> {
 	commands: Commands<'w, 's>,
 	images: Res<'w, HandleMap<ImageKey>>,
 	session: Res<'w, LastLevelSessionId>,
+	animation_length: Res<'w, TurnAnimationLength>,
 }
 
 impl BlockMarkerFactory<'_, '_> {
@@ -319,7 +324,13 @@ impl BlockMarkerFactory<'_, '_> {
 				custom_size: Some(SPRITE_SIZE),
 				..default()
 			},
-			PopupAnimation::new(ERROR_POPUP_TIME, ERROR_POPUP_INITIAL_SCALE),
+			PopupAnimation::new(
+				ERROR_POPUP_TIME,
+				ERROR_POPUP_INITIAL_SCALE,
+				// Wait half a turn (until the objects hit the walls)
+				// to display the marker
+				**self.animation_length / 2.0,
+			),
 			Transform::from_translation(position.extend(layers::FAIL_MARKERS))
 				.with_scale(Vec3::splat(ERROR_POPUP_INITIAL_SCALE)),
 			TemporaryMarker,
