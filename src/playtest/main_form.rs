@@ -130,37 +130,6 @@ fn spawn_feedback_form_screen(
 
 	commands.spawn((
 		Node {
-			column_gap: COMMON_GAP,
-			..default()
-		},
-		ChildOf(main),
-		children![
-			(
-				ImageNode::default(),
-				Node {
-					width: Val::Px(COMMON_TEXT_SIZE),
-					height: Val::Px(COMMON_TEXT_SIZE),
-					..default()
-				},
-				NodeColorKey(default()),
-				SubmitResultNode,
-			),
-			(
-				Text::default(),
-				TextFont {
-					font_size: COMMON_TEXT_SIZE,
-					font: font.0.clone(),
-					..default()
-				},
-				TextColorKey(ColorKey::UiLabelText),
-				SubmitResultNode,
-			),
-		],
-	));
-
-	commands.spawn((
-		Node {
-			padding: UiRect::top(WIDE_GAP),
 			flex_direction: FlexDirection::Column,
 			max_width: GLOBAL_FEEDBACK_FORM_MAX_WIDTH,
 			row_gap: COMMON_GAP,
@@ -169,6 +138,35 @@ fn spawn_feedback_form_screen(
 		},
 		ChildOf(main),
 		children![
+			(
+				Node {
+					padding: UiRect::vertical(WIDE_GAP),
+					column_gap: COMMON_GAP,
+					..default()
+				},
+				children![
+					(
+						ImageNode::default(),
+						Node {
+							width: Val::Px(COMMON_TEXT_SIZE),
+							height: Val::Px(COMMON_TEXT_SIZE),
+							..default()
+						},
+						NodeColorKey(default()),
+						SubmitResultNode,
+					),
+					(
+						Text::default(),
+						TextFont {
+							font_size: COMMON_TEXT_SIZE,
+							font: font.0.clone(),
+							..default()
+						},
+						TextColorKey(ColorKey::UiLabelText),
+						SubmitResultNode,
+					),
+				],
+			),
 			(
 				widgets::grid_button("Submit all playtest feedback", font.0.clone()),
 				FeedbackFormAction::Submit(LogSerializationScope::Full),

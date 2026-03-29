@@ -5,6 +5,7 @@ use bevy::prelude::*;
 
 // Common
 pub const HEADING_HEIGHT: Val = Px(65.0);
+pub const HEADING_PADDING: UiRect = UiRect::all(Val::Px(10.0));
 pub const HEADING_TEXT_SIZE: f32 = 40.0;
 pub const MENU_BUTTON_HEIGHT: Val = HEADING_HEIGHT;
 pub const MENU_BUTTON_TEXT_SIZE: f32 = HEADING_TEXT_SIZE;

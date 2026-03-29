@@ -128,8 +128,8 @@ pub fn header(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	(
 		Name::new("Header"),
 		Node {
-			width: LABEL_WIDTH,
-			height: HEADING_HEIGHT,
+			min_width: LABEL_WIDTH,
+			padding: HEADING_PADDING,
 			justify_content: JustifyContent::Center,
 			align_items: AlignItems::Center,
 			..default()
