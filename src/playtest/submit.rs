@@ -110,7 +110,7 @@ fn submit_playtest_log(
 	playtest: &PlaytestLog,
 	scope: LogSerializationScope,
 	promise: Sender<Result<(), ureq::Error>>,
-) -> impl Future<Output = ()> + Send + Sync {
+) -> impl Future<Output = ()> + Send + Sync + use<> {
 	let mut body = serde_json::Map::new().into();
 	playtest.write_json(&mut body, scope);
 	let tester_id = playtest.tester_id();
