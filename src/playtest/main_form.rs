@@ -97,7 +97,7 @@ fn spawn_feedback_form_screen(
 		.id();
 
 	commands.spawn((
-		widgets::header("Playtest feedback form", font.0.clone()),
+		widgets::header("Feedback and submission", font.0.clone()),
 		ChildOf(main),
 	));
 
@@ -130,74 +130,6 @@ fn spawn_feedback_form_screen(
 
 	commands.spawn((
 		Node {
-			padding: UiRect::top(WIDE_GAP),
-			flex_direction: FlexDirection::Column,
-			max_width: GLOBAL_FEEDBACK_FORM_MAX_WIDTH,
-			row_gap: COMMON_GAP,
-			align_items: AlignItems::Center,
-			..default()
-		},
-		ChildOf(main),
-		children![
-			(
-				widgets::grid_button("Submit feedback", font.0.clone()),
-				FeedbackFormAction::Submit(LogSerializationScope::Full),
-			),
-			(
-				Node {
-					padding: UiRect::bottom(WIDE_GAP),
-					..default()
-				},
-				Text::new("Send us all your feedback"),
-				TextLayout::new_with_justify(Justify::Center),
-				TextFont {
-					font_size: SMALL_TEXT_SIZE,
-					font: font.0.clone(),
-					..default()
-				},
-				TextColorKey(ColorKey::UiLabelText),
-			),
-			(
-				widgets::grid_button("Submit feedback and logs", font.0.clone()),
-				FeedbackFormAction::Submit(LogSerializationScope::FeedbackOnly),
-			),
-			(
-				Node {
-					padding: UiRect::bottom(WIDE_GAP),
-					..default()
-				},
-				Text::new("Send us your feedback and game logs (please do! it helps us understand how you approached the puzzles and what you struggled with)"),
-				TextLayout::new_with_justify(Justify::Center),
-				TextFont {
-					font_size: SMALL_TEXT_SIZE,
-					font: font.0.clone(),
-					..default()
-				},
-				TextColorKey(ColorKey::UiLabelText),
-			),
-			(
-				widgets::grid_button("Delete submission", font.0.clone()),
-				FeedbackFormAction::Submit(LogSerializationScope::Clear),
-			),
-			(
-				Node {
-					padding: UiRect::bottom(WIDE_GAP),
-					..default()
-				},
-				Text::new("Delete your response from our server. All data stays on your machine, so you can resubmit if you change your mind."),
-				TextLayout::new_with_justify(Justify::Center),
-				TextFont {
-					font_size: SMALL_TEXT_SIZE,
-					font: font.0.clone(),
-					..default()
-				},
-				TextColorKey(ColorKey::UiLabelText),
-			),
-		],
-	));
-
-	commands.spawn((
-		Node {
 			column_gap: COMMON_GAP,
 			..default()
 		},
@@ -222,6 +154,74 @@ fn spawn_feedback_form_screen(
 				},
 				TextColorKey(ColorKey::UiLabelText),
 				SubmitResultNode,
+			),
+		],
+	));
+
+	commands.spawn((
+		Node {
+			padding: UiRect::top(WIDE_GAP),
+			flex_direction: FlexDirection::Column,
+			max_width: GLOBAL_FEEDBACK_FORM_MAX_WIDTH,
+			row_gap: COMMON_GAP,
+			align_items: AlignItems::Center,
+			..default()
+		},
+		ChildOf(main),
+		children![
+			(
+				widgets::grid_button("Submit all playtest feedback", font.0.clone()),
+				FeedbackFormAction::Submit(LogSerializationScope::Full),
+			),
+			(
+				Node {
+					padding: UiRect::bottom(WIDE_GAP),
+					..default()
+				},
+				Text::new("Send us all your feedback including a log of the moves you took in-game. (Please do! it helps us understand how you approached the puzzles and what you struggled with).\nYou can always submit again to update your response."),
+				TextLayout::new_with_justify(Justify::Center),
+				TextFont {
+					font_size: SMALL_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
+			),
+			(
+				widgets::grid_button("Submit feedback without move logs", font.0.clone()),
+				FeedbackFormAction::Submit(LogSerializationScope::FeedbackOnly),
+			),
+			(
+				Node {
+					padding: UiRect::bottom(WIDE_GAP),
+					..default()
+				},
+				Text::new("Send us your feedback but remove gameplay data."),
+				TextLayout::new_with_justify(Justify::Center),
+				TextFont {
+					font_size: SMALL_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
+			),
+			(
+				widgets::grid_button("Delete submission", font.0.clone()),
+				FeedbackFormAction::Submit(LogSerializationScope::Clear),
+			),
+			(
+				Node {
+					padding: UiRect::bottom(WIDE_GAP),
+					..default()
+				},
+				Text::new("Delete your playtest data from our server. All data stays on your machine, so you can resubmit if you change your mind."),
+				TextLayout::new_with_justify(Justify::Center),
+				TextFont {
+					font_size: SMALL_TEXT_SIZE,
+					font: font.0.clone(),
+					..default()
+				},
+				TextColorKey(ColorKey::UiLabelText),
 			),
 		],
 	));
@@ -286,8 +286,12 @@ fn display_submission_status(
 			Some(Err(ureq::Error::StatusCode(429))) => {
 				"You have submitted too many times recently, try again later"
 			}
-			Some(Err(ureq::Error::StatusCode(500..))) => "Internal server error",
-			Some(Err(_)) => "Could not process response",
+			Some(Err(ureq::Error::StatusCode(500..))) => {
+				"Internal server error, try again later or contact us."
+			}
+			Some(Err(_)) => {
+				"Could not process response from server, try again later or contact us."
+			}
 		};
 		let (icon_key, icon_color) = match task.get_result() {
 			None => (None, ColorKey::Blank),
