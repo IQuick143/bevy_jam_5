@@ -46,15 +46,19 @@ struct FeedbackTextQuestion(&'static str);
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct SubmitResultNode;
 
-const FEEDBACK_QUESTIONS: [(&str, &str, f32); 4] = [
+const FEEDBACK_QUESTIONS: [(&str, &str, bool); 4] = [
 	(
 		"favorites",
 		"Which parts of the game did you enjoy the most?",
-		3.0,
+		false,
 	),
-	("confusing", "Which parts of the game were confusing?", 3.0),
-	("comment", "Any other comments?", 3.0),
-	("price", "How much do you think the game should cost?", 1.0),
+	(
+		"confusing",
+		"Which parts of the game were confusing?",
+		false,
+	),
+	("comment", "Any other comments?", false),
+	("price", "How much do you think the game should cost?", true),
 ];
 
 fn spawn_feedback_form_screen(
@@ -101,7 +105,7 @@ fn spawn_feedback_form_screen(
 		ChildOf(main),
 	));
 
-	for (key, question, base_height) in FEEDBACK_QUESTIONS {
+	for (key, question, is_single_line) in FEEDBACK_QUESTIONS {
 		let current_answer = playtest
 			.global_feedback
 			.get(key)
@@ -122,7 +126,7 @@ fn spawn_feedback_form_screen(
 			children![super::widgets::text_input(
 				current_answer,
 				font.0.clone(),
-				base_height,
+				is_single_line,
 				FeedbackTextQuestion(key),
 			)],
 		));

@@ -4,18 +4,20 @@ use super::consts::*;
 use crate::drawing::{ColorKey, TextColorKey};
 use bevy::prelude::*;
 use bevy_ui_text_input::{
-	TextInputContents, TextInputNode, TextInputQueue,
+	TextInputContents, TextInputMode, TextInputNode, TextInputQueue,
 	actions::{TextInputAction, TextInputEdit},
 };
 
 pub fn text_input(
 	value: impl Into<String>,
 	font: Handle<Font>,
-	base_height: f32,
+	is_single_line: bool,
 	extra: impl Bundle,
 ) -> impl Bundle {
 	let mut queue = TextInputQueue::default();
 	queue.add(TextInputAction::Edit(TextInputEdit::Paste(value.into())));
+
+	let base_height = if is_single_line { 1.0 } else { 3.0 };
 
 	(
 		Node {
@@ -27,7 +29,16 @@ pub fn text_input(
 		BorderColor::all(FEEDBACK_FORM_FRAME_COLOR),
 		BackgroundColor(TEXT_INPUT_BACKGROUND),
 		children![(
-			TextInputNode::default(),
+			TextInputNode {
+				clear_on_submit: false,
+				unfocus_on_submit: false,
+				mode: if is_single_line {
+					TextInputMode::SingleLine
+				} else {
+					default()
+				},
+				..default()
+			},
 			TextInputContents::default(),
 			Node {
 				width: Val::Percent(100.0),

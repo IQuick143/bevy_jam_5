@@ -271,7 +271,7 @@ fn spawn_feedback_form(
 						super::widgets::text_input(
 							current_comment,
 							font.0.clone(),
-							3.0,
+							false,
 							LevelTextInput
 						),
 					],
