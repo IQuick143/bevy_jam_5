@@ -89,7 +89,7 @@ pub enum Screen {
 	#[cfg(feature = "playtest")]
 	Playtest,
 	#[cfg(feature = "playtest")]
-	PlaytestPrivacyStatement,
+	PlaytestInformation,
 }
 
 impl Screen {

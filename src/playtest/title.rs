@@ -61,8 +61,8 @@ fn spawn_playtest_title_ui(
 							NodeColorKey(ColorKey::PlaytestMarker),
 						));
 					children.spawn((
-						widgets::grid_button("Privacy policy", font.0.clone()),
-						TitlePlaytestPanelButton(Screen::PlaytestPrivacyStatement),
+						widgets::grid_button("Information and privacy", font.0.clone()),
+						TitlePlaytestPanelButton(Screen::PlaytestInformation),
 					));
 				});
 		});
