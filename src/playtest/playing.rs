@@ -218,7 +218,34 @@ fn spawn_feedback_form(
 						..default()
 					},
 					children![
-						widgets::label("How did you like this level?", font.0.clone()),
+						(
+							Node {
+								width: LABEL_WIDTH,
+								justify_content: JustifyContent::Center,
+								align_items: AlignItems::Center,
+								..default()
+							},
+							children![
+								(
+									Text::new("How did you like this level?"),
+									TextFont {
+										font_size: COMMON_TEXT_SIZE,
+										font: font.0.clone(),
+										..default()
+									},
+									TextColorKey(ColorKey::UiLabelText),
+								),
+								(
+									Text::new(" *"),
+									TextFont {
+										font_size: COMMON_TEXT_SIZE,
+										font: font.0.clone(),
+										..default()
+									},
+									TextColor(Srgba::RED.into()),
+								)
+							]
+						),
 						(
 							StarRating::new(5),
 							StarRatingValue(current_rating),
@@ -465,10 +492,12 @@ fn synchronize_text_feedback(
 }
 
 fn update_submit_enable_disable(
-	rating_q: Query<&StarRatingValue, Changed<StarRatingValue>>,
+	rating_q: Query<(&StarRatingValue, &LevelStarRating), Changed<StarRatingValue>>,
 	mut submit_q: Query<&mut InteractionEnabled, With<ExitFeedbackForm>>,
 ) {
-	let is_submitable = rating_q.iter().any(|&StarRatingValue(rating)| rating > 0);
+	let is_submitable = rating_q
+		.iter()
+		.any(|(&StarRatingValue(rating), &field)| field == LevelStarRating::General && rating > 0);
 	for mut enabled in &mut submit_q {
 		if is_submitable {
 			enabled.set_if_neq(InteractionEnabled(true));
