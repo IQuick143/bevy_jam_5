@@ -105,6 +105,14 @@ fn spawn_feedback_form_screen(
 		ChildOf(main),
 	));
 
+	commands.spawn((
+		widgets::label(
+			&format!("Tester ID: {}", playtest.tester_id()),
+			font.0.clone(),
+		),
+		ChildOf(main),
+	));
+
 	for (key, question, is_single_line) in FEEDBACK_QUESTIONS {
 		let current_answer = playtest
 			.global_feedback
