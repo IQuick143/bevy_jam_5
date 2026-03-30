@@ -1,5 +1,6 @@
 //! Extensions to title screen for playtesting builds
 
+use super::main_form::MainFormReturnScreen;
 use crate::{
 	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey},
@@ -71,9 +72,14 @@ fn spawn_playtest_title_ui(
 fn enter_playtest_screen(
 	query: InteractionQuery<&TitlePlaytestPanelButton>,
 	mut commands: Commands,
+	mut return_screen: ResMut<MainFormReturnScreen>,
 ) {
 	for (interaction, enabled, TitlePlaytestPanelButton(target_screen)) in &query {
 		if *interaction == Interaction::Pressed && enabled.is_none_or(|e| **e) {
+			// Mark the return screen so it takes the player back here
+			if *target_screen == Screen::Playtest {
+				*return_screen = MainFormReturnScreen::Title;
+			}
 			commands.do_screen_transition(*target_screen);
 		}
 	}

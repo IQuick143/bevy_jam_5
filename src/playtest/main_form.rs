@@ -12,24 +12,47 @@ use crate::{
 	screen::{DoScreenTransitionCommands as _, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
 };
-use bevy::prelude::*;
+use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 use bevy_ui_text_input::TextInputContents;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_message::<FeedbackFormAction>()
+		.init_resource::<MainFormReturnScreen>()
 		.add_systems(OnEnter(Screen::Playtest), spawn_feedback_form_screen)
 		.add_systems(
 			Update,
 			(
 				(
-					read_feedback_screen_input.run_if(ui_not_frozen),
+					(
+						exit_feedback_screen.run_if(input_just_pressed(KeyCode::Escape)),
+						read_feedback_screen_input,
+					)
+						.run_if(ui_not_frozen),
 					synchronize_text_feedback,
 				)
 					.in_set(AppSet::RecordInput),
 				handle_feedback_screen_input.in_set(AppSet::ExecuteInput),
 				display_submission_status.in_set(SubmissionSystems),
-			),
+			)
+				.run_if(in_state(Screen::Playtest)),
 		);
+}
+
+/// Denotes the screen to which the submission form should return on exit
+#[derive(Resource, Clone, Copy, Debug, Default)]
+pub enum MainFormReturnScreen {
+	#[default]
+	Title,
+	Playing,
+}
+
+impl From<MainFormReturnScreen> for Screen {
+	fn from(value: MainFormReturnScreen) -> Self {
+		match value {
+			MainFormReturnScreen::Title => Self::Title,
+			MainFormReturnScreen::Playing => Self::Playing,
+		}
+	}
 }
 
 #[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
@@ -253,11 +276,12 @@ fn read_feedback_screen_input(
 fn handle_feedback_screen_input(
 	mut messages: MessageReader<FeedbackFormAction>,
 	mut commands: Commands,
+	return_screen: Res<MainFormReturnScreen>,
 ) {
 	for message in messages.read() {
 		match message {
 			FeedbackFormAction::Back => {
-				commands.do_screen_transition(Screen::Title);
+				commands.do_screen_transition((*return_screen).into());
 			}
 			FeedbackFormAction::Submit(scope) => {
 				commands.spawn((SubmissionTask::new(*scope), FreezeUi));
@@ -314,4 +338,8 @@ fn display_submission_status(
 		image_node.image = icon_key.map(|k| images[&k].clone()).unwrap_or_default();
 		**image_color = icon_color;
 	}
+}
+
+fn exit_feedback_screen(mut commands: Commands, return_screen: Res<MainFormReturnScreen>) {
+	commands.do_screen_transition((*return_screen).into());
 }

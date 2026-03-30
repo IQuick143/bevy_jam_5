@@ -100,8 +100,6 @@ impl Screen {
 			Self::Credits => Some(Self::Title),
 			Self::LevelSelect => Some(Self::Title),
 			Self::Playing => Some(Self::LevelSelect),
-			#[cfg(feature = "playtest")]
-			Self::Playtest => Some(Self::Title),
 			_ => None,
 		}
 	}
