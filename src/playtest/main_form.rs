@@ -106,8 +106,10 @@ fn spawn_feedback_form_screen(
 	));
 
 	commands.spawn((
-		widgets::label(
-			&format!("Tester ID: {}", playtest.tester_id()),
+		widgets::text_with_size(
+			format!("Tester ID: {}", playtest.tester_id()),
+			JustifyContent::Center,
+			SMALL_TEXT_SIZE,
 			font.0.clone(),
 		),
 		ChildOf(main),

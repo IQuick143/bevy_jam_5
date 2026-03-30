@@ -171,8 +171,18 @@ pub fn label(text: impl Into<String>, font: Handle<Font>) -> impl Bundle {
 	)
 }
 
-/// Aligned text label with automatic width
+/// Aligned text label with automatic width and base font size
 pub fn text(text: impl Into<String>, align: JustifyContent, font: Handle<Font>) -> impl Bundle {
+	text_with_size(text, align, COMMON_TEXT_SIZE, font)
+}
+
+/// Aligned text label with automatic width
+pub fn text_with_size(
+	text: impl Into<String>,
+	align: JustifyContent,
+	font_size: f32,
+	font: Handle<Font>,
+) -> impl Bundle {
 	(
 		Name::new("Text"),
 		Node {
@@ -184,7 +194,7 @@ pub fn text(text: impl Into<String>, align: JustifyContent, font: Handle<Font>) 
 			Name::new("Text Content"),
 			Text::new(text),
 			TextFont {
-				font_size: COMMON_TEXT_SIZE,
+				font_size,
 				font,
 				..default()
 			},
