@@ -49,6 +49,12 @@ impl GameState {
 		Self { objects }
 	}
 
+	/// Resizes internal storage of the data buffer
+	/// to match the level definition
+	pub fn resize(&mut self, level: &LevelData) {
+		self.objects.resize(level.vertices.len(), None);
+	}
+
 	/// Turns a cycle and all cycles linked to it by any number of ticks
 	pub fn turn_cycle_with_links(
 		&mut self,

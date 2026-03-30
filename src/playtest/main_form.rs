@@ -9,7 +9,8 @@ use crate::{
 	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
-	screen::{DoScreenTransitionCommands as _, Screen},
+	game::spawn::EnterLevelStage,
+	screen::{DoScreenTransition, DoScreenTransitionCommands as _, LoadLevel, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
 };
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
@@ -44,15 +45,6 @@ pub enum MainFormReturnScreen {
 	#[default]
 	Title,
 	Playing,
-}
-
-impl From<MainFormReturnScreen> for Screen {
-	fn from(value: MainFormReturnScreen) -> Self {
-		match value {
-			MainFormReturnScreen::Title => Self::Title,
-			MainFormReturnScreen::Playing => Self::Playing,
-		}
-	}
 }
 
 #[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
@@ -281,7 +273,8 @@ fn handle_feedback_screen_input(
 	for message in messages.read() {
 		match message {
 			FeedbackFormAction::Back => {
-				commands.do_screen_transition((*return_screen).into());
+				exit_feedback_screen(commands, return_screen);
+				break;
 			}
 			FeedbackFormAction::Submit(scope) => {
 				commands.spawn((SubmissionTask::new(*scope), FreezeUi));
@@ -341,5 +334,14 @@ fn display_submission_status(
 }
 
 fn exit_feedback_screen(mut commands: Commands, return_screen: Res<MainFormReturnScreen>) {
-	commands.do_screen_transition((*return_screen).into());
+	match *return_screen {
+		MainFormReturnScreen::Title => commands.do_screen_transition(Screen::Title),
+		MainFormReturnScreen::Playing => {
+			commands.spawn((
+				FadeAnimationBundle::default(),
+				DoScreenTransition(Screen::Playing),
+				LoadLevel(EnterLevelStage::Resume),
+			));
+		}
+	}
 }

@@ -8,7 +8,7 @@ mod settings;
 mod splash;
 mod title;
 
-use crate::ui::prelude::*;
+use crate::{AppSet, ui::prelude::*};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 #[allow(unused_imports)]
@@ -32,7 +32,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and(ui_not_frozen)),
-			do_screen_transitions,
+			do_screen_transitions.in_set(AppSet::SwitchState),
 		),
 	);
 }

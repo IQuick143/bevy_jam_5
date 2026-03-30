@@ -78,7 +78,7 @@ mod utils {
 		mut spawn_trigger: MessageWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
 		let handle = asset_server.add(level);
-		spawn_trigger.write(EnterLevel(Some(handle)));
+		spawn_trigger.write(EnterLevel(Some((handle, default()))));
 		Ok(())
 	}
 

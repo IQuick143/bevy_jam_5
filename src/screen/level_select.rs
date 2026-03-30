@@ -210,7 +210,11 @@ fn handle_level_select_screen_action(
 			}
 			LevelSelectAction::PlayLevel(id) => {
 				next_level.set(PlayingLevel(Some(*id)));
-				commands.do_screen_transition(Screen::Playing);
+				commands.spawn((
+					FadeAnimationBundle::default(),
+					DoScreenTransition(Screen::Playing),
+					LoadLevel::default(),
+				));
 			}
 		}
 	}

@@ -4,7 +4,7 @@ mod palette_picker;
 
 use crate::{
 	camera::CameraHarness,
-	game::{animation::TurnAnimationLength, components::*, prelude::*},
+	game::{animation::TurnAnimationLength, components::*, prelude::*, spawn::EnterLevelStage},
 	graphics::VERTICAL_PADDING_FRACTION,
 	save::SaveGame,
 	screen::PlayingLevel,
@@ -189,7 +189,7 @@ fn automatic_reloading(
 	if reload {
 		commands.spawn((
 			FadeAnimationBundle::from_time(0.05),
-			crate::screen::LoadLevel,
+			crate::screen::LoadLevel(EnterLevelStage::Resume),
 		));
 	}
 }

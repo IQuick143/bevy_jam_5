@@ -40,6 +40,7 @@ impl Plugin for AppPlugin {
 			Update,
 			(
 				AppSet::TickTimers,
+				AppSet::SwitchState,
 				AppSet::RecordInput,
 				AppSet::ExecuteInput,
 				AppSet::PreGameLogic,
@@ -113,6 +114,8 @@ impl Plugin for AppPlugin {
 enum AppSet {
 	/// Tick timers.
 	TickTimers,
+	/// Update global states like screen
+	SwitchState,
 	/// Record player input.
 	RecordInput,
 	/// Process inputs that correspond to one-shot actions rather than lasting state

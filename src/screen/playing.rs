@@ -9,6 +9,7 @@ use crate::{
 	game::{
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
+		spawn::EnterLevelStage,
 	},
 	send_message,
 	ui::{
@@ -26,10 +27,7 @@ pub(super) fn plugin(app: &mut App) {
 		.add_message::<GameUiAction>()
 		.add_fade_message::<LoadLevel>()
 		.add_fade_message::<GotoNextLevel>()
-		.add_systems(
-			OnEnter(Screen::Playing),
-			(spawn_game_ui, send_message(LoadLevel)),
-		)
+		.add_systems(OnEnter(Screen::Playing), spawn_game_ui)
 		.add_systems(OnExit(Screen::Playing), send_message(EnterLevel(None)))
 		.add_systems(
 			Update,
@@ -129,7 +127,7 @@ enum GameUiAction {
 
 /// Message that is sent to signal that the currently selected level should be (re)loaded
 #[derive(Message, Component, Clone, Copy, Debug, Default)]
-pub struct LoadLevel;
+pub struct LoadLevel(pub EnterLevelStage);
 
 /// Message that is sent to switch to the next level
 #[derive(Message, Component, Clone, Copy, Debug, Default)]
@@ -333,7 +331,7 @@ fn game_ui_input_processing_system(
 				commands.do_screen_transition(Screen::LevelSelect);
 			}
 			GameUiAction::Reset => {
-				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
+				commands.spawn((FadeAnimationBundle::default(), LoadLevel::default()));
 			}
 			GameUiAction::NextLevel => {
 				commands.spawn((FadeAnimationBundle::default(), GotoNextLevel));
@@ -362,7 +360,7 @@ fn proceed_to_next_level(
 		log::warn!("Received a Next level action on a level without a successor");
 	} else {
 		next_level.set(PlayingLevel(next_level_id));
-		events.write(LoadLevel);
+		events.write(LoadLevel::default());
 	}
 }
 
@@ -517,7 +515,7 @@ fn update_level_name_display(
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 	level_assets: Res<Assets<LevelData>>,
 ) {
-	if let Some(level_handle) = events.read().last().and_then(|e| e.0.as_ref()) {
+	if let Some((level_handle, _)) = events.read().last().and_then(|e| e.0.as_ref()) {
 		let level_data = level_assets
 			.get(level_handle)
 			.expect("Got an invalid level handle");
@@ -529,11 +527,20 @@ fn update_level_name_display(
 	}
 }
 
-fn load_level(playing_level: PlayingLevelListEntry, mut events: MessageWriter<EnterLevel>) {
+fn load_level(
+	playing_level: PlayingLevelListEntry,
+	mut reader: MessageReader<LoadLevel>,
+	mut writer: MessageWriter<EnterLevel>,
+) {
+	let Some(LoadLevel(enter_stage)) = reader.read().last() else {
+		return;
+	};
+
 	let level_handle = playing_level
 		.get()
 		.expect("load_level called but current level could not be loaded")
 		.data_handle
 		.clone();
-	events.write(EnterLevel(Some(level_handle)));
+
+	writer.write(EnterLevel(Some((level_handle, *enter_stage))));
 }

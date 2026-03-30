@@ -26,16 +26,16 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				handle_enter_level.after(AppSet::ExecuteInput),
+				handle_enter_level,
 				(
 					(|w: &mut World| w.run_schedule(LevelInitialization))
 						.run_if(on_message::<SpawnLevel>),
 					despawn_expired_level_entities
 						.run_if(resource_changed::<ExpiringLevelSessionId>),
 				)
-					.after(handle_enter_level)
-					.before(AppSet::GameLogic),
-			),
+					.after(handle_enter_level),
+			)
+				.before(AppSet::RecordInput),
 		)
 		.add_systems(
 			LevelInitialization,
@@ -80,10 +80,21 @@ pub enum LevelInitializationSet {
 	SpawnVisuals,
 }
 
+/// Denotes how a level should be loaded
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum EnterLevelStage {
+	/// Loads the level as defined in the description,
+	/// including the position of objects
+	#[default]
+	Initialize,
+	/// Uses position of objects from previous session
+	Resume,
+}
+
 /// A message that is sent to switch the game to a level
 /// or to exit a level entirely
 #[derive(Message, Clone, Debug)]
-pub struct EnterLevel(pub Option<Handle<LevelData>>);
+pub struct EnterLevel(pub Option<(Handle<LevelData>, EnterLevelStage)>);
 
 /// A message that is sent to spawn entities for a particular level.
 /// These will replace any older entities
@@ -120,14 +131,21 @@ fn handle_enter_level(
 ) {
 	if let Some(event) = enter_events.read().last() {
 		expiring_session_id.0 = last_session_id.0;
-		if let Some(level_handle) = &event.0 {
+		if let Some((level_handle, enter_stage)) = &event.0 {
 			if let Some(level) = level_assets.get(level_handle) {
 				active_level.0 = if level.is_valid {
 					Some(level_handle.clone())
 				} else {
 					None
 				};
-				*game_state = GameState::new(level);
+				if *enter_stage == EnterLevelStage::Initialize {
+					// Wipe game state only if reinitializing level
+					*game_state = GameState::new(level);
+				} else {
+					// Final failsafe against mismatched state data:
+					// resize state to match level definition
+					game_state.resize(level);
+				}
 				last_session_id.0.0 += 1;
 				spawn_events.write(SpawnLevel(level_handle.clone(), last_session_id.0));
 			} else {
@@ -400,6 +418,7 @@ fn spawn_thing_entities(
 	mut entity_index: ResMut<GameStateEcsIndex>,
 	session_id: Res<LastLevelSessionId>,
 	active_level: PlayingLevelData,
+	game_state: Res<GameState>,
 ) {
 	let Ok(level) = active_level.get() else {
 		warn!("Current playing level is not available");
@@ -408,8 +427,9 @@ fn spawn_thing_entities(
 	let session = session_id.0;
 	let mut object_ids = Vec::new();
 	let mut glyph_ids = Vec::new();
-	for data in &level.vertices {
-		let object_id = data.object.map(|object| match object {
+
+	for object in game_state.objects.iter().copied() {
+		let object_id = object.map(|object| match object {
 			ObjectData::Player => commands
 				.spawn((
 					Object,
@@ -448,6 +468,10 @@ fn spawn_thing_entities(
 				))
 				.id(),
 		});
+		object_ids.push(object_id);
+	}
+
+	for data in &level.vertices {
 		let glyph_id = data.glyph.map(|glyph| match glyph {
 			GlyphData::Flag => commands
 				.spawn((
@@ -487,9 +511,9 @@ fn spawn_thing_entities(
 				))
 				.id(),
 		});
-		object_ids.push(object_id);
 		glyph_ids.push(glyph_id);
 	}
+
 	entity_index.objects = object_ids;
 	entity_index.glyphs = glyph_ids;
 }

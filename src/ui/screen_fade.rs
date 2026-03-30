@@ -1,13 +1,15 @@
 //! An overlay which changes opacity in order to create a fading in/out effect for the game for screen transitions.
 
 use super::freeze::FreezeUi;
-use crate::graphics::fade::*;
+use crate::{AppSet, graphics::fade::*};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		(update_fade_animations, despawn_expired_fade_animations).chain(),
+		(update_fade_animations, despawn_expired_fade_animations)
+			.chain()
+			.in_set(AppSet::TickTimers),
 	);
 }
 
