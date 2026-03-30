@@ -181,8 +181,10 @@ pub mod layers {
 	pub const FAIL_MARKERS: f32 = -5.0;
 	/// Z depth of sprites that indicate logical color of boxes
 	pub const BOX_COLOR_SPRITES: f32 = -8.0;
-	/// Z depth of sprites for players and boxes
-	pub const OBJECT_SPRITES: f32 = -10.0;
+	/// Z depth of base sprites for boxes
+	pub const BOX_BASE_SPRITES: f32 = -10.0;
+	/// Z depth of sprites for players
+	pub const PLAYER_SPRITES: f32 = -15.0;
 	/// Z depth of detectors and walls
 	pub const DETECTORS: f32 = -40.0;
 	/// Z depth of sprites that indicate logical color of buttons

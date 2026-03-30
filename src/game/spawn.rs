@@ -1030,10 +1030,10 @@ fn create_thing_sprites(
 			ThingData::Object(ObjectData::Player) => (
 				ColorKey::Player,
 				Anchor(PLAYER_FLAG_SPRITE_ANCHOR),
-				layers::OBJECT_SPRITES,
+				layers::PLAYER_SPRITES,
 			),
 			ThingData::Object(ObjectData::Box(_)) => {
-				(ColorKey::BoxBase, default(), layers::OBJECT_SPRITES)
+				(ColorKey::BoxBase, default(), layers::BOX_BASE_SPRITES)
 			}
 			ThingData::Glyph(GlyphData::Flag) => (
 				ColorKey::GoalClosed,
