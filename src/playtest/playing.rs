@@ -308,7 +308,6 @@ fn spawn_feedback_form(
 					widgets::grid_button("General feedback & submission", font.0.clone()),
 					ExitFeedbackForm(AfterExitFeedbackForm::ChangeScreen(Screen::Playtest)),
 					Unfreeze,
-					InteractionEnabled(current_rating > 0),
 				)
 			],
 		)],
@@ -398,14 +397,18 @@ fn intercept_exit_from_level(
 		if animation.is_past_peak() {
 			continue;
 		}
-		// Cancel the transition by despawning it
-		commands.entity(id).despawn();
 		// Proceed to the player's selected action after closing the form
 		let after_close = if let Some(DoScreenTransition(screen)) = next_screen {
+			// Allow the tester to go to the main form, but that's it
+			if *screen == Screen::Playtest {
+				continue;
+			}
 			AfterExitFeedbackForm::ChangeScreen(*screen)
 		} else {
 			AfterExitFeedbackForm::NextLevel
 		};
+		// Cancel the transition by despawning it
+		commands.entity(id).despawn();
 		// Open the form before letting the player proceed
 		messgaes.write(OpenFeedbackForm(after_close));
 	}
