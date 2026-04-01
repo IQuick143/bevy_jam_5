@@ -58,7 +58,8 @@ pub(super) fn plugin(app: &mut App) {
 				update_submit_enable_disable,
 				increment_move_counter.run_if(on_message::<RotateCycleGroup>),
 				reset_move_counter.run_if(state_changed::<PlayingLevel>),
-			),
+			)
+				.run_if(in_state(Screen::Playing)),
 		);
 }
 
@@ -170,6 +171,7 @@ fn spawn_feedback_form(
 
 	commands.spawn((
 		widgets::ui_root(),
+		DespawnOnExit(Screen::Playing),
 		FeedbackForm,
 		FreezeUi, // Modal dialog; block all other UI while active
 		children![(
