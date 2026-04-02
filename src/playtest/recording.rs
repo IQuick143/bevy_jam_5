@@ -12,7 +12,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			record_level_enter.run_if(on_message::<EnterLevel>),
-			record_moves,
+			record_moves.run_if(on_message::<RotateCycleGroupWithResult>),
 		)
 			.run_if(in_state(Screen::Playing)),
 	);
