@@ -75,7 +75,7 @@ impl FadeAnimation {
 impl Default for FadeAnimation {
 	fn default() -> Self {
 		Self {
-			total_time: 1.0,
+			total_time: 0.5,
 			time_elapsed: 0.0,
 			prev_time_elapsed: 0.0,
 		}
