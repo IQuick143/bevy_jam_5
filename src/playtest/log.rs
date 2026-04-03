@@ -160,6 +160,8 @@ impl PlaytestLog {
 		for (key, answer) in &self.global_feedback {
 			if !answer.is_empty() {
 				global.write(key, answer.clone());
+			} else {
+				global.remove(key);
 			}
 		}
 
@@ -240,6 +242,8 @@ impl LevelPlaytestLog {
 		}
 		if !self.comment.is_empty() {
 			m.write(Self::EXTRA_FEEDBACK, self.comment.as_str());
+		} else {
+			m.remove(Self::EXTRA_FEEDBACK);
 		}
 		if include_game_log && !self.sessions.is_empty() {
 			let list = self
