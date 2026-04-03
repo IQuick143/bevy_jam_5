@@ -112,21 +112,34 @@ fn spawn_feedback_form_screen(
 	let id = commands
 		.spawn((widgets::ui_root(), DespawnOnExit(Screen::Playtest)))
 		.id();
-	let main = commands
+	let scrollbox = commands
 		.spawn((
 			Scrollbox {
-				step: COMMON_TEXT_SIZE,
+				step: 2. * COMMON_TEXT_SIZE,
 			},
 			Node {
 				flex_direction: FlexDirection::Column,
 				justify_content: JustifyContent::Start,
 				align_items: AlignItems::Center,
-				padding: UiRect::vertical(Val::Percent(5.0)),
-				row_gap: COMMON_GAP,
+				width: Val::Percent(100.0),
 				overflow: Overflow::scroll_y(),
 				..default()
 			},
 			ChildOf(id),
+		))
+		.id();
+	let main = commands
+		.spawn((
+			Node {
+				flex_direction: FlexDirection::Column,
+				justify_content: JustifyContent::Start,
+				align_items: AlignItems::Center,
+				width: Val::Percent(90.0),
+				padding: UiRect::vertical(Val::Percent(5.0)),
+				row_gap: COMMON_GAP,
+				..default()
+			},
+			ChildOf(scrollbox),
 		))
 		.id();
 

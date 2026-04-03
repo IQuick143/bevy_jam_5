@@ -100,7 +100,7 @@ fn spawn_statement_screen(
 		DespawnOnExit(Screen::PlaytestInformation),
 		children![(
 			Scrollbox {
-				step: COMMON_TEXT_SIZE,
+				step: 2.*COMMON_TEXT_SIZE,
 			},
 			Node {
 				flex_direction: FlexDirection::Column,
