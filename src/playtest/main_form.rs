@@ -19,7 +19,15 @@ use bevy_ui_text_input::TextInputContents;
 pub(super) fn plugin(app: &mut App) {
 	app.add_message::<FeedbackFormAction>()
 		.init_resource::<MainFormReturnScreen>()
+		.add_systems(Startup, spawn_feedback_form_navigation_button)
 		.add_systems(OnEnter(Screen::Playtest), spawn_feedback_form_screen)
+		.add_systems(
+			Update,
+			(
+				update_feedback_form_button_visibility.run_if(state_changed::<Screen>),
+				handle_enter_feedback_form_action.in_set(AppSet::ExecuteInput),
+			),
+		)
 		.add_systems(
 			Update,
 			(
@@ -40,17 +48,14 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 /// Denotes the screen to which the submission form should return on exit
-#[derive(Resource, Clone, Copy, Debug, Default)]
-pub enum MainFormReturnScreen {
-	#[default]
-	Title,
-	Playing,
-}
+#[derive(Resource, Clone, Copy, Debug, Default, Deref, DerefMut)]
+struct MainFormReturnScreen(Screen);
 
 #[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
 enum FeedbackFormAction {
 	Back,
 	Submit(LogSerializationScope),
+	Info,
 }
 
 /// Marker for a text input linked to a text question identified by a key
@@ -60,6 +65,10 @@ struct FeedbackTextQuestion(&'static str);
 /// Marker component for the node that displays the status of a submission
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct SubmitResultNode;
+
+/// Marker component for the playtest panel button
+#[derive(Component, Clone, Copy, Debug)]
+struct PlaytestPanelButton;
 
 const FEEDBACK_QUESTIONS: [(&str, &str, bool); 7] = [
 	(
@@ -90,6 +99,88 @@ const FEEDBACK_QUESTIONS: [(&str, &str, bool); 7] = [
 	("comment", "Any other comments?", false),
 	("price", "How much do you think the game should cost?", true),
 ];
+
+fn spawn_feedback_form_navigation_button(
+	mut commands: Commands,
+	font: Res<GlobalFont>,
+	image_handles: Res<HandleMap<ImageKey>>,
+) {
+	const ENTER_BUTTON_MARGIN: f32 = 500.0;
+
+	let root = commands
+		.spawn((
+			Node {
+				// Dark magic, ignore
+				left: Val::Px(-(ENTER_BUTTON_MARGIN - GRID_BUTTON_HEIGHT_PX) / 2.0 - 1.0),
+				width: Val::Px(ENTER_BUTTON_MARGIN),
+				height: Val::Percent(100.0),
+				justify_content: JustifyContent::Center,
+				align_items: AlignItems::Center,
+				..default()
+			},
+			// Keep it below so it does not obstruct scrollboxes
+			ZIndex(-1),
+		))
+		.id();
+	commands
+		.spawn((
+			widgets::grid_button("Playtester panel", font.0.clone()),
+			UiTransform::from_rotation(Rot2::PI * Rot2::FRAC_PI_2),
+			PlaytestPanelButton,
+			ChildOf(root),
+		))
+		.with_child((
+			Node {
+				position_type: PositionType::Absolute,
+				left: Val::Px(0.0),
+				top: Val::Px(2.5),
+				width: Val::Px(40.0),
+				height: Val::Px(40.0),
+				..default()
+			},
+			ImageNode {
+				image: image_handles[&ImageKey::PlaytestMarker].clone(),
+				..default()
+			},
+			NodeColorKey(ColorKey::PlaytestMarker),
+		));
+}
+
+fn update_feedback_form_button_visibility(
+	mut query: Query<&mut Node, With<PlaytestPanelButton>>,
+	screen: Res<State<Screen>>,
+) {
+	let allowed_screens = [
+		Screen::Title,
+		Screen::Credits,
+		Screen::LevelSelect,
+		Screen::Playing,
+		Screen::Settings,
+	];
+	let is_visible = allowed_screens.contains(screen.get());
+	let display = if is_visible {
+		Display::DEFAULT
+	} else {
+		Display::None
+	};
+	for mut node in &mut query {
+		node.display = display;
+	}
+}
+
+fn handle_enter_feedback_form_action(
+	query: InteractionQuery<(), With<PlaytestPanelButton>>,
+	screen: Res<State<Screen>>,
+	mut commands: Commands,
+	mut return_screen: ResMut<MainFormReturnScreen>,
+) {
+	for (interaction, enabled, _) in &query {
+		if *interaction == Interaction::Pressed && *enabled.copied().unwrap_or_default() {
+			**return_screen = *screen.get();
+			commands.do_screen_transition(Screen::Playtest);
+		}
+	}
+}
 
 fn spawn_feedback_form_screen(
 	mut commands: Commands,
@@ -140,23 +231,21 @@ fn spawn_feedback_form_screen(
 				..default()
 			},
 			ChildOf(scrollbox),
+			children![
+				widgets::header("Feedback and submission", font.0.clone()),
+				widgets::text_with_size(
+					format!("Tester ID: {}", playtest.tester_id()),
+					JustifyContent::Center,
+					SMALL_TEXT_SIZE,
+					font.0.clone(),
+				),
+				(
+					widgets::grid_button("Information and privacy", font.0.clone()),
+					FeedbackFormAction::Info,
+				),
+			],
 		))
 		.id();
-
-	commands.spawn((
-		widgets::header("Feedback and submission", font.0.clone()),
-		ChildOf(main),
-	));
-
-	commands.spawn((
-		widgets::text_with_size(
-			format!("Tester ID: {}", playtest.tester_id()),
-			JustifyContent::Center,
-			SMALL_TEXT_SIZE,
-			font.0.clone(),
-		),
-		ChildOf(main),
-	));
 
 	for (key, question, is_single_line) in FEEDBACK_QUESTIONS {
 		let current_answer = playtest
@@ -307,6 +396,9 @@ fn handle_feedback_screen_input(
 			FeedbackFormAction::Submit(scope) => {
 				commands.spawn((SubmissionTask::new(*scope), FreezeUi));
 			}
+			FeedbackFormAction::Info => {
+				commands.do_screen_transition(Screen::PlaytestInformation);
+			}
 		}
 	}
 }
@@ -362,14 +454,12 @@ fn display_submission_status(
 }
 
 fn exit_feedback_screen(mut commands: Commands, return_screen: Res<MainFormReturnScreen>) {
-	match *return_screen {
-		MainFormReturnScreen::Title => commands.do_screen_transition(Screen::Title),
-		MainFormReturnScreen::Playing => {
-			commands.spawn((
-				FadeAnimationBundle::default(),
-				DoScreenTransition(Screen::Playing),
-				LoadLevel(EnterLevelStage::Resume),
-			));
-		}
+	let mut transition_entity = commands.spawn((
+		FadeAnimationBundle::default(),
+		DoScreenTransition(**return_screen),
+	));
+	// If returning to playing screen, reload the level where we left off
+	if **return_screen == Screen::Playing {
+		transition_entity.insert(LoadLevel(EnterLevelStage::Resume));
 	}
 }

@@ -3,7 +3,6 @@
 use super::{
 	consts::*,
 	log::PlaytestLog,
-	main_form::MainFormReturnScreen,
 	stars::{StarRating, StarRatingValue},
 };
 use crate::{
@@ -305,11 +304,6 @@ fn spawn_feedback_form(
 							LevelTextInput
 						),
 					],
-				),
-				(
-					widgets::grid_button("General feedback & submission", font.0.clone()),
-					ExitFeedbackForm(AfterExitFeedbackForm::ChangeScreen(Screen::Playtest)),
-					Unfreeze,
 				)
 			],
 		)],
@@ -334,7 +328,6 @@ fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<Feedbac
 fn do_action_after_close_form(
 	mut messages: MessageReader<ExitFeedbackForm>,
 	mut commands: Commands,
-	mut return_screen: ResMut<MainFormReturnScreen>,
 ) {
 	let Some(ExitFeedbackForm(action)) = messages.read().last() else {
 		return;
@@ -342,9 +335,6 @@ fn do_action_after_close_form(
 	match action {
 		AfterExitFeedbackForm::Stay => {}
 		AfterExitFeedbackForm::ChangeScreen(screen) => {
-			if *screen == Screen::Playtest {
-				*return_screen = MainFormReturnScreen::Playing;
-			}
 			commands.do_screen_transition(*screen);
 		}
 		AfterExitFeedbackForm::NextLevel => {

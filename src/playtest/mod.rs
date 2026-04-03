@@ -8,7 +8,6 @@ mod privacy;
 mod recording;
 mod stars;
 mod submit;
-mod title;
 mod widgets;
 
 use bevy::prelude::*;
@@ -23,6 +22,5 @@ pub(super) fn plugin(app: &mut App) {
 		recording::plugin,
 		stars::plugin,
 		submit::plugin,
-		title::plugin,
 	));
 }

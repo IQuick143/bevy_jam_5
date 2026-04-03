@@ -145,12 +145,16 @@ fn record_button_inputs(
 }
 
 fn exit_privacy_screen(mut commands: Commands, mut playtest: ResMut<PlaytestLog>) {
-	// Mark it as seen, so it does not pop up the next time
 	if !playtest.has_ackd_privacy_statement {
+		// Mark it as seen, so it does not pop up the next time
 		playtest.has_ackd_privacy_statement = true;
+		// Proceed to the title
+		commands.do_screen_transition(Screen::Title);
+	} else {
+		// Otherwise the user must have navigated here manually,
+		// which can only be done from the playetest panel
+		commands.do_screen_transition(Screen::Playtest);
 	}
-
-	commands.do_screen_transition(Screen::Title);
 }
 
 fn has_seen_privacy_statement(playtest: Res<PlaytestLog>) -> bool {
