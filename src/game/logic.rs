@@ -49,6 +49,12 @@ impl GameState {
 		Self { objects }
 	}
 
+	/// Resizes internal storage of the data buffer
+	/// to match the level definition
+	pub fn resize(&mut self, level: &LevelData) {
+		self.objects.resize(level.vertices.len(), None);
+	}
+
 	/// Turns a cycle and all cycles linked to it by any number of ticks
 	pub fn turn_cycle_with_links(
 		&mut self,
@@ -198,7 +204,9 @@ impl GameState {
 						let n_detectors = detector_cycle.detector_indices.len();
 						let n_walls = detector_cycle.wall_indices.len();
 						if n_vertices == 0 || (n_detectors == 0 && n_walls == 0) {
-							return Err(GameStateActionError::BrokenLevelData("cycle with no vertices or no detectors and no walls is somehow in the outgoing_detector_cycles list."));
+							return Err(GameStateActionError::BrokenLevelData(
+								"cycle with no vertices or no detectors and no walls is somehow in the outgoing_detector_cycles list.",
+							));
 						}
 						// Grab vertex occupancy data from state
 						let vertex_occupation = detector_cycle

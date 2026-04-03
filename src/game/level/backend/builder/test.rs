@@ -2,12 +2,12 @@ use itertools::Itertools;
 
 use super::{
 	super::super::{
-		builder::{error::*, LevelBuildResult},
+		builder::{LevelBuildResult, error::*},
 		*,
 	},
+	Error,
 	finalize::FinalizeError,
 	runtime::RuntimeError,
-	Error,
 };
 use crate::epilang::interpreter::{FunctionCallError, InterpreterError, LogicError};
 use std::f32::consts::PI;
@@ -906,7 +906,7 @@ circle(cycle; 0,0,1);
 mod layout_tests {
 	use super::*;
 	use bevy::math::Vec2;
-	use rand::{seq::SliceRandom, SeedableRng as _};
+	use rand::{SeedableRng as _, seq::SliceRandom};
 
 	#[test]
 	fn basic_metatest() {
@@ -1161,7 +1161,9 @@ put_vertex(c; 1 0);",
 				} else {
 					"".to_owned()
 				};
-				cycles.push(format!("circle(cycle({start_vertices} {extra_vertices} {end_vertices}); {i}*o, 0, R);\n"));
+				cycles.push(format!(
+					"circle(cycle({start_vertices} {extra_vertices} {end_vertices}); {i}*o, 0, R);\n"
+				));
 			}
 			let mut rng = rand::rngs::SmallRng::seed_from_u64(101);
 			for _ in 0..60 {

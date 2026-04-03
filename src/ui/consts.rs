@@ -1,10 +1,11 @@
 //! Global UI measurements
 
-use bevy::prelude::*;
 use Val::*;
+use bevy::prelude::*;
 
 // Common
 pub const HEADING_HEIGHT: Val = Px(65.0);
+pub const HEADING_PADDING: UiRect = UiRect::all(Val::Px(10.0));
 pub const HEADING_TEXT_SIZE: f32 = 40.0;
 pub const MENU_BUTTON_HEIGHT: Val = HEADING_HEIGHT;
 pub const MENU_BUTTON_TEXT_SIZE: f32 = HEADING_TEXT_SIZE;
@@ -14,8 +15,11 @@ pub const LABEL_WIDTH: Val = Px(500.0);
 pub const COMMON_GAP_PX: f32 = 10.0;
 pub const COMMON_GAP: Val = Px(COMMON_GAP_PX);
 pub const COMMON_TEXT_SIZE: f32 = 24.0;
+pub const SMALL_TEXT_SIZE: f32 = 20.0;
 pub const SPRITE_BUTTON_HEIGHT: f32 = 45.0;
-pub const TOOLBAR_MARGIN: UiRect = UiRect::axes(Px(15.0), COMMON_GAP);
+pub const TOOLBAR_MARGIN_X_PX: f32 = 15.0;
+pub const TOOLBAR_MARGIN_X: Val = Val::Px(TOOLBAR_MARGIN_X_PX);
+pub const TOOLBAR_MARGIN: UiRect = UiRect::axes(TOOLBAR_MARGIN_X, COMMON_GAP);
 
 // Double-columned screens
 pub const WIDE_GAP: Val = Px(20.0);
@@ -34,7 +38,7 @@ pub const GRID_BUTTON_PADDING: UiRect = UiRect::horizontal(Px(
 ));
 
 // Playing screen
-pub const HOVER_HINT_TEXT_SIZE: f32 = 20.0;
+pub const HOVER_HINT_TEXT_SIZE: f32 = SMALL_TEXT_SIZE;
 /// Size of the level title label on the playing screen
 pub const LEVEL_TITLE_SIZE: f32 = 35.0;
 /// Width of the gap between title label and checkmark indicating completion

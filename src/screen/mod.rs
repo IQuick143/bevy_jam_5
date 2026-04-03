@@ -8,10 +8,11 @@ mod settings;
 mod splash;
 mod title;
 
-use crate::ui::prelude::*;
+use crate::{AppSet, ui::prelude::*};
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
-pub use playing::{LoadLevel, PlayingLevel, PlayingLevelListEntry};
+#[allow(unused_imports)]
+pub use playing::{GotoNextLevel, LoadLevel, PlayingLevel, PlayingLevelListEntry};
 
 pub(super) fn plugin(app: &mut App) {
 	app.init_state::<Screen>();
@@ -31,7 +32,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and(ui_not_frozen)),
-			do_screen_transitions,
+			do_screen_transitions.in_set(AppSet::SwitchState),
 		),
 	);
 }
@@ -84,6 +85,11 @@ pub enum Screen {
 	LevelSelect,
 	/// The actual playing screen of the game.
 	Playing,
+	/// Global playtest feedback form
+	#[cfg(feature = "playtest")]
+	Playtest,
+	#[cfg(feature = "playtest")]
+	PlaytestInformation,
 }
 
 impl Screen {

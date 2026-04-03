@@ -1,10 +1,10 @@
 //! Camera movement on user input
 
 use super::{
-	inputs::{MoveCameraMessage, ZoomCameraMessage},
 	CameraHarness,
+	inputs::{MoveCameraMessage, ZoomCameraMessage},
 };
-use crate::{graphics::*, AppSet};
+use crate::{AppSet, graphics::*};
 use bevy::{
 	camera::ScalingMode,
 	math::bounding::{Aabb2d, BoundingVolume as _},

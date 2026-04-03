@@ -1,13 +1,15 @@
 //! An overlay which changes opacity in order to create a fading in/out effect for the game for screen transitions.
 
 use super::freeze::FreezeUi;
-use crate::graphics::fade::*;
+use crate::{AppSet, graphics::fade::*};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		(update_fade_animations, despawn_expired_fade_animations).chain(),
+		(update_fade_animations, despawn_expired_fade_animations)
+			.chain()
+			.in_set(AppSet::TickTimers),
 	);
 }
 
@@ -60,12 +62,20 @@ impl FadeAnimation {
 	pub fn is_completed(&self) -> bool {
 		self.time_elapsed >= self.total_time
 	}
+
+	pub fn is_past_peak(&self) -> bool {
+		self.progress() >= PEAK_OFFSET
+	}
+
+	pub fn is_just_past_peak(&self) -> bool {
+		self.is_past_peak() && self.prev_progress() < PEAK_OFFSET
+	}
 }
 
 impl Default for FadeAnimation {
 	fn default() -> Self {
 		Self {
-			total_time: 1.0,
+			total_time: 0.5,
 			time_elapsed: 0.0,
 			prev_time_elapsed: 0.0,
 		}
@@ -152,7 +162,7 @@ fn send_delayed_fade_messages<E: Message + Component + Clone>(
 	query: Query<(&FadeAnimation, &E)>,
 ) {
 	for (animation, message) in &query {
-		if animation.prev_progress() < PEAK_OFFSET && animation.progress() >= PEAK_OFFSET {
+		if animation.is_just_past_peak() {
 			messages.write(message.clone());
 		}
 	}

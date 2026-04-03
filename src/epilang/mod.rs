@@ -9,7 +9,7 @@ mod test;
 pub mod values;
 
 pub use ast::Module;
-pub use compile::{compile, CompileError};
+pub use compile::{CompileError, compile};
 pub use interpreter::{Interpreter, InterpreterEndState, InterpreterError};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]

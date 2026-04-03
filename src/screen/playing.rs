@@ -3,11 +3,13 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 
 use crate::{
+	AppSet,
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::{
 		level::list::{LevelInfo, LevelList},
 		prelude::*,
+		spawn::EnterLevelStage,
 	},
 	send_message,
 	ui::{
@@ -16,7 +18,6 @@ use crate::{
 		interaction::InteractionEnabled,
 		prelude::*,
 	},
-	AppSet,
 };
 
 use super::*;
@@ -25,10 +26,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_state::<PlayingLevel>()
 		.add_message::<GameUiAction>()
 		.add_fade_message::<LoadLevel>()
-		.add_systems(
-			OnEnter(Screen::Playing),
-			(spawn_game_ui, send_message(LoadLevel)),
-		)
+		.add_fade_message::<GotoNextLevel>()
+		.add_systems(OnEnter(Screen::Playing), spawn_game_ui)
 		.add_systems(OnExit(Screen::Playing), send_message(EnterLevel(None)))
 		.add_systems(
 			Update,
@@ -40,7 +39,8 @@ pub(super) fn plugin(app: &mut App) {
 					),
 					send_message(GameUiAction::NextLevel).run_if(
 						char_input_pressed('n')
-							.and(resource_equals(IsLevelPersistentlyCompleted(true))),
+							.and(resource_equals(IsLevelPersistentlyCompleted(true)))
+							.and(next_level_exists),
 					),
 					send_message(GameUiAction::Undo).run_if(
 						char_input_pressed('z')
@@ -55,9 +55,12 @@ pub(super) fn plugin(app: &mut App) {
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
+				proceed_to_next_level.run_if(on_message::<GotoNextLevel>),
 				(load_level, update_level_name_display)
 					.chain()
-					.run_if(on_message::<LoadLevel>),
+					.run_if(on_message::<LoadLevel>)
+					// Run them in this order to ensure the states propagate
+					.before(proceed_to_next_level),
 				(
 					update_next_level_button_display,
 					update_checkmark_display.before(update_checkmark_margin),
@@ -124,7 +127,11 @@ enum GameUiAction {
 
 /// Message that is sent to signal that the currently selected level should be (re)loaded
 #[derive(Message, Component, Clone, Copy, Debug, Default)]
-pub struct LoadLevel;
+pub struct LoadLevel(pub EnterLevelStage);
+
+/// Message that is sent to switch to the next level
+#[derive(Message, Component, Clone, Copy, Debug, Default)]
+pub struct GotoNextLevel;
 
 /// [`SystemParam`] that provides a reference to the entry
 /// of the level list that describes the level being played
@@ -315,9 +322,7 @@ fn game_ui_input_recording_system(
 
 fn game_ui_input_processing_system(
 	mut events: MessageReader<GameUiAction>,
-	playing_level: PlayingLevelListEntry,
 	mut commands: Commands,
-	mut next_level: ResMut<NextState<PlayingLevel>>,
 	mut undo_commands: MessageWriter<AlterHistory>,
 ) {
 	if let Some(action) = events.read().last() {
@@ -326,16 +331,10 @@ fn game_ui_input_processing_system(
 				commands.do_screen_transition(Screen::LevelSelect);
 			}
 			GameUiAction::Reset => {
-				commands.spawn((FadeAnimationBundle::default(), LoadLevel));
+				commands.spawn((FadeAnimationBundle::default(), LoadLevel::default()));
 			}
 			GameUiAction::NextLevel => {
-				let next_level_id = playing_level.get().ok().and_then(|l| l.next_level);
-				if next_level_id.is_none() {
-					log::warn!("Received a Next level action on a level without a successor");
-				} else {
-					next_level.set(PlayingLevel(next_level_id));
-					commands.spawn((FadeAnimationBundle::default(), LoadLevel));
-				}
+				commands.spawn((FadeAnimationBundle::default(), GotoNextLevel));
 			}
 			GameUiAction::Undo => {
 				undo_commands.write(AlterHistory::Undo);
@@ -344,6 +343,24 @@ fn game_ui_input_processing_system(
 				undo_commands.write(AlterHistory::Redo);
 			}
 		}
+	}
+}
+
+fn next_level_exists(playing_level: PlayingLevelListEntry) -> bool {
+	playing_level.get().is_ok_and(|l| l.next_level.is_some())
+}
+
+fn proceed_to_next_level(
+	mut events: MessageWriter<LoadLevel>,
+	playing_level: PlayingLevelListEntry,
+	mut next_level: ResMut<NextState<PlayingLevel>>,
+) {
+	let next_level_id = playing_level.get().ok().and_then(|l| l.next_level);
+	if next_level_id.is_none() {
+		log::warn!("Received a Next level action on a level without a successor");
+	} else {
+		next_level.set(PlayingLevel(next_level_id));
+		events.write(LoadLevel::default());
 	}
 }
 
@@ -498,7 +515,7 @@ fn update_level_name_display(
 	mut level_name_q: Query<&mut Text, With<LevelNameBox>>,
 	level_assets: Res<Assets<LevelData>>,
 ) {
-	if let Some(level_handle) = events.read().last().and_then(|e| e.0.as_ref()) {
+	if let Some((level_handle, _)) = events.read().last().and_then(|e| e.0.as_ref()) {
 		let level_data = level_assets
 			.get(level_handle)
 			.expect("Got an invalid level handle");
@@ -510,11 +527,20 @@ fn update_level_name_display(
 	}
 }
 
-fn load_level(playing_level: PlayingLevelListEntry, mut events: MessageWriter<EnterLevel>) {
+fn load_level(
+	playing_level: PlayingLevelListEntry,
+	mut reader: MessageReader<LoadLevel>,
+	mut writer: MessageWriter<EnterLevel>,
+) {
+	let Some(LoadLevel(enter_stage)) = reader.read().last() else {
+		return;
+	};
+
 	let level_handle = playing_level
 		.get()
 		.expect("load_level called but current level could not be loaded")
 		.data_handle
 		.clone();
-	events.write(EnterLevel(Some(level_handle)));
+
+	writer.write(EnterLevel(Some((level_handle, *enter_stage))));
 }

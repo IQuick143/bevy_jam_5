@@ -21,6 +21,8 @@ impl LevelBuilder {
 			scale_override: None,
 			initial_zoom: None,
 			initial_camera_pos: default(),
+			#[cfg(feature = "playtest")]
+			ignore_in_playtest: false,
 		}
 	}
 
@@ -50,6 +52,11 @@ impl LevelBuilder {
 
 	pub fn explicit_initial_camera_pos(&mut self) -> &mut PartialVec2 {
 		&mut self.initial_camera_pos
+	}
+
+	#[cfg(feature = "playtest")]
+	pub fn ignore_in_playtest(&mut self) {
+		self.ignore_in_playtest = true;
 	}
 
 	pub fn add_vertex(&mut self) -> Result<usize, LevelBuilderError> {
@@ -286,6 +293,8 @@ impl LevelBuilder {
 			bounding_box,
 			initial_zoom: self.initial_zoom.unwrap_or(1.0),
 			initial_camera_pos,
+			#[cfg(feature = "playtest")]
+			ignore_in_playtest: self.ignore_in_playtest,
 		};
 		LevelBuildResult { level, errors }
 	}
@@ -349,7 +358,9 @@ impl LevelBuilder {
 			let IntermediateLinkStatus::Group(group, direction_2) =
 				self.cycles[root_cycle].linked_cycle
 			else {
-				unreachable!("Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)");
+				unreachable!(
+					"Some doofus done doofed up the for loop above this one. (or the one inside find_group_root)"
+				);
 			};
 			let direction = direction_1 * direction_2;
 			groups[group]
@@ -687,7 +698,10 @@ impl LevelBuilder {
 			IntermediateCycleCenterSpritePosition::Placed(pos) => Some(pos),
 			IntermediateCycleCenterSpritePosition::Disabled => None,
 			IntermediateCycleCenterSpritePosition::Unspecified => {
-				debug_assert!(false, "Unplaced cycle center sprite in build phase, should have been materialized earlier");
+				debug_assert!(
+					false,
+					"Unplaced cycle center sprite in build phase, should have been materialized earlier"
+				);
 				None
 			}
 		};

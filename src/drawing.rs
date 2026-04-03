@@ -1,8 +1,8 @@
 //! Global non-asset graphical repository
 
 use crate::{
-	graphics::{primitives::*, *},
 	AppSet,
+	graphics::{primitives::*, *},
 };
 use bevy::{
 	color::palettes::{self, tailwind::*},
@@ -82,6 +82,12 @@ pub enum ColorKey {
 	BackgroundDetail,
 	BackgroundSolvedBase,
 	BackgroundSolvedDetail,
+	#[cfg(feature = "playtest")]
+	PlaytestMarker,
+	#[cfg(feature = "playtest")]
+	StarWidgetHovered,
+	#[cfg(feature = "playtest")]
+	StarWidgetSelected,
 }
 
 /// Identifies a material used somewhere in the game
@@ -326,6 +332,12 @@ impl Default for ThingPalette {
 				ColorKey::BackgroundSolvedDetail,
 				Srgba::hex("F5F8FB").unwrap().into(),
 			),
+			#[cfg(feature = "playtest")]
+			(ColorKey::PlaytestMarker, YELLOW_500.into()),
+			#[cfg(feature = "playtest")]
+			(ColorKey::StarWidgetSelected, YELLOW_500.into()),
+			#[cfg(feature = "playtest")]
+			(ColorKey::StarWidgetHovered, YELLOW_200.into()),
 		]))
 	}
 }

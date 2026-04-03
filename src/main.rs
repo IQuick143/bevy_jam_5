@@ -12,6 +12,8 @@ pub mod explorer;
 mod game;
 mod graphics;
 mod persistent;
+#[cfg(feature = "playtest")]
+mod playtest;
 mod save;
 mod screen;
 mod settings;
@@ -24,7 +26,7 @@ use bevy::{
 	prelude::*,
 };
 
-use explorer::{run_state_explorer, StateExplorerOptions};
+use explorer::{StateExplorerOptions, run_state_explorer};
 
 pub struct AppPlugin;
 
@@ -38,6 +40,7 @@ impl Plugin for AppPlugin {
 			Update,
 			(
 				AppSet::TickTimers,
+				AppSet::SwitchState,
 				AppSet::RecordInput,
 				AppSet::ExecuteInput,
 				AppSet::PreGameLogic,
@@ -97,6 +100,10 @@ impl Plugin for AppPlugin {
 		// Enable dev tools for dev builds.
 		#[cfg(feature = "dev")]
 		app.add_plugins(dev_tools::plugin);
+
+		// Enable playtest support for test builds
+		#[cfg(feature = "playtest")]
+		app.add_plugins(playtest::plugin);
 	}
 }
 
@@ -107,6 +114,8 @@ impl Plugin for AppPlugin {
 enum AppSet {
 	/// Tick timers.
 	TickTimers,
+	/// Update global states like screen
+	SwitchState,
 	/// Record player input.
 	RecordInput,
 	/// Process inputs that correspond to one-shot actions rather than lasting state

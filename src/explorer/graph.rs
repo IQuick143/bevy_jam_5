@@ -4,7 +4,7 @@ use crate::game::{
 	level::{CycleTurnability, LevelData, ObjectData},
 	logic::GameState,
 };
-use bevy::platform::collections::{hash_map::Entry, HashMap, HashSet};
+use bevy::platform::collections::{HashMap, HashSet, hash_map::Entry};
 use std::collections::VecDeque;
 
 #[derive(Clone, Copy, Debug)]

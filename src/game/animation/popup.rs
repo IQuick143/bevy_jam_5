@@ -2,8 +2,8 @@
 
 use super::animation_easing_function;
 use crate::{
-	drawing::{ColorKey, ThingPalette},
 	AppSet,
+	drawing::{ColorKey, ThingPalette},
 };
 use bevy::prelude::*;
 

@@ -1,7 +1,7 @@
 [package]
-name = "bevy_cycle_permutation_puzzle"
+name = "epicycles"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 bevy = { version = "0.18.0", default-features=false, features = [
@@ -54,7 +54,7 @@ bevy = { version = "0.18.0", default-features=false, features = [
     # "track_location",             # Enables source location tracking for change detection and spawning/despawning, which can assist with debugging
     "ui_picking",                   # Provides an implementation for picking UI
     "vorbis",                       # OGG/VORBIS audio format support
-    # "wayland",                    # Wayland display server support
+    "wayland",                      # Wayland display server support
     "x11",                          # X11 display server support
 ] }
 
@@ -73,10 +73,16 @@ serde = "*"
 serde_json = "*"
 directories = "6.0.0"
 
+bevy_ui_text_input = { version = "0.7", optional = true }
+ureq = { version = "3.2", optional = true }
+futures = { version = "0.3", features = ["alloc"], optional = true }
+
 [features]
 default = [
     # Default to a native dev build.
     "dev_native",
+    # While playtest view is in development, enable it by default
+    "playtest",
 ]
 dev = [
     "bevy/debug", # Enable collecting debug information about systems and components to help with diagnostics
@@ -98,6 +104,11 @@ dev_native = [
 hotpatching = [
     "dev_native",
     "bevy/hotpatching",
+]
+playtest = [
+    "dep:bevy_ui_text_input",
+    "dep:ureq",
+    "dep:futures",
 ]
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.

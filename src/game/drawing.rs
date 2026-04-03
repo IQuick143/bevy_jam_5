@@ -7,11 +7,11 @@ use super::{
 	spawn::LastLevelSessionId,
 };
 use crate::{
+	AppSet,
 	assets::{HandleMap, ImageKey},
 	drawing::*,
 	graphics::*,
 	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority},
-	AppSet,
 };
 use bevy::{
 	ecs::system::SystemParam,

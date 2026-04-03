@@ -1,9 +1,8 @@
 use bevy::{image::ImageLoaderSettings, platform::collections::HashMap, prelude::*};
 
 use crate::game::level::{
-	asset::plugin as level_asset_plugin, list::LevelList,
-	list_asset::plugin as level_list_asset_plugin, CycleTurnability, GlyphType, ObjectType,
-	ThingType,
+	CycleTurnability, GlyphType, ObjectType, ThingType, asset::plugin as level_asset_plugin,
+	list::LevelList, list_asset::plugin as level_list_asset_plugin,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -40,6 +39,8 @@ pub enum ImageKey {
 	Wall,
 	Detector,
 	ErrorX,
+	#[cfg(feature = "playtest")]
+	PlaytestMarker,
 }
 
 impl AssetKey for ImageKey {
@@ -103,6 +104,11 @@ impl FromWorld for HandleMap<ImageKey> {
 			(ImageKey::Wall, asset_server.load("images/wall.png")),
 			(ImageKey::Detector, asset_server.load("images/detector.png")),
 			(ImageKey::ErrorX, asset_server.load("images/x.png")),
+			#[cfg(feature = "playtest")]
+			(
+				ImageKey::PlaytestMarker,
+				asset_server.load("images/playtest.png"),
+			),
 		]
 		.into()
 	}
@@ -408,4 +414,20 @@ impl<K: AssetKey> HandleMap<K> {
 		self.values()
 			.all(|x| asset_server.is_loaded_with_dependencies(x))
 	}
+}
+
+pub fn all_assets_loaded(
+	asset_server: Res<AssetServer>,
+	image_handles: Res<HandleMap<ImageKey>>,
+	sfx_handles: Res<HandleMap<SfxKey>>,
+	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
+	font: Res<GlobalFont>,
+	// This resource gets initialized later, so it needs to be optional
+	level_list: Option<Res<LoadedLevelList>>,
+) -> bool {
+	image_handles.all_loaded(&asset_server)
+		&& sfx_handles.all_loaded(&asset_server)
+		&& soundtrack_handles.all_loaded(&asset_server)
+		&& asset_server.is_loaded_with_dependencies(font.0.id())
+		&& level_list.is_some_and(|list| list.all_loaded(&asset_server))
 }

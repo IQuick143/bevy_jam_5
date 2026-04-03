@@ -1,4 +1,4 @@
-use super::{ast::*, values::*, SourceLocation};
+use super::{SourceLocation, ast::*, values::*};
 use bevy::platform::collections::HashMap;
 use std::ops::Range;
 
@@ -623,7 +623,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 		Self {
 			value_stack: InterpreterStack::new(Self::DEFAULT_VALUE_STACK_LIMIT),
 			instruction_stack: InterpreterStack {
-				values: vec![Instruction::Execute(&ast.0 .0)],
+				values: vec![Instruction::Execute(&ast.0.0)],
 				max_height: Self::DEFAULT_INSTRUCTION_STACK_LIMIT,
 			},
 			is_halted: false,
@@ -741,7 +741,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 							return Err(InterpreterError::LogicError(
 								Box::new(LogicError::VariableDoesNotExist(name.to_owned())),
 								expression.loc.clone(),
-							))
+							));
 						}
 					}
 				}
@@ -914,7 +914,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 									instruction.function_name.to_owned(),
 								)),
 								instruction.loc,
-							))
+							));
 						}
 					}
 				}
@@ -945,7 +945,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 									operand.value.get_type(),
 								)),
 								loc,
-							))
+							));
 						}
 					},
 					UnaryOperator::Plus => match operand.value {
@@ -957,7 +957,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 									operand.value.get_type(),
 								)),
 								loc,
-							))
+							));
 						}
 					},
 					UnaryOperator::Minus => match operand.value {
@@ -977,7 +977,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 									operand.value.get_type(),
 								)),
 								loc,
-							))
+							));
 						}
 					},
 				};
@@ -1014,7 +1014,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1039,7 +1039,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1064,7 +1064,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1080,7 +1080,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						};
 						let right_value = match right.value {
@@ -1094,7 +1094,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						};
 						VariableValue::Float(left_value / right_value)
@@ -1118,7 +1118,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 									right.value.get_type(),
 								)),
 								loc,
-							))
+							));
 						}
 					},
 					BinaryOperator::Modulo => match (&left.value, &right.value) {
@@ -1140,7 +1140,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 									right.value.get_type(),
 								)),
 								loc,
-							))
+							));
 						}
 					},
 					BinaryOperator::Pow => {
@@ -1170,7 +1170,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1190,7 +1190,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1210,7 +1210,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1230,7 +1230,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1250,7 +1250,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1270,7 +1270,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}
@@ -1290,7 +1290,7 @@ impl<'ast, T: InterpreterBackend + 'ast> Interpreter<'ast, T> {
 										right.value.get_type(),
 									)),
 									loc,
-								))
+								));
 							}
 						}
 					}

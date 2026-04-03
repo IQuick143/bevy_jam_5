@@ -5,8 +5,8 @@ use crate::{
 	drawing::{BorderColorKey, ColorKey, NodeColorKey},
 	graphics::*,
 };
-use bevy::{prelude::*, ui::RelativeCursorPosition};
 use Val::*;
+use bevy::{prelude::*, ui::RelativeCursorPosition};
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(

@@ -2,7 +2,7 @@
 
 use super::super::{
 	super::{
-		builder::{error::LevelBuilderError, LevelBuildResult, LevelBuilder},
+		builder::{LevelBuildResult, LevelBuilder, error::LevelBuilderError},
 		*,
 	},
 	domain::*,
@@ -33,10 +33,10 @@ fn read_variables_before_finalize(
 		warning_handler(FinalizeWarning::LevelNameNotSet);
 	}
 
-	if let Some(level_hint) = variable_pool.load_as::<&str>("hint").transpose()? {
-		if let Err(err) = builder.set_level_hint(level_hint.to_owned()) {
-			return Err(FinalizeError::BuilderError(err));
-		}
+	if let Some(level_hint) = variable_pool.load_as::<&str>("hint").transpose()?
+		&& let Err(err) = builder.set_level_hint(level_hint.to_owned())
+	{
+		return Err(FinalizeError::BuilderError(err));
 	}
 
 	if let Some(level_scale) = variable_pool
@@ -69,16 +69,16 @@ fn read_variables_before_finalize(
 		builder.explicit_bounding_box().bottom = Some(bb_bottom);
 	}
 
-	if let (Some(bb_left), Some(bb_right)) = (bb_left, bb_right) {
-		if bb_left >= bb_right {
-			warning_handler(FinalizeWarning::LeftRightBoundingBoxInversion);
-		}
+	if let (Some(bb_left), Some(bb_right)) = (bb_left, bb_right)
+		&& bb_left >= bb_right
+	{
+		warning_handler(FinalizeWarning::LeftRightBoundingBoxInversion);
 	}
 
-	if let (Some(bb_top), Some(bb_bottom)) = (bb_top, bb_bottom) {
-		if bb_top >= bb_bottom {
-			warning_handler(FinalizeWarning::TopBottomBoundingBoxInversion);
-		}
+	if let (Some(bb_top), Some(bb_bottom)) = (bb_top, bb_bottom)
+		&& bb_top >= bb_bottom
+	{
+		warning_handler(FinalizeWarning::TopBottomBoundingBoxInversion);
 	}
 
 	if let Some(init_scale) = variable_pool.load_as::<f32>("init_scale").transpose()? {
@@ -91,6 +91,15 @@ fn read_variables_before_finalize(
 
 	if let Some(init_cam_y) = variable_pool.load_as::<f32>("init_cam_y").transpose()? {
 		builder.explicit_initial_camera_pos().y = Some(init_cam_y);
+	}
+
+	#[cfg(feature = "playtest")]
+	if variable_pool
+		.load_as::<bool>("playtest_norequire")
+		.transpose()?
+		== Some(true)
+	{
+		builder.ignore_in_playtest();
 	}
 
 	Ok(())

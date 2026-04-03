@@ -1,3 +1,4 @@
+use super::freeze::ui_not_frozen;
 use crate::{camera::CameraHarness, screen::Screen};
 use bevy::{
 	math::bounding::{Aabb2d, BoundingCircle, BoundingVolume},
@@ -20,8 +21,7 @@ pub const UI_UNDO: &str = "Undo [Z]";
 pub const UI_REDO: &str = "Redo [Y]";
 pub const UI_NEXT: &str = "Next level [N]";
 
-pub const BLOCKADE_WARNING: &str =
-	"The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
+pub const BLOCKADE_WARNING: &str = "The last turn did not execute because multiple cycles tried to move this vertex, resulting in a conflict that jammed the system.";
 pub const WALL_HIT_WARNING: &str =
 	"The last turn did not execute because this wall would've been hit by an object on this cycle.";
 
@@ -47,7 +47,7 @@ pub(super) fn plugin(app: &mut App) {
 		Update,
 		(
 			update_hover_state,
-			update_hover_state_from_interaction,
+			update_hover_state_from_interaction.run_if(ui_not_frozen),
 			update_hover_text_cache,
 			update_hover_text.run_if(resource_changed::<HintText>),
 		),
@@ -163,17 +163,16 @@ fn update_hover_state(
 					distance = distance.min(circle_distance);
 				}
 			}
-			if let Some(bounding_box) = bounding_rect {
-				if Vec2::cmplt(bounding_box.min, transformed_cursor).all()
-					&& Vec2::cmpgt(bounding_box.max, transformed_cursor).all()
-				{
-					hovered = true;
-					// Evil hack approximation, does not actually compute the box inside distance
-					let box_distance = (transformed_cursor - bounding_box.center())
-						.abs()
-						.max_element();
-					distance = distance.min(box_distance);
-				}
+			if let Some(bounding_box) = bounding_rect
+				&& Vec2::cmplt(bounding_box.min, transformed_cursor).all()
+				&& Vec2::cmpgt(bounding_box.max, transformed_cursor).all()
+			{
+				hovered = true;
+				// Evil hack approximation, does not actually compute the box inside distance
+				let box_distance = (transformed_cursor - bounding_box.center())
+					.abs()
+					.max_element();
+				distance = distance.min(box_distance);
 			}
 
 			if hovered && (priority, distance) < closest_priority_and_distance {

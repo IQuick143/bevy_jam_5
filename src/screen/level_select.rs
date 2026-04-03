@@ -5,9 +5,9 @@ use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, LoadedLevelList, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::level::{
+		LevelData,
 		completion::{CompletionStatus, LevelHubCompletion},
 		list::LevelList,
-		LevelData,
 	},
 	save::SaveGame,
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox},
@@ -47,7 +47,8 @@ fn spawn_screen(
 			DespawnOnExit(Screen::LevelSelect),
 		))
 		.id();
-	let main_id = commands
+
+	let scrollbox = commands
 		.spawn((
 			Scrollbox {
 				step: COMMON_GAP_PX + GRID_BUTTON_HEIGHT_PX,
@@ -55,14 +56,26 @@ fn spawn_screen(
 			Node {
 				flex_direction: FlexDirection::Column,
 				justify_content: JustifyContent::Start,
-				align_content: AlignContent::Center,
-				width: Val::Percent(90.0),
-				padding: UiRect::vertical(Val::Percent(5.0)),
-				row_gap: COMMON_GAP,
+				align_items: AlignItems::Center,
+				width: Val::Percent(100.0),
 				overflow: Overflow::scroll_y(),
 				..default()
 			},
 			ChildOf(root_id),
+		))
+		.id();
+	let main_id = commands
+		.spawn((
+			Node {
+				flex_direction: FlexDirection::Column,
+				justify_content: JustifyContent::Start,
+				align_items: AlignItems::Center,
+				width: Val::Percent(90.0),
+				padding: UiRect::vertical(Val::Percent(5.0)),
+				row_gap: COMMON_GAP,
+				..default()
+			},
+			ChildOf(scrollbox),
 		))
 		.id();
 	commands.spawn((
@@ -210,7 +223,11 @@ fn handle_level_select_screen_action(
 			}
 			LevelSelectAction::PlayLevel(id) => {
 				next_level.set(PlayingLevel(Some(*id)));
-				commands.do_screen_transition(Screen::Playing);
+				commands.spawn((
+					FadeAnimationBundle::default(),
+					DoScreenTransition(Screen::Playing),
+					LoadLevel::default(),
+				));
 			}
 		}
 	}

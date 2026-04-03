@@ -89,18 +89,18 @@ impl LevelHubCompletion {
 				hub_completion.completion_status = CompletionStatus::Completed;
 			}
 
-			if just_completed || just_cleared {
-				if let Some(parent_id) = hub.parent_hub {
-					// Recursive call for parent goes here:
-					// self.add_completed_child_to_hub(level_list, parent_id, just_completed, just_cleared);
-					//
-					// Buuut I'm a little anxious about the compiler neglecting
-					// to do a tail recursion optimization, so...
-					hub_id = parent_id;
-					add_as_completed = just_completed;
-					add_as_cleared = just_cleared;
-					continue;
-				}
+			if (just_completed || just_cleared)
+				&& let Some(parent_id) = hub.parent_hub
+			{
+				// Recursive call for parent goes here:
+				// self.add_completed_child_to_hub(level_list, parent_id, just_completed, just_cleared);
+				//
+				// Buuut I'm a little anxious about the compiler neglecting
+				// to do a tail recursion optimization, so...
+				hub_id = parent_id;
+				add_as_completed = just_completed;
+				add_as_cleared = just_cleared;
+				continue;
 			}
 
 			break;
@@ -112,11 +112,13 @@ impl LevelHubCompletion {
 	}
 
 	pub fn is_level_unlocked(&self, level_list: &LevelList, level_id: usize) -> bool {
-		self.is_prerequisite_satisfied(&level_list.levels[level_id].prerequisites)
+		cfg!(feature = "playtest")
+			|| self.is_prerequisite_satisfied(&level_list.levels[level_id].prerequisites)
 	}
 
 	pub fn is_hub_unlocked(&self, level_list: &LevelList, hub_id: usize) -> bool {
-		self.is_prerequisite_satisfied(&level_list.hubs[hub_id].prerequisites)
+		cfg!(feature = "playtest")
+			|| self.is_prerequisite_satisfied(&level_list.hubs[hub_id].prerequisites)
 	}
 
 	fn is_prerequisite_satisfied(&self, prerequisites: &[LevelOrHubId]) -> bool {

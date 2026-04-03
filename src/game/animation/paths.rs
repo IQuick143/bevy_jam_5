@@ -2,8 +2,9 @@
 
 use smallvec::SmallVec;
 
-use super::{animation_easing_function, TurnAnimationLength};
+use super::{TurnAnimationLength, animation_easing_function};
 use crate::{
+	AppSet,
 	game::{
 		components::*,
 		level::{CyclePlacement, LevelData, ThingData},
@@ -11,7 +12,6 @@ use crate::{
 		prelude::*,
 	},
 	screen::Screen,
-	AppSet,
 };
 
 pub(super) fn plugin(app: &mut App) {

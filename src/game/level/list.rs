@@ -294,14 +294,30 @@ impl std::error::Error for LevelListBuildError {}
 impl std::fmt::Display for LevelListBuildError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::BadAssetPath(path, reason) => write!(f, "'{path}' is not a valid path to an asset: {reason}"),
-			Self::HubIndexOutOfRange(i) => write!(f, "trying to reference hub {i}, but there are not that many hubs"),
-			Self::LevelIndexOutOfRange(i) => write!(f, "trying to reference level {i}, but there are not that many levels"),
-			Self::CycleInHubHierarchy(child, parent) => write!(f, "adding hub {child} as child of hub {parent} would create a loop in hierarchy"),
+			Self::BadAssetPath(path, reason) => {
+				write!(f, "'{path}' is not a valid path to an asset: {reason}")
+			}
+			Self::HubIndexOutOfRange(i) => write!(
+				f,
+				"trying to reference hub {i}, but there are not that many hubs"
+			),
+			Self::LevelIndexOutOfRange(i) => write!(
+				f,
+				"trying to reference level {i}, but there are not that many levels"
+			),
+			Self::CycleInHubHierarchy(child, parent) => write!(
+				f,
+				"adding hub {child} as child of hub {parent} would create a loop in hierarchy"
+			),
 			Self::NoHub => f.write_str("level list is missing a hub"),
-			Self::MultipleRootHubs([first, second]) => write!(f, "only one root hub can exist, but hubs {first} and {second} are both in root position"),
+			Self::MultipleRootHubs([first, second]) => write!(
+				f,
+				"only one root hub can exist, but hubs {first} and {second} are both in root position"
+			),
 			Self::OrphanedLevel(i) => write!(f, "level {i} does not have a parent set"),
-			Self::LevelParentReassignment(l, p) => write!(f, "level {l} is already a child of hub {p}"),
+			Self::LevelParentReassignment(l, p) => {
+				write!(f, "level {l} is already a child of hub {p}")
+			}
 			Self::HubParentReassignment(h, p) => write!(f, "hub {h} is already a child of hub {p}"),
 		}
 	}

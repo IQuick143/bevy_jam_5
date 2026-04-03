@@ -1,7 +1,7 @@
 mod utils {
 	use crate::game::{
 		components::{Cycle, GameStateEcsIndex, Vertex},
-		level::{backend::builder as parser, GlyphData, ObjectData},
+		level::{GlyphData, ObjectData, backend::builder as parser},
 		logic_relay::{RotateCycleGroup, RotationCause},
 		prelude::*,
 	};
@@ -78,7 +78,7 @@ mod utils {
 		mut spawn_trigger: MessageWriter<EnterLevel>,
 	) -> Result<(), parser::Error> {
 		let handle = asset_server.add(level);
-		spawn_trigger.write(EnterLevel(Some(handle)));
+		spawn_trigger.write(EnterLevel(Some((handle, default()))));
 		Ok(())
 	}
 

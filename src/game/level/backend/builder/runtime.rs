@@ -5,7 +5,7 @@
 
 use super::super::{
 	super::{
-		builder::{error::LevelBuilderError, CycleBoundColorLabelPositionSet, LevelBuilder},
+		builder::{CycleBoundColorLabelPositionSet, LevelBuilder, error::LevelBuilderError},
 		*,
 	},
 	domain::*,
@@ -387,10 +387,10 @@ impl LevelBuilder {
 		}
 
 		// Handle the first input potentially being a detector
-		if let Some(detector) = detector {
-			if let Some(cycle) = cycles.first() {
-				self.one_way_link_detector(detector, *cycle, direction, abs_multiplicity)?;
-			}
+		if let Some(detector) = detector
+			&& let Some(cycle) = cycles.first()
+		{
+			self.one_way_link_detector(detector, *cycle, direction, abs_multiplicity)?;
 		}
 
 		for (a, b) in cycles.into_iter().tuple_windows() {
