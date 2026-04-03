@@ -1,6 +1,6 @@
 //! The slider UI element
 
-use super::{freeze::ui_not_frozen, interaction::InteractionQuery};
+use super::{cyl::prelude::*, freeze::ui_not_frozen, interaction::CylInteractionQuery};
 use crate::{
 	drawing::{BorderColorKey, ColorKey, NodeColorKey},
 	graphics::*,
@@ -9,7 +9,7 @@ use Val::*;
 use bevy::{prelude::*, ui::RelativeCursorPosition};
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
+	app.add_observer(slider_inputs_from_cyl).add_systems(
 		Update,
 		(
 			create_slider_children.before(move_slider_handles),
@@ -150,15 +150,19 @@ fn create_slider_children(mut commands: Commands, query: Query<Entity, Added<Sli
 }
 
 fn apply_slider_interaction_palettes(
-	slider_q: InteractionQuery<&SliderChildren>,
+	slider_q: CylInteractionQuery<&SliderChildren>,
 	mut node_q: Query<&mut NodeColorKey>,
 ) {
-	for (interaction, enabled, children) in &slider_q {
+	for ((interaction, cyl_interaction), enabled, children) in &slider_q {
 		let new_color = if enabled.is_none_or(|e| **e) {
-			match interaction {
-				Interaction::None => ColorKey::SliderFill,
-				Interaction::Hovered => ColorKey::SliderHoveredFill,
-				Interaction::Pressed => ColorKey::SliderPressedFill,
+			let final_interaction = cyl_interaction
+				.copied()
+				.or(interaction.copied().map(CylInteraction::from))
+				.unwrap_or_default();
+			match final_interaction {
+				CylInteraction::None => ColorKey::SliderFill,
+				CylInteraction::Focused => ColorKey::SliderHoveredFill,
+				CylInteraction::Hot => ColorKey::SliderPressedFill,
 			}
 		} else {
 			ColorKey::SliderDisabledFill
@@ -200,6 +204,18 @@ fn accept_slider_inputs(
 			.clamp(0.0, slider.step_count as f32) as u32;
 		if new_position != slider.position {
 			slider.position = new_position;
+		}
+	}
+}
+
+fn slider_inputs_from_cyl(event: On<CylMultistateTrigger>, mut query: Query<&mut Slider>) {
+	if let Ok(mut slider) = query.get_mut(event.event_target()) {
+		let new_pos = slider
+			.position
+			.saturating_add_signed(event.direction.to_i32())
+			.min(slider.step_count);
+		if new_pos != slider.position {
+			slider.position = new_pos;
 		}
 	}
 }

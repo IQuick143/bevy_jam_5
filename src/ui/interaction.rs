@@ -3,6 +3,7 @@ use crate::{
 	assets::SfxKey,
 	audio::sfx::PlaySfx,
 	drawing::{ColorKey, NodeColorKey},
+	ui::cyl::prelude::CylInteraction,
 };
 use bevy::{
 	ecs::{lifecycle::HookContext, world::DeferredWorld},
@@ -45,6 +46,24 @@ pub type InteractionQuery<'w, 's, T, F = ()> = Query<
 	's,
 	(&'static Interaction, Option<&'static InteractionEnabled>, T),
 	(Or<(Changed<Interaction>, Changed<InteractionEnabled>)>, F),
+>;
+
+pub type CylInteractionQuery<'w, 's, T, F = ()> = Query<
+	'w,
+	's,
+	(
+		AnyOf<(&'static Interaction, &'static CylInteraction)>,
+		Option<&'static InteractionEnabled>,
+		T,
+	),
+	(
+		Or<(
+			Changed<Interaction>,
+			Changed<CylInteraction>,
+			Changed<InteractionEnabled>,
+		)>,
+		F,
+	),
 >;
 
 /// Palette for widget interactions.

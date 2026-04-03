@@ -1,17 +1,11 @@
 //! Checkbox-like UI elements
 
-use crate::{AppSet, ui::prelude::InteractionQuery};
+use crate::ui::cyl::prelude::*;
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
-			update_multistate_state.before(AppSet::RecordInput),
-			update_multistate_labels,
-		)
-			.chain(),
-	);
+	app.add_observer(update_multistate_state)
+		.add_systems(Update, update_multistate_labels);
 }
 
 /// Marks a checkbox node and holds its current state
@@ -44,14 +38,13 @@ impl MultiStateButtonLabels {
 	}
 }
 
-fn update_multistate_state(mut query: InteractionQuery<&mut MultiStateButton>) {
-	for (interaction, enabled, mut button) in &mut query {
-		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
-			button.current_state += 1;
-			if button.current_state >= button.state_count {
-				button.current_state = 0;
-			}
-		}
+fn update_multistate_state(
+	event: On<CylMultistateTrigger>,
+	mut query: Query<&mut MultiStateButton>,
+) {
+	if let Ok(mut button) = query.get_mut(event.event_target()) {
+		button.current_state = (button.current_state as i32 + event.direction.to_i32())
+			.rem_euclid(button.state_count as i32) as u32;
 	}
 }
 

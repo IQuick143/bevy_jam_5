@@ -8,6 +8,7 @@ use crate::{
 	ui::{
 		background::BackgroundMode,
 		consts::*,
+		cyl::prelude::*,
 		multistate::{MultiStateButton, MultiStateButtonLabels},
 		prelude::*,
 		slider::Slider,
@@ -64,6 +65,7 @@ fn enter_settings(
 		children![
 			widgets::header("Settings", font.0.clone()),
 			(
+				CylListWidget,
 				Node {
 					display: Display::Grid,
 					width: Val::Percent(100.0),
@@ -76,6 +78,9 @@ fn enter_settings(
 				children![
 					widgets::text("Music volume", JustifyContent::End, font.0.clone()),
 					(
+						CylWidget,
+						CylMultistate::default(),
+						CylInteraction::default(),
 						Node {
 							width: Val::Px(SLIDER_WIDTH),
 							..default()
@@ -85,6 +90,9 @@ fn enter_settings(
 					),
 					widgets::text("Sfx volume", JustifyContent::End, font.0.clone()),
 					(
+						CylWidget,
+						CylMultistate::default(),
+						CylInteraction::default(),
 						Node {
 							width: Val::Px(SLIDER_WIDTH),
 							..default()
@@ -96,6 +104,12 @@ fn enter_settings(
 					(
 						Node::DEFAULT,
 						children![(
+							CylWidget,
+							CylMultistate {
+								trigger_on_interact: true
+							},
+							CylClickable,
+							CylInteraction::default(),
 							widgets::inline_button("", font.0.clone()),
 							MultiStateButton::new(
 								3,
@@ -109,6 +123,12 @@ fn enter_settings(
 					(
 						Node::DEFAULT,
 						children![(
+							CylWidget,
+							CylMultistate {
+								trigger_on_interact: true
+							},
+							CylClickable,
+							CylInteraction::default(),
 							widgets::inline_button("", font.0.clone()),
 							MultiStateButton::new(2, settings.enable_parallax as u32),
 							MultiStateButtonLabels::new(["Off", "On"]),
