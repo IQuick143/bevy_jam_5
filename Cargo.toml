@@ -33,9 +33,9 @@ bevy = { version = "0.18.0", default-features=false, features = [
     "default_font",                 # Include a default font, containing only ASCII characters, at the cost of a 20kB binary size increase
     # "force_disable_dlss",         # Forcibly disable DLSS so that cargo build --all-features works without the DLSS SDK being installed. Not meant for users.
     # "hotpatching",                # Enable hotpatching of Bevy systems
-    "jpeg",                         # JPEG image format support
+    # "jpeg",                       # JPEG image format support
     "libm",                         # Uses the `libm` maths library instead of the one provided in `std` and `core`.
-    "mp3",                          # MP3 audio format support
+    # "mp3",                        # MP3 audio format support
     "multi_threaded",               # Enables multithreaded parallelism in the engine. Disabling it forces all engine tasks to run on a single thread.
     "png",                          # PNG image format support
     "reflect_auto_register",        # Enable automatic reflect registration
