@@ -34,8 +34,13 @@ pub(super) fn plugin(app: &mut App) {
 			log_transitions::<Screen>,
 			log_transitions::<PlayingLevel>,
 			automatic_reloading.run_if(in_state(Screen::Playing)),
-			print_level_data.run_if(input_just_pressed(KeyCode::KeyY)),
-			(debug_oneways, debug_camera_bounds, draw_hover_boxes)
+			print_level_data
+				.run_if(input_just_pressed(KeyCode::KeyY).and(in_state(Screen::Playing))),
+			(
+				debug_oneways.run_if(in_state(Screen::Playing)),
+				debug_camera_bounds,
+				draw_hover_boxes,
+			)
 				.run_if(resource_equals(RenderOutlines(true))),
 			toggle_debug_outline_display.run_if(resource_changed::<RenderOutlines>),
 			toggle_box_outlines.run_if(input_just_pressed(KeyCode::KeyB)),
