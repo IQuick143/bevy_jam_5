@@ -38,27 +38,29 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				(
-					record_playing_screen_input,
-					send_message(ExitFeedbackForm(AfterExitFeedbackForm::Stay))
-						.run_if(input_just_pressed(KeyCode::Escape).and(feedback_form_is_open)),
+					(
+						record_playing_screen_input,
+						send_message(ExitFeedbackForm(AfterExitFeedbackForm::Stay))
+							.run_if(input_just_pressed(KeyCode::Escape).and(feedback_form_is_open)),
+					)
+						.in_set(AppSet::RecordInput),
+					(
+						spawn_feedback_form.run_if(on_message::<OpenFeedbackForm>),
+						(close_feedback_form, do_action_after_close_form)
+							.run_if(on_message::<ExitFeedbackForm>),
+					)
+						.in_set(AppSet::ExecuteInput),
+					intercept_exit_from_level
+						.after(AppSet::ExecuteInput)
+						.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
+					synchronize_star_feedback,
+					synchronize_text_feedback,
+					update_submit_enable_disable,
+					increment_move_counter.run_if(on_message::<RotateCycleGroup>),
 				)
-					.in_set(AppSet::RecordInput),
-				(
-					spawn_feedback_form.run_if(on_message::<OpenFeedbackForm>),
-					(close_feedback_form, do_action_after_close_form)
-						.run_if(on_message::<ExitFeedbackForm>),
-				)
-					.in_set(AppSet::ExecuteInput),
-				intercept_exit_from_level
-					.after(AppSet::ExecuteInput)
-					.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
-				synchronize_star_feedback,
-				synchronize_text_feedback,
-				update_submit_enable_disable,
-				increment_move_counter.run_if(on_message::<RotateCycleGroup>),
+					.run_if(in_state(Screen::Playing)),
 				reset_move_counter.run_if(state_changed::<PlayingLevel>),
-			)
-				.run_if(in_state(Screen::Playing)),
+			),
 		);
 }
 
