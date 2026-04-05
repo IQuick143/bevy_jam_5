@@ -73,14 +73,14 @@ impl KeyBindings {
 		for binding in self.bindings.iter() {
 			for input in binding.inputs.iter() {
 				if match input {
-					InputKey::Mouse(mouse_key) => mouse.just_released(*mouse_key),
+					InputKey::Mouse(mouse_key) => mouse.just_pressed(*mouse_key),
 					InputKey::Keyboard(key) => match key {
 						Key::Character(character) => {
-							keyboard.just_released(Key::Character(character.to_lowercase().into()))
+							keyboard.just_pressed(Key::Character(character.to_lowercase().into()))
 								|| keyboard
-									.just_released(Key::Character(character.to_uppercase().into()))
+									.just_pressed(Key::Character(character.to_uppercase().into()))
 						}
-						key => keyboard.just_released(key.clone()),
+						key => keyboard.just_pressed(key.clone()),
 					},
 				} {
 					actions.push(binding.action);
