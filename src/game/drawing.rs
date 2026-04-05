@@ -1,7 +1,7 @@
 use super::{
 	animation::{PopupAnimation, TurnAnimationLength},
 	components::*,
-	inputs::CycleInteraction,
+	inputs::HoveredCycle,
 	logic_relay::*,
 	prelude::*,
 	spawn::LastLevelSessionId,
@@ -11,7 +11,7 @@ use crate::{
 	assets::{HandleMap, ImageKey},
 	drawing::*,
 	graphics::*,
-	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority},
+	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority, IsHovered},
 };
 use bevy::{
 	ecs::system::SystemParam,
@@ -150,14 +150,15 @@ fn cycle_center_turnability_visuals_update_system(
 }
 
 fn cycle_interaction_visuals_changed(
-	query: Query<(), Or<(Changed<CycleInteraction>, Changed<ComputedCycleTurnability>)>>,
+	query: Query<(), Or<(Changed<IsHovered>, Changed<ComputedCycleTurnability>)>>,
 ) -> bool {
 	!query.is_empty()
 }
 
 fn cycle_center_interaction_visuals_update_system(
+	hovered_cycle: Res<HoveredCycle>,
 	cycles_q: Query<(
-		&CycleInteraction,
+		Entity,
 		&Cycle,
 		&ComputedCycleTurnability,
 		Option<&CycleCenterVisualEntities>,
@@ -172,16 +173,15 @@ fn cycle_center_interaction_visuals_update_system(
 	mut visibility_q: Query<&mut Visibility>,
 	materials: Res<GameObjectMaterials>,
 ) {
+	let HoveredCycle(hovered_cycle) = *hovered_cycle;
 	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
 
-	let selected_groups = cycles_q
-		.iter()
-		.filter(|(interaction, ..)| **interaction != CycleInteraction::None)
-		.map(|(_, cycle, ..)| cycle.group_id)
-		.collect::<HashSet<_>>();
+	let selected_group = hovered_cycle
+		.and_then(|hovered| cycles_q.get(hovered).ok())
+		.map(|(_, cycle, ..)| cycle.group_id);
 
 	let mut meshes_to_repaint = HashMap::<Entity, CycleStatus>::default();
 	let mut outlines_to_repaint = HashMap::<Entity, CycleStatus>::default();
@@ -189,9 +189,9 @@ fn cycle_center_interaction_visuals_update_system(
 	let mut hitboxes_to_repaint = HashMap::<Entity, bool>::default();
 
 	for data in &cycles_q {
-		let (interaction, cycle, is_turnable, center_visuals, ring_visuals, hitbox_visuals) = data;
-		let is_selected = selected_groups.contains(&cycle.group_id);
-		let is_directly_selected = *interaction != CycleInteraction::None;
+		let (entity, cycle, is_turnable, center_visuals, ring_visuals, hitbox_visuals) = data;
+		let is_selected = selected_group == Some(cycle.group_id);
+		let is_directly_selected = Some(entity) == hovered_cycle;
 
 		let cycle_status = if is_selected {
 			CycleStatus::Selected

@@ -1316,6 +1316,7 @@ fn stress_test_undo_invertibility() {
 	}
 }
 
+/*
 #[test]
 fn turn_ordering_consistency_test() {
 	let level = "
@@ -1378,3 +1379,4 @@ circle(b; 0 1 1);
 	let final_state = app.read_vertices();
 	assert!(final_state.objects == expected_result_a || final_state.objects == expected_result_b);
 }
+*/

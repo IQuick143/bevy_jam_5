@@ -3,7 +3,6 @@
 use super::{
 	components::*,
 	drawing::*,
-	inputs::CycleInteraction,
 	level::*,
 	logic_relay::{ComputedCycleTurnability, IsTriggered},
 	prelude::*,
@@ -257,7 +256,6 @@ fn spawn_primary_level_entities(
 							orientation_within_group: cycle.orientation_within_group,
 						},
 						ComputedCycleTurnability(false),
-						CycleInteraction::default(),
 						Transform::default(),
 						Visibility::default(),
 					))

@@ -8,32 +8,26 @@ use crate::{
 	camera::CameraHarness,
 	game::components::Cycle,
 	graphics::RING_SHADOW_BLEED,
+	input::*,
 	ui::{freeze::ui_not_frozen, hover::IsHovered},
 };
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
-			cycle_inputs_system.in_set(AppSet::RecordInput),
-			cycle_rotation_with_inputs_system.in_set(AppSet::PreGameLogic),
-		)
-			.run_if(ui_not_frozen),
-	);
+	app.init_resource::<HoveredCycle>()
+		.add_systems(ProcessInputs, cycle_inputs_system.run_if(ui_not_frozen))
+		.add_systems(
+			Update,
+			cycle_hover_system
+				.in_set(AppSet::RecordInput)
+				.run_if(ui_not_frozen),
+		);
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Reflect, Default)]
-pub enum CycleInteraction {
-	#[default]
-	None,
-	Hover,
-	LeftClick,
-	RightClick,
-}
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+pub struct HoveredCycle(pub Option<Entity>);
 
-fn cycle_inputs_system(
-	input_mouse: Res<ButtonInput<MouseButton>>,
-	input_key: Res<ButtonInput<KeyCode>>,
+fn cycle_hover_system(
+	mut hovered_cycle: ResMut<HoveredCycle>,
 	window: Single<&Window>,
 	camera: Single<(&Camera, &GlobalTransform), With<CameraHarness>>,
 	mut cycles_q: Query<(
@@ -41,18 +35,9 @@ fn cycle_inputs_system(
 		&CyclePlacement,
 		&GlobalTransform,
 		&ComputedCycleTurnability,
-		&mut CycleInteraction,
 		&mut IsHovered,
 	)>,
 ) {
-	let lmb = input_mouse.just_pressed(MouseButton::Left) || input_key.just_pressed(KeyCode::KeyD);
-	let rmb = input_mouse.just_pressed(MouseButton::Right) || input_key.just_pressed(KeyCode::KeyA);
-	let new_interaction = match (lmb, rmb) {
-		(true, true) => CycleInteraction::Hover,
-		(true, false) => CycleInteraction::LeftClick,
-		(false, true) => CycleInteraction::RightClick,
-		(false, false) => CycleInteraction::Hover,
-	};
 	let (camera, camera_transform) = *camera;
 	let cursor_pos = window
 		.cursor_position()
@@ -61,9 +46,9 @@ fn cycle_inputs_system(
 		return;
 	};
 
-	let (nearest_cycle, _, _, is_turnable) = cycles_q
+	let (nearest_cycle, _, _, _) = cycles_q
 		.iter()
-		.filter_map(|(e, placement, transform, turnability, _, _)| {
+		.filter_map(|(e, placement, transform, turnability, _)| {
 			let is_turnable = turnability.0;
 			let d_sq = transform.translation().xy().distance_squared(cursor_pos);
 
@@ -92,38 +77,43 @@ fn cycle_inputs_system(
 			},
 		);
 
+	hovered_cycle.set_if_neq(HoveredCycle(nearest_cycle));
+
 	// Now that we have found the cycle to interact with, commit all of them
-	// Use checked assignment, we do not want to flood the schedules
-	// that filter by Changed<CycleInteraction>
-	for (e, _, _, _, mut interaction, mut is_hovered) in &mut cycles_q {
+	// Use checked assignment, we do not want to flood the systems
+	// that filter by `Changed<IsHovered>`
+	for (e, _, _, _, mut is_hovered) in &mut cycles_q {
 		if nearest_cycle == Some(e) {
-			if is_turnable {
-				interaction.set_if_neq(new_interaction);
-			} else {
-				interaction.set_if_neq(CycleInteraction::None);
-			}
 			is_hovered.set_if_neq(IsHovered(true));
 		} else {
-			interaction.set_if_neq(CycleInteraction::None);
 			is_hovered.set_if_neq(IsHovered(false));
 		}
 	}
 }
 
-fn cycle_rotation_with_inputs_system(
-	query: Query<(&Cycle, &CycleInteraction), Changed<CycleInteraction>>,
+fn cycle_inputs_system(
+	input: Res<CurrentAction>,
+	hovered_cycle: Res<HoveredCycle>,
+	cycles_q: Query<&Cycle>,
 	mut rot_events: MessageWriter<RotateCycleGroup>,
 ) {
-	for (cycle, interaction) in &query {
-		let amount = match interaction {
-			CycleInteraction::LeftClick => 1,
-			CycleInteraction::RightClick => -1,
-			_ => return,
-		};
+	let HoveredCycle(Some(hovered_cycle)) = *hovered_cycle else {
+		return;
+	};
+	let CurrentAction(Some(InputAction::Turn(turn_direction))) = *input else {
+		return;
+	};
+	let turn_direction = turn_direction.clamp(-1, 1);
+
+	if turn_direction == 0 {
+		return;
+	}
+
+	if let Ok(cycle) = &cycles_q.get(hovered_cycle) {
 		let rotation = RotateCycle {
 			target_cycle: cycle.id,
 			target_group: cycle.group_id,
-			amount,
+			amount: turn_direction as i64,
 		};
 		rot_events.write(RotateCycleGroup {
 			rotation,
