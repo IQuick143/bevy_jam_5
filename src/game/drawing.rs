@@ -20,31 +20,28 @@ use bevy::{
 };
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_observer(marker_popdown_system).add_systems(
-		Update,
-		(
+	app.add_observer(marker_popdown_system)
+		.add_observer(button_trigger_animation_system)
+		.add_observer(cycle_center_turnability_visuals_update_system)
+		.add_systems(
+			Update,
 			(
-				goal_unlock_animation_system
-					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
 				(
-					button_trigger_animation_system,
-					cycle_center_turnability_visuals_update_system
-						.before(cycle_center_interaction_visuals_update_system),
+					goal_unlock_animation_system
+						.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
+					cycle_center_interaction_visuals_update_system
+						.run_if(cycle_interaction_visuals_changed),
 				)
-					.run_if(on_message::<GameLayoutChanged>),
-				cycle_center_interaction_visuals_update_system
-					.run_if(cycle_interaction_visuals_changed),
-			)
-				.in_set(AppSet::UpdateVisuals),
-			(
-				cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
-				wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
-				marker_despawn_system,
-			)
-				.after(AppSet::GameLogic)
-				.before(AppSet::UpdateVisuals),
-		),
-	);
+					.in_set(AppSet::UpdateVisuals),
+				(
+					cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
+					wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
+					marker_despawn_system,
+				)
+					.after(AppSet::GameLogic)
+					.before(AppSet::UpdateVisuals),
+			),
+		);
 }
 
 /// References to entities that make up the visualization of a cycle's ring
@@ -110,6 +107,7 @@ fn goal_unlock_animation_system(
 }
 
 fn button_trigger_animation_system(
+	_trigger: On<GameLayoutChanged>,
 	mut sprites_q: Query<&mut SpriteColorKey>,
 	buttons_q: Query<(&Children, &IsTriggered), (With<SokoButton>, Changed<IsTriggered>)>,
 ) {
@@ -129,6 +127,7 @@ fn button_trigger_animation_system(
 }
 
 fn cycle_center_turnability_visuals_update_system(
+	_trigger: On<GameLayoutChanged>,
 	cycles_q: Query<(&ComputedCycleTurnability, &CycleCenterVisualEntities)>,
 	mut arrows_q: Query<&mut Visibility>,
 ) {
