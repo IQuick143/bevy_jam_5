@@ -1,14 +1,12 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
 use super::{components::*, logic::TurnCycleResult, prelude::*};
-use crate::{AppSet, send_event};
+use crate::send_event;
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
 		.init_resource::<GameState>()
 		.init_resource::<IsLevelCompleted>()
-		.add_message::<TurnBlockedByGroupConflict>()
-		.add_message::<TurnBlockedByWallHit>()
 		.add_systems(
 			LevelInitialization,
 			(
@@ -80,24 +78,6 @@ pub struct RotateCycleGroup {
 #[derive(Event, Clone, Copy, Default, Debug)]
 pub struct GameLayoutChanged;
 
-/// Message indicating that a pair of groups that cannot be turned together
-/// blocked the execution of a turn.
-/// Emitted for each pair of conflicting groups.
-/// The value indexes into [`LevelData::forbidden_group_pairs`]
-#[derive(Message, Clone, Copy, Default, Debug)]
-pub struct TurnBlockedByGroupConflict(pub usize);
-
-/// Message indicating that a cycle with a wall
-/// blocked the execution of a turn.
-/// Emitted for each wall that would've been hit.
-#[derive(Message, Clone, Copy, Default, Debug)]
-pub struct TurnBlockedByWallHit {
-	/// The value indexes into [`LevelData::cycles`]
-	pub cycle: usize,
-	/// The value indexes into [`super::level::CycleData::wall_indices`]
-	pub wall: usize,
-}
-
 /// [`Event`] emited after a turn has been handled,
 /// including its result
 #[derive(Event, Clone, Debug)]
@@ -114,8 +94,6 @@ pub struct IsLevelCompleted(pub bool);
 /// Rotates cycles in game state and sends out events to other systems
 fn cycle_group_rotation_system(
 	event: On<RotateCycleGroup>,
-	mut blocked_event: MessageWriter<TurnBlockedByGroupConflict>,
-	mut wall_hit_event: MessageWriter<TurnBlockedByWallHit>,
 	mut game_state: ResMut<GameState>,
 	mut entity_index: ResMut<GameStateEcsIndex>,
 	active_level: PlayingLevelData,
@@ -127,15 +105,6 @@ fn cycle_group_rotation_system(
 	match game_state.turn_cycle_with_links(level, target_cycle, rotate_by) {
 		Err(err) => warn!("Could not turn cycle: {err}"),
 		Ok(result) => {
-			for clash in &result.clashes {
-				blocked_event.write(TurnBlockedByGroupConflict(*clash));
-			}
-			for wall_hit in &result.wall_hits {
-				wall_hit_event.write(TurnBlockedByWallHit {
-					cycle: wall_hit.0,
-					wall: wall_hit.1,
-				});
-			}
 			// TODO: Events?
 			if !result.blocked() && result.layout_changed() {
 				commands.trigger(GameLayoutChanged);
@@ -176,7 +145,7 @@ fn button_trigger_check_system(
 	mut things_q: Query<&mut IsTriggered>,
 	level: PlayingLevelData,
 	game_state: Res<GameState>,
-	entity_index: Res<GameStateEcsIndex>,
+	entity_index: If<Res<GameStateEcsIndex>>,
 ) -> Result<(), BevyError> {
 	let level = level.get()?;
 	let vertices = entity_index

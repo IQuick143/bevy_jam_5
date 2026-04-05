@@ -23,6 +23,8 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_observer(marker_popdown_system)
 		.add_observer(button_trigger_animation_system)
 		.add_observer(cycle_center_turnability_visuals_update_system)
+		.add_observer(cycle_blocked_marker_system)
+		.add_observer(wall_blocked_marker_system)
 		.add_systems(
 			Update,
 			(
@@ -33,11 +35,7 @@ pub(super) fn plugin(app: &mut App) {
 						.run_if(cycle_interaction_visuals_changed),
 				)
 					.in_set(AppSet::UpdateVisuals),
-				(
-					cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
-					wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
-					marker_despawn_system,
-				)
+				marker_despawn_system
 					.after(AppSet::GameLogic)
 					.before(AppSet::UpdateVisuals),
 			),
@@ -360,8 +358,8 @@ fn marker_despawn_system(
 }
 
 fn cycle_blocked_marker_system(
+	event: On<RotateCycleGroupWithResult>,
 	mut markers: BlockMarkerFactory,
-	mut events: MessageReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,
@@ -372,8 +370,8 @@ fn cycle_blocked_marker_system(
 	};
 
 	let mut marked_vertices = HashSet::<_>::default();
-	for event in events.read() {
-		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
+	for &clash in event.result.clashes.iter() {
+		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(clash) else {
 			log::error!("Incorrect level data!?");
 			return;
 		};
@@ -396,15 +394,15 @@ fn cycle_blocked_marker_system(
 }
 
 fn wall_blocked_marker_system(
+	event: On<RotateCycleGroupWithResult>,
 	mut markers: BlockMarkerFactory,
-	mut events: MessageReader<TurnBlockedByWallHit>,
 	walls_q: Query<&Transform, With<Wall>>,
 	entity_index: Res<GameStateEcsIndex>,
 ) {
-	for event in events.read() {
+	for &(cycle, wall) in event.result.wall_hits.iter() {
 		let Some(vertex_transform) = entity_index
 			.walls
-			.get(&(event.cycle, event.wall))
+			.get(&(cycle, wall))
 			.and_then(|entity| walls_q.get(*entity).ok())
 		else {
 			log::warn!("Nonexistent wall!");
