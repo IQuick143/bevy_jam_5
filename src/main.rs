@@ -11,6 +11,7 @@ mod epilang;
 pub mod explorer;
 mod game;
 mod graphics;
+mod input;
 mod persistent;
 #[cfg(feature = "playtest")]
 mod playtest;
@@ -85,6 +86,7 @@ impl Plugin for AppPlugin {
 		// Add other plugins.
 		app.add_plugins((
 			persistent::plugin,
+			input::plugin,
 			save::plugin,
 			drawing::plugin,
 			game::plugin,
