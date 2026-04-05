@@ -1,7 +1,6 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
 use super::{components::*, logic::TurnCycleResult, prelude::*};
-use crate::send_event;
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
@@ -12,7 +11,6 @@ pub fn plugin(app: &mut App) {
 			(
 				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
 				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
-				send_event(GameLayoutChanged),
 			),
 		)
 		.add_observer(cycle_group_rotation_system)
@@ -145,7 +143,7 @@ fn button_trigger_check_system(
 	mut things_q: Query<&mut IsTriggered>,
 	level: PlayingLevelData,
 	game_state: Res<GameState>,
-	entity_index: If<Res<GameStateEcsIndex>>,
+	entity_index: Res<GameStateEcsIndex>,
 ) -> Result<(), BevyError> {
 	let level = level.get()?;
 	let vertices = entity_index

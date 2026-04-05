@@ -21,7 +21,6 @@ use bevy::{
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_observer(marker_popdown_system)
-		.add_observer(button_trigger_animation_system)
 		.add_observer(cycle_center_turnability_visuals_update_system)
 		.add_observer(cycle_blocked_marker_system)
 		.add_observer(wall_blocked_marker_system)
@@ -35,7 +34,7 @@ pub(super) fn plugin(app: &mut App) {
 						.run_if(cycle_interaction_visuals_changed),
 				)
 					.in_set(AppSet::UpdateVisuals),
-				marker_despawn_system
+				(marker_despawn_system, button_trigger_animation_system)
 					.after(AppSet::GameLogic)
 					.before(AppSet::UpdateVisuals),
 			),
@@ -105,9 +104,8 @@ fn goal_unlock_animation_system(
 }
 
 fn button_trigger_animation_system(
-	_trigger: On<GameLayoutChanged>,
 	mut sprites_q: Query<&mut SpriteColorKey>,
-	buttons_q: Query<(&Children, &IsTriggered), (With<SokoButton>, Changed<IsTriggered>)>,
+	buttons_q: Query<(&Children, &IsTriggered), With<SokoButton>>,
 ) {
 	for (children, is_triggered) in &buttons_q {
 		let color_key = if is_triggered.0 {
