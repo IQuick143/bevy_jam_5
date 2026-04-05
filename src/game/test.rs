@@ -132,7 +132,7 @@ mod utils {
 		In(event): In<RotateCycleGroup>,
 		level: PlayingLevelData,
 		state: Res<GameState>,
-		mut events: MessageWriter<RotateCycleGroup>,
+		mut commands: Commands,
 	) {
 		let level = level.get().expect("Level data must exist");
 
@@ -140,7 +140,7 @@ mod utils {
 			.is_cycle_turnable(level, event.rotation.target_cycle)
 			.unwrap()
 		{
-			events.write(event);
+			commands.trigger(event);
 		}
 	}
 

@@ -40,7 +40,7 @@ pub(super) fn plugin(app: &mut App) {
 					.and(feedback_form_is_open),
 			),
 		)
-		// .add_observer(increment_move_counter)
+		.add_observer(increment_move_counter)
 		.add_observer(close_feedback_form)
 		.add_observer(do_action_after_close_form)
 		.add_observer(spawn_feedback_form)
@@ -54,7 +54,6 @@ pub(super) fn plugin(app: &mut App) {
 				synchronize_star_feedback,
 				synchronize_text_feedback,
 				update_submit_enable_disable,
-				increment_move_counter,
 				reset_move_counter.run_if(state_changed::<PlayingLevel>),
 			)
 				.run_if(in_state(Screen::Playing)),
@@ -506,14 +505,9 @@ fn update_submit_enable_disable(
 	}
 }
 
-fn increment_move_counter(
-	mut messages: MessageReader<RotateCycleGroup>,
-	mut move_count: ResMut<MoveCounter>,
-) {
-	for message in messages.read() {
-		if message.cause == RotationCause::Manual {
-			**move_count += 1;
-		}
+fn increment_move_counter(trigger: On<RotateCycleGroup>, mut move_count: ResMut<MoveCounter>) {
+	if trigger.cause == RotationCause::Manual {
+		**move_count += 1;
 	}
 }
 

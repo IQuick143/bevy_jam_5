@@ -95,7 +95,7 @@ fn cycle_inputs_system(
 	input: Res<CurrentAction>,
 	hovered_cycle: Res<HoveredCycle>,
 	cycles_q: Query<&Cycle>,
-	mut rot_events: MessageWriter<RotateCycleGroup>,
+	mut commands: Commands,
 ) {
 	let HoveredCycle(Some(hovered_cycle)) = *hovered_cycle else {
 		return;
@@ -115,7 +115,7 @@ fn cycle_inputs_system(
 			target_group: cycle.group_id,
 			amount: turn_direction as i64,
 		};
-		rot_events.write(RotateCycleGroup {
+		commands.trigger(RotateCycleGroup {
 			rotation,
 			cause: RotationCause::Manual,
 		});

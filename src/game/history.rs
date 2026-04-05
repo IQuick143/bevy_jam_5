@@ -13,14 +13,12 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(LevelInitialization, |mut history: ResMut<MoveHistory>| {
 			history.clear()
 		})
+		.add_observer(record_moves)
 		.add_systems(
 			Update,
-			(
-				record_moves.in_set(AppSet::PostGameLogic),
-				undo_moves
-					.after(AppSet::ExecuteInput)
-					.before(AppSet::PreGameLogic),
-			),
+			undo_moves
+				.after(AppSet::ExecuteInput)
+				.before(AppSet::PreGameLogic),
 		);
 }
 
@@ -107,26 +105,21 @@ impl AlterHistory {
 	}
 }
 
-fn record_moves(
-	mut history: ResMut<MoveHistory>,
-	mut events: MessageReader<RotateCycleGroupWithResult>,
-) {
-	// Zip the events, they should match eventually
-	for RotateCycleGroupWithResult { action, result } in events.read() {
-		if action.cause == RotationCause::Manual && !result.blocked() && result.objects_moved {
-			history.push(action.rotation);
-		}
+fn record_moves(event: On<RotateCycleGroupWithResult>, mut history: ResMut<MoveHistory>) {
+	let RotateCycleGroupWithResult { action, result } = &*event;
+	if action.cause == RotationCause::Manual && !result.blocked() && result.objects_moved {
+		history.push(action.rotation);
 	}
 }
 
 fn undo_moves(
 	mut events: MessageReader<AlterHistory>,
 	mut history: ResMut<MoveHistory>,
-	mut rotations: MessageWriter<RotateCycleGroup>,
+	mut commands: Commands,
 ) {
 	for alter in events.read() {
 		if let Some(rotation) = alter.execute(&mut history) {
-			rotations.write(RotateCycleGroup {
+			commands.trigger(RotateCycleGroup {
 				rotation,
 				cause: alter.to_rotation_cause(),
 			});

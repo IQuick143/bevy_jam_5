@@ -1,15 +1,12 @@
 //! One-off rotation animations of cycle centers
 
 use super::{TurnAnimationLength, animation_easing_function};
-use crate::{
-	AppSet,
-	game::{
-		components::GameStateEcsIndex,
-		drawing::CycleCenterVisualEntities,
-		logic_relay::RotateCycleGroupWithResult,
-		prelude::PlayingLevelData,
-		spawn::{LevelInitialization, LevelInitializationSet},
-	},
+use crate::game::{
+	components::GameStateEcsIndex,
+	drawing::CycleCenterVisualEntities,
+	logic_relay::RotateCycleGroupWithResult,
+	prelude::PlayingLevelData,
+	spawn::{LevelInitialization, LevelInitializationSet},
 };
 use bevy::prelude::*;
 
@@ -18,15 +15,8 @@ pub(super) fn plugin(app: &mut App) {
 		LevelInitialization,
 		init_cycle_jump_turn_animation.after(LevelInitializationSet::SpawnVisuals),
 	)
-	.add_systems(
-		Update,
-		(
-			jump_turn_animation_system,
-			cycle_turning_animation_system
-				.run_if(on_message::<RotateCycleGroupWithResult>)
-				.in_set(AppSet::UpdateVisuals),
-		),
-	);
+	.add_observer(cycle_turning_animation_system)
+	.add_systems(Update, jump_turn_animation_system);
 }
 
 /// A component that lets an entity rotate quickly
@@ -99,9 +89,9 @@ fn init_cycle_jump_turn_animation(
 const CYCLE_CENTER_ANIMATION_ANGLE: f32 = std::f32::consts::PI / 2.0;
 
 fn cycle_turning_animation_system(
+	event: On<RotateCycleGroupWithResult>,
 	cycles_q: Query<&CycleCenterVisualEntities>,
 	mut jump_q: Query<&mut JumpTurnAnimation>,
-	mut events: MessageReader<RotateCycleGroupWithResult>,
 	animation_time: Res<TurnAnimationLength>,
 	entity_index: Res<GameStateEcsIndex>,
 	level_data: PlayingLevelData,
@@ -114,40 +104,38 @@ fn cycle_turning_animation_system(
 		}
 	};
 
-	for event in events.read() {
-		for (group_id, &rotate_amount) in event.result.groups_turned_by.iter().enumerate() {
-			// Skip groups that did not turn at all
-			if rotate_amount == 0 {
-				continue;
-			}
-			// Get the group data
-			let Some(group) = level_data.groups.get(group_id) else {
-				warn!("Rotation target group is out of range");
+	for (group_id, &rotate_amount) in event.result.groups_turned_by.iter().enumerate() {
+		// Skip groups that did not turn at all
+		if rotate_amount == 0 {
+			continue;
+		}
+		// Get the group data
+		let Some(group) = level_data.groups.get(group_id) else {
+			warn!("Rotation target group is out of range");
+			continue;
+		};
+		for &(cycle_id, direction) in &group.cycles {
+			// Get the animation component of the center sprite for each cycle
+			let Some(target_cycle) = entity_index.cycles.get(cycle_id) else {
+				warn!("Rotation target cycle is out of range");
 				continue;
 			};
-			for &(cycle_id, direction) in &group.cycles {
-				// Get the animation component of the center sprite for each cycle
-				let Some(target_cycle) = entity_index.cycles.get(cycle_id) else {
-					warn!("Rotation target cycle is out of range");
-					continue;
-				};
-				let Ok(visuals) = cycles_q.get(*target_cycle) else {
-					// Can happen with a cycle that does not have a visible center
-					continue;
-				};
-				let Ok(mut animation) = jump_q.get_mut(visuals.sprite) else {
-					warn!("Cycle center sprite does not have JumpTurnAnimation component");
-					continue;
-				};
-				// Start a new jump animation for all affected cycles
-				let direction_multiplier = -(direction * rotate_amount).signum() as f32;
-				animation.make_jump(
-					direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
-					**animation_time,
-				);
-				// If the turn failed, set the animation to bounce back
-				animation.bounce_midway = event.result.blocked();
-			}
+			let Ok(visuals) = cycles_q.get(*target_cycle) else {
+				// Can happen with a cycle that does not have a visible center
+				continue;
+			};
+			let Ok(mut animation) = jump_q.get_mut(visuals.sprite) else {
+				warn!("Cycle center sprite does not have JumpTurnAnimation component");
+				continue;
+			};
+			// Start a new jump animation for all affected cycles
+			let direction_multiplier = -(direction * rotate_amount).signum() as f32;
+			animation.make_jump(
+				direction_multiplier * CYCLE_CENTER_ANIMATION_ANGLE,
+				**animation_time,
+			);
+			// If the turn failed, set the animation to bounce back
+			animation.bounce_midway = event.result.blocked();
 		}
 	}
 }

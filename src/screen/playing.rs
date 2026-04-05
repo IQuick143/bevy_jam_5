@@ -564,6 +564,6 @@ fn process_game_ui_actions(
 			}
 			writer.write(GameUiAction::NextLevel);
 		}
-		_ => return,
+		_ => (),
 	}
 }

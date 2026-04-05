@@ -20,7 +20,7 @@ use bevy::{
 };
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
+	app.add_observer(marker_popdown_system).add_systems(
 		Update,
 		(
 			(
@@ -39,10 +39,6 @@ pub(super) fn plugin(app: &mut App) {
 			(
 				cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
 				wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
-				marker_popdown_system
-					.run_if(on_message::<RotateCycleGroup>)
-					.before(cycle_blocked_marker_system)
-					.before(wall_blocked_marker_system),
 				marker_despawn_system,
 			)
 				.after(AppSet::GameLogic)
@@ -343,7 +339,10 @@ impl BlockMarkerFactory<'_, '_> {
 }
 
 /// Hides entities with [`TemporaryMarker`] during the start of a turn.
-fn marker_popdown_system(mut query: Query<&mut PopupAnimation, With<TemporaryMarker>>) {
+fn marker_popdown_system(
+	_trigger: On<RotateCycleGroupWithResult>,
+	mut query: Query<&mut PopupAnimation, With<TemporaryMarker>>,
+) {
 	for mut animation in &mut query {
 		animation.set_reversed(true);
 	}
