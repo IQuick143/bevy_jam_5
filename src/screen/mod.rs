@@ -9,7 +9,7 @@ mod splash;
 mod title;
 
 use crate::{AppSet, input::prelude::*, ui::prelude::*};
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::prelude::*;
 
 #[allow(unused_imports)]
 pub use playing::{GotoNextLevel, LoadLevel, PlayingLevel, PlayingLevelListEntry};

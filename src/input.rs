@@ -98,7 +98,7 @@ impl Default for KeyBindings {
 			Binding {
 				hard_coded_bind: false,
 				action,
-				inputs: binds.iter().cloned().collect(),
+				inputs: binds.to_vec(),
 			}
 		}
 		#[inline]
@@ -106,7 +106,7 @@ impl Default for KeyBindings {
 			Binding {
 				hard_coded_bind: true,
 				action,
-				inputs: binds.iter().cloned().collect(),
+				inputs: binds.to_vec(),
 			}
 		}
 		let a_key: Key = Key::Character("a".into());

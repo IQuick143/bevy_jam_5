@@ -10,7 +10,7 @@ use crate::{
 	send_event,
 	ui::{consts::*, interaction::InteractionQuery, scrollbox::Scrollbox, widgets},
 };
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_systems(OnEnter(Screen::PlaytestInformation), spawn_statement_screen)

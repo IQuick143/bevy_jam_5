@@ -14,7 +14,7 @@ use crate::{
 	screen::{DoScreenTransition, DoScreenTransitionCommands as _, LoadLevel, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
 };
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::prelude::*;
 use bevy_ui_text_input::TextInputContents;
 
 pub(super) fn plugin(app: &mut App) {
