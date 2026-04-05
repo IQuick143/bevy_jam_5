@@ -1,9 +1,10 @@
 //! Quick palette editing for developers
 
+use super::input_just_pressed;
 use crate::{
 	AppSet,
 	drawing::{ColorKey, NodeColorKey, ThingPalette},
-	ui::{char_input_pressed, interaction::InteractionQuery, slider::Slider},
+	ui::{interaction::InteractionQuery, slider::Slider},
 };
 use bevy::prelude::*;
 
@@ -15,7 +16,7 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				toggle_color_picker_display.run_if(char_input_pressed('c')),
+				toggle_color_picker_display.run_if(input_just_pressed(KeyCode::KeyC)),
 				collect_picker_button_inputs.in_set(AppSet::RecordInput),
 				(handle_picker_button_inputs, handle_picker_slider_inputs)
 					.in_set(AppSet::ExecuteInput),
