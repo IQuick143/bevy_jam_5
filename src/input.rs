@@ -1,24 +1,29 @@
+use crate::AppSet;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::system::{RunSystemError, RunSystemOnce};
 use bevy::input::keyboard::Key;
 use bevy::prelude::*;
 
+pub mod prelude {
+	pub use super::{CurrentAction, InputAction, ProcessInputs};
+}
+
 pub fn plugin(app: &mut App) {
 	app.init_schedule(ProcessInputs)
 		.init_resource::<KeyBindings>()
 		.init_resource::<CurrentAction>()
-		.add_systems(Update, process_inputs);
+		.add_systems(Update, process_inputs.in_set(AppSet::ExecuteInput));
 }
 
 #[derive(ScheduleLabel, Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct ProcessInputs;
 
 /// Resource describing the action that should be currently processed by the [`ProcessInputs`] schedule.
-#[derive(Resource, Default, Clone, Copy)]
-pub struct CurrentAction(Option<InputAction>);
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CurrentAction(pub Option<InputAction>);
 
 // TODO: Impl format
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum InputAction {
 	Click,
 	Turn(i8),
@@ -31,7 +36,7 @@ pub enum InputAction {
 	NextLevel,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
 	Up,
 	Down,

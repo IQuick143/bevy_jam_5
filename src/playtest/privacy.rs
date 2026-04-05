@@ -5,39 +5,37 @@ use crate::{
 	AppSet,
 	assets::{GlobalFont, UiButtonAtlas, all_assets_loaded},
 	drawing::{ColorKey, TextColorKey},
+	input::prelude::*,
 	screen::{DoScreenTransitionCommands as _, Screen},
-	send_message,
+	send_event,
 	ui::{consts::*, interaction::InteractionQuery, scrollbox::Scrollbox, widgets},
 };
 use bevy::{input::common_conditions::input_just_pressed, prelude::*};
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_message::<ExitInfoScreen>()
-		.add_systems(OnEnter(Screen::PlaytestInformation), spawn_statement_screen)
+	app.add_systems(OnEnter(Screen::PlaytestInformation), spawn_statement_screen)
+		.add_systems(
+			ProcessInputs,
+			// Enable quitting via escape only after
+			// the tester has properly clicked through once
+			send_event(ExitInfoScreen).run_if(
+				has_seen_privacy_statement
+					.and(resource_equals(CurrentAction(Some(InputAction::GoBack)))),
+			),
+		)
+		.add_observer(exit_privacy_screen)
 		.add_systems(
 			Update,
 			(
 				proceed_to_entry_screen.run_if(in_state(Screen::Loading).and(all_assets_loaded)),
-				(
-					(
-						record_button_inputs,
-						// Enable quitting via escape only after
-						// the tester has properly clicked through once
-						send_message(ExitInfoScreen).run_if(
-							has_seen_privacy_statement.and(input_just_pressed(KeyCode::Escape)),
-						),
-					)
-						.in_set(AppSet::RecordInput),
-					exit_privacy_screen
-						.run_if(on_message::<ExitInfoScreen>)
-						.in_set(AppSet::ExecuteInput),
-				)
+				record_button_inputs
+					.in_set(AppSet::RecordInput)
 					.run_if(in_state(Screen::PlaytestInformation)),
 			),
 		);
 }
 
-#[derive(Component, Message, Clone, Copy, Debug)]
+#[derive(Component, Event, Clone, Copy, Debug)]
 struct ExitInfoScreen;
 
 /// Replacement system for leaving the loading screen.
@@ -133,18 +131,23 @@ fn spawn_statement_screen(
 	));
 }
 
-fn record_button_inputs(
-	query: InteractionQuery<&ExitInfoScreen>,
-	mut messages: MessageWriter<ExitInfoScreen>,
-) {
+fn record_button_inputs(query: InteractionQuery<&ExitInfoScreen>, mut commands: Commands) {
 	for (interaction, enabled, action) in &query {
 		if enabled.is_none_or(|x| **x) && *interaction == Interaction::Pressed {
-			messages.write(*action);
+			commands.trigger(*action);
 		}
 	}
 }
 
-fn exit_privacy_screen(mut commands: Commands, mut playtest: ResMut<PlaytestLog>) {
+fn exit_privacy_screen(
+	_trigger: On<ExitInfoScreen>,
+	mut commands: Commands,
+	screen: Res<State<Screen>>,
+	mut playtest: ResMut<PlaytestLog>,
+) {
+	if *screen != Screen::PlaytestInformation {
+		return;
+	}
 	if !playtest.has_ackd_privacy_statement {
 		// Mark it as seen, so it does not pop up the next time
 		playtest.has_ackd_privacy_statement = true;

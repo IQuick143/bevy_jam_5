@@ -10,6 +10,7 @@ use crate::{
 	assets::{GlobalFont, HandleMap, ImageKey, UiButtonAtlas},
 	drawing::{ColorKey, NodeColorKey, TextColorKey},
 	game::spawn::EnterLevelStage,
+	input::prelude::*,
 	screen::{DoScreenTransition, DoScreenTransitionCommands as _, LoadLevel, Screen},
 	ui::{consts::*, prelude::*, scrollbox::Scrollbox, widgets},
 };
@@ -22,6 +23,14 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(Startup, spawn_feedback_form_navigation_button)
 		.add_systems(OnEnter(Screen::Playtest), spawn_feedback_form_screen)
 		.add_systems(
+			ProcessInputs,
+			exit_feedback_screen.run_if(
+				resource_equals(CurrentAction(Some(InputAction::GoBack)))
+					.and(ui_not_frozen)
+					.and(in_state(Screen::Playtest)),
+			),
+		)
+		.add_systems(
 			Update,
 			(
 				update_feedback_form_button_visibility.run_if(state_changed::<Screen>),
@@ -32,11 +41,7 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				(
-					(
-						exit_feedback_screen.run_if(input_just_pressed(KeyCode::Escape)),
-						read_feedback_screen_input,
-					)
-						.run_if(ui_not_frozen),
+					read_feedback_screen_input.run_if(ui_not_frozen),
 					synchronize_text_feedback,
 				)
 					.in_set(AppSet::RecordInput),
