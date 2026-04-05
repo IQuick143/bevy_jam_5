@@ -46,7 +46,7 @@ fn cycle_hover_system(
 		return;
 	};
 
-	let (nearest_cycle, _, _, _) = cycles_q
+	let (nearest_cycle, _, _, is_turnable) = cycles_q
 		.iter()
 		.filter_map(|(e, placement, transform, turnability, _)| {
 			let is_turnable = turnability.0;
@@ -77,7 +77,11 @@ fn cycle_hover_system(
 			},
 		);
 
-	hovered_cycle.set_if_neq(HoveredCycle(nearest_cycle));
+	if is_turnable {
+		hovered_cycle.set_if_neq(HoveredCycle(nearest_cycle));
+	} else {
+		hovered_cycle.set_if_neq(HoveredCycle(None));
+	}
 
 	// Now that we have found the cycle to interact with, commit all of them
 	// Use checked assignment, we do not want to flood the systems
