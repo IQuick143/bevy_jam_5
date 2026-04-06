@@ -5,13 +5,14 @@ use bevy::input::keyboard::Key;
 use bevy::prelude::*;
 
 pub mod prelude {
-	pub use super::{CurrentAction, InputAction, ProcessInputs};
+	pub use super::{CurrentAction, InputAction, PressedActions, ProcessInputs};
 }
 
 pub fn plugin(app: &mut App) {
 	app.init_schedule(ProcessInputs)
 		.init_resource::<KeyBindings>()
 		.init_resource::<CurrentAction>()
+		.init_resource::<PressedActions>()
 		.add_systems(Update, process_inputs.in_set(AppSet::ExecuteInput));
 }
 
@@ -22,21 +23,32 @@ pub struct ProcessInputs;
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CurrentAction(pub Option<InputAction>);
 
-// TODO: Impl format
-#[derive(Clone, Copy, PartialEq, Eq)]
+/// Resource describing the actions that are currently held.
+#[derive(Resource, Default, Clone, PartialEq, Eq)]
+pub struct PressedActions(pub Vec<InputAction>);
+
+// TODO: Impl `Display`
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InputAction {
 	Click,
+	/// Zoom camera
+	Zoom(i8),
+	/// Turn a cycle, amount is clamped to +-1
 	Turn(i8),
+	/// Directional input, navigate menus (TODO) or move camera
 	Direction(Direction),
 	Confirm,
+	/// Go back, return to previous screen, close (cancel) a menu
 	GoBack,
 	Undo,
 	Redo,
 	Reset,
 	NextLevel,
+	/// Switch from one player cycle to the next adjacent one (TODO)
+	Swap,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
 	Up,
 	Down,
@@ -73,14 +85,13 @@ impl KeyBindings {
 		for binding in self.bindings.iter() {
 			for input in binding.inputs.iter() {
 				if match input {
-					InputKey::Mouse(mouse_key) => mouse.just_pressed(*mouse_key),
+					InputKey::Mouse(mouse_key) => mouse.pressed(*mouse_key),
 					InputKey::Keyboard(key) => match key {
 						Key::Character(character) => {
-							keyboard.just_pressed(Key::Character(character.to_lowercase().into()))
-								|| keyboard
-									.just_pressed(Key::Character(character.to_uppercase().into()))
+							keyboard.pressed(Key::Character(character.to_lowercase().into()))
+								|| keyboard.pressed(Key::Character(character.to_uppercase().into()))
 						}
-						key => keyboard.just_pressed(key.clone()),
+						key => keyboard.pressed(key.clone()),
 					},
 				} {
 					actions.push(binding.action);
@@ -112,9 +123,12 @@ impl Default for KeyBindings {
 		let a_key: Key = Key::Character("a".into());
 		let d_key: Key = Key::Character("d".into());
 		let n_key: Key = Key::Character("n".into());
+		let p_key: Key = Key::Character("p".into());
 		let r_key: Key = Key::Character("r".into());
 		let y_key: Key = Key::Character("y".into());
 		let z_key: Key = Key::Character("z".into());
+		let plus_key: Key = Key::Character("+".into());
+		let minus_key: Key = Key::Character("-".into());
 		const U: InputAction = InputAction::Direction(super::input::Direction::Up);
 		const D: InputAction = InputAction::Direction(super::input::Direction::Down);
 		const L: InputAction = InputAction::Direction(super::input::Direction::Left);
@@ -133,6 +147,9 @@ impl Default for KeyBindings {
 				bind_hard(R,		&[Keyboard(Key::ArrowRight)]),
 				bind_hard(Confirm,	&[Keyboard(Key::Enter)]),
 				bind_hard(GoBack,	&[Keyboard(Key::Escape), Mouse(MouseButton::Back)]),
+				bind(Zoom(-1),		&[Keyboard(minus_key)]),
+				bind(Zoom( 1),		&[Keyboard(plus_key)]),
+				bind(Swap,			&[Keyboard(p_key)]),
 				bind(Undo,			&[Keyboard(z_key)]),
 				bind(Redo,			&[Keyboard(y_key)]),
 				bind(Reset,			&[Keyboard(r_key)]),
@@ -160,8 +177,19 @@ fn parse_inputs(
 }
 
 fn process_inputs(world: &mut World) -> Result<(), RunSystemError> {
-	let actions = world.run_system_once(parse_inputs)?;
-	for action in actions.into_iter() {
+	let actions: Vec<InputAction> = world.run_system_once(parse_inputs)?;
+	let just_pressed_actions = world.resource_scope(
+		|_world: &mut World, mut active_actions: Mut<PressedActions>| {
+			let new_actions: Vec<InputAction> = actions
+				.iter()
+				.filter(|x| !active_actions.0.contains(x))
+				.copied()
+				.collect();
+			active_actions.0 = actions;
+			new_actions
+		},
+	);
+	for action in just_pressed_actions.into_iter() {
 		world.insert_resource(CurrentAction(Some(action)));
 		world.run_schedule(ProcessInputs);
 	}
