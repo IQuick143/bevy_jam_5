@@ -64,6 +64,7 @@ pub enum InputKey {
 }
 
 pub struct Binding {
+	#[expect(unused, reason = "This will be relevant when we do rebinding.")]
 	/// Whether the first binding is hardcoded
 	hard_coded_bind: bool,
 	action: InputAction,
