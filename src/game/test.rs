@@ -207,16 +207,11 @@ mod utils {
 	}
 }
 
-use bevy::ecs::system::RunSystemOnce;
+use super::level::ObjectData;
 use bevy::prelude::*;
 use itertools::Itertools;
 use rand::{Rng, SeedableRng};
 use utils::*;
-
-use crate::game::{
-	components::GameStateEcsIndex, history::AlterHistory, inputs::CycleInteraction,
-	level::ObjectData,
-};
 
 /// Metatest for asserting that running the headless game works.
 #[test]
