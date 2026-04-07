@@ -19,10 +19,10 @@ pub(super) fn plugin(app: &mut App) {
 		LevelInitialization,
 		init_thing_animation.after(LevelInitializationSet::SpawnPrimaryEntities),
 	)
+	.add_observer(listen_for_moves)
 	.add_systems(
 		Update,
-		(listen_for_moves, move_objects)
-			.chain()
+		move_objects
 			.in_set(AppSet::UpdateVisuals)
 			.run_if(in_state(Screen::Playing)),
 	);
@@ -280,7 +280,7 @@ impl AnimationPathSegmentMeasurements {
 }
 
 fn listen_for_moves(
-	mut rotation_events: MessageReader<RotateCycleGroupWithResult>,
+	event: On<RotateCycleGroupWithResult>,
 	mut objects: Query<(&mut Transform, Option<&mut PathAnimation>), With<Object>>,
 	active_level: PlayingLevelData,
 	entity_index: Res<GameStateEcsIndex>,
@@ -292,33 +292,31 @@ fn listen_for_moves(
 			return;
 		}
 	};
-	for event in rotation_events.read() {
-		// Maps vertices that have been affected to the path segments taken by the objects on them
-		let vertex_paths = event.result.get_vertex_paths(level_data);
+	// Maps vertices that have been affected to the path segments taken by the objects on them
+	let vertex_paths = event.result.get_vertex_paths(level_data);
 
-		let moved_objects = entity_index
-			.objects
-			.iter()
-			.zip(vertex_paths)
-			.filter_map(|(i, p)| i.and_then(|i| p.map(|p| (i, p))));
-		for (object_id, path) in moved_objects {
-			let Ok((mut transform, animation)) = objects.get_mut(object_id) else {
-				warn!("Object referenced by entity index not found in ECS");
-				continue;
-			};
-			let end_position = path.end_position(level_data);
-			if let Some(mut animation) = animation {
-				animation.add_segment(path, end_position, true);
-				// If the move got blocked, play the animation back without splicing
-				if event.result.blocked() {
-					let start_position = path.start_position(level_data);
-					animation.add_segment(path.reverse(), start_position, false);
-				}
-			} else if !event.result.blocked() {
-				// Object is not animated, so we just set the translation to the desired place.
-				transform.translation.x = end_position.x;
-				transform.translation.y = end_position.y;
+	let moved_objects = entity_index
+		.objects
+		.iter()
+		.zip(vertex_paths)
+		.filter_map(|(i, p)| i.and_then(|i| p.map(|p| (i, p))));
+	for (object_id, path) in moved_objects {
+		let Ok((mut transform, animation)) = objects.get_mut(object_id) else {
+			warn!("Object referenced by entity index not found in ECS");
+			continue;
+		};
+		let end_position = path.end_position(level_data);
+		if let Some(mut animation) = animation {
+			animation.add_segment(path, end_position, true);
+			// If the move got blocked, play the animation back without splicing
+			if event.result.blocked() {
+				let start_position = path.start_position(level_data);
+				animation.add_segment(path.reverse(), start_position, false);
 			}
+		} else if !event.result.blocked() {
+			// Object is not animated, so we just set the translation to the desired place.
+			transform.translation.x = end_position.x;
+			transform.translation.y = end_position.y;
 		}
 	}
 }

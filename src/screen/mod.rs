@@ -8,8 +8,8 @@ mod settings;
 mod splash;
 mod title;
 
-use crate::{AppSet, ui::prelude::*};
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use crate::{AppSet, input::prelude::*, ui::prelude::*};
+use bevy::prelude::*;
 
 #[allow(unused_imports)]
 pub use playing::{GotoNextLevel, LoadLevel, PlayingLevel, PlayingLevelListEntry};
@@ -29,12 +29,12 @@ pub(super) fn plugin(app: &mut App) {
 	));
 
 	app.add_systems(
-		Update,
-		(
-			go_to_return_screen.run_if(input_just_pressed(KeyCode::Escape).and(ui_not_frozen)),
-			do_screen_transitions.in_set(AppSet::SwitchState),
-		),
+		ProcessInputs,
+		go_to_return_screen
+			.run_if(resource_equals(CurrentAction(Some(InputAction::GoBack))).and(ui_not_frozen)),
 	);
+
+	app.add_systems(Update, do_screen_transitions.in_set(AppSet::SwitchState));
 }
 
 /// Message that instantly causes a screen transition when sent.

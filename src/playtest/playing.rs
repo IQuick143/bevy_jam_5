@@ -13,12 +13,13 @@ use crate::{
 		level::LevelData,
 		logic_relay::{RotateCycleGroup, RotationCause},
 	},
+	input::prelude::*,
 	save::SaveGame,
 	screen::{
 		DoScreenTransition, DoScreenTransitionCommands, GotoNextLevel, PlayingLevel,
 		PlayingLevelListEntry, Screen,
 	},
-	send_message,
+	send_event,
 	ui::{
 		consts::*,
 		hover::{self, *},
@@ -26,39 +27,36 @@ use crate::{
 		prelude::*,
 	},
 };
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::prelude::*;
 use bevy_ui_text_input::TextInputContents;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_message::<OpenFeedbackForm>()
-		.add_message::<ExitFeedbackForm>()
-		.init_resource::<MoveCounter>()
+	app.init_resource::<MoveCounter>()
 		.add_systems(OnEnter(Screen::Playing), spawn_playtest_playing_ui)
+		.add_systems(
+			ProcessInputs,
+			send_event(ExitFeedbackForm(AfterExitFeedbackForm::Stay)).run_if(
+				resource_equals(CurrentAction(Some(InputAction::GoBack)))
+					.and(feedback_form_is_open),
+			),
+		)
+		.add_observer(increment_move_counter)
+		.add_observer(close_feedback_form)
+		.add_observer(do_action_after_close_form)
+		.add_observer(spawn_feedback_form)
 		.add_systems(
 			Update,
 			(
 				(
-					(
-						record_playing_screen_input,
-						send_message(ExitFeedbackForm(AfterExitFeedbackForm::Stay))
-							.run_if(input_just_pressed(KeyCode::Escape).and(feedback_form_is_open)),
-					)
-						.in_set(AppSet::RecordInput),
-					(
-						spawn_feedback_form.run_if(on_message::<OpenFeedbackForm>),
-						(close_feedback_form, do_action_after_close_form)
-							.run_if(on_message::<ExitFeedbackForm>),
-					)
-						.in_set(AppSet::ExecuteInput),
-					intercept_exit_from_level
-						.after(AppSet::ExecuteInput)
-						.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
+					record_playing_screen_input.in_set(AppSet::RecordInput),
 					synchronize_star_feedback,
 					synchronize_text_feedback,
 					update_submit_enable_disable,
-					increment_move_counter.run_if(on_message::<RotateCycleGroup>),
 				)
 					.run_if(in_state(Screen::Playing)),
+				intercept_exit_from_level
+					.after(AppSet::ExecuteInput)
+					.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
 				reset_move_counter.run_if(state_changed::<PlayingLevel>),
 			),
 		);
@@ -68,10 +66,10 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct FeedbackForm;
 
-#[derive(Component, Message, Clone, Copy, Debug, Default)]
+#[derive(Component, Event, Clone, Copy, Debug, Default)]
 struct OpenFeedbackForm(AfterExitFeedbackForm);
 
-#[derive(Component, Message, Clone, Copy, Debug, Default)]
+#[derive(Component, Event, Clone, Copy, Debug, Default)]
 struct ExitFeedbackForm(AfterExitFeedbackForm);
 
 /// Action to take after the tester completes the feedback form
@@ -147,7 +145,7 @@ fn spawn_playtest_playing_ui(mut commands: Commands, image_handles: Res<HandleMa
 }
 
 fn spawn_feedback_form(
-	mut messages: MessageReader<OpenFeedbackForm>,
+	trigger: On<OpenFeedbackForm>,
 	mut commands: Commands,
 	playing_level: PlayingLevelListEntry,
 	playtest_log: Res<PlaytestLog>,
@@ -160,9 +158,7 @@ fn spawn_feedback_form(
 		return Err("Attempting to open feedback form when one is already open".into());
 	}
 
-	let Some(&OpenFeedbackForm(after_close)) = messages.read().last() else {
-		return Ok(());
-	};
+	let OpenFeedbackForm(after_close) = *trigger;
 
 	let level_key = &playing_level.get()?.identifier;
 	let level_data = playtest_log.get_level(level_key);
@@ -318,7 +314,11 @@ fn feedback_form_is_open(query: Query<(), With<FeedbackForm>>) -> bool {
 	!query.is_empty()
 }
 
-fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<FeedbackForm>>) {
+fn close_feedback_form(
+	_trigger: On<ExitFeedbackForm>,
+	mut commands: Commands,
+	query: Query<Entity, With<FeedbackForm>>,
+) {
 	for id in &query {
 		commands.entity(id).despawn();
 	}
@@ -327,17 +327,13 @@ fn close_feedback_form(mut commands: Commands, query: Query<Entity, With<Feedbac
 /// This system resubmits the transition thas was intercepted
 /// by [`intercept_exit_from_level`] once the feedback form
 /// is closed
-fn do_action_after_close_form(
-	mut messages: MessageReader<ExitFeedbackForm>,
-	mut commands: Commands,
-) {
-	let Some(ExitFeedbackForm(action)) = messages.read().last() else {
-		return;
-	};
+fn do_action_after_close_form(trigger: On<ExitFeedbackForm>, mut commands: Commands) {
+	let ExitFeedbackForm(action) = *trigger;
+
 	match action {
 		AfterExitFeedbackForm::Stay => {}
 		AfterExitFeedbackForm::ChangeScreen(screen) => {
-			commands.do_screen_transition(*screen);
+			commands.do_screen_transition(screen);
 		}
 		AfterExitFeedbackForm::NextLevel => {
 			commands.spawn((FadeAnimationBundle::default(), GotoNextLevel));
@@ -347,23 +343,22 @@ fn do_action_after_close_form(
 
 fn record_playing_screen_input(
 	query: InteractionQuery<AnyOf<(&OpenFeedbackForm, &ExitFeedbackForm)>>,
-	mut open_events: MessageWriter<OpenFeedbackForm>,
-	mut close_events: MessageWriter<ExitFeedbackForm>,
+	mut commands: Commands,
 	existing_form: Query<(), With<FeedbackForm>>,
 ) {
 	for (interaction, enabled, (open, close)) in &query {
 		if enabled.is_none_or(|e| **e) && *interaction == Interaction::Pressed {
 			if let Some(e) = open {
 				if existing_form.is_empty() {
-					open_events.write(*e);
+					commands.trigger(*e);
 				} else {
 					// If a form is already open, close it when the tester
 					// clicks the button instead
-					close_events.write(ExitFeedbackForm(AfterExitFeedbackForm::Stay));
+					commands.trigger(ExitFeedbackForm(AfterExitFeedbackForm::Stay));
 				}
 			}
 			if let Some(e) = close {
-				close_events.write(*e);
+				commands.trigger(*e);
 			}
 		}
 	}
@@ -384,7 +379,6 @@ fn intercept_exit_from_level(
 		AnyOf<(&DoScreenTransition, &GotoNextLevel)>,
 	)>,
 	mut commands: Commands,
-	mut messgaes: MessageWriter<OpenFeedbackForm>,
 ) {
 	for (id, animation, (next_screen, _)) in &query {
 		// This means we are entering the level, so we should let it finish on its own
@@ -404,7 +398,7 @@ fn intercept_exit_from_level(
 		// Cancel the transition by despawning it
 		commands.entity(id).despawn();
 		// Open the form before letting the player proceed
-		messgaes.write(OpenFeedbackForm(after_close));
+		commands.trigger(OpenFeedbackForm(after_close));
 	}
 }
 
@@ -513,14 +507,9 @@ fn update_submit_enable_disable(
 	}
 }
 
-fn increment_move_counter(
-	mut messages: MessageReader<RotateCycleGroup>,
-	mut move_count: ResMut<MoveCounter>,
-) {
-	for message in messages.read() {
-		if message.cause == RotationCause::Manual {
-			**move_count += 1;
-		}
+fn increment_move_counter(trigger: On<RotateCycleGroup>, mut move_count: ResMut<MoveCounter>) {
+	if trigger.cause == RotationCause::Manual {
+		**move_count += 1;
 	}
 }
 

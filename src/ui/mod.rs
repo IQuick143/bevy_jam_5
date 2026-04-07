@@ -14,7 +14,6 @@ pub mod widgets;
 #[allow(unused_imports)]
 pub mod prelude {
 	pub use super::{
-		char_input_pressed,
 		freeze::{FreezeUi, IsUiFrozen, ui_not_frozen},
 		interaction::{InteractionPalette, InteractionQuery},
 		screen_fade::{AddFadeMessage as _, FadeAnimation, FadeAnimationBundle},
@@ -22,20 +21,7 @@ pub mod prelude {
 	};
 }
 
-use bevy::{
-	input::keyboard::{Key, KeyboardInput},
-	prelude::*,
-};
-
-pub fn char_input_pressed(c: char) -> impl Fn(MessageReader<KeyboardInput>) -> bool {
-	let key = Key::Character(String::from(c).into());
-	move |mut events| {
-		events
-			.read()
-			.last()
-			.is_some_and(|input| input.state.is_pressed() && input.logical_key == key)
-	}
-}
+use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((

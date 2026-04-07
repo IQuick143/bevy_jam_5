@@ -11,6 +11,7 @@ mod epilang;
 pub mod explorer;
 mod game;
 mod graphics;
+mod input;
 mod persistent;
 #[cfg(feature = "playtest")]
 mod playtest;
@@ -85,6 +86,7 @@ impl Plugin for AppPlugin {
 		// Add other plugins.
 		app.add_plugins((
 			persistent::plugin,
+			input::plugin,
 			save::plugin,
 			drawing::plugin,
 			game::plugin,
@@ -136,6 +138,17 @@ enum AppSet {
 fn send_message<E: Message + Clone>(message: E) -> impl Fn(MessageWriter<E>) {
 	move |mut messages| {
 		messages.write(message.clone());
+	}
+}
+
+/// System that triggers an event every time it runs.
+/// Use together with input-based run conditions to send input events
+fn send_event<E: Event + Clone>(event: E) -> impl Fn(Commands)
+where
+	for<'a> E::Trigger<'a>: Default,
+{
+	move |mut commands| {
+		commands.trigger(event.clone());
 	}
 }
 

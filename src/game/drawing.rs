@@ -1,7 +1,7 @@
 use super::{
 	animation::{PopupAnimation, TurnAnimationLength},
 	components::*,
-	inputs::CycleInteraction,
+	inputs::HoveredCycle,
 	logic_relay::*,
 	prelude::*,
 	spawn::LastLevelSessionId,
@@ -11,7 +11,7 @@ use crate::{
 	assets::{HandleMap, ImageKey},
 	drawing::*,
 	graphics::*,
-	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority},
+	ui::hover::{self, HoverHint, HoverHintBoundingRect, HoverPriority, IsHovered},
 };
 use bevy::{
 	ecs::system::SystemParam,
@@ -20,35 +20,25 @@ use bevy::{
 };
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
+	app.add_observer(marker_popdown_system)
+		.add_observer(cycle_center_turnability_visuals_update_system)
+		.add_observer(cycle_blocked_marker_system)
+		.add_observer(wall_blocked_marker_system)
+		.add_systems(
+			Update,
 			(
-				goal_unlock_animation_system
-					.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
 				(
-					button_trigger_animation_system,
-					cycle_center_turnability_visuals_update_system
-						.before(cycle_center_interaction_visuals_update_system),
+					goal_unlock_animation_system
+						.run_if(resource_exists_and_changed::<LevelCompletionConditions>),
+					cycle_center_interaction_visuals_update_system
+						.run_if(cycle_interaction_visuals_changed),
 				)
-					.run_if(on_message::<GameLayoutChanged>),
-				cycle_center_interaction_visuals_update_system
-					.run_if(cycle_interaction_visuals_changed),
-			)
-				.in_set(AppSet::UpdateVisuals),
-			(
-				cycle_blocked_marker_system.run_if(on_message::<TurnBlockedByGroupConflict>),
-				wall_blocked_marker_system.run_if(on_message::<TurnBlockedByWallHit>),
-				marker_popdown_system
-					.run_if(on_message::<RotateCycleGroup>)
-					.before(cycle_blocked_marker_system)
-					.before(wall_blocked_marker_system),
-				marker_despawn_system,
-			)
-				.after(AppSet::GameLogic)
-				.before(AppSet::UpdateVisuals),
-		),
-	);
+					.in_set(AppSet::UpdateVisuals),
+				(marker_despawn_system, button_trigger_animation_system)
+					.after(AppSet::GameLogic)
+					.before(AppSet::UpdateVisuals),
+			),
+		);
 }
 
 /// References to entities that make up the visualization of a cycle's ring
@@ -115,7 +105,7 @@ fn goal_unlock_animation_system(
 
 fn button_trigger_animation_system(
 	mut sprites_q: Query<&mut SpriteColorKey>,
-	buttons_q: Query<(&Children, &IsTriggered), (With<SokoButton>, Changed<IsTriggered>)>,
+	buttons_q: Query<(&Children, &IsTriggered), With<SokoButton>>,
 ) {
 	for (children, is_triggered) in &buttons_q {
 		let color_key = if is_triggered.0 {
@@ -133,6 +123,7 @@ fn button_trigger_animation_system(
 }
 
 fn cycle_center_turnability_visuals_update_system(
+	_trigger: On<GameLayoutChanged>,
 	cycles_q: Query<(&ComputedCycleTurnability, &CycleCenterVisualEntities)>,
 	mut arrows_q: Query<&mut Visibility>,
 ) {
@@ -150,14 +141,15 @@ fn cycle_center_turnability_visuals_update_system(
 }
 
 fn cycle_interaction_visuals_changed(
-	query: Query<(), Or<(Changed<CycleInteraction>, Changed<ComputedCycleTurnability>)>>,
+	query: Query<(), Or<(Changed<IsHovered>, Changed<ComputedCycleTurnability>)>>,
 ) -> bool {
 	!query.is_empty()
 }
 
 fn cycle_center_interaction_visuals_update_system(
+	hovered_cycle: Res<HoveredCycle>,
 	cycles_q: Query<(
-		&CycleInteraction,
+		Entity,
 		&Cycle,
 		&ComputedCycleTurnability,
 		Option<&CycleCenterVisualEntities>,
@@ -172,16 +164,15 @@ fn cycle_center_interaction_visuals_update_system(
 	mut visibility_q: Query<&mut Visibility>,
 	materials: Res<GameObjectMaterials>,
 ) {
+	let HoveredCycle(hovered_cycle) = *hovered_cycle;
 	let Ok(level) = level.get() else {
 		log::error!("Non-existent level asset being referenced.");
 		return;
 	};
 
-	let selected_groups = cycles_q
-		.iter()
-		.filter(|(interaction, ..)| **interaction != CycleInteraction::None)
-		.map(|(_, cycle, ..)| cycle.group_id)
-		.collect::<HashSet<_>>();
+	let selected_group = hovered_cycle
+		.and_then(|hovered| cycles_q.get(hovered).ok())
+		.map(|(_, cycle, ..)| cycle.group_id);
 
 	let mut meshes_to_repaint = HashMap::<Entity, CycleStatus>::default();
 	let mut outlines_to_repaint = HashMap::<Entity, CycleStatus>::default();
@@ -189,9 +180,9 @@ fn cycle_center_interaction_visuals_update_system(
 	let mut hitboxes_to_repaint = HashMap::<Entity, bool>::default();
 
 	for data in &cycles_q {
-		let (interaction, cycle, is_turnable, center_visuals, ring_visuals, hitbox_visuals) = data;
-		let is_selected = selected_groups.contains(&cycle.group_id);
-		let is_directly_selected = *interaction != CycleInteraction::None;
+		let (entity, cycle, is_turnable, center_visuals, ring_visuals, hitbox_visuals) = data;
+		let is_selected = selected_group == Some(cycle.group_id);
+		let is_directly_selected = Some(entity) == hovered_cycle;
 
 		let cycle_status = if is_selected {
 			CycleStatus::Selected
@@ -210,27 +201,36 @@ fn cycle_center_interaction_visuals_update_system(
 			*sprite_status = *sprite_status || is_directly_selected;
 		}
 
-		level.cycles[cycle.id]
-			.vertex_indices
-			.iter()
-			.filter_map(|id| {
-				vertices_q
-					.get(entity_index.vertices[*id])
-					.inspect_err(|e| log::warn!("CycleVertices refers to a non-vertex entity: {e}"))
-					.ok()
-					.map(|visuals| (visuals.node, visuals.outline))
-			})
-			.chain(
-				ring_visuals
-					.into_iter()
-					.map(|visuals| (visuals.ring, visuals.outline)),
-			)
-			.for_each(|(body, outline)| {
-				let mesh_status = meshes_to_repaint.entry(body).or_default();
-				*mesh_status = (*mesh_status).max(cycle_status);
-				let mesh_status = outlines_to_repaint.entry(outline).or_default();
-				*mesh_status = (*mesh_status).max(cycle_status);
-			});
+		if let Some(cycle) = level.cycles.get(cycle.id) {
+			cycle
+				.vertex_indices
+				.iter()
+				.filter_map(|id| {
+					entity_index
+						.vertices
+						.get(*id)
+						.and_then(|index| {
+							vertices_q
+								.get(*index)
+								.inspect_err(|e| {
+									log::warn!("CycleVertices refers to a non-vertex entity: {e}")
+								})
+								.ok()
+						})
+						.map(|visuals| (visuals.node, visuals.outline))
+				})
+				.chain(
+					ring_visuals
+						.into_iter()
+						.map(|visuals| (visuals.ring, visuals.outline)),
+				)
+				.for_each(|(body, outline)| {
+					let mesh_status = meshes_to_repaint.entry(body).or_default();
+					*mesh_status = (*mesh_status).max(cycle_status);
+					let mesh_status = outlines_to_repaint.entry(outline).or_default();
+					*mesh_status = (*mesh_status).max(cycle_status);
+				});
+		}
 	}
 
 	for (id, status) in sprites_to_repaint {
@@ -343,7 +343,10 @@ impl BlockMarkerFactory<'_, '_> {
 }
 
 /// Hides entities with [`TemporaryMarker`] during the start of a turn.
-fn marker_popdown_system(mut query: Query<&mut PopupAnimation, With<TemporaryMarker>>) {
+fn marker_popdown_system(
+	_trigger: On<RotateCycleGroupWithResult>,
+	mut query: Query<&mut PopupAnimation, With<TemporaryMarker>>,
+) {
 	for mut animation in &mut query {
 		animation.set_reversed(true);
 	}
@@ -362,8 +365,8 @@ fn marker_despawn_system(
 }
 
 fn cycle_blocked_marker_system(
+	event: On<RotateCycleGroupWithResult>,
 	mut markers: BlockMarkerFactory,
-	mut events: MessageReader<TurnBlockedByGroupConflict>,
 	vertices_q: Query<&Transform, With<Vertex>>,
 	entity_index: Res<GameStateEcsIndex>,
 	level: PlayingLevelData,
@@ -374,8 +377,8 @@ fn cycle_blocked_marker_system(
 	};
 
 	let mut marked_vertices = HashSet::<_>::default();
-	for event in events.read() {
-		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(event.0) else {
+	for &clash in event.result.clashes.iter() {
+		let Some((_, _, conflicting_vertices)) = level.forbidden_group_pairs.get(clash) else {
 			log::error!("Incorrect level data!?");
 			return;
 		};
@@ -398,15 +401,15 @@ fn cycle_blocked_marker_system(
 }
 
 fn wall_blocked_marker_system(
+	event: On<RotateCycleGroupWithResult>,
 	mut markers: BlockMarkerFactory,
-	mut events: MessageReader<TurnBlockedByWallHit>,
 	walls_q: Query<&Transform, With<Wall>>,
 	entity_index: Res<GameStateEcsIndex>,
 ) {
-	for event in events.read() {
+	for &(cycle, wall) in event.result.wall_hits.iter() {
 		let Some(vertex_transform) = entity_index
 			.walls
-			.get(&(event.cycle, event.wall))
+			.get(&(cycle, wall))
 			.and_then(|entity| walls_q.get(*entity).ok())
 		else {
 			log::warn!("Nonexistent wall!");

@@ -29,29 +29,11 @@ pub(super) fn plugin(app: &mut App) {
 		.add_fade_message::<GotoNextLevel>()
 		.add_systems(OnEnter(Screen::Playing), spawn_game_ui)
 		.add_systems(OnExit(Screen::Playing), send_message(EnterLevel(None)))
+		.add_systems(ProcessInputs, process_game_ui_actions.run_if(ui_not_frozen))
 		.add_systems(
 			Update,
 			(
-				(
-					send_message(GameUiAction::Reset).run_if(
-						char_input_pressed('r')
-							.and(|history: Res<MoveHistory>| history.has_undoable_move()),
-					),
-					send_message(GameUiAction::NextLevel).run_if(
-						char_input_pressed('n')
-							.and(resource_equals(IsLevelPersistentlyCompleted(true)))
-							.and(next_level_exists),
-					),
-					send_message(GameUiAction::Undo).run_if(
-						char_input_pressed('z')
-							.and(|history: Res<MoveHistory>| history.has_undoable_move()),
-					),
-					send_message(GameUiAction::Redo).run_if(
-						char_input_pressed('y')
-							.and(|history: Res<MoveHistory>| history.has_redoable_move()),
-					),
-					game_ui_input_recording_system,
-				)
+				game_ui_input_recording_system
 					.run_if(ui_not_frozen)
 					.in_set(AppSet::RecordInput),
 				game_ui_input_processing_system.in_set(AppSet::ExecuteInput),
@@ -516,14 +498,13 @@ fn update_level_name_display(
 	level_assets: Res<Assets<LevelData>>,
 ) {
 	if let Some((level_handle, _)) = events.read().last().and_then(|e| e.0.as_ref()) {
-		let level_data = level_assets
-			.get(level_handle)
-			.expect("Got an invalid level handle");
-		level_name_q
-			.single_mut()
-			.unwrap()
-			.0
-			.clone_from(&level_data.name);
+		let Some(level_data) = level_assets.get(level_handle) else {
+			warn!("Got an invalid level handle");
+			return;
+		};
+		for mut text in level_name_q.iter_mut() {
+			text.0.clone_from(&level_data.name);
+		}
 	}
 }
 
@@ -536,11 +517,51 @@ fn load_level(
 		return;
 	};
 
-	let level_handle = playing_level
-		.get()
-		.expect("load_level called but current level could not be loaded")
-		.data_handle
-		.clone();
+	let Ok(level_handle) = playing_level.get().map(|level| level.data_handle.clone()) else {
+		warn!("load_level called but current level could not be loaded");
+		return;
+	};
 
 	writer.write(EnterLevel(Some((level_handle, *enter_stage))));
+}
+
+fn process_game_ui_actions(
+	current_action: Res<CurrentAction>,
+	history: Res<MoveHistory>,
+	playing_level: PlayingLevelListEntry,
+	completion: Option<Res<IsLevelPersistentlyCompleted>>,
+	mut writer: MessageWriter<GameUiAction>,
+) {
+	let CurrentAction(Some(current_action)) = *current_action else {
+		return;
+	};
+	match current_action {
+		InputAction::Undo => {
+			if !history.has_undoable_move() {
+				return;
+			}
+			writer.write(GameUiAction::Undo);
+		}
+		InputAction::Redo => {
+			if !history.has_redoable_move() {
+				return;
+			}
+			writer.write(GameUiAction::Redo);
+		}
+		InputAction::Reset => {
+			if !history.has_undoable_move() {
+				return;
+			}
+			writer.write(GameUiAction::Reset);
+		}
+		InputAction::NextLevel => {
+			if !(next_level_exists(playing_level)
+				&& completion.is_some_and(|completion| completion.0))
+			{
+				return;
+			}
+			writer.write(GameUiAction::NextLevel);
+		}
+		_ => (),
+	}
 }

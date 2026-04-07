@@ -8,12 +8,10 @@ use crate::{
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
-	app.add_systems(
+	app.add_observer(record_moves).add_systems(
 		Update,
-		(
-			record_level_enter.run_if(on_message::<EnterLevel>),
-			record_moves.run_if(on_message::<RotateCycleGroupWithResult>),
-		)
+		record_level_enter
+			.run_if(on_message::<EnterLevel>)
 			.run_if(in_state(Screen::Playing)),
 	);
 }
@@ -31,7 +29,7 @@ fn record_level_enter(
 }
 
 fn record_moves(
-	mut moves: MessageReader<RotateCycleGroupWithResult>,
+	action: On<RotateCycleGroupWithResult>,
 	mut log: ResMut<PlaytestLog>,
 	time: Res<Time>,
 	playing_level: PlayingLevelListEntry,
@@ -39,17 +37,15 @@ fn record_moves(
 	let level_key = playing_level.get()?.identifier.clone();
 	let elapsed = (time.elapsed_secs() * 100.0) as u32;
 	if let Some(session_log) = log.level_mut(level_key).sessions.last_mut() {
-		for action in moves.read() {
-			let entry = PlaytestMoveLog {
-				time: elapsed,
-				succeeded: !action.result.blocked(),
-				target_cycle: action.action.rotation.target_cycle,
-				// Amount is going to be small for user inputs
-				amount: action.action.rotation.amount as i32,
-				cause: action.action.cause,
-			};
-			session_log.moves.push(entry);
-		}
+		let entry = PlaytestMoveLog {
+			time: elapsed,
+			succeeded: !action.result.blocked(),
+			target_cycle: action.action.rotation.target_cycle,
+			// Amount is going to be small for user inputs
+			amount: action.action.rotation.amount as i32,
+			cause: action.action.cause,
+		};
+		session_log.moves.push(entry);
 	} else {
 		warn!("Cannot log a move because playing level has no logged session");
 	}

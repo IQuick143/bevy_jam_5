@@ -1,6 +1,6 @@
 //! User controls for camera movement
 
-use crate::AppSet;
+use crate::{AppSet, input::prelude::*, screen::Screen};
 use bevy::prelude::*;
 
 pub(super) fn plugin(app: &mut App) {
@@ -8,7 +8,12 @@ pub(super) fn plugin(app: &mut App) {
 		.add_message::<ZoomCameraMessage>()
 		.init_resource::<EnableCursorPanning>()
 		.init_resource::<LastCursorPosition>()
-		.add_systems(Update, camera_movement_inputs.in_set(AppSet::RecordInput));
+		.add_systems(
+			Update,
+			camera_movement_inputs
+				.in_set(AppSet::RecordInput)
+				.run_if(in_state(Screen::Playing)),
+		);
 }
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Deref, DerefMut)]
@@ -46,13 +51,29 @@ struct LastCursorPosition(Option<Vec2>);
 fn camera_movement_inputs(
 	window: Single<&Window>,
 	enable_cursor_panning: Res<EnableCursorPanning>,
-	input_key: Res<ButtonInput<KeyCode>>,
+	held_inputs: Res<PressedActions>,
 	mut last_cursor_position: ResMut<LastCursorPosition>,
 	mut camera_move: MessageWriter<MoveCameraMessage>,
 	mut camera_zoom: MessageWriter<ZoomCameraMessage>,
 ) {
 	let cursor_pos = window.cursor_position();
-	let camera_direction = camera_pan_from_keys(&input_key);
+	let mut camera_direction = Vec2::ZERO;
+	for &input in held_inputs.0.iter() {
+		match input {
+			InputAction::Direction(dir) => {
+				camera_direction += camera_pan_from_direction(dir);
+			}
+			InputAction::Zoom(value) => {
+				if value > 0 {
+					camera_zoom.write(ZoomCameraMessage::In);
+				}
+				if value < 0 {
+					camera_zoom.write(ZoomCameraMessage::Out);
+				}
+			}
+			_ => {}
+		}
+	}
 	if camera_direction == Vec2::ZERO && **enable_cursor_panning {
 		if **last_cursor_position != cursor_pos {
 			// The cursor has moved, so we allow it to trigger panning
@@ -66,13 +87,6 @@ fn camera_movement_inputs(
 		// A key was touched, so we freeze panning by the cursor until it moves
 		**last_cursor_position = cursor_pos;
 		camera_move.write(MoveCameraMessage(camera_direction));
-	}
-
-	if input_key.pressed(KeyCode::NumpadAdd) {
-		camera_zoom.write(ZoomCameraMessage::In);
-	}
-	if input_key.pressed(KeyCode::NumpadSubtract) {
-		camera_zoom.write(ZoomCameraMessage::Out);
 	}
 }
 
@@ -100,19 +114,11 @@ fn camera_pan_from_cursor(cursor_pos: Vec2, viewport_size: Vec2) -> Vec2 {
 	camera_direction
 }
 
-fn camera_pan_from_keys(input_key: &ButtonInput<KeyCode>) -> Vec2 {
-	let mut camera_direction = Vec2::ZERO;
-	if input_key.pressed(KeyCode::ArrowUp) {
-		camera_direction += Vec2::Y;
+fn camera_pan_from_direction(input_direction: crate::input::Direction) -> Vec2 {
+	match input_direction {
+		crate::input::Direction::Up => Vec2::Y,
+		crate::input::Direction::Down => -Vec2::Y,
+		crate::input::Direction::Left => -Vec2::X,
+		crate::input::Direction::Right => Vec2::X,
 	}
-	if input_key.pressed(KeyCode::ArrowDown) {
-		camera_direction -= Vec2::Y;
-	}
-	if input_key.pressed(KeyCode::ArrowLeft) {
-		camera_direction -= Vec2::X;
-	}
-	if input_key.pressed(KeyCode::ArrowRight) {
-		camera_direction += Vec2::X;
-	}
-	camera_direction
 }

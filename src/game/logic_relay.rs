@@ -1,39 +1,22 @@
 //! Reflects the game's logic from [`super::logic`] into ECS
 
 use super::{components::*, logic::TurnCycleResult, prelude::*};
-use crate::{AppSet, send_message};
 
 pub fn plugin(app: &mut App) {
 	app.init_resource::<LevelCompletionConditions>()
 		.init_resource::<GameState>()
 		.init_resource::<IsLevelCompleted>()
-		.add_message::<RotateCycleGroupWithResult>()
-		.add_message::<GameLayoutChanged>()
-		.add_message::<RotateCycleGroup>()
-		.add_message::<TurnBlockedByGroupConflict>()
-		.add_message::<TurnBlockedByWallHit>()
 		.add_systems(
 			LevelInitialization,
 			(
 				|mut is_completed: ResMut<IsLevelCompleted>| is_completed.0 = false,
 				|mut completion: ResMut<LevelCompletionConditions>| *completion = default(),
-				send_message(GameLayoutChanged),
 			),
 		)
-		.add_systems(
-			Update,
-			(
-				cycle_group_rotation_system.run_if(on_message::<RotateCycleGroup>),
-				(
-					button_trigger_check_system,
-					level_completion_check_system,
-					cycle_turnability_update_system,
-				)
-					.run_if(on_message::<GameLayoutChanged>)
-					.after(cycle_group_rotation_system),
-			)
-				.in_set(AppSet::GameLogic),
-		);
+		.add_observer(cycle_group_rotation_system)
+		.add_observer(button_trigger_check_system)
+		.add_observer(level_completion_check_system)
+		.add_observer(cycle_turnability_update_system);
 }
 
 /// Determines whether a cycle may be turned at any given moment
@@ -80,41 +63,22 @@ pub enum RotationCause {
 	Redo,
 }
 
-/// Message sent to a cycle entity to rotate [`super::components::Object`]
-/// entities that lie on the cycle and all cycles linked to it
+/// [`Event`] sent to rotate a cycle with all cycles linked to it.
 /// Should be sent only if it is valid to rotate the given cycle.
-#[derive(Message, Clone, Copy, Debug)]
+#[derive(Event, Clone, Copy, Debug)]
 pub struct RotateCycleGroup {
 	pub rotation: RotateCycle,
 	pub cause: RotationCause,
 }
 
-/// Message that is sent when state of the game map changes,
+/// Event that is sent when state of the game map changes,
 /// usually by turning a cycle
-#[derive(Message, Clone, Copy, Default, Debug)]
+#[derive(Event, Clone, Copy, Default, Debug)]
 pub struct GameLayoutChanged;
 
-/// Message indicating that a pair of groups that cannot be turned together
-/// blocked the execution of a turn.
-/// Emitted for each pair of conflicting groups.
-/// The value indexes into [`LevelData::forbidden_group_pairs`]
-#[derive(Message, Clone, Copy, Default, Debug)]
-pub struct TurnBlockedByGroupConflict(pub usize);
-
-/// Message indicating that a cycle with a wall
-/// blocked the execution of a turn.
-/// Emitted for each wall that would've been hit.
-#[derive(Message, Clone, Copy, Default, Debug)]
-pub struct TurnBlockedByWallHit {
-	/// The value indexes into [`LevelData::cycles`]
-	pub cycle: usize,
-	/// The value indexes into [`super::level::CycleData::wall_indices`]
-	pub wall: usize,
-}
-
-/// Message emited after a turn has been handled,
+/// [`Event`] emited after a turn has been handled,
 /// including its result
-#[derive(Message, Clone, Debug)]
+#[derive(Event, Clone, Debug)]
 pub struct RotateCycleGroupWithResult {
 	pub action: RotateCycleGroup,
 	pub result: TurnCycleResult,
@@ -127,47 +91,34 @@ pub struct IsLevelCompleted(pub bool);
 
 /// Rotates cycles in game state and sends out events to other systems
 fn cycle_group_rotation_system(
-	mut group_events: MessageReader<RotateCycleGroup>,
-	mut update_event: MessageWriter<GameLayoutChanged>,
-	mut blocked_event: MessageWriter<TurnBlockedByGroupConflict>,
-	mut wall_hit_event: MessageWriter<TurnBlockedByWallHit>,
-	mut turn_events: MessageWriter<RotateCycleGroupWithResult>,
+	event: On<RotateCycleGroup>,
 	mut game_state: ResMut<GameState>,
 	mut entity_index: ResMut<GameStateEcsIndex>,
 	active_level: PlayingLevelData,
+	mut commands: Commands,
 ) -> Result<(), BevyError> {
 	let level = active_level.get()?;
-	for event in group_events.read() {
-		let target_cycle = event.rotation.target_cycle;
-		let rotate_by = event.rotation.amount;
-		match game_state.turn_cycle_with_links(level, target_cycle, rotate_by) {
-			Err(err) => warn!("Could not turn cycle: {err}"),
-			Ok(result) => {
-				for clash in &result.clashes {
-					blocked_event.write(TurnBlockedByGroupConflict(*clash));
-				}
-				for wall_hit in &result.wall_hits {
-					wall_hit_event.write(TurnBlockedByWallHit {
-						cycle: wall_hit.0,
-						wall: wall_hit.1,
-					});
-				}
-				// TODO: Events?
-				if !result.blocked() && result.layout_changed() {
-					update_event.write(GameLayoutChanged);
-					result.reorder_sequence_by_all_cycle_turns(level, &mut entity_index.objects)?;
-				}
-				turn_events.write(RotateCycleGroupWithResult {
-					action: *event,
-					result,
-				});
+	let target_cycle = event.rotation.target_cycle;
+	let rotate_by = event.rotation.amount;
+	match game_state.turn_cycle_with_links(level, target_cycle, rotate_by) {
+		Err(err) => warn!("Could not turn cycle: {err}"),
+		Ok(result) => {
+			// TODO: Events?
+			if !result.blocked() && result.layout_changed() {
+				commands.trigger(GameLayoutChanged);
+				result.reorder_sequence_by_all_cycle_turns(level, &mut entity_index.objects)?;
 			}
+			commands.trigger(RotateCycleGroupWithResult {
+				action: *event,
+				result,
+			});
 		}
 	}
 	Ok(())
 }
 
 fn cycle_turnability_update_system(
+	_trigger: On<GameLayoutChanged>,
 	mut cycles_q: Query<(&Cycle, &mut ComputedCycleTurnability)>,
 	level: PlayingLevelData,
 	game_state: Res<GameState>,
@@ -188,6 +139,7 @@ fn cycle_turnability_update_system(
 }
 
 fn button_trigger_check_system(
+	_trigger: On<GameLayoutChanged>,
 	mut things_q: Query<&mut IsTriggered>,
 	level: PlayingLevelData,
 	game_state: Res<GameState>,
@@ -209,6 +161,7 @@ fn button_trigger_check_system(
 }
 
 fn level_completion_check_system(
+	_trigger: On<GameLayoutChanged>,
 	level: PlayingLevelData,
 	game_state: ResMut<GameState>,
 	mut completion: ResMut<LevelCompletionConditions>,
