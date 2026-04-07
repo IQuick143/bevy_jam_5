@@ -128,6 +128,7 @@ impl Default for KeyBindings {
 		let r_key: Key = Key::Character("r".into());
 		let y_key: Key = Key::Character("y".into());
 		let z_key: Key = Key::Character("z".into());
+		let space_key: Key = Key::Character(" ".into());
 		let plus_key: Key = Key::Character("+".into());
 		let minus_key: Key = Key::Character("-".into());
 		const U: InputAction = InputAction::Direction(super::input::Direction::Up);
@@ -154,7 +155,7 @@ impl Default for KeyBindings {
 				bind(Undo,			&[Keyboard(z_key)]),
 				bind(Redo,			&[Keyboard(y_key)]),
 				bind(Reset,			&[Keyboard(r_key)]),
-				bind(NextLevel,		&[Keyboard(n_key), Mouse(MouseButton::Forward)]),
+				bind(NextLevel,		&[Keyboard(n_key), Keyboard(space_key), Mouse(MouseButton::Forward)]),
 			]
 		};
 	}
