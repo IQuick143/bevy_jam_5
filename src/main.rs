@@ -145,7 +145,7 @@ fn send_message<E: Message + Clone>(message: E) -> impl Fn(MessageWriter<E>) {
 /// Use together with input-based run conditions to send input events
 fn send_event<E: Event + Clone>(event: E) -> impl Fn(Commands)
 where
-	for<'a> <E as bevy::prelude::Event>::Trigger<'a>: std::default::Default,
+	for<'a> E::Trigger<'a>: Default,
 {
 	move |mut commands| {
 		commands.trigger(event.clone());
