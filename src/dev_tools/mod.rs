@@ -5,7 +5,7 @@ mod palette_picker;
 use crate::{
 	camera::CameraHarness,
 	game::{animation::TurnAnimationLength, components::*, prelude::*, spawn::EnterLevelStage},
-	graphics::VERTICAL_PADDING_FRACTION,
+	graphics::PADDING_FRACTION,
 	save::SaveGame,
 	screen::PlayingLevel,
 	ui::{
@@ -104,8 +104,8 @@ fn init_viewport_box(mut commands: Commands) {
 		))
 		.with_child((
 			Node {
-				width: Val::Percent(100.0),
-				height: Val::Percent(100.0 * (1.0 - VERTICAL_PADDING_FRACTION)),
+				width: Val::Percent(100.0 * (1.0 - PADDING_FRACTION.x)),
+				height: Val::Percent(100.0 * (1.0 - PADDING_FRACTION.y)),
 				border: UiRect::all(Val::Px(1.0)),
 				..default()
 			},

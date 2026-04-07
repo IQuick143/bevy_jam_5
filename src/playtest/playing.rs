@@ -47,16 +47,18 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
-				record_playing_screen_input.in_set(AppSet::RecordInput),
+				(
+					record_playing_screen_input.in_set(AppSet::RecordInput),
+					synchronize_star_feedback,
+					synchronize_text_feedback,
+					update_submit_enable_disable,
+				)
+					.run_if(in_state(Screen::Playing)),
 				intercept_exit_from_level
 					.after(AppSet::ExecuteInput)
 					.run_if(in_state(Screen::Playing).and(level_exit_should_be_intercepted)),
-				synchronize_star_feedback,
-				synchronize_text_feedback,
-				update_submit_enable_disable,
 				reset_move_counter.run_if(state_changed::<PlayingLevel>),
-			)
-				.run_if(in_state(Screen::Playing)),
+			),
 		);
 }
 

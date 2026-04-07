@@ -82,7 +82,7 @@ impl CameraHarness {
 	}
 
 	fn camera_bounds(&self) -> Vec2 {
-		self.level_size() / self.scale * Vec2::new(1.0, 1.0 / (1.0 - VERTICAL_PADDING_FRACTION))
+		self.level_size() / self.scale / (Vec2::ONE - PADDING_FRACTION)
 	}
 
 	fn level_size(&self) -> Vec2 {
@@ -163,7 +163,7 @@ fn update_camera(
 	time: Res<Time<Real>>,
 ) {
 	let (mut harness, mut projection, mut camera_transform, mut inertia) = camera.into_inner();
-	let viewport_size = window.size() * Vec2::new(1.0, 1.0 - VERTICAL_PADDING_FRACTION);
+	let viewport_size = window.size() * (Vec2::ONE - PADDING_FRACTION);
 
 	let zoom_movement = zoom_movement_input(zoom_events);
 	harness.update_zoom(&mut inertia, zoom_movement, time.delta_secs());

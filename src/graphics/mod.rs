@@ -12,15 +12,19 @@ pub(super) fn plugin(app: &mut App) {
 	app.add_plugins((scrolling_texture::plugin, background_material::plugin));
 }
 
-/// Fraction of vertical space that should be reserved for UI.
+/// Fraction of space that should be reserved for UI
+/// and for ensuring that wide levels do not hit the edges of the screen
 /// Half of it is at the bottom and half of it is at the top.
-pub const VERTICAL_PADDING_FRACTION: f32 = 0.2;
+pub const PADDING_FRACTION: Vec2 = Vec2::new(0.075, 0.2);
 
 /// Rectangle centered on (0,0), into which everything should fit in order to guarantee it being rendered.
 pub const GAME_AREA: Vec2 = Vec2::new(1600.0, 900.0);
 
 /// Rectangle extents into which the level should fit for layout purposes.
-pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(1500.0, 650.0);
+pub const LEVEL_AREA_WIDTH: Vec2 = Vec2::new(
+	GAME_AREA.x * (1.0 - PADDING_FRACTION.x),
+	GAME_AREA.y * (1.0 - PADDING_FRACTION.y),
+);
 /// Center of the rectangle into which the level should fit for layout purposes.
 /// See [`LEVEL_AREA_WIDTH`]
 pub const LEVEL_AREA_CENTER: Vec2 = Vec2::ZERO;

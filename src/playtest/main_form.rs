@@ -34,7 +34,9 @@ pub(super) fn plugin(app: &mut App) {
 			Update,
 			(
 				update_feedback_form_button_visibility.run_if(state_changed::<Screen>),
-				handle_enter_feedback_form_action.in_set(AppSet::ExecuteInput),
+				handle_enter_feedback_form_action
+					.in_set(AppSet::ExecuteInput)
+					.run_if(ui_not_frozen),
 			),
 		)
 		.add_systems(
