@@ -201,27 +201,36 @@ fn cycle_center_interaction_visuals_update_system(
 			*sprite_status = *sprite_status || is_directly_selected;
 		}
 
-		level.cycles[cycle.id]
-			.vertex_indices
-			.iter()
-			.filter_map(|id| {
-				vertices_q
-					.get(entity_index.vertices[*id])
-					.inspect_err(|e| log::warn!("CycleVertices refers to a non-vertex entity: {e}"))
-					.ok()
-					.map(|visuals| (visuals.node, visuals.outline))
-			})
-			.chain(
-				ring_visuals
-					.into_iter()
-					.map(|visuals| (visuals.ring, visuals.outline)),
-			)
-			.for_each(|(body, outline)| {
-				let mesh_status = meshes_to_repaint.entry(body).or_default();
-				*mesh_status = (*mesh_status).max(cycle_status);
-				let mesh_status = outlines_to_repaint.entry(outline).or_default();
-				*mesh_status = (*mesh_status).max(cycle_status);
-			});
+		if let Some(cycle) = level.cycles.get(cycle.id) {
+			cycle
+				.vertex_indices
+				.iter()
+				.filter_map(|id| {
+					entity_index
+						.vertices
+						.get(*id)
+						.and_then(|index| {
+							vertices_q
+								.get(*index)
+								.inspect_err(|e| {
+									log::warn!("CycleVertices refers to a non-vertex entity: {e}")
+								})
+								.ok()
+						})
+						.map(|visuals| (visuals.node, visuals.outline))
+				})
+				.chain(
+					ring_visuals
+						.into_iter()
+						.map(|visuals| (visuals.ring, visuals.outline)),
+				)
+				.for_each(|(body, outline)| {
+					let mesh_status = meshes_to_repaint.entry(body).or_default();
+					*mesh_status = (*mesh_status).max(cycle_status);
+					let mesh_status = outlines_to_repaint.entry(outline).or_default();
+					*mesh_status = (*mesh_status).max(cycle_status);
+				});
+		}
 	}
 
 	for (id, status) in sprites_to_repaint {
