@@ -155,7 +155,7 @@ impl Default for KeyBindings {
 				bind(Undo,			&[Keyboard(z_key)]),
 				bind(Redo,			&[Keyboard(y_key)]),
 				bind(Reset,			&[Keyboard(r_key)]),
-				bind(NextLevel,		&[Keyboard(n_key), Keyboard(space_key), Mouse(MouseButton::Forward)]),
+				bind(NextLevel,		&[Keyboard(n_key), Keyboard(space_key), Keyboard(Key::Space), Mouse(MouseButton::Forward)]),
 			]
 		};
 	}
