@@ -1254,10 +1254,13 @@ fn typeset_number(
 	let mut caret_offset = 0.0;
 
 	for digit in digits.chars() {
-		let current_digit_width = DigitAtlas::width_of(digit)
-			.expect("String representation of a number should only be valid characters");
-		let sprite_index = DigitAtlas::sprite_index_of(digit)
-			.expect("String representation of a number should only be valid characters");
+		let (Some(current_digit_width), Some(sprite_index)) = (
+			DigitAtlas::width_of(digit),
+			DigitAtlas::sprite_index_of(digit),
+		) else {
+			warn!("String representation of a number should only be valid characters");
+			continue;
+		};
 		// Offset of the current digit from `start_transform`, measured
 		// to the center of the digit, in multiples of sprite size
 		let relative_offset = caret_offset + current_digit_width / 2.0;

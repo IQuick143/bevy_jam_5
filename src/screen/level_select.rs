@@ -38,9 +38,10 @@ fn spawn_screen(
 	images: Res<HandleMap<ImageKey>>,
 	button_sprites: Res<UiButtonAtlas>,
 ) {
-	let levels = level_list_asset
-		.get(&levels.0)
-		.expect("The LevelList asset should be valid");
+	let Some(levels) = level_list_asset.get(&levels.0) else {
+		error!("The LevelList asset is not valid");
+		return;
+	};
 	let root_id = commands
 		.spawn((
 			widgets::ui_root_justified(JustifyContent::Center),

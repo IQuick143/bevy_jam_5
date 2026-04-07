@@ -55,9 +55,10 @@ impl std::error::Error for CompileError {
 
 impl std::fmt::Display for CompileError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		std::fmt::Display::fmt(
-			std::error::Error::source(&self).expect("All compile errors should have a source"),
-			f,
-		)
+		if let Some(source) = std::error::Error::source(&self) {
+			std::fmt::Display::fmt(source, f)
+		} else {
+			std::fmt::Display::fmt("<MISSING ERROR SOURCE>", f)
+		}
 	}
 }

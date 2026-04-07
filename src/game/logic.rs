@@ -120,7 +120,9 @@ impl GameState {
 	pub fn get_completion(&self, level_data: &LevelData) -> LevelCompletionConditions {
 		let mut completion = LevelCompletionConditions::default();
 		for (i, vertex) in level_data.vertices.iter().enumerate() {
-			let is_triggered = self.is_vertex_triggered(level_data, i).unwrap();
+			let Ok(is_triggered) = self.is_vertex_triggered(level_data, i) else {
+				continue;
+			};
 			match &vertex.glyph {
 				Some(GlyphData::Flag) => {
 					completion.flags_present += 1;

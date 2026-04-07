@@ -60,10 +60,14 @@ struct ParallaxBasis {
 
 fn init_parallax_basis(mut world: DeferredWorld, context: HookContext) {
 	let mut entity = world.entity_mut(context.entity);
-	let transform = *entity.components::<&Transform>();
-	let mut basis = entity
-		.get_mut::<ParallaxBasis>()
-		.expect("Insert hook has been triggered, but the component is not present");
+	let Ok(&transform) = entity.get_components::<&Transform>() else {
+		warn!("Insert hook has been triggered, but the component is not present");
+		return;
+	};
+	let Some(mut basis) = entity.get_mut::<ParallaxBasis>() else {
+		warn!("Insert hook has been triggered, but the component is not present");
+		return;
+	};
 	basis.position = transform.translation.xy();
 	basis.scale = transform.scale.xy();
 }

@@ -106,9 +106,10 @@ fn set_background_mode(
 	mut materials: ResMut<Assets<BackgroundMaterial>>,
 	mut query: Query<&mut Visibility, With<IsBackground>>,
 ) {
-	let material = materials
-		.get_mut(&**material)
-		.expect("Background material should have been inserted");
+	let Some(material) = materials.get_mut(&**material) else {
+		warn!("Background material should have been inserted");
+		return;
+	};
 	let new_visibility;
 	match mode.event() {
 		BackgroundMode::None => {

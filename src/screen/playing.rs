@@ -498,14 +498,13 @@ fn update_level_name_display(
 	level_assets: Res<Assets<LevelData>>,
 ) {
 	if let Some((level_handle, _)) = events.read().last().and_then(|e| e.0.as_ref()) {
-		let level_data = level_assets
-			.get(level_handle)
-			.expect("Got an invalid level handle");
-		level_name_q
-			.single_mut()
-			.unwrap()
-			.0
-			.clone_from(&level_data.name);
+		let Some(level_data) = level_assets.get(level_handle) else {
+			warn!("Got an invalid level handle");
+			return;
+		};
+		for mut text in level_name_q.iter_mut() {
+			text.0.clone_from(&level_data.name);
+		}
 	}
 }
 
@@ -518,11 +517,10 @@ fn load_level(
 		return;
 	};
 
-	let level_handle = playing_level
-		.get()
-		.expect("load_level called but current level could not be loaded")
-		.data_handle
-		.clone();
+	let Ok(level_handle) = playing_level.get().map(|level| level.data_handle.clone()) else {
+		warn!("load_level called but current level could not be loaded");
+		return;
+	};
 
 	writer.write(EnterLevel(Some((level_handle, *enter_stage))));
 }
