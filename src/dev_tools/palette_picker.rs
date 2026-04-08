@@ -31,66 +31,66 @@ pub(super) fn plugin(app: &mut App) {
 }
 
 #[derive(Resource, Clone, Copy, PartialEq, Eq, Debug, Default, Deref, DerefMut)]
-struct ColorPickerClipboard(SrgbaU8);
+struct ColorPickerClipboard(OklchaU16);
 
 #[derive(Component, Clone, Copy, Debug, Default)]
 struct ColorPickerWidget;
 
 #[derive(Component, Clone, Copy, Debug, Default, Deref, DerefMut)]
-struct ColorPickerCurrentColor(SrgbaU8);
+struct ColorPickerCurrentColor(OklchaU16);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct SrgbaU8 {
-	r: u8,
-	g: u8,
-	b: u8,
-	a: u8,
+struct OklchaU16 {
+	h: u16,
+	c: u16,
+	l: u16,
+	a: u16,
 }
 
-impl Default for SrgbaU8 {
+impl Default for OklchaU16 {
 	fn default() -> Self {
 		Self {
-			r: 255,
-			g: 255,
-			b: 255,
+			h: 360,
+			c: 255,
+			l: 255,
 			a: 255,
 		}
 	}
 }
 
-impl SrgbaU8 {
-	fn from_srgba(color: Srgba) -> Self {
+impl OklchaU16 {
+	fn from_oklcha(color: Oklcha) -> Self {
 		Self {
-			r: (color.red * 255.0) as u8,
-			g: (color.green * 255.0) as u8,
-			b: (color.blue * 255.0) as u8,
-			a: (color.alpha * 255.0) as u8,
+			h: color.hue as u16,
+			c: (color.chroma * 255.0) as u16,
+			l: (color.lightness * 255.0) as u16,
+			a: (color.alpha * 255.0) as u16,
 		}
 	}
 
-	fn to_srgba(self) -> Srgba {
-		Srgba {
-			red: self.r as f32 / 255.0,
-			green: self.g as f32 / 255.0,
-			blue: self.b as f32 / 255.0,
+	fn to_oklcha(self) -> Oklcha {
+		Oklcha {
+			hue: self.h as f32,
+			chroma: self.c as f32 / 255.0,
+			lightness: self.l as f32 / 255.0,
 			alpha: self.a as f32 / 255.0,
 		}
 	}
 
-	fn get_channel(&self, channel: ColorChannel) -> &u8 {
+	fn get_channel(&self, channel: ColorChannel) -> &u16 {
 		match channel {
-			ColorChannel::Red => &self.r,
-			ColorChannel::Green => &self.g,
-			ColorChannel::Blue => &self.b,
+			ColorChannel::Hue => &self.h,
+			ColorChannel::Chroma => &self.c,
+			ColorChannel::Lightness => &self.l,
 			ColorChannel::Alpha => &self.a,
 		}
 	}
 
-	fn get_channel_mut(&mut self, channel: ColorChannel) -> &mut u8 {
+	fn get_channel_mut(&mut self, channel: ColorChannel) -> &mut u16 {
 		match channel {
-			ColorChannel::Red => &mut self.r,
-			ColorChannel::Green => &mut self.g,
-			ColorChannel::Blue => &mut self.b,
+			ColorChannel::Hue => &mut self.h,
+			ColorChannel::Chroma => &mut self.c,
+			ColorChannel::Lightness => &mut self.l,
 			ColorChannel::Alpha => &mut self.a,
 		}
 	}
@@ -110,7 +110,7 @@ fn contrasting_text_color(background_color: Srgba) -> Color {
 
 #[derive(Component, Message, Clone, Copy, PartialEq, Eq, Debug)]
 enum ColorPickerButton {
-	EditColor(ColorChannel, i8),
+	EditColor(ColorChannel, i16),
 	ColorKey(ColorKey),
 	Reset,
 	Copy,
@@ -123,10 +123,16 @@ struct ColorPickerSlider(ColorChannel);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ColorChannel {
-	Red,
-	Green,
-	Blue,
+	Hue,
+	Chroma,
+	Lightness,
 	Alpha,
+}
+
+impl ColorChannel {
+	fn max_value(self) -> u16 {
+		if self == ColorChannel::Hue { 360 } else { 255 }
+	}
 }
 
 #[derive(States, Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
@@ -196,9 +202,9 @@ fn spawn_picker_ui(mut commands: Commands, palette: Res<ThingPalette>) {
 		},
 		ChildOf(root),
 		children![
-			color_manipulator_slider(ColorChannel::Red),
-			color_manipulator_slider(ColorChannel::Green),
-			color_manipulator_slider(ColorChannel::Blue),
+			color_manipulator_slider(ColorChannel::Hue),
+			color_manipulator_slider(ColorChannel::Chroma),
+			color_manipulator_slider(ColorChannel::Lightness),
 			color_manipulator_slider(ColorChannel::Alpha),
 			(
 				Node::default(),
@@ -240,14 +246,9 @@ fn spawn_picker_ui(mut commands: Commands, palette: Res<ThingPalette>) {
 fn color_manipulator_button(
 	label: impl Into<String>,
 	channel: ColorChannel,
-	amount: i8,
+	amount: i16,
 ) -> impl Bundle {
-	let (color, text_color) = match channel {
-		ColorChannel::Red => (Srgba::RED.into(), Color::WHITE),
-		ColorChannel::Green => (Srgba::GREEN.into(), Color::WHITE),
-		ColorChannel::Blue => (Srgba::BLUE.into(), Color::WHITE),
-		ColorChannel::Alpha => (Srgba::WHITE.into(), Color::BLACK),
-	};
+	let (color, text_color) = (Srgba::WHITE.into(), Color::BLACK);
 	(
 		color_manipulator_button_base(label, text_color),
 		BackgroundColor(color),
@@ -274,9 +275,16 @@ fn color_manipulator_button_base(label: impl Into<String>, text_color: Color) ->
 }
 
 fn color_manipulator_slider(channel: ColorChannel) -> impl Bundle {
+	let channel_label = match channel {
+		ColorChannel::Hue => "h",
+		ColorChannel::Chroma => "c",
+		ColorChannel::Lightness => "l",
+		ColorChannel::Alpha => "a",
+	};
 	(
 		Node::default(),
 		children![
+			(Text::new(channel_label), TextColor(Color::BLACK),),
 			color_manipulator_button("<", channel, -16),
 			color_manipulator_button("-", channel, -1),
 			(
@@ -284,7 +292,7 @@ fn color_manipulator_slider(channel: ColorChannel) -> impl Bundle {
 					flex_grow: 1.0,
 					..default()
 				},
-				Slider::new(255, 0),
+				Slider::new(channel.max_value().into(), 0),
 				ColorPickerSlider(channel),
 			),
 			color_manipulator_button("+", channel, 1),
@@ -326,14 +334,16 @@ fn handle_picker_button_inputs(
 		match action {
 			ColorPickerButton::EditColor(channel, delta) => {
 				let target = current_color.get_channel_mut(*channel);
-				*target = target.saturating_add_signed(*delta);
+				*target = target
+					.saturating_add_signed(*delta)
+					.min(channel.max_value());
 			}
 			ColorPickerButton::ColorKey(color_key) => {
 				new_selected_color.set(SelectedColorKey(*color_key))
 			}
 			ColorPickerButton::Reset => {
 				***current_color =
-					SrgbaU8::from_srgba(ThingPalette::default()[&selected_color.0].to_srgba())
+					OklchaU16::from_oklcha(ThingPalette::default()[&selected_color.0].into())
 			}
 			ColorPickerButton::Copy => **clipboard = ***current_color,
 			ColorPickerButton::Paste => ***current_color = **clipboard,
@@ -351,7 +361,7 @@ fn handle_picker_slider_inputs(
 			// Do not handle the false input after the slider is created
 			continue;
 		}
-		*current_color.get_channel_mut(*channel) = slider.position as u8;
+		*current_color.get_channel_mut(*channel) = slider.position as u16;
 	}
 }
 
@@ -367,10 +377,11 @@ fn update_picker_preview(
 	>,
 ) {
 	for (current, mut text, mut background, mut text_content) in &mut query {
-		let current = current.to_srgba();
+		let current = current.to_oklcha();
 		background.0 = current.into();
-		**text = contrasting_text_color(current);
-		**text_content = current.to_hex();
+		let srgba = current.into();
+		**text = contrasting_text_color(srgba);
+		**text_content = srgba.to_hex();
 	}
 }
 
@@ -407,7 +418,7 @@ fn update_current_color_from_key(
 	mut query: Query<&mut ColorPickerCurrentColor>,
 ) {
 	for mut color in &mut query {
-		**color = SrgbaU8::from_srgba(palette[&key.get().0].to_srgba());
+		**color = OklchaU16::from_oklcha(palette[&key.get().0].into());
 	}
 }
 
@@ -417,7 +428,7 @@ fn update_palette_entry(
 	mut palette: ResMut<ThingPalette>,
 ) {
 	if let Some(current) = query.iter().filter(|r| !r.is_added()).last() {
-		let current = current.to_srgba();
+		let current = current.to_oklcha();
 		palette.insert(key.get().0, current.into());
 	}
 }
