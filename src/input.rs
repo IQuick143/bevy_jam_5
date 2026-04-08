@@ -46,6 +46,8 @@ pub enum InputAction {
 	NextLevel,
 	/// Switch from one player cycle to the next adjacent one (TODO)
 	Swap,
+	/// Toggle full screen
+	FullScreen,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -131,6 +133,7 @@ impl Default for KeyBindings {
 		let space_key: Key = Key::Character(" ".into());
 		let plus_key: Key = Key::Character("+".into());
 		let minus_key: Key = Key::Character("-".into());
+		let f11_key: Key = Key::F11;
 		const U: InputAction = InputAction::Direction(super::input::Direction::Up);
 		const D: InputAction = InputAction::Direction(super::input::Direction::Down);
 		const L: InputAction = InputAction::Direction(super::input::Direction::Left);
@@ -156,6 +159,7 @@ impl Default for KeyBindings {
 				bind(Redo,			&[Keyboard(y_key)]),
 				bind(Reset,			&[Keyboard(r_key)]),
 				bind(NextLevel,		&[Keyboard(n_key), Keyboard(space_key), Keyboard(Key::Space), Mouse(MouseButton::Forward)]),
+				bind(FullScreen,    &[Keyboard(f11_key)]),
 			]
 		};
 	}

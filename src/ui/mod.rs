@@ -3,6 +3,7 @@
 pub mod background;
 pub mod consts;
 pub mod freeze;
+pub mod fullscreen;
 pub mod hover;
 pub mod interaction;
 pub mod multistate;
@@ -32,5 +33,6 @@ pub(super) fn plugin(app: &mut App) {
 		slider::plugin,
 		multistate::plugin,
 		scrollbox::plugin,
+		fullscreen::plugin,
 	));
 }

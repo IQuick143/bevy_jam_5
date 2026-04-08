@@ -21,7 +21,6 @@ use bevy::{
 	},
 	input::common_conditions::input_just_pressed,
 	math::bounding::BoundingVolume,
-	window::WindowMode,
 };
 
 use crate::screen::Screen;
@@ -48,7 +47,6 @@ pub(super) fn plugin(app: &mut App) {
 			(|mut s: ResMut<SaveGame>| *s = default()).run_if(input_just_pressed(KeyCode::Delete)),
 			toggle_fps_diagnostic.run_if(input_just_pressed(KeyCode::KeyF)),
 			toggle_ui_display.run_if(input_just_pressed(KeyCode::F1)),
-			toggle_full_screen.run_if(input_just_pressed(KeyCode::F11)),
 		),
 	);
 	app.add_systems(Startup, init_viewport_box);
@@ -249,13 +247,5 @@ fn toggle_ui_display(
 	};
 	for mut visibility in &mut query {
 		*visibility = new_visibility;
-	}
-}
-
-fn toggle_full_screen(mut window: Single<&mut Window>) {
-	if window.mode == WindowMode::Windowed {
-		window.mode = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
-	} else {
-		window.mode = WindowMode::Windowed;
 	}
 }

@@ -8,6 +8,7 @@ use crate::{
 	ui::{
 		background::BackgroundMode,
 		consts::*,
+		fullscreen::IsFullScreen,
 		multistate::{MultiStateButton, MultiStateButtonLabels},
 		prelude::*,
 		slider::Slider,
@@ -22,6 +23,7 @@ pub(super) fn plugin(app: &mut App) {
 				handle_settings_action,
 				handle_settings_slider_input,
 				handle_settings_checkbox_input,
+				synchronize_fullscreen_checkbox.run_if(resource_changed::<IsFullScreen>),
 			)
 				.run_if(in_state(Screen::Settings).and(ui_not_frozen)),
 		);
@@ -45,6 +47,7 @@ enum SettingsSliderControl {
 enum SettingsCheckboxControl {
 	Background,
 	Parallax,
+	Fullscreen,
 }
 
 /// Width of a slider control, in pixels
@@ -57,6 +60,7 @@ fn enter_settings(
 	font: Res<GlobalFont>,
 	button_sprites: Res<UiButtonAtlas>,
 	settings: Res<Settings>,
+	is_fullscreen: Res<IsFullScreen>,
 ) {
 	commands.spawn((
 		widgets::ui_root(),
@@ -115,6 +119,16 @@ fn enter_settings(
 							SettingsCheckboxControl::Parallax,
 						)],
 					),
+					widgets::text("Full screen", JustifyContent::End, font.0.clone()),
+					(
+						Node::DEFAULT,
+						children![(
+							widgets::inline_button("", font.0.clone()),
+							MultiStateButton::new(2, **is_fullscreen as u32),
+							MultiStateButtonLabels::new(["Off", "On"]),
+							SettingsCheckboxControl::Fullscreen,
+						)],
+					)
 				],
 			),
 		],
@@ -172,6 +186,7 @@ fn handle_settings_slider_input(
 fn handle_settings_checkbox_input(
 	query: Query<(&MultiStateButton, &SettingsCheckboxControl), Changed<MultiStateButton>>,
 	mut settings: ResMut<Settings>,
+	mut is_fullscreen: ResMut<IsFullScreen>,
 ) {
 	for (MultiStateButton { current_state, .. }, control) in &query {
 		match control {
@@ -185,6 +200,22 @@ fn handle_settings_checkbox_input(
 			SettingsCheckboxControl::Parallax => {
 				settings.enable_parallax = *current_state != 0;
 			}
+			SettingsCheckboxControl::Fullscreen => {
+				is_fullscreen.set_if_neq(IsFullScreen(*current_state != 0));
+			}
+		}
+	}
+}
+
+fn synchronize_fullscreen_checkbox(
+	mut query: Query<(&mut MultiStateButton, &SettingsCheckboxControl)>,
+	is_fullscreen: Res<IsFullScreen>,
+) {
+	for (mut checkbox, control) in &mut query {
+		if *control == SettingsCheckboxControl::Fullscreen
+			&& (checkbox.current_state > 0) != **is_fullscreen
+		{
+			checkbox.current_state = **is_fullscreen as u32;
 		}
 	}
 }
