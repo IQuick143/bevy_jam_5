@@ -180,6 +180,17 @@ impl LevelListBuilder {
 		Ok(())
 	}
 
+	pub fn current_levels_in_hub(
+		&self,
+		hub_index: usize,
+	) -> Result<impl Iterator<Item = usize>, LevelListBuildError> {
+		self.list
+			.hubs
+			.get(hub_index)
+			.ok_or(LevelListBuildError::HubIndexOutOfRange(hub_index))
+			.map(|h| h.levels.iter().copied())
+	}
+
 	pub fn create_prerequisite(
 		&mut self,
 		dependency: LevelOrHubId,

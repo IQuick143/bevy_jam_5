@@ -91,10 +91,19 @@ impl LevelListBuilder {
 		mut args: ArgumentStream<DomainValue>,
 		mut warnings: WarningSink<RuntimeWarning>,
 	) -> CallResult {
+		use DomainValue::*;
+		use VariableValue::*;
+
 		let mut levels = Vec::new();
-		while let Some(LevelId(level_id)) = args.read_as_until_end_or_separator()? {
-			levels.push(level_id);
+		while let Some(arg) = args.read_until_end_or_separator() {
+			match arg {
+				Blank => {} // Accept a blank as dummy, to allow conditional inclusion
+				Domain(Level(LevelId(level_id))) => levels.push(*level_id),
+				Domain(Hub(HubId(hub_id))) => levels.extend(self.current_levels_in_hub(*hub_id)?),
+				_ => return Err(TypeError(arg.get_type()).into()),
+			}
 		}
+
 		args.read_end()?;
 
 		if levels.len() < 2 {
