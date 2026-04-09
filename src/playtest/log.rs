@@ -36,6 +36,8 @@ pub struct LevelPlaytestLog {
 	pub difficulty: u8,
 	/// Additional comments left by the user
 	pub comment: String,
+	/// Whether the user has completed the level
+	pub completed: bool,
 	/// Move logs from all sessions of the level
 	pub sessions: Vec<LevelSessionPlaytestLog>,
 }
@@ -231,6 +233,7 @@ impl LevelPlaytestLog {
 	const DIFFICULTY_RATING: &str = "difficulty";
 	const EXTRA_FEEDBACK: &str = "comment";
 	const PLAY_LOG: &str = "sessions";
+	const COMPLETED: &str = "completed";
 
 	fn write_json(
 		&self,
@@ -243,6 +246,9 @@ impl LevelPlaytestLog {
 		}
 		if self.difficulty != 0 {
 			m.write(Self::DIFFICULTY_RATING, self.difficulty);
+		}
+		if self.completed {
+			m.write(Self::COMPLETED, self.completed);
 		}
 		if !self.comment.is_empty() {
 			m.write(Self::EXTRA_FEEDBACK, self.comment.as_str());
@@ -282,6 +288,10 @@ impl LevelPlaytestLog {
 
 		if let Some(comment) = m.get(Self::EXTRA_FEEDBACK).and_then(Value::as_str) {
 			self.comment = comment.to_owned();
+		}
+
+		if let Some(completed) = m.get(Self::COMPLETED).and_then(Value::as_bool) {
+			self.completed = completed;
 		}
 
 		if let Some(sessions) = m.get(Self::PLAY_LOG).and_then(Value::as_array) {

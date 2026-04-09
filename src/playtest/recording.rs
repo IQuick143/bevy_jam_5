@@ -1,9 +1,8 @@
 //! Recording of tester's moves to the persistent log
 
 use super::log::*;
-use crate::game::logic_relay::RotationCause;
 use crate::{
-	game::{logic_relay::RotateCycleGroupWithResult, spawn::EnterLevel},
+	game::{logic_relay::*, spawn::EnterLevel},
 	screen::{PlayingLevelListEntry, Screen},
 };
 use bevy::prelude::*;
@@ -11,8 +10,12 @@ use bevy::prelude::*;
 pub(super) fn plugin(app: &mut App) {
 	app.add_observer(record_moves).add_systems(
 		Update,
-		record_level_enter
-			.run_if(on_message::<EnterLevel>)
+		(
+			record_level_enter.run_if(on_message::<EnterLevel>),
+			save_level_completion.run_if(
+				resource_changed::<IsLevelCompleted>.and(resource_equals(IsLevelCompleted(true))),
+			),
+		)
 			.run_if(in_state(Screen::Playing)),
 	);
 }
@@ -54,5 +57,14 @@ fn record_moves(
 	} else {
 		warn!("Cannot log a move because playing level has no logged session");
 	}
+	Ok(())
+}
+
+fn save_level_completion(
+	mut playtest: ResMut<PlaytestLog>,
+	playing_level: PlayingLevelListEntry,
+) -> Result {
+	let level_id = playing_level.get()?.identifier.clone();
+	playtest.level_mut(level_id).completed = true;
 	Ok(())
 }
