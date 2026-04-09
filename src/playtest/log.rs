@@ -311,7 +311,7 @@ impl LevelSessionPlaytestLog {
 		let mut m = Vec::new();
 		m.push(self.game_session.into());
 		m.push(self.time_entered.into());
-		if let Ok(move_log) = serialize_move_list(&self.moves)
+		if let Ok(move_log) = serialize_move_list(&self.moves, self.time_entered)
 			&& !move_log.is_empty()
 		{
 			m.push(move_log.into());
@@ -339,7 +339,7 @@ impl LevelSessionPlaytestLog {
 		let moves = m
 			.get(2)
 			.and_then(Value::as_str)
-			.and_then(|s| deserialise_move_list(s).ok())
+			.and_then(|s| deserialise_move_list(s, time_entered).ok())
 			.unwrap_or_default();
 
 		Ok(Self {
@@ -441,75 +441,63 @@ fn test_base64_serde() {
 	);
 }
 
-impl std::fmt::Display for PlaytestMoveLog {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+fn serialize_move_list(
+	moves: &[PlaytestMoveLog],
+	mut reference_timestamp: u32,
+) -> Result<String, std::fmt::Error> {
+	use std::fmt::Write;
+	let mut move_log = String::new();
+	for mv in moves {
 		let mut write_move = None;
-		match self.turn {
+		match mv.turn {
 			PlaytestMove::Manual {
 				amount,
 				target_cycle,
 			} => {
-				write!(f, "{}", if amount > 0 { '+' } else { '-' })?;
+				write!(move_log, "{}", if amount > 0 { '+' } else { '-' })?;
 				write_move = Some(target_cycle);
 			}
-			PlaytestMove::Undo => write!(f, "u")?,
-			PlaytestMove::Redo => write!(f, "r")?,
+			PlaytestMove::Undo => write!(move_log, "u")?,
+			PlaytestMove::Redo => write!(move_log, "r")?,
 		}
-		serialise_varlen_base32_number(self.time as u64, f)?;
+		let time_delta = mv.time.saturating_sub(reference_timestamp);
+		reference_timestamp = mv.time;
+		serialise_varlen_base32_number(time_delta as u64, &mut move_log)?;
 		if let Some(cycle) = write_move {
-			serialise_varlen_base32_number(cycle as u64, f)?;
+			serialise_varlen_base32_number(cycle as u64, &mut move_log)?;
 		}
-		Ok(())
-	}
-}
-
-fn serialize_move_list(moves: &[PlaytestMoveLog]) -> Result<String, std::fmt::Error> {
-	let mut move_log = String::new();
-	for mv in moves {
-		use std::fmt::Write;
-		write!(move_log, "{mv}")?;
 	}
 	Ok(move_log)
 }
 
-fn deserialise_move_list(data: &str) -> Result<Vec<PlaytestMoveLog>, ()> {
+fn deserialise_move_list(
+	data: &str,
+	mut reference_timestamp: u32,
+) -> Result<Vec<PlaytestMoveLog>, ()> {
 	let mut iter = data.chars();
 	let mut moves = Vec::new();
 	while let Some(first_char) = iter.next() {
-		match first_char {
+		let Some(time_delta) = deserialise_varlen_base32_number(&mut iter) else {
+			return Err(());
+		};
+		let time = reference_timestamp + u32::try_from(time_delta).map_err(|_| ())?;
+		reference_timestamp = time;
+		let turn = match first_char {
 			'+' | '-' => {
-				let Some(time) = deserialise_varlen_base32_number(&mut iter) else {
-					return Err(());
-				};
 				let Some(cycle) = deserialise_varlen_base32_number(&mut iter) else {
 					return Err(());
 				};
 				let amount = if first_char == '+' { 1 } else { -1 };
-				moves.push(PlaytestMoveLog {
-					time: u32::try_from(time).map_err(|_| ())?,
-					turn: PlaytestMove::Manual {
-						target_cycle: usize::try_from(cycle).map_err(|_| ())?,
-						amount,
-					},
-				})
+				PlaytestMove::Manual {
+					target_cycle: usize::try_from(cycle).map_err(|_| ())?,
+					amount,
+				}
 			}
-			'u' | 'r' => {
-				let Some(time) = deserialise_varlen_base32_number(&mut iter) else {
-					return Err(());
-				};
-				moves.push(PlaytestMoveLog {
-					time: u32::try_from(time).map_err(|_| ())?,
-					turn: if first_char == 'u' {
-						PlaytestMove::Undo
-					} else {
-						PlaytestMove::Redo
-					},
-				})
-			}
-			_ => {
-				return Err(());
-			}
-		}
+			'u' => PlaytestMove::Undo,
+			'r' => PlaytestMove::Redo,
+			_ => return Err(()),
+		};
+		moves.push(PlaytestMoveLog { time, turn })
 	}
 	Ok(moves)
 }
@@ -521,8 +509,8 @@ mod test {
 	#[test]
 	fn success_serde() {
 		let original = "-kvoFC+kvqdC-kvtDB-kvucB-kvwMB+kvwbB-kv0QC-kv3NB+kv5YB-kv8XB+kv+aB+kwgRB+kwkYB-kwmIB-kwnVB+kwpTB-kwvRG-kwyYB-kw2QF-kw6NE-kw8EE-kxhVD-kxiOD-kxlLC-kxmfC+kxqDH-kxtRH+kxwOH+kxyKB+kx1TB+kx6BG-kx9IB-kyoGB-kysKE+kyvHD-kyyQC+ky1FC+ky3DC-ky6WC-kzjEBukzsdukztMukztbukzubukzvXukzwQukzyE";
-		let moves = deserialise_move_list(original).unwrap();
-		let result = serialize_move_list(&moves).unwrap();
+		let moves = deserialise_move_list(original, 42).unwrap();
+		let result = serialize_move_list(&moves, 42).unwrap();
 		assert_eq!(original, result);
 	}
 }
