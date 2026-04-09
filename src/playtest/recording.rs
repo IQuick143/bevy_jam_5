@@ -1,6 +1,7 @@
 //! Recording of tester's moves to the persistent log
 
 use super::log::*;
+use crate::game::logic_relay::RotationCause;
 use crate::{
 	game::{logic_relay::RotateCycleGroupWithResult, spawn::EnterLevel},
 	screen::{PlayingLevelListEntry, Screen},
@@ -39,11 +40,15 @@ fn record_moves(
 	if let Some(session_log) = log.level_mut(level_key).sessions.last_mut() {
 		let entry = PlaytestMoveLog {
 			time: elapsed,
-			succeeded: !action.result.blocked(),
-			target_cycle: action.action.rotation.target_cycle,
-			// Amount is going to be small for user inputs
-			amount: action.action.rotation.amount as i32,
-			cause: action.action.cause,
+			turn: match action.action.cause {
+				RotationCause::Undo => PlaytestMove::Undo,
+				RotationCause::Redo => PlaytestMove::Redo,
+				RotationCause::Manual => PlaytestMove::Manual {
+					target_cycle: action.action.rotation.target_cycle,
+					// Amount is going to be small for user inputs
+					amount: action.action.rotation.amount as i32,
+				},
+			},
 		};
 		session_log.moves.push(entry);
 	} else {

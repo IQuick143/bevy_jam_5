@@ -1,9 +1,7 @@
 //! Persistent storage of the tester's feedback and playthrough log
 
-use crate::{game::logic_relay::RotationCause, persistent::*};
+use crate::persistent::*;
 use bevy::{platform::collections::HashMap, prelude::*};
-use logos::Logos;
-use pomelo::pomelo;
 use rand::Rng;
 use serde_json::{Map, Value};
 
@@ -57,14 +55,20 @@ pub struct LevelSessionPlaytestLog {
 pub struct PlaytestMoveLog {
 	/// Timestamp of the move, in 100ths of second
 	pub time: u32,
-	/// Index of cycle that the player has attempted to move
-	pub target_cycle: usize,
-	/// How much the player tried to move the cycle
-	pub amount: i32,
 	/// What kind of input from the player translated into the move
-	pub cause: RotationCause,
-	/// Whether the move actually went through
-	pub succeeded: bool,
+	pub turn: PlaytestMove,
+}
+
+#[derive(Debug)]
+pub enum PlaytestMove {
+	Undo,
+	Redo,
+	Manual {
+		/// Index of cycle that the player has attempted to move
+		target_cycle: usize,
+		/// How much the player tried to move the cycle
+		amount: i32,
+	},
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default)]
@@ -295,10 +299,6 @@ impl LevelPlaytestLog {
 }
 
 impl LevelSessionPlaytestLog {
-	const SESSION_INDEX: &str = "session";
-	const ENTER_TIME: &str = "enter";
-	const MOVE_LOG: &str = "moves";
-
 	pub fn new(game_session: u32, time_entered: u32) -> Self {
 		Self {
 			game_session,
@@ -307,21 +307,21 @@ impl LevelSessionPlaytestLog {
 		}
 	}
 
-	fn to_json(&self) -> Map<String, Value> {
-		let mut m = Map::new();
-		m.write(Self::SESSION_INDEX, self.game_session);
-		m.write(Self::ENTER_TIME, self.time_entered);
+	fn to_json(&self) -> Vec<Value> {
+		let mut m = Vec::new();
+		m.push(self.game_session.into());
+		m.push(self.time_entered.into());
 		if let Ok(move_log) = serialize_move_list(&self.moves)
 			&& !move_log.is_empty()
 		{
-			m.write(Self::MOVE_LOG, move_log);
+			m.push(move_log.into());
 		}
 		m
 	}
 
 	fn from_json(m: &Value) -> Result<Self, ()> {
 		let Some(game_session) = m
-			.get(Self::SESSION_INDEX)
+			.get(0)
 			.and_then(Value::as_u64)
 			.and_then(|i| u32::try_from(i).ok())
 		else {
@@ -329,7 +329,7 @@ impl LevelSessionPlaytestLog {
 		};
 
 		let Some(time_entered) = m
-			.get(Self::ENTER_TIME)
+			.get(1)
 			.and_then(Value::as_u64)
 			.and_then(|i| u32::try_from(i).ok())
 		else {
@@ -337,9 +337,9 @@ impl LevelSessionPlaytestLog {
 		};
 
 		let moves = m
-			.get(Self::MOVE_LOG)
+			.get(2)
 			.and_then(Value::as_str)
-			.and_then(|s| move_list_parser::parse(s).ok())
+			.and_then(|s| deserialise_move_list(s).ok())
 			.unwrap_or_default();
 
 		Ok(Self {
@@ -350,21 +350,114 @@ impl LevelSessionPlaytestLog {
 	}
 }
 
+fn base64_character_to_u8(character: char) -> Option<u8> {
+	let num = character as u32;
+	let uppercase_a = 'A' as u32;
+	let lowercase_a = 'a' as u32;
+	let zero = '0' as u32;
+	match character {
+		'A'..='Z' => Some((num - uppercase_a) as u8),
+		'a'..='z' => Some((num - lowercase_a) as u8 + 26),
+		'0'..='9' => Some((num - zero) as u8 + 52),
+		'+' => Some(62),
+		'-' => Some(63),
+		_ => None,
+	}
+}
+
+fn base64_to_character(value: u8) -> Option<char> {
+	match value {
+		0..=25 => Some((value + b'A') as char),
+		26..=51 => Some(((value - 26) + b'a') as char),
+		52..=61 => Some(((value - 52) + b'0') as char),
+		62 => Some('+'),
+		63 => Some('-'),
+		_ => None,
+	}
+}
+
+#[test]
+fn test_base64() {
+	for i in 0..=63 {
+		assert_eq!(
+			base64_to_character(i).map(base64_character_to_u8),
+			Some(Some(i))
+		);
+	}
+}
+
+fn serialise_varlen_base32_number(
+	mut number: u64,
+	writer: &mut impl std::fmt::Write,
+) -> std::fmt::Result {
+	let mut digits = smallvec::SmallVec::<[u8; 13]>::new();
+	if number == 0 {
+		digits.push(0);
+	}
+	while number > 0 {
+		let digit = (number % 32) as u8;
+		number >>= 5;
+		digits.push(digit);
+	}
+	for digit in digits.iter().skip(1).rev() {
+		write!(writer, "{}", base64_to_character(digit + 32).unwrap())?;
+	}
+	// Last digit (which is first in the vector)
+	write!(writer, "{}", base64_to_character(digits[0]).unwrap())?;
+	Ok(())
+}
+
+fn deserialise_varlen_base32_number(characters: &mut impl Iterator<Item = char>) -> Option<u64> {
+	let mut current_character = characters.next()?;
+	let mut value = base64_character_to_u8(current_character)?;
+	let mut result = (value & 0b00011111) as u64;
+	// Continue until we reach a value without a top bit
+	while value & 0b00100000 != 0 {
+		if result >= (1 << (64 - 5)) {
+			// Overflow
+			return None;
+		}
+		result <<= 5;
+		current_character = characters.next()?;
+		value = base64_character_to_u8(current_character)?;
+		result += (value & 0b00011111) as u64;
+	}
+	Some(result)
+}
+
+#[test]
+fn test_base64_serde() {
+	for i in 0..=2000 {
+		let mut string = String::new();
+		serialise_varlen_base32_number(i, &mut string).unwrap();
+		let value = deserialise_varlen_base32_number(&mut string.chars()).unwrap();
+		assert_eq!(value, i);
+	}
+	assert_eq!(
+		deserialise_varlen_base32_number(
+			&mut "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxA".chars()
+		),
+		None
+	);
+}
+
 impl std::fmt::Display for PlaytestMoveLog {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.time)?;
-		write!(f, "{}", if self.amount > 0 { '+' } else { '-' })?;
-		if self.amount.abs() != 1 {
-			write!(f, "{}:", self.amount.abs())?;
+		let mut write_move = None;
+		match self.turn {
+			PlaytestMove::Manual {
+				amount,
+				target_cycle,
+			} => {
+				write!(f, "{}", if amount > 0 { '+' } else { '-' })?;
+				write_move = Some(target_cycle);
+			}
+			PlaytestMove::Undo => write!(f, "u")?,
+			PlaytestMove::Redo => write!(f, "r")?,
 		}
-		write!(f, "{}", self.target_cycle)?;
-		if !self.succeeded {
-			write!(f, "F")?;
-		}
-		match self.cause {
-			RotationCause::Manual => {}
-			RotationCause::Undo => write!(f, "u")?,
-			RotationCause::Redo => write!(f, "r")?,
+		serialise_varlen_base32_number(self.time as u64, f)?;
+		if let Some(cycle) = write_move {
+			serialise_varlen_base32_number(cycle as u64, f)?;
 		}
 		Ok(())
 	}
@@ -374,87 +467,51 @@ fn serialize_move_list(moves: &[PlaytestMoveLog]) -> Result<String, std::fmt::Er
 	let mut move_log = String::new();
 	for mv in moves {
 		use std::fmt::Write;
-		write!(move_log, "{mv};")?;
+		write!(move_log, "{mv}")?;
 	}
-	// Drop the trailing semicolon
-	move_log.pop();
 	Ok(move_log)
 }
 
-pomelo! {
-	%module move_list_parser;
-	%include {
-		use super::*;
-
-		pub fn parse(s: &str) -> Result<Vec<PlaytestMoveLog>, ()> {
-			let mut lexer = Token::lexer(s);
-			let mut parser = Parser::new();
-			for token in lexer.flatten() {
-				// Parser error is irrecoverable,
-				// the parser will just keep failing
-				parser.parse(token)?;
+fn deserialise_move_list(data: &str) -> Result<Vec<PlaytestMoveLog>, ()> {
+	let mut iter = data.chars();
+	let mut moves = Vec::new();
+	while let Some(first_char) = iter.next() {
+		match first_char {
+			'+' | '-' => {
+				let Some(time) = deserialise_varlen_base32_number(&mut iter) else {
+					return Err(());
+				};
+				let Some(cycle) = deserialise_varlen_base32_number(&mut iter) else {
+					return Err(());
+				};
+				let amount = if first_char == '+' { 1 } else { -1 };
+				moves.push(PlaytestMoveLog {
+					time: u32::try_from(time).map_err(|_| ())?,
+					turn: PlaytestMove::Manual {
+						target_cycle: usize::try_from(cycle).map_err(|_| ())?,
+						amount,
+					},
+				})
 			}
-			parser.end_of_input()
+			'u' | 'r' => {
+				let Some(time) = deserialise_varlen_base32_number(&mut iter) else {
+					return Err(());
+				};
+				moves.push(PlaytestMoveLog {
+					time: u32::try_from(time).map_err(|_| ())?,
+					turn: if first_char == 'u' {
+						PlaytestMove::Undo
+					} else {
+						PlaytestMove::Redo
+					},
+				})
+			}
+			_ => {
+				return Err(());
+			}
 		}
 	}
-
-	%syntax_error { Ok(()) }
-
-	%token
-	#[derive(Logos)]
-	enum Token {};
-
-	%type
-	#[regex(r"\d+", |lex| lex.slice().parse().map_err(|_| ()))]
-	Int u32;
-
-	%type
-	#[token("+", |_| 1)]
-	#[token("-", |_| -1)]
-	Sign i32;
-
-	%type
-	#[token("u", |_| RotationCause::Undo)]
-	#[token("r", |_| RotationCause::Redo)]
-	Cause RotationCause;
-
-	%type
-	#[token("F")]
-	Fail;
-
-	%type
-	#[token(";")]
-	Semi;
-
-	%type
-	#[token(":")]
-	Colon;
-
-	// Underlying types of nonterminals
-	%type output Vec<PlaytestMoveLog>;
-	%type list   Vec<PlaytestMoveLog>;
-	%type entry  PlaytestMoveLog;
-	%type rot    (usize, i32);
-
-	output ::= { Vec::new() }
-	output ::= list;
-
-	list ::= entry(m) { vec![m] }
-	list ::= list error;
-	list ::= list(mut l) Semi entry(m) { l.push(m); l }
-
-	entry ::= Int(time) rot((target_cycle, amount)) Fail?(f) Cause?(cause) {
-		PlaytestMoveLog {
-			time,
-			succeeded: f.is_none(),
-			target_cycle,
-			amount,
-			cause: cause.unwrap_or_default(),
-		}
-	}
-
-	rot ::= Sign(s) Int(cycle) { (cycle as usize, s) }
-	rot ::= Sign(s) Int(abs) Colon Int(cycle) { (cycle as usize, s * abs as i32) }
+	Ok(moves)
 }
 
 #[cfg(test)]
@@ -463,8 +520,8 @@ mod test {
 
 	#[test]
 	fn success_serde() {
-		let original = "1234+0;1352-2:1u;4353+2F;4531-2Fu";
-		let moves = move_list_parser::parse(original).unwrap();
+		let original = "-kvoFC+kvqdC-kvtDB-kvucB-kvwMB+kvwbB-kv0QC-kv3NB+kv5YB-kv8XB+kv+aB+kwgRB+kwkYB-kwmIB-kwnVB+kwpTB-kwvRG-kwyYB-kw2QF-kw6NE-kw8EE-kxhVD-kxiOD-kxlLC-kxmfC+kxqDH-kxtRH+kxwOH+kxyKB+kx1TB+kx6BG-kx9IB-kyoGB-kysKE+kyvHD-kyyQC+ky1FC+ky3DC-ky6WC-kzjEBukzsdukztMukztbukzubukzvXukzwQukzyE";
+		let moves = deserialise_move_list(original).unwrap();
 		let result = serialize_move_list(&moves).unwrap();
 		assert_eq!(original, result);
 	}
