@@ -96,6 +96,7 @@ fn init_viewport_box(mut commands: Commands) {
 				height: Val::Percent(100.0),
 				flex_direction: FlexDirection::Column,
 				justify_content: JustifyContent::Center,
+				align_items: AlignItems::Center,
 				..default()
 			},
 			IsDebugOutline,
