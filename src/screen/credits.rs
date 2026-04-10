@@ -55,12 +55,8 @@ fn enter_credits(
 				(
 					table_node.clone(),
 					children![
-						widgets::text("IQuick 143", JustifyContent::End, font.0.clone()),
-						widgets::text("Game design, Programming, Visual direction, Level design", JustifyContent::Start, font.0.clone()),
-						widgets::text("IWonderWhatThisAPIDoes", JustifyContent::End, font.0.clone()),
-						widgets::text("Programming, Art, Level Design", JustifyContent::Start, font.0.clone()),
-						widgets::text("SoysCodingCafe", JustifyContent::End, font.0.clone()),
-						widgets::text("Level Design", JustifyContent::Start, font.0.clone()),
+						widgets::text("Lidajatus team", JustifyContent::End, font.0.clone()),
+						widgets::text("Production, Game design, Programming, Visual direction, Level design, Mathematics\nMore programming, Art, More level design, Programming language design", JustifyContent::Start, font.0.clone()),
 						widgets::text("spilledcereals", JustifyContent::End, font.0.clone()),
 						widgets::text("Music, SFX", JustifyContent::Start, font.0.clone()),
 					]
