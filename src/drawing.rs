@@ -2,6 +2,7 @@
 
 use crate::{
 	AppSet,
+	assets::DefaultPalette,
 	graphics::{primitives::*, *},
 };
 use bevy::{
@@ -17,6 +18,7 @@ pub(super) fn plugin(app: &mut App) {
 		.add_systems(
 			Update,
 			(
+				reload_palette_from_asset,
 				update_material_colors.run_if(resource_changed::<ThingPalette>),
 				(
 					update_sprite_colors,
@@ -88,6 +90,68 @@ pub enum ColorKey {
 	StarWidgetHovered,
 	#[cfg(feature = "playtest")]
 	StarWidgetSelected,
+}
+
+impl ColorKey {
+	fn palette_sheet_position(self) -> Option<UVec2> {
+		match self {
+			ColorKey::Blank => None,
+			ColorKey::BoxBase => Some(UVec2::new(0, 0)),
+			ColorKey::ButtonBase => Some(UVec2::new(1, 0)),
+			ColorKey::ButtonTrigger => Some(UVec2::new(2, 0)),
+			ColorKey::Player => Some(UVec2::new(4, 0)),
+			ColorKey::GoalClosed => Some(UVec2::new(5, 0)),
+			ColorKey::GoalOpen => Some(UVec2::new(6, 0)),
+			ColorKey::CycleDisabled => Some(UVec2::new(0, 1)),
+			ColorKey::CycleReady => Some(UVec2::new(1, 1)),
+			ColorKey::CycleTrigger => Some(UVec2::new(2, 1)),
+			ColorKey::CycleCentralArrow => Some(UVec2::new(3, 1)),
+			ColorKey::LinkMultiplicityLabel => Some(UVec2::new(1, 2)),
+			ColorKey::InvertedLinkMultiplicityLabel => Some(UVec2::new(2, 2)),
+			ColorKey::WarningSign => Some(UVec2::new(4, 5)),
+			ColorKey::Checkmark => Some(UVec2::new(3, 5)),
+			ColorKey::Wall => Some(UVec2::new(7, 0)),
+			ColorKey::Detector => Some(UVec2::new(8, 0)),
+			ColorKey::CycleRingsReady => Some(UVec2::new(4, 1)),
+			ColorKey::CycleRingsSelect => Some(UVec2::new(5, 1)),
+			ColorKey::CycleRingsDisabled => Some(UVec2::new(6, 1)),
+			ColorKey::CycleRingOutlines => Some(UVec2::new(7, 1)),
+			ColorKey::CycleRingOutlinesDisabled => Some(UVec2::new(8, 1)),
+			ColorKey::CycleHitboxes => Some(UVec2::new(9, 1)),
+			ColorKey::LinkLines => Some(UVec2::new(0, 2)),
+			ColorKey::ColoredButtonLabels => Some(UVec2::new(3, 0)),
+			ColorKey::NodeBackground => Some(UVec2::new(0, 3)),
+			ColorKey::UiButtonHovered => Some(UVec2::new(1, 3)),
+			ColorKey::UiButtonPressed => Some(UVec2::new(2, 3)),
+			ColorKey::UiButtonDisabled => Some(UVec2::new(3, 3)),
+			ColorKey::SpriteButton => Some(UVec2::new(5, 3)),
+			ColorKey::SpriteButtonHovered => Some(UVec2::new(6, 3)),
+			ColorKey::SpriteButtonPressed => Some(UVec2::new(7, 3)),
+			ColorKey::SpriteButtonDisabled => Some(UVec2::new(8, 3)),
+			ColorKey::NextLevelButton => Some(UVec2::new(0, 5)),
+			ColorKey::NextLevelButtonHovered => Some(UVec2::new(1, 5)),
+			ColorKey::NextLevelButtonPressed => Some(UVec2::new(2, 5)),
+			ColorKey::NewLevelButton => Some(UVec2::new(4, 3)),
+			ColorKey::SliderOutline => Some(UVec2::new(2, 4)),
+			ColorKey::SliderFill => Some(UVec2::new(3, 4)),
+			ColorKey::SliderHoveredFill => Some(UVec2::new(4, 4)),
+			ColorKey::SliderPressedFill => Some(UVec2::new(5, 4)),
+			ColorKey::SliderDisabledFill => Some(UVec2::new(6, 4)),
+			ColorKey::UiButtonText => Some(UVec2::new(9, 3)),
+			ColorKey::UiLabelText => Some(UVec2::new(0, 4)),
+			ColorKey::HeaderText => Some(UVec2::new(1, 4)),
+			ColorKey::BackgroundBase => Some(UVec2::new(0, 6)),
+			ColorKey::BackgroundDetail => Some(UVec2::new(1, 6)),
+			ColorKey::BackgroundSolvedBase => Some(UVec2::new(2, 6)),
+			ColorKey::BackgroundSolvedDetail => Some(UVec2::new(3, 6)),
+			#[cfg(feature = "playtest")]
+			ColorKey::PlaytestMarker => None,
+			#[cfg(feature = "playtest")]
+			ColorKey::StarWidgetHovered => None,
+			#[cfg(feature = "playtest")]
+			ColorKey::StarWidgetSelected => None,
+		}
+	}
 }
 
 /// Identifies a material used somewhere in the game
@@ -399,5 +463,26 @@ fn update_node_border_colors(
 ) {
 	for (mut border, color_key) in &mut query {
 		*border = BorderColor::all(palette[&**color_key]);
+	}
+}
+
+fn reload_palette_from_asset(
+	mut palette: ResMut<ThingPalette>,
+	sheet: Res<DefaultPalette>,
+	images: Res<Assets<Image>>,
+	mut events: MessageReader<AssetEvent<Image>>,
+) {
+	for e in events.read() {
+		if e.is_loaded_with_dependencies(sheet.id())
+			&& let Some(sheet) = images.get(sheet.id())
+		{
+			for (key, color) in palette.iter_mut() {
+				if let Some(UVec2 { x, y }) = key.palette_sheet_position()
+					&& let Ok(new_color) = sheet.get_color_at(x, y)
+				{
+					*color = new_color;
+				}
+			}
+		}
 	}
 }

@@ -23,6 +23,7 @@ pub(super) fn plugin(app: &mut App) {
 	app.init_resource::<DigitAtlas>();
 	app.init_resource::<UiButtonAtlas>();
 	app.init_resource::<GlobalFont>();
+	app.init_resource::<DefaultPalette>();
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Reflect)]
@@ -395,6 +396,17 @@ impl FromWorld for GlobalFont {
 	}
 }
 
+/// Palette to be used for coloring things unless specified otherwise
+#[derive(Resource, Deref)]
+pub struct DefaultPalette(pub Handle<Image>);
+
+impl FromWorld for DefaultPalette {
+	fn from_world(world: &mut World) -> Self {
+		let asset_server = world.resource::<AssetServer>();
+		Self(asset_server.load("images/palettes/default.png"))
+	}
+}
+
 pub trait AssetKey: Eq + std::hash::Hash + Sized {
 	type Asset: Asset;
 }
@@ -422,6 +434,7 @@ pub fn all_assets_loaded(
 	sfx_handles: Res<HandleMap<SfxKey>>,
 	soundtrack_handles: Res<HandleMap<SoundtrackKey>>,
 	font: Res<GlobalFont>,
+	palette: Res<DefaultPalette>,
 	// This resource gets initialized later, so it needs to be optional
 	level_list: Option<Res<LoadedLevelList>>,
 ) -> bool {
@@ -429,5 +442,6 @@ pub fn all_assets_loaded(
 		&& sfx_handles.all_loaded(&asset_server)
 		&& soundtrack_handles.all_loaded(&asset_server)
 		&& asset_server.is_loaded_with_dependencies(font.0.id())
+		&& asset_server.is_loaded_with_dependencies(palette.id())
 		&& level_list.is_some_and(|list| list.all_loaded(&asset_server))
 }
