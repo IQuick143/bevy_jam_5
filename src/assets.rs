@@ -1,4 +1,5 @@
 use bevy::{image::ImageLoaderSettings, platform::collections::HashMap, prelude::*};
+use bevy_seedling::prelude::*;
 
 use crate::game::level::{
 	CycleTurnability, GlyphType, ObjectType, ThingType, asset::plugin as level_asset_plugin,
@@ -319,7 +320,7 @@ impl SfxKey {
 }
 
 impl AssetKey for SfxKey {
-	type Asset = AudioSource;
+	type Asset = AudioSample;
 }
 
 impl FromWorld for HandleMap<SfxKey> {
@@ -353,7 +354,7 @@ pub enum SoundtrackKey {
 }
 
 impl AssetKey for SoundtrackKey {
-	type Asset = AudioSource;
+	type Asset = AudioSample;
 }
 
 impl FromWorld for HandleMap<SoundtrackKey> {
