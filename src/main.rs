@@ -20,12 +20,8 @@ mod screen;
 mod settings;
 mod ui;
 
-use bevy::{
-	asset::AssetMetaCheck,
-	audio::{AudioPlugin, Volume},
-	ecs::error::warn,
-	prelude::*,
-};
+use bevy::{asset::AssetMetaCheck, ecs::error::warn, prelude::*};
+use bevy_seedling::prelude::*;
 
 use explorer::{StateExplorerOptions, run_state_explorer};
 
@@ -74,17 +70,12 @@ impl Plugin for AppPlugin {
 					}
 					.into(),
 					..default()
-				})
-				.set(AudioPlugin {
-					global_volume: GlobalVolume {
-						volume: Volume::Linear(0.3),
-					},
-					..default()
 				}),
 		);
 
 		// Add other plugins.
 		app.add_plugins((
+			SeedlingPlugins,
 			persistent::plugin,
 			input::plugin,
 			save::plugin,

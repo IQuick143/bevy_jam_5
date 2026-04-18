@@ -8,7 +8,7 @@ bevy = { version = "0.18.0", default-features=false, features = [
     # "asset_processor",            # Enables the built-in asset processor for processed assets.
     "async_executor",               # Uses `async-executor` as a task execution backend.
     "bevy_asset",                   # Provides asset functionality
-    "bevy_audio",                   # Provides audio functionality
+    # "bevy_audio",                 # Provides audio functionality
     "bevy_camera",                  # Provides camera and visibility types, as well as culling primitives.
     "bevy_color",                   # Provides shared color types and operations
     "bevy_core_pipeline",           # Provides cameras and other basic render pipeline features
@@ -53,11 +53,12 @@ bevy = { version = "0.18.0", default-features=false, features = [
     # "trace_tracy_memory",         # Tracing support, with memory profiling, exposing a port for Tracy
     # "track_location",             # Enables source location tracking for change detection and spawning/despawning, which can assist with debugging
     "ui_picking",                   # Provides an implementation for picking UI
-    "vorbis",                       # OGG/VORBIS audio format support
+    # "vorbis",                     # OGG/VORBIS audio format support
     "wayland",                      # Wayland display server support
     "x11",                          # X11 display server support
 ] }
 
+bevy_seedling = { git = "https://github.com/CorvusPrudens/bevy_seedling.git", rev = "b610bb1a9c40370eacc7a9e49239ce74addb826a", default-features = false, features = ["ogg", "cpal"]}
 itertools = "0.14.0"
 # Disable low-severity logs at compile time for performance.
 log = { version = "0.4", features = [
