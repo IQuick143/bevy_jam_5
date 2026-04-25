@@ -517,8 +517,14 @@ impl TurnCycleResult {
 
 	fn wall_hits_by_cycle(&self, level_data: &LevelData) -> Vec<SmallVec<[usize; 1]>> {
 		let mut hits_by_cycle = vec![SmallVec::new(); level_data.cycles.len()];
-		for &(cycle_id, offset) in &self.wall_hits {
-			hits_by_cycle[cycle_id].push(offset);
+		for &(cycle_id, wall_index) in &self.wall_hits {
+			if let Some(offset) = level_data
+				.cycles
+				.get(cycle_id)
+				.and_then(|c| c.wall_indices.get(wall_index))
+			{
+				hits_by_cycle[cycle_id].push(*offset);
+			}
 		}
 		hits_by_cycle
 	}
