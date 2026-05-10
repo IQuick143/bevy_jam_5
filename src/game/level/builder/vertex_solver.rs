@@ -1136,127 +1136,117 @@ impl LevelBuilder {
 			let next_single_vertex =
 				point_data.cycle_data[cycle_id].vertices[next_single_index].vertex;
 
-			match (
-				point_data.vertex_constraints[pair_vertex],
-				point_data.vertex_constraints[prev_single_vertex],
-				point_data.vertex_constraints[next_single_vertex],
-			) {
-				(
-					IntersectionPointSet::Pair(point_a, point_b),
-					IntersectionPointSet::Single(prev_point),
-					IntersectionPointSet::Single(next_point),
-				) => {
-					// If there is only one `Single` vertex, then it will point to itself and
-					// `prev_single_vertex` might equal `next_single_vertex`
+			let constraints = &point_data.vertex_constraints;
+			if let IntersectionPointSet::Pair(point_a, point_b) = constraints[pair_vertex]
+				&& let IntersectionPointSet::Single(prev_point) = constraints[prev_single_vertex]
+				&& let IntersectionPointSet::Single(next_point) = constraints[next_single_vertex]
+			{
+				// If there is only one `Single` vertex, then it will point to itself and
+				// `prev_single_vertex` might equal `next_single_vertex`
 
-					// Inner if checks whether we have two different vertices, and if so,
-					// Executes code that might resolve the `Pair`
-					// Outer if checks if the previous code failed, and if so,
-					// Tries running a special branch that applies to twin vertices.
-					if !if prev_single_vertex != next_single_vertex {
-						// The two `Single` make a "sandwich" constraining the range of
-						// Allowed positions for the `Pair` vertex.
-						// This might be enough to eliminate one of the options
+				// If we have two different vertices, try to resolve the `Pair`
+				let direct_placement_succeeded = prev_single_vertex != next_single_vertex && {
+					// The two `Single` make a "sandwich" constraining the range of
+					// Allowed positions for the `Pair` vertex.
+					// This might be enough to eliminate one of the options
 
-						// Two constraints are available
+					// Two constraints are available
+					let clockwiseness = test_index_clockwiseness(
+						prev_single_index,
+						pair_vertex_index,
+						next_single_index,
+					);
+					let sign = if clockwiseness { 1.0 } else { -1.0 };
+
+					let score_a = test_point_clockwiseness(
+						point_data.points[prev_point],
+						point_data.points[point_a],
+						point_data.points[next_point],
+						Some(cycle_position),
+					) * sign;
+					let score_b = test_point_clockwiseness(
+						point_data.points[prev_point],
+						point_data.points[point_b],
+						point_data.points[next_point],
+						Some(cycle_position),
+					) * sign;
+					let mut point_a_valid = score_a > 0.0;
+					let mut point_b_valid = score_b > 0.0;
+					// if one of the results is weirdly small, but not the other one,
+					// use the non-tiny one
+					if point_a_valid && point_b_valid {
+						const THRESHOLD: f32 = 0.001;
+						if score_a < score_b * THRESHOLD {
+							point_a_valid = false;
+						} else if score_b < score_a * THRESHOLD {
+							point_b_valid = false;
+						}
+					}
+					match (point_a_valid, point_b_valid) {
+						(true, true) => {
+							// Tough luck, nothing got done here
+							false
+						}
+						(true, false) => {
+							point_data.place_vertex(pair_vertex, point_a, error_log);
+							true
+						}
+						(false, true) => {
+							point_data.place_vertex(pair_vertex, point_b, error_log);
+							true
+						}
+						(false, false) => {
+							error_log.push(VertexSolverError::VertexHasNoPointsAvailable {
+								vertex: pair_vertex,
+							});
+							// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
+							// so there's no need for more attempts at solving
+							true
+						}
+					}
+				};
+				// If the previous code failed, try running a special branch that applies to twin vertices.
+				if !direct_placement_succeeded {
+					// Only one constraint is guaranteed, but twin vertices can still be decided this way
+					if let Some((twin_vertex, twin_vertex_index)) =
+						// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
+						// But in the case of a `Single` it can always be decided which order is correct.
+						point_data.find_twin(pair_vertex).and_then(|twin_vertex| {
+								point_data.problematic_vertex_to_cycle[twin_vertex]
+									.iter()
+									.find(|&&(twin_cycle_id, _twin_position_in_cycle)| {
+										twin_cycle_id == cycle_id
+									})
+									.map(|&(_, twin_position_in_cycle)| {
+										(twin_vertex, twin_position_in_cycle)
+									})
+							}) {
 						let clockwiseness = test_index_clockwiseness(
 							prev_single_index,
 							pair_vertex_index,
-							next_single_index,
+							twin_vertex_index,
 						);
-						let sign = if clockwiseness { 1.0 } else { -1.0 };
-
-						let score_a = test_point_clockwiseness(
+						let point_clockwiseness = test_point_clockwiseness(
 							point_data.points[prev_point],
 							point_data.points[point_a],
-							point_data.points[next_point],
-							Some(cycle_position),
-						) * sign;
-						let score_b = test_point_clockwiseness(
-							point_data.points[prev_point],
 							point_data.points[point_b],
-							point_data.points[next_point],
 							Some(cycle_position),
-						) * sign;
-						let mut point_a_valid = score_a > 0.0;
-						let mut point_b_valid = score_b > 0.0;
-						// if one of the results is weirdly small, but not the other one,
-						// use the non-tiny one
-						if point_a_valid && point_b_valid {
-							const THRESHOLD: f32 = 0.001;
-							if score_a < score_b * THRESHOLD {
-								point_a_valid = false;
-							} else if score_b < score_a * THRESHOLD {
-								point_b_valid = false;
-							}
+						);
+						if clockwiseness == (point_clockwiseness > 0.0) {
+							point_data.place_vertex(pair_vertex, point_a, error_log);
+						} else {
+							point_data.place_vertex(pair_vertex, point_b, error_log);
 						}
-						match (point_a_valid, point_b_valid) {
-							(true, true) => {
-								/* Tough luck, nothing got done here */
-								false
-							}
-							(true, false) => {
-								point_data.place_vertex(pair_vertex, point_a, error_log);
-								true
-							}
-							(false, true) => {
-								point_data.place_vertex(pair_vertex, point_b, error_log);
-								true
-							}
-							(false, false) => {
-								error_log.push(VertexSolverError::VertexHasNoPointsAvailable {
-									vertex: pair_vertex,
-								});
-								// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
-								// so there's no need for more attempts at solving
-								true
-							}
-						}
-					} else {
-						false
-					} {
-						// Only one constraint is guaranteed, but twin vertices can still be decided this way
-						if let Some((twin_vertex, twin_vertex_index)) =
-							// Similarly as in `'pair_therapy`, the twin vertices have an order fixed by an external point
-							// But in the case of a `Single` it can always be decided which order is correct.
-							point_data.find_twin(pair_vertex).and_then(|twin_vertex| {
-									point_data.problematic_vertex_to_cycle[twin_vertex]
-										.iter()
-										.find(|&&(twin_cycle_id, _twin_position_in_cycle)| {
-											twin_cycle_id == cycle_id
-										})
-										.map(|&(_, twin_position_in_cycle)| {
-											(twin_vertex, twin_position_in_cycle)
-										})
-								}) {
-							let clockwiseness = test_index_clockwiseness(
-								prev_single_index,
-								pair_vertex_index,
-								twin_vertex_index,
-							);
-							let point_clockwiseness = test_point_clockwiseness(
-								point_data.points[prev_point],
-								point_data.points[point_a],
-								point_data.points[point_b],
-								Some(cycle_position),
-							);
-							if clockwiseness == (point_clockwiseness > 0.0) {
-								point_data.place_vertex(pair_vertex, point_a, error_log);
-							} else {
-								point_data.place_vertex(pair_vertex, point_b, error_log);
-							}
-							debug_assert!(
-								!error_log.is_empty()
-									|| matches!(
-										point_data.vertex_constraints[twin_vertex],
-										IntersectionPointSet::Single(_)
-									),
-								"Vertex propagation should've filled this in."
-							);
-						}
+						debug_assert!(
+							!error_log.is_empty()
+								|| matches!(
+									point_data.vertex_constraints[twin_vertex],
+									IntersectionPointSet::Single(_)
+								),
+							"Vertex propagation should've filled this in."
+						);
 					}
 				}
-				_ => { /* dont care */ }
 			}
 
 			#[cfg(any(debug_assertions, test))]
