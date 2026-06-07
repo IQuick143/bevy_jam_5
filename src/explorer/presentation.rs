@@ -29,26 +29,26 @@ impl GameState {
 impl StateGraph {
 	const PAGE_HEADER: &str = r#"<!doctype html>
 <html>
-    <head>
-        <!-- https://github.com/vasturiano/3d-force-graph -->
-        <script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
-        <script>
-            addEventListener('load', () => {
-                const main = document.getElementById('main')
-                const graph = new ForceGraph3D(main);
-                graph.linkOpacity(0.5);
-                graph.graphData("#;
+	<head>
+		<!-- https://github.com/vasturiano/3d-force-graph -->
+		<script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
+		<script>
+			addEventListener('load', () => {
+				const main = document.getElementById('main')
+				const graph = new ForceGraph3D(main);
+				graph.linkOpacity(0.5);
+				graph.graphData("#;
 
 	const PAGE_CENTER: &str = r#");
-            });
-        </script>
-        <style>
-            body, html {
-                margin: 0;
-            }
-            #main {
-                height: 100%;
-            }
+			});
+		</script>
+		<style>
+			body, html {
+				margin: 0;
+			}
+			#main {
+				height: 100%;
+			}
 			#meta {
 				position: absolute;
 				color: #aaa;
@@ -56,15 +56,15 @@ impl StateGraph {
 				font-family: sans-serif;
 				font-size: small;
 			}
-        </style>
-    </head>
-    <body>
+		</style>
+	</head>
+	<body>
 		<div id="meta">"#;
 
 	const PAGE_FOOTER: &str = r#"
 		</div>
-        <div id="main"></div>
-    </body>
+		<div id="main"></div>
+	</body>
 </html>"#;
 
 	pub fn wrap_in_html_page(&self, writer: &mut impl Write) -> std::io::Result<()> {
