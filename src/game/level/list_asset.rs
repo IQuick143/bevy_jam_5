@@ -92,6 +92,6 @@ impl bevy::asset::AssetLoader for LevelListLoader {
 	}
 
 	fn extensions(&self) -> &[&str] {
-		&["txt"]
+		&["txt", "epilang"]
 	}
 }

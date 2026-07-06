@@ -1276,13 +1276,13 @@ circle(c2; 0 0 1);
 #[test]
 fn stress_test_random_levels() {
 	let levels = [
-		include_str!("../../epilang/tests/1_intro.txt"),
-		include_str!("../../epilang/tests/2_sort.txt"),
-		//include_str!("../../epilang/tests/rubik.txt"),
-		include_str!("../../epilang/tests/5_sync.txt"),
-		include_str!("../../epilang/tests/6_sync2.txt"),
-		include_str!("../../epilang/tests/send.txt"),
-		include_str!("../../epilang/tests/linked_sort.txt"),
+		include_str!("../../epilang/tests/1_intro.epilang"),
+		include_str!("../../epilang/tests/2_sort.epilang"),
+		//include_str!("../../epilang/tests/rubik.epilang"),
+		include_str!("../../epilang/tests/5_sync.epilang"),
+		include_str!("../../epilang/tests/6_sync2.epilang"),
+		include_str!("../../epilang/tests/send.epilang"),
+		include_str!("../../epilang/tests/linked_sort.epilang"),
 	];
 	for level in levels {
 		println!("{level}");
@@ -1294,12 +1294,12 @@ fn stress_test_random_levels() {
 #[test]
 fn stress_test_undo_invertibility() {
 	let levels = [
-		include_str!("../../epilang/tests/1_intro.txt"),
-		include_str!("../../epilang/tests/send.txt"),
+		include_str!("../../epilang/tests/1_intro.epilang"),
+		include_str!("../../epilang/tests/send.epilang"),
 		// Verify non-group levels.
-		include_str!("../../epilang/tests/detectors/clash.txt"),
-		include_str!("../../epilang/tests/detectors/wall.txt"),
-		include_str!("../../epilang/tests/detectors/two_rails.txt"), // This level is here specifically because it failed layouting once.
+		include_str!("../../epilang/tests/detectors/clash.epilang"),
+		include_str!("../../epilang/tests/detectors/wall.epilang"),
+		include_str!("../../epilang/tests/detectors/two_rails.epilang"), // This level is here specifically because it failed layouting once.
 	];
 	for level in levels {
 		println!("{level}");
