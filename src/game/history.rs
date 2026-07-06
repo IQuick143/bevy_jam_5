@@ -105,9 +105,21 @@ impl AlterHistory {
 	}
 }
 
+impl RotationCause {
+	fn is_recordable(self) -> bool {
+		match self {
+			RotationCause::Manual => true,
+			RotationCause::Undo => false,
+			RotationCause::Redo => false,
+			#[cfg(feature = "playback")]
+			RotationCause::Playback => true,
+		}
+	}
+}
+
 fn record_moves(event: On<RotateCycleGroupWithResult>, mut history: ResMut<MoveHistory>) {
 	let RotateCycleGroupWithResult { action, result } = &*event;
-	if action.cause == RotationCause::Manual && !result.blocked() && result.objects_moved {
+	if action.cause.is_recordable() && !result.blocked() && result.objects_moved {
 		history.push(action.rotation);
 	}
 }

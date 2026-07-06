@@ -13,6 +13,8 @@ mod game;
 mod graphics;
 mod input;
 mod persistent;
+#[cfg(feature = "playback")]
+mod playback;
 #[cfg(feature = "playtest")]
 mod playtest;
 mod save;
@@ -102,6 +104,9 @@ impl Plugin for AppPlugin {
 		// Enable dev tools for dev builds.
 		#[cfg(feature = "dev")]
 		app.add_plugins(dev_tools::plugin);
+
+		#[cfg(feature = "playback")]
+		app.add_plugins(playback::plugin);
 
 		// Enable playtest support for test builds
 		#[cfg(feature = "playtest")]

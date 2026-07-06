@@ -51,6 +51,11 @@ fn record_moves(
 					// Amount is going to be small for user inputs
 					amount: action.action.rotation.amount as i32,
 				},
+				#[cfg(feature = "playback")]
+				RotationCause::Playback => {
+					// Do not record moves that are being replayed
+					return Ok(());
+				}
 			},
 		};
 		session_log.moves.push(entry);

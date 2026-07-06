@@ -81,7 +81,8 @@ futures = { version = "0.3", features = ["alloc"], optional = true }
 default = [
     # Default to a native dev build.
     "dev_native",
-    # While playtest view is in development, enable it by default
+    # Enable other features while they are in development
+    "playback",
     "playtest",
 ]
 dev = [
@@ -110,6 +111,7 @@ playtest = [
     "dep:ureq",
     "dep:futures",
 ]
+playback = []
 
 # Idiomatic Bevy code often triggers these lints, and the CI workflow treats them as errors.
 # In some cases they may still signal poor code quality however, so consider commenting out these lines.

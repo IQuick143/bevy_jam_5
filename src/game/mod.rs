@@ -6,7 +6,7 @@ pub mod drawing;
 mod game_sfx;
 mod hints;
 pub mod history;
-mod inputs;
+pub mod inputs;
 pub mod level;
 pub mod logic;
 pub mod logic_relay;

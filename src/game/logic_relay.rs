@@ -61,6 +61,9 @@ pub enum RotationCause {
 	Undo,
 	/// Rotation command issued to replay a previously undone action
 	Redo,
+	/// Rotation executed automatically from a recording
+	#[cfg(feature = "playback")]
+	Playback,
 }
 
 /// [`Event`] sent to rotate a cycle with all cycles linked to it.
