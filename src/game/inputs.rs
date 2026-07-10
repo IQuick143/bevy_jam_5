@@ -53,7 +53,7 @@ fn cycle_hover_system(
 			let d_sq = transform.translation().xy().distance_squared(cursor_pos);
 
 			match placement.shape {
-				CycleShape::Circle(radius) => {
+				CycleShape::Circle { radius, .. } => {
 					if d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {
 						Some((e, d_sq, radius.powi(2), is_turnable))
 					} else {

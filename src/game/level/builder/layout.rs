@@ -24,8 +24,7 @@ impl LevelBuilder {
 			));
 		}
 		self.cycles[target_cycle].placement = Some(CyclePlacement {
-			position: center,
-			shape: CycleShape::Circle(radius),
+			shape: CycleShape::Circle { center, radius },
 		});
 		Ok(())
 	}
@@ -144,11 +143,17 @@ impl LevelBuilder {
 				let Some(vertex_position) = vertex.position.get_fixed() else {
 					continue;
 				};
-				let Some(placement) = self.cycles[p.owner_cycle].placement else {
+				let Some(CyclePlacement {
+					shape: CycleShape::Circle { center, .. },
+				}) = self.cycles[p.owner_cycle].placement
+				else {
+					warn!(
+						"Ignoring cycle-bound button labels on cycle {} which is not a circle",
+						p.owner_cycle
+					);
 					continue;
 				};
-				let owner_cycle_position = placement.position;
-				let angle_from_owner = -Vec2::Y.angle_to(vertex_position - owner_cycle_position);
+				let angle_from_owner = -Vec2::Y.angle_to(vertex_position - center);
 				// Flip target angle if we want the labels inside the cycle
 				let target_angle = if p.place_outside_cycle {
 					angle_from_owner
@@ -214,7 +219,7 @@ impl LevelBuilder {
 				// If center sprite has not been explicitly positioned
 				// or disabled, put it in the cycle center
 				cycle_data.center_sprite_position =
-					IntermediateCycleCenterSpritePosition::Placed(placement.position);
+					IntermediateCycleCenterSpritePosition::Placed(placement.shape.center());
 			}
 		}
 	}
@@ -283,7 +288,7 @@ impl LevelBuilder {
 	/// Computes the bounding box for a given cycle shape
 	fn get_bounding_box_for_cycle(placement: CyclePlacement) -> Aabb2d {
 		match placement.shape {
-			CycleShape::Circle(radius) => Aabb2d::new(placement.position, Vec2::splat(radius)),
+			CycleShape::Circle { center, radius } => Aabb2d::new(center, Vec2::splat(radius)),
 		}
 	}
 
@@ -321,9 +326,11 @@ impl LevelBuilder {
 		}
 		for cycle in &mut self.cycles {
 			if let Some(p) = &mut cycle.placement {
-				p.position = (p.position - bounds_center) * scale + viewport_center;
 				match &mut p.shape {
-					CycleShape::Circle(radius) => *radius *= scale,
+					CycleShape::Circle { center, radius } => {
+						*radius *= scale;
+						*center = (*center - bounds_center) * scale + viewport_center
+					}
 				}
 			}
 			if let IntermediateCycleCenterSpritePosition::Placed(p) =

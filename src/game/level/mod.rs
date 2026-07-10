@@ -199,8 +199,6 @@ impl OneWayLinkData {
 /// Computed placement of a cycle
 #[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub struct CyclePlacement {
-	/// Position of the cycle center. This is the position of the cycle entity
-	pub position: Vec2,
 	/// Shape of the cycle's perimeter
 	pub shape: CycleShape,
 }
@@ -208,7 +206,7 @@ pub struct CyclePlacement {
 impl CyclePlacement {
 	pub fn sample(&self, t: f32) -> Vec2 {
 		match self.shape {
-			CycleShape::Circle(radius) => self.position + radius * Vec2::from_angle(t * TAU),
+			CycleShape::Circle { center, radius } => center + radius * Vec2::from_angle(t * TAU),
 		}
 	}
 }
@@ -217,14 +215,21 @@ impl CyclePlacement {
 #[derive(Clone, Copy, PartialEq, Debug, Reflect)]
 pub enum CycleShape {
 	/// Circle defined by a radius, centered in the cycle's position
-	Circle(f32),
+	Circle { center: Vec2, radius: f32 },
 }
 
 impl CycleShape {
+	/// Some center-point of the shape
+	pub fn center(&self) -> Vec2 {
+		match self {
+			Self::Circle { center, .. } => *center,
+		}
+	}
+
 	/// Length of the cycle's perimeter, in world units
 	pub fn length(&self) -> f32 {
 		match self {
-			Self::Circle(radius) => TAU * radius,
+			Self::Circle { radius, .. } => TAU * radius,
 		}
 	}
 }
@@ -381,8 +386,11 @@ impl LogicalColor {
 impl std::fmt::Display for CyclePlacement {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self.shape {
-			CycleShape::Circle(r) => {
-				write!(f, "[x={} y={} r={r}]", self.position.x, self.position.y)
+			CycleShape::Circle {
+				center: Vec2 { x, y },
+				radius,
+			} => {
+				write!(f, "[x={x} y={y} r={radius}]")
 			}
 		}
 	}

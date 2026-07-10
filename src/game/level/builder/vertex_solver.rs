@@ -596,12 +596,11 @@ impl LevelBuilder {
 
 			#[expect(clippy::single_match, reason = "There will be more")]
 			match cycle.placement {
-				Some(CyclePlacement { position, shape }) => {
-					let size = match shape {
-						CycleShape::Circle(radius) => radius.abs(),
+				Some(CyclePlacement { shape }) => {
+					let limit_metric = match shape {
+						CycleShape::Circle { center, radius } => center.length() + radius.abs(),
 					};
-					let distance = position.length();
-					absolute_precision_limit = absolute_precision_limit.max(distance + size);
+					absolute_precision_limit = absolute_precision_limit.max(limit_metric);
 				}
 				None => {}
 			}
@@ -699,15 +698,11 @@ impl LevelBuilder {
 							// Use hints if possible
 							match self.vertices[vertex].hint_position {
 								Some(hint_position) => {
-									if let Some(CyclePlacement {
-										position: cycle_position,
-										shape,
-									}) = self.cycles[cycle].placement
-									{
-										match shape {
-											CycleShape::Circle(radius) => {
+									if let Some(placement) = self.cycles[cycle].placement {
+										match placement.shape {
+											CycleShape::Circle { center, radius } => {
 												let distance_from_center =
-													cycle_position.distance(hint_position);
+													center.distance(hint_position);
 												if distance_from_center <= absolute_precision_limit
 												{
 													errors.push(
@@ -715,8 +710,8 @@ impl LevelBuilder {
 													);
 													IntersectionPointSet::Cycle(cycle)
 												} else {
-													let offset = hint_position - cycle_position;
-													let point = cycle_position
+													let offset = hint_position - center;
+													let point = center
 														+ (radius / distance_from_center) * offset;
 													IntersectionPointSet::Single(
 														insert_point_if_needed(
@@ -956,9 +951,8 @@ impl LevelBuilder {
 			// This should not really happen
 			return;
 		};
-		let cycle_position = placement.position;
 		match placement.shape {
-			CycleShape::Circle(_) => {
+			CycleShape::Circle { center, .. } => {
 				// Only go through the logic if there is an undecided vertex available.
 				if let Some(first_pair_index) =
 					point_data.cycle_data[cycle_id].first_undecided_vertex
@@ -970,10 +964,7 @@ impl LevelBuilder {
 						// There are no `Single`s available,
 						// so we go after `Pair` therapy
 						self.try_reduce_pairs_on_cycle_without_single(
-							cycle_id,
-							cycle_position,
-							point_data,
-							error_log,
+							cycle_id, center, point_data, error_log,
 						);
 					}
 					// If there is a `Single` vertex available (as an anchor)
@@ -984,7 +975,7 @@ impl LevelBuilder {
 					{
 						self.try_reduce_pairs_on_cycle_using_single(
 							cycle_id,
-							cycle_position,
+							center,
 							first_pair_index,
 							point_data,
 							error_log,
@@ -1379,12 +1370,11 @@ impl LevelBuilder {
 		for &cycle in cycles_to_check.iter() {
 			match cycles[cycle].placement {
 				Some(CyclePlacement {
-					position,
-					shape: CycleShape::Circle(_),
+					shape: CycleShape::Circle { center, .. },
 				}) => {
 					// Calculate disparity between inner and outer areas
-					let dir_a = Dir2::new(point_data.points[point_a] - position).unwrap_or(Dir2::X);
-					let dir_b = Dir2::new(point_data.points[point_b] - position).unwrap_or(Dir2::Y);
+					let dir_a = Dir2::new(point_data.points[point_a] - center).unwrap_or(Dir2::X);
+					let dir_b = Dir2::new(point_data.points[point_b] - center).unwrap_or(Dir2::Y);
 					let inner_fraction = {
 						let mut fraction = dir_a.rotation_to(dir_b).as_turn_fraction();
 						if fraction < 0.0 {
@@ -1468,8 +1458,7 @@ impl LevelBuilder {
 		for &cycle in cycles_to_check.iter() {
 			match cycles[cycle].placement {
 				Some(CyclePlacement {
-					position,
-					shape: CycleShape::Circle(_),
+					shape: CycleShape::Circle { center, .. },
 				}) => {
 					let mut constrained_inside = false;
 					let mut constrained_outside = false;
@@ -1479,7 +1468,7 @@ impl LevelBuilder {
 							point_data.points[point_a],
 							point_data.points[point],
 							point_data.points[point_b],
-							Some(position),
+							Some(center),
 						);
 						if score.abs() > 0.001 {
 							if score > 0.0 {
@@ -1525,14 +1514,14 @@ impl LevelBuilder {
 				.collect::<Vec<_>>()
 				.into_iter();
 			match cycle_placement.shape {
-				CycleShape::Circle(cycle_radius) => {
+				CycleShape::Circle { center, radius } => {
 					if let Some((first_fixed_vertex, first_fixed_pos)) = fixed_vertices.next() {
-						let first_relative_pos = first_fixed_pos - cycle_placement.position;
+						let first_relative_pos = first_fixed_pos - center;
 						let mut current_fixed_vertex = first_fixed_vertex;
 						let mut current_relative_pos = first_relative_pos;
 						for (next_fixed_vertex, next_fixed_pos) in fixed_vertices {
 							// Materialize all vertices between the marked ones
-							let next_relative_pos = next_fixed_pos - cycle_placement.position;
+							let next_relative_pos = next_fixed_pos - center;
 							let vertex_count = next_fixed_vertex - current_fixed_vertex;
 							let mut segment_angle =
 								next_relative_pos.angle_to(current_relative_pos);
@@ -1544,7 +1533,7 @@ impl LevelBuilder {
 								((current_fixed_vertex + 1)..next_fixed_vertex).enumerate()
 							{
 								let target_vertex = cycle_data.vertex_indices[i];
-								let new_pos = cycle_placement.position
+								let new_pos = center
 									+ current_relative_pos.rotate(Vec2::from_angle(
 										-segment_angle * (j + 1) as f32 / vertex_count as f32,
 									));
@@ -1573,7 +1562,7 @@ impl LevelBuilder {
 							.enumerate()
 						{
 							let target_vertex = cycle_data.vertex_indices[i];
-							let new_pos = cycle_placement.position
+							let new_pos = center
 								+ current_relative_pos.rotate(Vec2::from_angle(
 									-segment_angle * (j + 1) as f32 / vertex_count as f32,
 								));
@@ -1584,8 +1573,8 @@ impl LevelBuilder {
 						// If none of the vertices have fixed placement, distribute them uniformly in clock order
 						let vertex_count = cycle_data.vertex_indices.len();
 						for (i, &j) in cycle_data.vertex_indices.iter().enumerate() {
-							let new_pos = cycle_placement.position
-								+ cycle_radius
+							let new_pos = center
+								+ radius
 									* Vec2::from_angle(
 										PI / 2.0 - 2.0 * PI * i as f32 / vertex_count as f32,
 									);
@@ -1628,27 +1617,33 @@ impl LevelBuilder {
 
 	fn check_vertex_placements_are_clockwise(&self, errors: &mut Vec<VertexSolverError>) {
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
-			let Some(placement) = &cycle.placement else {
-				continue;
-			};
-			let positions = cycle
-				.vertex_indices
-				.iter()
-				.filter_map(|&i| self.vertices[i].position.get_fixed().map(|p| (i, p)))
-				.collect::<Vec<_>>();
-			if positions.len() < 3 {
-				continue;
-			}
-			for ((ia, a), (ib, b), (ic, c)) in positions.into_iter().circular_tuple_windows() {
-				let score = test_point_clockwiseness(a, b, c, Some(placement.position));
-				if score < 0.0 {
-					errors.push(VertexSolverError::VerticesNotClockwise {
-						cycle: cycle_id,
-						vertices: [ia, ib, ic],
-					});
-					// Break the inner loop, we do not need additional diagnostics
-					// for the same cycle
-					break;
+			match cycle.placement {
+				None => {}
+				Some(CyclePlacement {
+					shape: CycleShape::Circle { center, .. },
+				}) => {
+					let positions = cycle
+						.vertex_indices
+						.iter()
+						.filter_map(|&i| self.vertices[i].position.get_fixed().map(|p| (i, p)))
+						.collect::<Vec<_>>();
+					if positions.len() < 3 {
+						continue;
+					}
+					for ((ia, a), (ib, b), (ic, c)) in
+						positions.into_iter().circular_tuple_windows()
+					{
+						let score = test_point_clockwiseness(a, b, c, Some(center));
+						if score < 0.0 {
+							errors.push(VertexSolverError::VerticesNotClockwise {
+								cycle: cycle_id,
+								vertices: [ia, ib, ic],
+							});
+							// Break the inner loop, we do not need additional diagnostics
+							// for the same cycle
+							break;
+						}
+					}
 				}
 			}
 		}
@@ -1663,33 +1658,35 @@ impl LevelBuilder {
 				continue;
 			};
 
-			let position = placement.position;
-			let CycleShape::Circle(radius) = placement.shape;
+			match placement {
+				CyclePlacement {
+					shape: CycleShape::Circle { center, radius },
+				} => {
+					for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
+						.vertex_indices
+						.iter()
+						.copied()
+						.map(|vertex| self.vertices[vertex].position.get_fixed().unwrap())
+						.enumerate()
+						.array_combinations::<3>()
+					{
+						debug_assert!(
+							test_index_clockwiseness(pos_1, pos_2, pos_3)
+								== (test_point_clockwiseness(vert_1, vert_2, vert_3, Some(center))
+									> 0.0),
+							"Vertices out of order: [{pos_1} -> {vert_1}, {pos_2} -> {vert_2}, {pos_3} -> {vert_3}]"
+						);
+					}
 
-			for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
-				.vertex_indices
-				.iter()
-				.copied()
-				.map(|vertex| self.vertices[vertex].position.get_fixed().unwrap())
-				.enumerate()
-				.array_combinations::<3>()
-			{
-				debug_assert!(
-					test_index_clockwiseness(pos_1, pos_2, pos_3)
-						== (test_point_clockwiseness(vert_1, vert_2, vert_3, Some(position)) > 0.0),
-					"Vertices out of order: [{pos_1} -> {vert_1}, {pos_2} -> {vert_2}, {pos_3} -> {vert_3}]"
-				);
-			}
-
-			for (vertex, point) in cycle
-				.vertex_indices
-				.iter()
-				.map(|&vertex| (vertex, self.vertices[vertex].position.get_fixed().unwrap()))
-			{
-				debug_assert!(
-					point_lies_on_circle(position, radius, point),
-					"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} with position {position} and radius {radius}"
-				);
+					for (vertex, point) in cycle.vertex_indices.iter().map(|&vertex| {
+						(vertex, self.vertices[vertex].position.get_fixed().unwrap())
+					}) {
+						debug_assert!(
+							point_lies_on_circle(center, radius, point),
+							"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} with position {center} and radius {radius}"
+						);
+					}
+				}
 			}
 		}
 	}
@@ -1721,12 +1718,11 @@ impl LevelBuilder {
 				(_, IntersectionPointSet::Unconstrained) => IntersectionPointSet::Cycle(cycle),
 				(
 					Some(CyclePlacement {
-						position,
-						shape: CycleShape::Circle(radius),
+						shape: CycleShape::Circle { radius, center },
 					}),
 					IntersectionPointSet::Single(point),
 				) => {
-					if point_lies_on_circle(position, radius, point) {
+					if point_lies_on_circle(center, radius, point) {
 						IntersectionPointSet::Single(point)
 					} else {
 						return IntersectionPointSet::Empty;
@@ -1734,14 +1730,13 @@ impl LevelBuilder {
 				}
 				(
 					Some(CyclePlacement {
-						position,
-						shape: CycleShape::Circle(radius),
+						shape: CycleShape::Circle { radius, center },
 					}),
 					IntersectionPointSet::Pair(point_a, point_b),
 				) => {
 					match (
-						point_lies_on_circle(position, radius, point_a),
-						point_lies_on_circle(position, radius, point_b),
+						point_lies_on_circle(center, radius, point_a),
+						point_lies_on_circle(center, radius, point_b),
 					) {
 						(true, true) => IntersectionPointSet::Pair(point_a, point_b),
 						(true, false) => IntersectionPointSet::Single(point_a),
@@ -1759,10 +1754,17 @@ impl LevelBuilder {
 							IntersectionPointSet::Cycle(cycle)
 						}
 						Some(cycle_b_placement) => {
-							let position_a = cycle_a_placement.position;
-							let position_b = cycle_b_placement.position;
 							match (cycle_a_placement.shape, cycle_b_placement.shape) {
-								(CycleShape::Circle(radius_a), CycleShape::Circle(radius_b)) => {
+								(
+									CycleShape::Circle {
+										radius: radius_a,
+										center: position_a,
+									},
+									CycleShape::Circle {
+										radius: radius_b,
+										center: position_b,
+									},
+								) => {
 									let tolerance = radius_a.max(radius_b).max(0.01)
 										* Self::PLACEMENT_VALIDATION_TOLERANCE;
 									let offset = position_a - position_b;
@@ -1837,7 +1839,7 @@ fn point_lies_on_circle(center: Vec2, radius: f32, point: Vec2) -> bool {
 
 fn point_lies_on_cycle(cycle: CyclePlacement, point: Vec2) -> bool {
 	match cycle.shape {
-		CycleShape::Circle(radius) => point_lies_on_circle(cycle.position, radius, point),
+		CycleShape::Circle { center, radius } => point_lies_on_circle(center, radius, point),
 	}
 }
 

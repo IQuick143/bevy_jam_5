@@ -203,11 +203,10 @@ fn get_position_and_normal_for_detector(
 
 	match cycle.placement {
 		CyclePlacement {
-			position,
-			shape: CycleShape::Circle(_radius),
+			shape: CycleShape::Circle { center, .. },
 		} => Some((
 			detector_placement,
-			Dir2::new(detector_placement - position).unwrap_or(Dir2::NEG_X),
+			Dir2::new(detector_placement - center).unwrap_or(Dir2::NEG_X),
 		)),
 	}
 }
@@ -554,8 +553,9 @@ fn set_cycle_transforms(
 	mut query: Query<(&CyclePlacement, &mut Transform), Added<CyclePlacement>>,
 ) {
 	for (placement, mut transform) in &mut query {
-		transform.translation.x = placement.position.x;
-		transform.translation.y = placement.position.y;
+		let center = placement.shape.center();
+		transform.translation.x = center.x;
+		transform.translation.y = center.y;
 	}
 }
 
@@ -636,7 +636,7 @@ fn create_cycle_visuals(
 		let hitbox_mesh;
 
 		match placement.shape {
-			CycleShape::Circle(radius) => {
+			CycleShape::Circle { radius, .. } => {
 				let resolution = cycle_ring_mesh_resolution(radius);
 				mesh = Annulus::new(radius - RING_HALF_WIDTH, radius + RING_HALF_WIDTH)
 					.mesh()
@@ -814,7 +814,7 @@ fn get_link_endpoint(cycle_index: usize, level: &LevelData) -> Option<Vec2> {
 
 	if let Some(center_offset) = cycle.center_sprite_appearence.0 {
 		// Links are anchored at cycle center sprites
-		Some(cycle.placement.position + center_offset)
+		Some(cycle.placement.shape.center() + center_offset)
 	} else {
 		// Links cannot be drawn if a cycle does not have center sprite
 		log::warn!("Visible link to a cycle with invisible center sprite");

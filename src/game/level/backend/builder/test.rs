@@ -1084,8 +1084,10 @@ put_vertex(c; 1 0);",
 				CycleDoesNotContainVertexError {
 					cycle: 0,
 					placement: CyclePlacement {
-						position: Vec2::ZERO,
-						shape: CycleShape::Circle(1.0)
+						shape: CycleShape::Circle {
+							center: Vec2::ZERO,
+							radius: 1.0
+						}
 					},
 					vertex: 0,
 					position: Vec2::new(0.0, 2.0)

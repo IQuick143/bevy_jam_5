@@ -690,8 +690,10 @@ impl LevelBuilder {
 				"Unplaced cycle in build phase, should have been detected earlier"
 			);
 			CyclePlacement {
-				position: Vec2::ZERO,
-				shape: CycleShape::Circle(1.0),
+				shape: CycleShape::Circle {
+					center: Vec2::ZERO,
+					radius: 1.0,
+				},
 			}
 		});
 		let center_sprite_position = match intermediate.center_sprite_position {
@@ -705,8 +707,9 @@ impl LevelBuilder {
 				None
 			}
 		};
-		let center_sprite_appearence =
-			CycleCenterSpriteAppearence(center_sprite_position.map(|p| p - placement.position));
+		let center_sprite_appearence = CycleCenterSpriteAppearence(
+			center_sprite_position.map(|p| p - placement.shape.center()),
+		);
 		let (group, relative_direction) = match intermediate.linked_cycle {
 			IntermediateLinkStatus::Group(group, relative_direction) => (group, relative_direction),
 			_ => {
@@ -714,15 +717,16 @@ impl LevelBuilder {
 				(0, LinkedCycleDirection::Coincident)
 			}
 		};
-		// This only works for circles
-		// TODO: Make different versions for other cycle shapes
+		// Calculate the relative positions of vertices along the cycle
 		let vertex_positions = intermediate
 			.vertex_indices
 			.iter()
-			.map(|i| {
-				let relative_vertex_position = vertex_data[*i].position - placement.position;
-				let angle = Vec2::X.angle_to(relative_vertex_position);
-				(angle / TAU).rem_euclid(1.0)
+			.map(|i| match placement.shape {
+				CycleShape::Circle { center, .. } => {
+					let relative_vertex_position = vertex_data[*i].position - center;
+					let angle = Vec2::X.angle_to(relative_vertex_position);
+					(angle / TAU).rem_euclid(1.0)
+				}
 			})
 			.collect();
 		CycleData {
@@ -748,8 +752,10 @@ impl LevelBuilder {
 				errors.push(LevelBuilderError::UnplacedCycle(i));
 				// Fill in some placeholder value so we can return partial build
 				cycle.placement = Some(CyclePlacement {
-					position: Vec2::ZERO,
-					shape: CycleShape::Circle(1.0),
+					shape: CycleShape::Circle {
+						center: Vec2::ZERO,
+						radius: 1.0,
+					},
 				})
 			}
 		}
