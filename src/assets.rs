@@ -375,7 +375,7 @@ pub struct LoadedLevelList(pub Handle<LevelList>);
 impl FromWorld for LoadedLevelList {
 	fn from_world(world: &mut World) -> Self {
 		let asset_server = world.resource::<AssetServer>();
-		Self(asset_server.load("levels/levels.txt"))
+		Self(asset_server.load("levels/levels.epilang"))
 	}
 }
 
