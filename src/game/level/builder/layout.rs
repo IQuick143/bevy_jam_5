@@ -29,6 +29,31 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	pub fn place_line(
+		&mut self,
+		target_cycle: usize,
+		start: Vec2,
+		end: Vec2,
+	) -> Result<(), LevelBuilderError> {
+		if target_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
+		}
+		if self.cycles[target_cycle].placement.is_some() {
+			return Err(LevelBuilderError::CycleAlreadyPlaced(target_cycle));
+		}
+		if !start.is_finite() || !start.is_finite() || start == end {
+			return Err(LevelBuilderError::CycleLengthNotPositive(
+				target_cycle,
+				start,
+				end,
+			));
+		}
+		self.cycles[target_cycle].placement = Some(CyclePlacement {
+			shape: CycleShape::Line { start, end },
+		});
+		Ok(())
+	}
+
 	/// Explicitly sets the position of a cycle's center indicator
 	/// or makes it invisible
 	pub fn place_cycle_center(
@@ -289,6 +314,10 @@ impl LevelBuilder {
 	fn get_bounding_box_for_cycle(placement: CyclePlacement) -> Aabb2d {
 		match placement.shape {
 			CycleShape::Circle { center, radius } => Aabb2d::new(center, Vec2::splat(radius)),
+			CycleShape::Line { start, end } => Aabb2d {
+				min: start.min(end),
+				max: start.max(end),
+			},
 		}
 	}
 
@@ -330,6 +359,10 @@ impl LevelBuilder {
 					CycleShape::Circle { center, radius } => {
 						*radius *= scale;
 						*center = (*center - bounds_center) * scale + viewport_center
+					}
+					CycleShape::Line { start, end } => {
+						*start = (*start - bounds_center) * scale + viewport_center;
+						*end = (*end - bounds_center) * scale + viewport_center;
 					}
 				}
 			}

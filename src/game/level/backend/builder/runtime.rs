@@ -55,6 +55,7 @@ impl InterpreterBackend for LevelBuilder {
 			"set_thing" => self.call_set_thing(args),
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
+			"line" => self.call_line(args),
 			"put_center" => self.call_put_center(args),
 			"put_vertex" => self.call_put_vertex(args),
 			"hint_vertex" => self.call_hint_vertex(args),
@@ -297,6 +298,26 @@ impl LevelBuilder {
 		};
 		args.read_end()?;
 		self.place_circle(cycle_id, Vec2::new(x, y), r)?;
+		if let Some(position) = center_position {
+			self.place_cycle_center(cycle_id, position)?;
+		}
+		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
+	}
+
+	fn call_line(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
+		let CycleId(cycle_id) = args.read_as()?;
+		args.read_separator()?;
+		let x1 = args.read_as()?;
+		let y1 = args.read_as()?;
+		let x2 = args.read_as()?;
+		let y2 = args.read_as()?;
+		let center_position = if args.optional_separator() {
+			Some(Self::read_optional_vec2(&mut args)?)
+		} else {
+			None
+		};
+		args.read_end()?;
+		self.place_line(cycle_id, Vec2::new(x1, y1), Vec2::new(x2, y2))?;
 		if let Some(position) = center_position {
 			self.place_cycle_center(cycle_id, position)?;
 		}

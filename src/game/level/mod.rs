@@ -207,6 +207,15 @@ impl CyclePlacement {
 	pub fn sample(&self, t: f32) -> Vec2 {
 		match self.shape {
 			CycleShape::Circle { center, radius } => center + radius * Vec2::from_angle(t * TAU),
+			CycleShape::Line { start, end } => {
+				let t = t.rem_euclid(1.0);
+				let u = match t {
+					..0.25 => 1.0 - 0.25 / t,
+					0.75.. => 0.25 / (1.0 - t),
+					_ => 2.0 * (t - 0.25),
+				};
+				end.lerp(start, u)
+			}
 		}
 	}
 }
@@ -216,6 +225,8 @@ impl CyclePlacement {
 pub enum CycleShape {
 	/// Circle defined by a radius, centered in the cycle's position
 	Circle { center: Vec2, radius: f32 },
+	/// Line passing through two points, with all vertices on the segment in between
+	Line { start: Vec2, end: Vec2 },
 }
 
 impl CycleShape {
@@ -223,6 +234,7 @@ impl CycleShape {
 	pub fn center(&self) -> Vec2 {
 		match self {
 			Self::Circle { center, .. } => *center,
+			Self::Line { start, .. } => *start,
 		}
 	}
 
@@ -230,6 +242,7 @@ impl CycleShape {
 	pub fn length(&self) -> f32 {
 		match self {
 			Self::Circle { radius, .. } => TAU * radius,
+			Self::Line { start, end } => start.distance(*end),
 		}
 	}
 }
@@ -391,6 +404,12 @@ impl std::fmt::Display for CyclePlacement {
 				radius,
 			} => {
 				write!(f, "[x={x} y={y} r={radius}]")
+			}
+			CycleShape::Line {
+				start: Vec2 { x: x1, y: y1 },
+				end: Vec2 { x: x2, y: y2 },
+			} => {
+				write!(f, "[x1={x1} y1={y1} x2={x2} y2={y2}]")
 			}
 		}
 	}

@@ -567,7 +567,7 @@ impl LevelBuilder {
 		self.first_pass_pair_placements(&mut point_data, &mut cycle_data, &mut error_log);
 		self.pin_single_placements(&mut point_data, &cycle_data, &mut error_log);
 		self.check_oversaturated_points(&point_data, &mut error_log);
-		self.check_vertex_placements_are_clockwise(&mut error_log);
+		self.check_vertex_placements_are_geometrically_correct(&mut error_log);
 		self.pin_cycle_placements();
 		#[cfg(debug_assertions)]
 		if error_log.is_empty() {
@@ -594,15 +594,12 @@ impl LevelBuilder {
 				vertex_to_cycle[vertex].push(id);
 			}
 
-			#[expect(clippy::single_match, reason = "There will be more")]
-			match cycle.placement {
-				Some(CyclePlacement { shape }) => {
-					let limit_metric = match shape {
-						CycleShape::Circle { center, radius } => center.length() + radius.abs(),
-					};
-					absolute_precision_limit = absolute_precision_limit.max(limit_metric);
-				}
-				None => {}
+			if let Some(CyclePlacement { shape }) = cycle.placement {
+				let limit_metric = match shape {
+					CycleShape::Circle { center, radius } => center.length() + radius.abs(),
+					CycleShape::Line { start, end } => start.max(end).length(),
+				};
+				absolute_precision_limit = absolute_precision_limit.max(limit_metric);
 			}
 		}
 		(
@@ -696,43 +693,57 @@ impl LevelBuilder {
 						}
 						IntersectionPointSet::Cycle(cycle) => {
 							// Use hints if possible
-							match self.vertices[vertex].hint_position {
-								Some(hint_position) => {
-									if let Some(placement) = self.cycles[cycle].placement {
-										match placement.shape {
-											CycleShape::Circle { center, radius } => {
-												let distance_from_center =
-													center.distance(hint_position);
-												if distance_from_center <= absolute_precision_limit
-												{
-													errors.push(
-														VertexSolverError::UnnecessaryHint(vertex),
-													);
-													IntersectionPointSet::Cycle(cycle)
-												} else {
-													let offset = hint_position - center;
-													let point = center
-														+ (radius / distance_from_center) * offset;
-													IntersectionPointSet::Single(
-														insert_point_if_needed(
-															&mut points,
-															&mut vertices_interested_in_point,
-															&points_on_cycle,
-															point,
-															vertex,
-															parent_cycle,
-														),
-													)
-												}
-											}
+							if let Some(hint_position) = self.vertices[vertex].hint_position {
+								match self.cycles[cycle].placement {
+									Some(CyclePlacement {
+										shape: CycleShape::Circle { center, radius },
+									}) => {
+										let distance_from_center = center.distance(hint_position);
+										if distance_from_center <= absolute_precision_limit {
+											errors.push(VertexSolverError::UnnecessaryHint(vertex));
+											IntersectionPointSet::Cycle(cycle)
+										} else {
+											let offset = hint_position - center;
+											let point =
+												center + (radius / distance_from_center) * offset;
+											IntersectionPointSet::Single(insert_point_if_needed(
+												&mut points,
+												&mut vertices_interested_in_point,
+												&points_on_cycle,
+												point,
+												vertex,
+												parent_cycle,
+											))
 										}
-									} else {
+									}
+									Some(CyclePlacement {
+										shape: CycleShape::Line { start, end },
+									}) => {
+										let (_, mut point) =
+											nearest_point_on_line(start, end, hint_position);
+										// Clamp to the ends of the line
+										if (point - end).dot(end - start) > 0.0 {
+											point = end;
+										} else if (point - start).dot(end - start) < 0.0 {
+											point = start;
+										}
+										IntersectionPointSet::Single(insert_point_if_needed(
+											&mut points,
+											&mut vertices_interested_in_point,
+											&points_on_cycle,
+											point,
+											vertex,
+											parent_cycle,
+										))
+									}
+									None => {
 										// Should not be happening
 										debug_assert!(false, "Unplaced cycle");
 										IntersectionPointSet::Cycle(cycle)
 									}
 								}
-								None => IntersectionPointSet::Cycle(cycle),
+							} else {
+								IntersectionPointSet::Cycle(cycle)
 							}
 						}
 						IntersectionPointSet::Pair(point_a, point_b) => {
@@ -746,12 +757,10 @@ impl LevelBuilder {
 										Some(Ordering::Less) => One(point_a),
 										Some(Ordering::Equal) => {
 											errors.push(VertexSolverError::UnnecessaryHint(vertex));
-											eprintln!("eq {point_a} {point_b} {position}");
 											Two(point_a, point_b)
 										}
 										None => {
 											errors.push(VertexSolverError::UnnecessaryHint(vertex));
-											eprintln!("nc {point_a} {point_b} {position}");
 											Two(point_a, point_b)
 										}
 									}
@@ -963,7 +972,7 @@ impl LevelBuilder {
 					{
 						// There are no `Single`s available,
 						// so we go after `Pair` therapy
-						self.try_reduce_pairs_on_cycle_without_single(
+						self.try_reduce_pairs_on_circle_without_single(
 							cycle_id, center, point_data, error_log,
 						);
 					}
@@ -973,7 +982,7 @@ impl LevelBuilder {
 						.first_decided_vertex
 						.is_some()
 					{
-						self.try_reduce_pairs_on_cycle_using_single(
+						self.try_reduce_pairs_on_circle_using_single(
 							cycle_id,
 							center,
 							first_pair_index,
@@ -983,6 +992,148 @@ impl LevelBuilder {
 					}
 				}
 			}
+			CycleShape::Line { start, end } => {
+				self.try_reduce_pairs_on_line(cycle_id, start, end, point_data, error_log);
+			}
+		}
+	}
+
+	fn try_reduce_pairs_on_line(
+		&self,
+		cycle_id: usize,
+		start: Vec2,
+		end: Vec2,
+		point_data: &mut PointData,
+		error_log: &mut Vec<VertexSolverError>,
+	) {
+		let Some(first_pair_vertex) = point_data.cycle_data[cycle_id].first_undecided_vertex else {
+			// Nothing to do here
+			return;
+		};
+
+		for current_vertex_ix in first_pair_vertex..point_data.cycle_data[cycle_id].vertices.len() {
+			// Only pair vertices are interesting
+			let LogicalVertex {
+				vertex: current_vertex,
+				inner: LogicalVertexVariant::Pair {
+					prev_single: prev_single_ix,
+					..
+				},
+			} = point_data.cycle_data[cycle_id].vertices[current_vertex_ix]
+			else {
+				continue;
+			};
+
+			// Get the following single vertex if there are any
+			let next_single_ix = match prev_single_ix {
+				Some(prev_single_ix) => {
+					let LogicalVertexVariant::Single { next_single } =
+						point_data.cycle_data[cycle_id].vertices[prev_single_ix].inner
+					else {
+						debug_assert!(false, "Your invariants are not very invariant");
+						return;
+					};
+					Some(next_single)
+				}
+				None => None,
+			};
+
+			// Extract the points the vertex is interested in
+			// and the points delimited either by the `Single`s
+			// or the end points of the cycle
+			let constraints = &point_data.vertex_constraints;
+			let cycle_data = &point_data.cycle_data[cycle_id];
+			let IntersectionPointSet::Pair(point_a, point_b) = constraints[current_vertex] else {
+				debug_assert!(false, "Your invariants are not very invariant");
+				return;
+			};
+			let p_a = point_data.points[point_a];
+			let p_b = point_data.points[point_b];
+			let before_point = if let Some(prev_single_ix) = prev_single_ix
+				&& prev_single_ix < current_vertex
+			{
+				let prev_single = cycle_data.vertices[prev_single_ix].vertex;
+				let IntersectionPointSet::Single(point) = constraints[prev_single] else {
+					debug_assert!(false, "Your invariants are not very invariant");
+					return;
+				};
+				point_data.points[point]
+			} else {
+				// Use the start of the line if there is no previous vertex
+				// or it would loop over to the end of the line
+				start
+			};
+			let after_point = if let Some(next_single_ix) = next_single_ix
+				&& next_single_ix > current_vertex
+			{
+				let next_single = cycle_data.vertices[next_single_ix].vertex;
+				let IntersectionPointSet::Single(point) = constraints[next_single] else {
+					debug_assert!(false, "Your invariants are not very invariant");
+					return;
+				};
+				point_data.points[point]
+			} else {
+				// Use the end of the line if there is no next vertex
+				// or it would loop over to the start of the line
+				end
+			};
+
+			// Positive ordering is in the direction towards end
+			let points_order_score = |a, b| (end - start).dot(b - a);
+
+			let point_a_score =
+				points_order_score(before_point, p_a) * points_order_score(p_a, after_point);
+			let point_b_score =
+				points_order_score(before_point, p_b) * points_order_score(p_b, after_point);
+
+			let mut point_a_valid = point_a_score > 0.0;
+			let mut point_b_valid = point_b_score > 0.0;
+			// If one of the scores is too small, use the other one
+			if point_a_valid && point_b_valid {
+				const THRESHOLD: f32 = 0.001;
+				if point_a_score < point_b_score * THRESHOLD {
+					point_a_valid = false;
+				} else if point_b_score < point_a_score * THRESHOLD {
+					point_b_valid = false;
+				}
+			}
+
+			let direct_placement_succeeded = match (point_a_valid, point_b_valid) {
+				(true, true) => {
+					// Tough luck, nothing got done here
+					false
+				}
+				(true, false) => {
+					point_data.place_vertex(current_vertex, point_a, error_log);
+					true
+				}
+				(false, true) => {
+					point_data.place_vertex(current_vertex, point_b, error_log);
+					true
+				}
+				(false, false) => {
+					error_log.push(VertexSolverError::VertexHasNoPointsAvailable {
+						vertex: current_vertex,
+					});
+					// Pretend the code succeeded in placing the vertex, since the situation is unsolvable
+					// so there's no need for more attempts at solving
+					true
+				}
+			};
+
+			// If that did not work but the vertex has a twin,
+			// the order is still forced by the geometry
+			if !direct_placement_succeeded && point_data.find_twin(current_vertex).is_some() {
+				let target_point = if points_order_score(p_a, p_b) > 0.0 {
+					point_a
+				} else {
+					point_b
+				};
+				point_data.place_vertex(current_vertex, target_point, error_log);
+			}
+
+			#[cfg(any(debug_assertions, test))]
+			point_data.cycle_data[cycle_id].assert_validity();
 		}
 	}
 
@@ -990,7 +1141,7 @@ impl LevelBuilder {
 	///
 	/// Attempts to resolve a [`IntersectionPointSet::Pair`] placement
 	/// on a cycle where there are no [`IntersectionPointSet::Single`] vertices
-	fn try_reduce_pairs_on_cycle_without_single(
+	fn try_reduce_pairs_on_circle_without_single(
 		&self,
 		cycle_id: usize,
 		cycle_position: Vec2,
@@ -1092,7 +1243,7 @@ impl LevelBuilder {
 	///
 	/// Attempts to resolve a [`IntersectionPointSet::Pair`] placement
 	/// on a cycle using a [`IntersectionPointSet::Single`] vertex as reference point
-	fn try_reduce_pairs_on_cycle_using_single(
+	fn try_reduce_pairs_on_circle_using_single(
 		&self,
 		cycle_id: usize,
 		cycle_position: Vec2,
@@ -1368,60 +1519,56 @@ impl LevelBuilder {
 		/// At +inf it would not matter at all to place vertices very tightly together
 		const REGULARISATION: f32 = 0.2_f32;
 		for &cycle in cycles_to_check.iter() {
-			match cycles[cycle].placement {
-				Some(CyclePlacement {
-					shape: CycleShape::Circle { center, .. },
-				}) => {
-					// Calculate disparity between inner and outer areas
-					let dir_a = Dir2::new(point_data.points[point_a] - center).unwrap_or(Dir2::X);
-					let dir_b = Dir2::new(point_data.points[point_b] - center).unwrap_or(Dir2::Y);
-					let inner_fraction = {
-						let mut fraction = dir_a.rotation_to(dir_b).as_turn_fraction();
-						if fraction < 0.0 {
-							fraction += 1.0;
-						}
-						#[expect(clippy::manual_clamp, reason = "clamp handles NaN differently")]
-						fraction.min(1.0).max(0.0)
-					};
-					let outer_fraction = 1.0 - inner_fraction;
+			if let Some(CyclePlacement {
+				shape: CycleShape::Circle { center, .. },
+			}) = cycles[cycle].placement
+			{
+				// Calculate disparity between inner and outer areas
+				let dir_a = Dir2::new(point_data.points[point_a] - center).unwrap_or(Dir2::X);
+				let dir_b = Dir2::new(point_data.points[point_b] - center).unwrap_or(Dir2::Y);
+				let inner_fraction = {
+					let mut fraction = dir_a.rotation_to(dir_b).as_turn_fraction();
+					if fraction < 0.0 {
+						fraction += 1.0;
+					}
+					#[expect(clippy::manual_clamp, reason = "clamp handles NaN differently")]
+					fraction.min(1.0).max(0.0)
+				};
+				let outer_fraction = 1.0 - inner_fraction;
 
-					// Calculate disparity between inner and outer free vertex counts
-					let mut inverted = false;
-					let mut inner_vertices: i32 = 0;
-					let mut outer_vertices: i32 = 0;
-					let mut seen_first = false;
-					let mut seen_second = false;
+				// Calculate disparity between inner and outer free vertex counts
+				let mut inverted = false;
+				let mut inner_vertices: i32 = 0;
+				let mut outer_vertices: i32 = 0;
+				let mut seen_first = false;
+				let mut seen_second = false;
 
-					for &vertex in cycles[cycle].vertex_indices.iter() {
-						if vertex == pair_vertex {
-							if seen_second && !seen_first {
-								inverted = true;
-							}
-							seen_first = true;
+				for &vertex in cycles[cycle].vertex_indices.iter() {
+					if vertex == pair_vertex {
+						if seen_second && !seen_first {
+							inverted = true;
 						}
-						if vertex == twin_vertex {
-							seen_second = true;
-						}
-						if vertex != pair_vertex && vertex != twin_vertex {
-							if seen_first != seen_second {
-								inner_vertices += 1;
-							} else {
-								outer_vertices += 1;
-							}
+						seen_first = true;
+					}
+					if vertex == twin_vertex {
+						seen_second = true;
+					}
+					if vertex != pair_vertex && vertex != twin_vertex {
+						if seen_first != seen_second {
+							inner_vertices += 1;
+						} else {
+							outer_vertices += 1;
 						}
 					}
-
-					if inverted {
-						(inner_vertices, outer_vertices) = (outer_vertices, inner_vertices);
-					}
-
-					pressure += (inner_vertices - outer_vertices) as f32
-						* (1.0 / (inner_fraction + REGULARISATION)
-							- 1.0 / (outer_fraction + REGULARISATION));
 				}
-				None => {
-					// uhhh
+
+				if inverted {
+					(inner_vertices, outer_vertices) = (outer_vertices, inner_vertices);
 				}
+
+				pressure += (inner_vertices - outer_vertices) as f32
+					* (1.0 / (inner_fraction + REGULARISATION)
+						- 1.0 / (outer_fraction + REGULARISATION));
 			}
 		}
 
@@ -1481,6 +1628,21 @@ impl LevelBuilder {
 									pair_vertex,
 								));
 							}
+						}
+					}
+				}
+				Some(CyclePlacement {
+					shape: CycleShape::Line { start, end },
+				}) => {
+					for &point in &cycle_data.points_on_cycle[cycle] {
+						let p_a = point_data.points[point_a];
+						let p_b = point_data.points[point_b];
+						let p_m = point_data.points[point];
+
+						// If any of the points is in between the candidates,
+						// fail the placement immediately
+						if (end - start).dot(p_m - p_a) * (end - start).dot(p_b - p_m) > 0.0 {
+							return Err(VertexSolverError::CannotPinUnsaturatedPair(pair_vertex));
 						}
 					}
 				}
@@ -1582,6 +1744,49 @@ impl LevelBuilder {
 						}
 					}
 				}
+				CycleShape::Line { start, end } => {
+					// All fixed vertices act as bounds for the placements
+					// Assign out-of-bounds indices to the endpoints so we can do
+					// index arithmetics on them
+					let n_vertices = cycle_data.vertex_indices.len();
+					let fixed_vertices_and_endpoints = std::iter::once((0, start))
+						.chain(fixed_vertices.map(|(i, p)| (i + 1, p)))
+						.chain(std::iter::once((n_vertices + 1, end)));
+					let segments = fixed_vertices_and_endpoints.tuple_windows();
+
+					for ((vertex_a, p_a), (vertex_b, p_b)) in segments {
+						// How many floating vertices there are in between
+						let vertex_count = vertex_b - vertex_a - 1;
+						if vertex_count == 0 {
+							continue;
+						}
+						// Put a gap before the first and after the last floating vertex,
+						// unless the bounds are the end points of the line
+						let mut start_offset = if vertex_a == 0 { 0 } else { 1 };
+						let end_offset = if vertex_b == n_vertices + 1 { 0 } else { 1 };
+						// How many gaps there are between floating vertices and bounds
+						let gap_count;
+						if start_offset + end_offset == 0 && vertex_count == 1 {
+							// Special case: If there is exactly one floating vertex
+							// and nothing else on the line,
+							// the floating vertex goes in the middle
+							gap_count = 2;
+							start_offset += 1;
+						} else {
+							// One gap between each two vertices
+							// plus one at each end if eligible
+							gap_count = vertex_count + start_offset + end_offset - 1;
+						}
+
+						for (j, i) in (vertex_a..(vertex_b - 1)).enumerate() {
+							let target_vertex = cycle_data.vertex_indices[i];
+							let relative_position = (j + start_offset) as f32 / gap_count as f32;
+							let position = p_a.lerp(p_b, relative_position);
+							self.vertices[target_vertex].position =
+								IntermediateVertexPosition::Fixed(position);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1615,7 +1820,10 @@ impl LevelBuilder {
 		}
 	}
 
-	fn check_vertex_placements_are_clockwise(&self, errors: &mut Vec<VertexSolverError>) {
+	fn check_vertex_placements_are_geometrically_correct(
+		&self,
+		errors: &mut Vec<VertexSolverError>,
+	) {
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
 			match cycle.placement {
 				None => {}
@@ -1645,6 +1853,26 @@ impl LevelBuilder {
 						}
 					}
 				}
+				Some(CyclePlacement {
+					shape: CycleShape::Line { start, end },
+				}) => {
+					let positions = cycle
+						.vertex_indices
+						.iter()
+						.filter_map(|&i| self.vertices[i].position.get_fixed().map(|p| (i, p)))
+						.collect::<Vec<_>>();
+					for ((ia, a), (ib, b)) in positions.into_iter().tuple_windows() {
+						if (b - a).dot(end - start) < 0.0 {
+							errors.push(VertexSolverError::VerticesOutOfOrder {
+								cycle: cycle_id,
+								vertices: [ia, ib],
+							});
+							// Break the inner loop, we do not need additional diagnostics
+							// for the same cycle
+							break;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -1658,9 +1886,20 @@ impl LevelBuilder {
 				continue;
 			};
 
+			for (vertex, point) in cycle
+				.vertex_indices
+				.iter()
+				.map(|&vertex| (vertex, self.vertices[vertex].position.get_fixed().unwrap()))
+			{
+				debug_assert!(
+					point_lies_on_cycle(placement, point),
+					"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} at {placement}"
+				);
+			}
+
 			match placement {
 				CyclePlacement {
-					shape: CycleShape::Circle { center, radius },
+					shape: CycleShape::Circle { center, .. },
 				} => {
 					for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
 						.vertex_indices
@@ -1677,13 +1916,19 @@ impl LevelBuilder {
 							"Vertices out of order: [{pos_1} -> {vert_1}, {pos_2} -> {vert_2}, {pos_3} -> {vert_3}]"
 						);
 					}
-
-					for (vertex, point) in cycle.vertex_indices.iter().map(|&vertex| {
-						(vertex, self.vertices[vertex].position.get_fixed().unwrap())
-					}) {
+				}
+				CyclePlacement {
+					shape: CycleShape::Line { start, end },
+				} => {
+					for (p_a, p_b) in cycle
+						.vertex_indices
+						.iter()
+						.map(|vertex| self.vertices[*vertex].position.get_fixed().unwrap())
+						.tuple_windows()
+					{
 						debug_assert!(
-							point_lies_on_circle(center, radius, point),
-							"Vertex {vertex} with position {point} does not lie on cycle {cycle_id} with position {center} and radius {radius}"
+							(end - start).dot(p_b - p_a) > 0.0,
+							"Vertices out of order: [{p_a}, {p_b}] on cycle {cycle_id} at {placement}"
 						);
 					}
 				}
@@ -1716,27 +1961,17 @@ impl LevelBuilder {
 					current_intersection
 				}
 				(_, IntersectionPointSet::Unconstrained) => IntersectionPointSet::Cycle(cycle),
-				(
-					Some(CyclePlacement {
-						shape: CycleShape::Circle { radius, center },
-					}),
-					IntersectionPointSet::Single(point),
-				) => {
-					if point_lies_on_circle(center, radius, point) {
+				(Some(placement), IntersectionPointSet::Single(point)) => {
+					if point_lies_on_cycle(placement, point) {
 						IntersectionPointSet::Single(point)
 					} else {
 						return IntersectionPointSet::Empty;
 					}
 				}
-				(
-					Some(CyclePlacement {
-						shape: CycleShape::Circle { radius, center },
-					}),
-					IntersectionPointSet::Pair(point_a, point_b),
-				) => {
+				(Some(placement), IntersectionPointSet::Pair(point_a, point_b)) => {
 					match (
-						point_lies_on_circle(center, radius, point_a),
-						point_lies_on_circle(center, radius, point_b),
+						point_lies_on_cycle(placement, point_a),
+						point_lies_on_cycle(placement, point_b),
 					) {
 						(true, true) => IntersectionPointSet::Pair(point_a, point_b),
 						(true, false) => IntersectionPointSet::Single(point_a),
@@ -1747,58 +1982,141 @@ impl LevelBuilder {
 					}
 				}
 				(Some(cycle_a_placement), IntersectionPointSet::Cycle(cycle_b)) => {
-					match self.cycles[cycle_b].placement {
-						None => {
-							// Technically unreachable as the `None` branch does not assign
-							// the intersection points
-							IntersectionPointSet::Cycle(cycle)
-						}
-						Some(cycle_b_placement) => {
-							match (cycle_a_placement.shape, cycle_b_placement.shape) {
-								(
-									CycleShape::Circle {
-										radius: radius_a,
-										center: position_a,
-									},
-									CycleShape::Circle {
-										radius: radius_b,
-										center: position_b,
-									},
-								) => {
-									let tolerance = radius_a.max(radius_b).max(0.01)
-										* Self::PLACEMENT_VALIDATION_TOLERANCE;
-									let offset = position_a - position_b;
-									let offset_length = offset.length();
-									if offset_length <= tolerance {
-										if (radius_a - radius_b).abs() < tolerance {
-											IntersectionPointSet::Cycle(cycle)
-										} else {
-											return IntersectionPointSet::Empty;
-										}
-									} else {
-										match intersect_circles(
-											position_a, position_b, radius_a, radius_b,
-										) {
-											Some(OneTwo::One(point)) => {
-												IntersectionPointSet::Single(point)
-											}
-											Some(OneTwo::Two(point_a, point_b)) => {
-												IntersectionPointSet::Pair(point_a, point_b)
-											}
-											None => {
-												return IntersectionPointSet::Empty;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+					self.cycles[cycle_b]
+						.placement
+						// `None` is technically not possible here as the `None` branch
+						// does not assign the intersection points
+						.and_then(|cycle_b_placement| {
+							intersect_cycles(cycle_a_placement, cycle_b_placement)
+						})
+						.unwrap_or(IntersectionPointSet::Cycle(cycle))
 				}
 			}
 		}
 		intersection
 	}
+}
+
+/// Calculate the intersection of two cycles as [`IntersectionPointSet`]
+///
+/// [`None`] if the cycles are near-identical
+/// so the intersection does not actually narrow them
+fn intersect_cycles(
+	placement_a: CyclePlacement,
+	placement_b: CyclePlacement,
+) -> Option<IntersectionPointSet<Vec2>> {
+	use CycleShape::{Circle, Line};
+	use IntersectionPointSet::{Empty, Pair, Single};
+
+	match (placement_a.shape, placement_b.shape) {
+		(
+			Circle {
+				radius: radius_a,
+				center: position_a,
+			},
+			Circle {
+				radius: radius_b,
+				center: position_b,
+			},
+		) => {
+			let tolerance =
+				radius_a.max(radius_b).max(0.01) * LevelBuilder::PLACEMENT_VALIDATION_TOLERANCE;
+			let offset = position_a - position_b;
+			let offset_length = offset.length();
+			if offset_length <= tolerance {
+				if (radius_a - radius_b).abs() < tolerance {
+					None
+				} else {
+					Some(Empty)
+				}
+			} else {
+				match intersect_circles(position_a, position_b, radius_a, radius_b) {
+					Some(OneTwo::One(point)) => Some(Single(point)),
+					Some(OneTwo::Two(point_a, point_b)) => Some(Pair(point_a, point_b)),
+					None => Some(Empty),
+				}
+			}
+		}
+		(
+			Line {
+				start: start_a,
+				end: end_a,
+			},
+			Line {
+				start: start_b,
+				end: end_b,
+			},
+		) => {
+			let tolerance = start_a
+				.max(end_a)
+				.max(start_b)
+				.max(end_b)
+				.max_element()
+				.max(0.01) * LevelBuilder::PLACEMENT_VALIDATION_TOLERANCE;
+			let a = (end_a - start_a).perp();
+			let b = (end_b - start_b).perp();
+			let m = Mat2::from_cols(a, b).transpose();
+			let c = Vec2::new(a.dot(start_a), b.dot(start_b));
+			if m.determinant().abs() < tolerance {
+				// The lines are parallel
+				Some(Empty)
+			} else {
+				let intersection = m.inverse() * c;
+				if point_lies_on_line_segment(start_a, end_a, intersection)
+					&& point_lies_on_line_segment(start_b, end_b, intersection)
+				{
+					Some(Single(intersection))
+				} else {
+					// The lines intersect outside of the actual segments
+					Some(Empty)
+				}
+			}
+		}
+		(Circle { center, radius }, Line { start, end })
+		| (Line { start, end }, Circle { center, radius }) => {
+			let (d, midpoint) = nearest_point_on_line(start, end, center);
+			let normal_offset_sq = radius.powi(2) - d.powi(2);
+			// Round here, we want to cacth a single intersection with a margin of error
+			const TANGENTIAL_INTERSECTION_THRESHOLD: f32 = 0.001;
+			if normal_offset_sq.abs() < TANGENTIAL_INTERSECTION_THRESHOLD {
+				if point_lies_on_line_segment(start, end, midpoint) {
+					Some(Single(midpoint))
+				} else {
+					Some(Empty)
+				}
+			} else if normal_offset_sq > 0.0 {
+				let normal_offset = normal_offset_sq.sqrt();
+				let normal_unit = (end - start).normalize();
+				let offset = normal_offset * normal_unit;
+				let p_a = midpoint + offset;
+				let p_b = midpoint - offset;
+				match (
+					point_lies_on_line_segment(start, end, p_a),
+					point_lies_on_line_segment(start, end, p_b),
+				) {
+					(true, true) => Some(Pair(p_a, p_b)),
+					(true, false) => Some(Single(p_a)),
+					(false, true) => Some(Single(p_b)),
+					(false, false) => Some(Empty),
+				}
+			} else {
+				Some(Empty)
+			}
+		}
+	}
+}
+
+/// Find the point of a line that is closest to another point
+///
+/// ## Parameters
+/// - `a, `b` - two points that define the line
+/// - `nearest_to` - the queried point
+/// ## Returns
+/// Distance from `nearest_to` to the line and the nearest point
+fn nearest_point_on_line(a: Vec2, b: Vec2, nearest_to: Vec2) -> (f32, Vec2) {
+	let d = ((b - a).perp_dot(nearest_to) + a.perp_dot(b)) / b.distance(a);
+	let p = nearest_to - d * (b - a).normalize().perp();
+	(d, p)
 }
 
 fn intersect_circles(c1: Vec2, c2: Vec2, r1: f32, r2: f32) -> Option<OneTwo<Vec2>> {
@@ -1837,9 +2155,18 @@ fn point_lies_on_circle(center: Vec2, radius: f32, point: Vec2) -> bool {
 	)
 }
 
+fn point_lies_on_line_segment(start: Vec2, end: Vec2, point: Vec2) -> bool {
+	approx_eq_rel(
+		point.distance(start) + point.distance(end),
+		start.distance(end),
+		LevelBuilder::PLACEMENT_VALIDATION_TOLERANCE,
+	)
+}
+
 fn point_lies_on_cycle(cycle: CyclePlacement, point: Vec2) -> bool {
 	match cycle.shape {
 		CycleShape::Circle { center, radius } => point_lies_on_circle(center, radius, point),
+		CycleShape::Line { start, end } => point_lies_on_line_segment(start, end, point),
 	}
 }
 

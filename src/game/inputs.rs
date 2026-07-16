@@ -50,12 +50,19 @@ fn cycle_hover_system(
 		.iter()
 		.filter_map(|(e, placement, transform, turnability, _)| {
 			let is_turnable = turnability.0;
-			let d_sq = transform.translation().xy().distance_squared(cursor_pos);
-
 			match placement.shape {
 				CycleShape::Circle { radius, .. } => {
+					let d_sq = transform.translation().xy().distance_squared(cursor_pos);
 					if d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {
 						Some((e, d_sq, radius.powi(2), is_turnable))
+					} else {
+						None
+					}
+				}
+				CycleShape::Line { start, end } => {
+					let d = (end - start).normalize().perp_dot(cursor_pos - start);
+					if d.abs() <= RING_SHADOW_BLEED {
+						Some((e, d.powi(2), 0.0, is_turnable))
 					} else {
 						None
 					}

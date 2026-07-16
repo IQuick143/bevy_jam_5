@@ -208,6 +208,12 @@ fn get_position_and_normal_for_detector(
 			detector_placement,
 			Dir2::new(detector_placement - center).unwrap_or(Dir2::NEG_X),
 		)),
+		CyclePlacement {
+			shape: CycleShape::Line { start, end },
+		} => Some((
+			detector_placement,
+			Dir2::new((end - start).perp()).unwrap_or(Dir2::NEG_X),
+		)),
 	}
 }
 
@@ -634,6 +640,7 @@ fn create_cycle_visuals(
 		let mesh;
 		let outline_mesh;
 		let hitbox_mesh;
+		let rotation;
 
 		match placement.shape {
 			CycleShape::Circle { radius, .. } => {
@@ -653,6 +660,23 @@ fn create_cycle_visuals(
 					.mesh()
 					.resolution(resolution)
 					.build();
+				rotation = Quat::IDENTITY;
+			}
+			CycleShape::Line { start, end } => {
+				const LINE_MESH_LENGTH: f32 = 8000.0;
+				mesh = Rectangle::new(2.0 * RING_HALF_WIDTH, LINE_MESH_LENGTH)
+					.mesh()
+					.build();
+				outline_mesh = Rectangle::new(
+					2.0 * (RING_HALF_WIDTH + RING_OUTLINE_WIDTH),
+					LINE_MESH_LENGTH,
+				)
+				.mesh()
+				.build();
+				hitbox_mesh = Rectangle::new(2.0 * RING_SHADOW_BLEED, LINE_MESH_LENGTH)
+					.mesh()
+					.build();
+				rotation = Quat::from_rotation_arc_2d(Vec2::Y, (end - start).normalize());
 			}
 		}
 
@@ -660,14 +684,15 @@ fn create_cycle_visuals(
 			.spawn((
 				Mesh2d(meshes.add(mesh)),
 				MeshMaterial2d(materials[&MaterialKey::CycleRingsReady].clone()),
-				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS),
+				Transform::from_translation(Vec3::Z * layers::CYCLE_RINGS).with_rotation(rotation),
 			))
 			.id();
 		let outline = commands
 			.spawn((
 				Mesh2d(meshes.add(outline_mesh)),
 				MeshMaterial2d(materials[&MaterialKey::CycleRingOutlines].clone()),
-				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES),
+				Transform::from_translation(Vec3::Z * layers::CYCLE_RING_OUTLINES)
+					.with_rotation(rotation),
 			))
 			.id();
 		commands
@@ -680,7 +705,8 @@ fn create_cycle_visuals(
 				.spawn((
 					Mesh2d(meshes.add(hitbox_mesh)),
 					MeshMaterial2d(materials[&MaterialKey::CycleHitboxes].clone()),
-					Transform::from_translation(Vec3::Z * layers::CYCLE_SHADOWS),
+					Transform::from_translation(Vec3::Z * layers::CYCLE_SHADOWS)
+						.with_rotation(rotation),
 					Visibility::Hidden,
 				))
 				.id();

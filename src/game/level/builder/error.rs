@@ -53,6 +53,8 @@ pub enum LevelBuilderError {
 	WallOnEmptyCycle,
 	/// A cycle has been explicitly assigned negative radius
 	CycleRadiusNotPositive(usize, f32),
+	/// A cycle has been assigned endpoints that are equal or not finite
+	CycleLengthNotPositive(usize, Vec2, Vec2),
 	/// [`build`](LevelBuilder::build) was called
 	/// while a cycle had not been placed yet
 	UnplacedCycle(usize),
@@ -120,8 +122,11 @@ pub enum VertexSolverError {
 	/// Pinning an unsaturated pair vertex failed because another
 	/// cycle is intersecting it between the possible positions
 	CannotPinUnsaturatedPair(usize),
-	/// Vertices do not follow their common cycle in clockwise order
+	/// Vertices do not follow their common cycle with [`CycleShape::Circle`]
+	/// in clockwise order
 	VerticesNotClockwise { cycle: usize, vertices: [usize; 3] },
+	/// Vertices do not follow the direction of their common cycle with [`CycleShape::Line`]
+	VerticesOutOfOrder { cycle: usize, vertices: [usize; 2] },
 	/// A vertex has been explicitly placed at a position that its cycle does not intersect
 	CycleDoesNotContainVertex(CycleDoesNotContainVertexError),
 	/// A vertex was given a placement hint that did not affect its final position
@@ -172,6 +177,13 @@ impl std::fmt::Display for VertexSolverError {
 				f,
 				"vertices {a}, {b}, and {c} on cycle {cycle} do not appear in clockwise order"
 			),
+			Self::VerticesOutOfOrder {
+				cycle,
+				vertices: [a, b],
+			} => write!(
+				f,
+				"vertices {a} and {b} on cycle {cycle} appear in reverse order"
+			),
 			Self::CycleDoesNotContainVertex(e) => write!(
 				f,
 				"vertex {} has been explicitly placed at position {} which does not lie on cycle {} at {:?}",
@@ -218,6 +230,12 @@ impl std::fmt::Display for LevelBuilderError {
 			),
 			Self::CycleRadiusNotPositive(i, r) => {
 				write!(f, "Radius of cycle {i} is not positive ({r})")
+			}
+			Self::CycleLengthNotPositive(i, start, end) => {
+				write!(
+					f,
+					"End points of cycle {i} are invalid (from {start} to {end})"
+				)
 			}
 			Self::UnplacedCycle(i) => write!(
 				f,

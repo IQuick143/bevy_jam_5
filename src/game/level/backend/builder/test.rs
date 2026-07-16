@@ -1376,4 +1376,97 @@ hint_vertex(bri; 0, yh);
 		}
 		expect_fully_ok!(parse(&flowers.iter().join("")));
 	}
+
+	#[test]
+	fn flat_triangle() {
+		let level = r"
+line(cycle(a = vertex(), _, b = vertex()); -1, -1, 1, 2);
+line(cycle(b _, c = vertex()); -1, 2, 1, -1);
+line(cycle(c _ a); 1, 0, -1, 0);
+";
+		expect_fully_ok!(parse(level));
+	}
+
+	#[test]
+	fn line_auto_placements() {
+		let level = r"
+c = hint_vertex(vertex(); -4, 0);
+circle(cycle(a = vertex(), b = vertex()); 0 0 1);
+line(cycle(_ _ c _ a b _ _); -5, 0, 5, 0);
+line(cycle(_); -5, 1, 5, 1);
+";
+		let level = expect_fully_ok!(parse(level));
+
+		let CycleShape::Line { start, end } = level.cycles[1].placement.shape else {
+			unreachable!();
+		};
+
+		let expected_vertex_positions = [
+			-4.0, // c
+			-1.0, 1.0, // a, b
+			-5.0, -4.5, -2.5, 3.0, 5.0, // Anons on cycle 1
+			0.0, // Anon on cycle 2
+		];
+		for (vertex, expected) in level.vertices.iter().zip(expected_vertex_positions) {
+			// Recalculate back into original coordinates
+			let v_x = (vertex.position.x - start.x) / (end.x - start.x) * 10.0 - 5.0;
+			assert!(
+				(v_x - expected).abs() < 0.01,
+				"expected {expected}, got {v_x}"
+			);
+		}
+	}
+
+	#[test]
+	fn line_intersecting_circle_once() {
+		let good_level = r"
+a = vertex();
+circle(cycle(a _ _ _); 0 0 2);
+line(cycle(_ a _ _ _); 0 1 3 3);
+";
+		expect_fully_ok!(parse(good_level));
+
+		let bad_level = r"
+a = vertex();
+b = vertex();
+circle(cycle(a _ b _ _); 0 0 2);
+line(cycle(b _ a _ _ _); 0 1 3 3);
+";
+		assert_err_eq!(
+			parse(bad_level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide {
+				vertex_a: 1,
+				vertex_b: 0
+			})
+		);
+	}
+
+	#[test]
+	fn line_through_cycle() {
+		let good_level = r"
+a = vertex();
+b = vertex();
+c = hint_vertex(vertex(); 0, -1);
+
+circle(cycle(a b c); 0 0 1);
+line(cycle(a b); -2, 0, 2, 0);
+";
+		expect_fully_ok!(parse(good_level));
+
+		let bad_level = r"
+a = vertex();
+b = vertex();
+c = hint_vertex(vertex(); 0 1);
+
+circle(cycle(a b c); 0 0 1);
+line(cycle(a b); -2, 0, 2, 0);
+";
+		assert_err_eq!(
+			parse(bad_level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::VerticesOutOfOrder {
+				cycle: 1,
+				vertices: [0, 1]
+			},)
+		);
+	}
 }

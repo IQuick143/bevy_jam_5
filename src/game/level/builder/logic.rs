@@ -727,6 +727,9 @@ impl LevelBuilder {
 					let angle = Vec2::X.angle_to(relative_vertex_position);
 					(angle / TAU).rem_euclid(1.0)
 				}
+				CycleShape::Line { start, end } => {
+					0.25 + end.distance(vertex_data[*i].position) / end.distance(start) / 2.0
+				}
 			})
 			.collect();
 		CycleData {
