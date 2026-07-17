@@ -414,8 +414,8 @@ impl TurnCycleResult {
 					for &wall_position in &wall_hits_by_cycle[cycle_id] {
 						let start_and_end_swapped =
 							(start_index > proposed_end_index) == is_clockwise;
-						let wall_after_start = (wall_position >= start_index) == is_clockwise;
-						let wall_before_end = (wall_position < proposed_end_index) == is_clockwise;
+						let wall_after_start = (wall_position > start_index) == is_clockwise;
+						let wall_before_end = (wall_position <= proposed_end_index) == is_clockwise;
 						let wall_hit = full_rotations > 0 // The wall would be hit on a full rotation
 							|| wall_after_start && wall_before_end // Or if the wall is between start and end
 							|| start_and_end_swapped && (wall_after_start || wall_before_end); // If the indices wrapped, also count it as "between"
@@ -423,10 +423,10 @@ impl TurnCycleResult {
 							// Cut the rotation at the wall
 							proposed_end_index = if is_clockwise {
 								// One tile after the wall
-								(wall_position + 1) % vertex_count
+								wall_position % vertex_count
 							} else {
 								// One tile before the wall
-								wall_position
+								(wall_position + vertex_count - 1) % vertex_count
 							};
 						}
 					}

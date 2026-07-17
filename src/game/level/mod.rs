@@ -86,9 +86,9 @@ pub struct CycleData {
 	pub vertex_positions: Vec<f32>,
 	/// Indices into [`LevelData::detectors`]
 	/// that identify the detectors that lie on the cycle, and numerical offsets,
-	/// that identify which vertex this detector comes after
+	/// that identify which vertex this detector comes before (can be past-the-end)
 	pub detector_indices: Vec<(usize, usize)>,
-	/// Numerical offsets, that identify which vertex a wall comes after
+	/// Numerical offsets, that identify which vertex a wall comes before (can be past-the-end)
 	pub wall_indices: Vec<usize>,
 	/// When the cycle can be turned
 	pub turnability: CycleTurnability,

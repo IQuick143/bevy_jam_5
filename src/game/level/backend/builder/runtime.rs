@@ -270,11 +270,9 @@ impl LevelBuilder {
 					vertices.push(vertex_id);
 				}
 				Domain(Vertex(VertexId(id))) => vertices.push(*id),
-				Domain(Detector(DetectorId(id))) => {
-					detectors.push((*id, (vertices.len() as i32) - 1))
-				}
+				Domain(Detector(DetectorId(id))) => detectors.push((*id, vertices.len())),
 				Domain(Wall) => {
-					walls.push((vertices.len() as i32) - 1);
+					walls.push(vertices.len());
 				}
 				other => return Err(TypeError(other.get_type()).into()),
 			}

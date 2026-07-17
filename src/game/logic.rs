@@ -265,19 +265,17 @@ impl GameState {
 							}
 							for &(detector_id, offset) in &detector_cycle.detector_indices {
 								let detections = if partial_turns > 0 {
-									objects_in_interval[(offset + 1) % n_vertices]
+									objects_in_interval[offset % n_vertices]
 								} else {
-									-objects_in_interval
-										[(offset + 1 + interval_length) % n_vertices]
+									-objects_in_interval[(offset + interval_length) % n_vertices]
 								} as i64;
 								detector_rotations[detector_id] += detections;
 							}
 							for (wall, &offset) in detector_cycle.wall_indices.iter().enumerate() {
 								let detections = if partial_turns > 0 {
-									objects_in_interval[(offset + 1) % n_vertices]
+									objects_in_interval[offset % n_vertices]
 								} else {
-									-objects_in_interval
-										[(offset + 1 + interval_length) % n_vertices]
+									-objects_in_interval[(offset + interval_length) % n_vertices]
 								} as i64;
 								wall_hits[wall] |= detections != 0;
 							}

@@ -51,6 +51,9 @@ pub enum LevelBuilderError {
 	DetectorOnEmptyCycle,
 	/// A wall was attempted on a cycle with no vertices
 	WallOnEmptyCycle,
+	/// A detector or wall was attempted on a cycle with fewer
+	/// vertices than its placement offset
+	DetectorPositionOutOfRange(usize),
 	/// A cycle has been explicitly assigned negative radius
 	CycleRadiusNotPositive(usize, f32),
 	/// A cycle has been assigned endpoints that are equal or not finite
@@ -227,6 +230,10 @@ impl std::fmt::Display for LevelBuilderError {
 			Self::WallOnEmptyCycle => write!(
 				f,
 				"Cannot create cycle that contains no vertices and nonzero amount of walls."
+			),
+			Self::DetectorPositionOutOfRange(offset) => write!(
+				f,
+				"Cannot create cycle with wall or detector at offset {offset} because it has too few vertices"
 			),
 			Self::CycleRadiusNotPositive(i, r) => {
 				write!(f, "Radius of cycle {i} is not positive ({r})")

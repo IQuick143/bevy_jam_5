@@ -175,15 +175,15 @@ fn despawn_expired_level_entities(
 fn get_position_and_normal_for_detector(
 	level: &LevelData,
 	cycle_id: usize,
-	before_vertex_id: usize,
+	after_vertex_id: usize,
 ) -> Option<(Vec2, Dir2)> {
 	let cycle = level.cycles.get(cycle_id)?;
 	let n_vertices = cycle.vertex_positions.len();
 	if n_vertices == 0 {
 		return None;
 	}
-	let index_before = before_vertex_id % n_vertices;
-	let index_after = (before_vertex_id + 1) % n_vertices;
+	let index_before = (after_vertex_id + n_vertices - 1) % n_vertices;
+	let index_after = after_vertex_id % n_vertices;
 
 	let detector_position = if index_before == index_after {
 		let prev_vertex_position = cycle.vertex_positions[index_before];

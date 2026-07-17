@@ -74,8 +74,8 @@ impl LevelBuilder {
 		&mut self,
 		turnability: CycleTurnability,
 		vertex_indices: impl IntoIterator<Item = usize>,
-		detectors: impl IntoIterator<Item = (usize, i32)>,
-		walls: impl IntoIterator<Item = i32>,
+		detectors: Vec<(usize, usize)>,
+		walls: Vec<usize>,
 	) -> Result<usize, LevelBuilderError> {
 		let vertex_indices = vertex_indices.into_iter().collect::<Vec<_>>();
 		if let Some(i) = vertex_indices.iter().duplicates().next() {
@@ -88,16 +88,6 @@ impl LevelBuilder {
 		{
 			return Err(LevelBuilderError::VertexIndexOutOfRange(i));
 		}
-		// Max with 1 to avoid a possible panic in rem_euclid.
-		let n_vertices = usize::max(vertex_indices.len(), 1) as i32;
-		let detectors = detectors
-			.into_iter()
-			.map(|(detector, position)| (detector, i32::rem_euclid(position, n_vertices) as usize))
-			.collect::<Vec<_>>();
-		let walls = walls
-			.into_iter()
-			.map(|position| i32::rem_euclid(position, n_vertices) as usize)
-			.collect::<Vec<_>>();
 		// If there are detectors but no vertices, this cycle is invalid.
 		if vertex_indices.is_empty() && !detectors.is_empty() {
 			return Err(LevelBuilderError::DetectorOnEmptyCycle);
@@ -106,6 +96,16 @@ impl LevelBuilder {
 		if vertex_indices.is_empty() && !walls.is_empty() {
 			return Err(LevelBuilderError::WallOnEmptyCycle);
 		}
+		// If any of the walls or detectors are placed out of range, this cycle is invalid
+		if let Some(offset) = detectors
+			.iter()
+			.map(|(_, offset)| offset)
+			.chain(&walls)
+			.find(|offset| **offset > vertex_indices.len())
+		{
+			return Err(LevelBuilderError::DetectorPositionOutOfRange(*offset));
+		}
+		// If the detector does not exist, this cycle is invalid
 		if let Some((index, _)) = detectors
 			.iter()
 			.find(|&(index, _)| *index >= self.detectors.len())
