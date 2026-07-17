@@ -178,66 +178,10 @@ fn get_position_and_normal_for_detector(
 	after_vertex_id: usize,
 ) -> Option<(Vec2, Dir2)> {
 	let cycle = level.cycles.get(cycle_id)?;
-	if cycle.vertex_indices.is_empty() {
-		// Should not happen (level description like that is invalid),
-		// but just in case
-		return None;
-	}
-
-	let is_closed = cycle.placement.shape.is_closed();
-	let detector_position = if !is_closed && after_vertex_id == 0 {
-		// Before start of open cycle
-		let first_vertex = cycle
-			.vertex_positions
-			.first()
-			.expect("We just checked it is not empty");
-		first_vertex + EDGE_DETECTOR_MARGIN / cycle.placement.shape.length()
-	} else if !is_closed && after_vertex_id == cycle.vertex_indices.len() {
-		// After end of open cycle
-		let last_vertex = cycle
-			.vertex_positions
-			.last()
-			.expect("We just checked it is not empty");
-		last_vertex - EDGE_DETECTOR_MARGIN / cycle.placement.shape.length()
-	} else {
-		// If the detector is not at the end of an open cycle,
-		// interpolate between the two vertices
-		default_detector_relative_placement(cycle, after_vertex_id)
-	};
-
+	let detector_position = cycle.detector_position_at(after_vertex_id);
 	let detector_placement = cycle.placement.sample(detector_position);
-
-	let normal_dir = match cycle.placement.shape {
-		CycleShape::Circle { center, .. } => {
-			Dir2::new(detector_placement - center).unwrap_or(Dir2::NEG_X)
-		}
-		CycleShape::Line { start, end } => Dir2::new((end - start).perp()).unwrap_or(Dir2::NEG_X),
-	};
-
+	let normal_dir = cycle.placement.shape.normal(detector_placement);
 	Some((detector_placement, normal_dir))
-}
-
-fn default_detector_relative_placement(cycle: &CycleData, after_vertex_id: usize) -> f32 {
-	let n_vertices = cycle.vertex_positions.len();
-	let index_before = (after_vertex_id + n_vertices - 1) % n_vertices;
-	let index_after = after_vertex_id % n_vertices;
-
-	let detector_position = if index_before == index_after {
-		let prev_vertex_position = cycle.vertex_positions[index_before];
-		prev_vertex_position + 0.5
-	} else {
-		// Get the path-based [0, 1] position of both neighboring vertices
-		let prev_vertex_position = cycle.vertex_positions[index_before];
-		let mut next_vertex_position = cycle.vertex_positions[index_after];
-		if prev_vertex_position < next_vertex_position {
-			// Wrap the position around the zeroth vertex
-			next_vertex_position += 1.0;
-		}
-		// Draw the detector halfway between the vertices
-		(prev_vertex_position + next_vertex_position) / 2.0
-	};
-
-	detector_position % 1.0
 }
 
 fn spawn_primary_level_entities(

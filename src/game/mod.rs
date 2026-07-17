@@ -4,6 +4,7 @@ pub mod animation;
 pub mod components;
 pub mod drawing;
 mod game_sfx;
+mod geometry;
 mod hints;
 pub mod history;
 mod inputs;

@@ -402,6 +402,9 @@ impl TurnCycleResult {
 				// Index [0,n) of the vertices where the animation starts and ends
 				let start_index;
 				let end_index;
+				// Start and end positions along the cycle, [0, 1]
+				let start_position;
+				let end_position;
 				if self.blocked() {
 					// The turn is blocked, so the object will return to its starting vertex
 					start_index = terminal_index;
@@ -410,6 +413,8 @@ impl TurnCycleResult {
 					let mut proposed_end_index =
 						vertex_count
 							- 1 - (vertex_count - start_index + movement_offset - 1) % vertex_count;
+					// If the object hit a wall, put the actual end position here explicitly
+					let mut early_end_position = None;
 					// Cut the path earlier if there is a wall to hit
 					for &wall_position in &wall_hits_by_cycle[cycle_id] {
 						let start_and_end_swapped =
@@ -421,40 +426,55 @@ impl TurnCycleResult {
 							|| start_and_end_swapped && (wall_after_start || wall_before_end); // If the indices wrapped, also count it as "between"
 						if wall_hit {
 							// Cut the rotation at the wall
-							proposed_end_index = if is_clockwise {
+							// Modulo it at one more vertex so we can
+							// tell wall before start from one after end
+							if is_clockwise {
 								// One tile after the wall
-								wall_position % vertex_count
+								proposed_end_index = wall_position;
 							} else {
 								// One tile before the wall
-								(wall_position + vertex_count - 1) % vertex_count
-							};
+								proposed_end_index =
+									(wall_position + vertex_count) % (vertex_count + 1);
+							}
+							// Stop precisely at the wall
+							let mut wall_stop_position =
+								cycle_data.detector_position_at(wall_position);
+							// Correct for potential wrapping
+							// Keep the position consistent with the past-the-end vertex
+							let past_end_position =
+								cycle_data.vertex_positions[proposed_end_index % vertex_count];
+							let wall_and_past_end_are_swapped =
+								(wall_stop_position < past_end_position) == is_clockwise;
+							if wall_and_past_end_are_swapped {
+								wall_stop_position += if is_clockwise { 1.0 } else { -1.0 };
+							}
+							early_end_position = Some(wall_stop_position);
 						}
 					}
-					end_index = proposed_end_index;
+					end_index = proposed_end_index % vertex_count;
+					start_position = cycle_data.vertex_positions[start_index];
+					end_position = early_end_position.unwrap_or_else(|| {
+						// Unless a wall has been hit, set the end position
+						// half a step before the end vertex
+						let pre_end_index = (end_index + vertex_count - (is_clockwise as usize)
+							+ (!is_clockwise as usize))
+							% vertex_count;
+						let mut pre_end_position = cycle_data.vertex_positions[pre_end_index];
+						let past_end_position = cycle_data.vertex_positions[end_index];
+						let pre_and_post_are_swapped =
+							(pre_end_position < past_end_position) == is_clockwise;
+						if pre_and_post_are_swapped || vertex_count == 1 {
+							pre_end_position += if is_clockwise { 1.0 } else { -1.0 };
+						};
+						(pre_end_position + past_end_position) / 2.0
+					});
 				} else {
 					// The object will end up at its end vertex
 					end_index = terminal_index;
 					start_index = (end_index + movement_offset) % vertex_count;
+					start_position = cycle_data.vertex_positions[start_index];
+					end_position = cycle_data.vertex_positions[end_index];
 				}
-				// Start and end positions along the cycle, [0, 1]
-				let start_position = cycle_data.vertex_positions[start_index];
-				let end_position = if self.blocked() {
-					// For a blocked turn, set the end position
-					// half a step before the end vertex
-					let pre_end_index = (end_index + vertex_count - (is_clockwise as usize)
-						+ (!is_clockwise as usize))
-						% vertex_count;
-					let mut pre_end_position = cycle_data.vertex_positions[pre_end_index];
-					let past_end_position = cycle_data.vertex_positions[end_index];
-					let pre_and_post_are_swapped =
-						(pre_end_position < past_end_position) == is_clockwise;
-					if pre_and_post_are_swapped || vertex_count == 1 {
-						pre_end_position += if is_clockwise { 1.0 } else { -1.0 };
-					};
-					(pre_end_position + past_end_position) / 2.0
-				} else {
-					cycle_data.vertex_positions[end_index]
-				};
 				// Adjust the end position so that it accurately reflects
 				// the direction and number of full turns relative to starting position
 				let adjusted_end_position = {

@@ -254,6 +254,14 @@ impl CycleShape {
 			Self::Line { .. } => false,
 		}
 	}
+
+	/// Get the normal to the cycle's perimeter at a given point
+	pub fn normal(&self, at: Vec2) -> Dir2 {
+		match self {
+			Self::Circle { center, .. } => Dir2::new(at - center).unwrap_or(Dir2::NEG_X),
+			Self::Line { start, end } => Dir2::new((end - start).perp()).unwrap_or(Dir2::NEG_X),
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
