@@ -106,6 +106,10 @@ pub const COLOR_SPRITE_OFFSET: f32 = 0.0;
 /// Spacing of digit sprites, relative to full width of a sprite slot
 pub const DIGIT_SPRITE_SPACING: f32 = 0.15;
 
+/// How far past the last vertex we should draw a wall or detector
+/// that is at the end of an open cycle
+pub const EDGE_DETECTOR_MARGIN: f32 = SPRITE_LENGTH;
+
 /// Parallax factor of background
 pub const BACKGROUND_PARALLAX: f32 = 0.5;
 

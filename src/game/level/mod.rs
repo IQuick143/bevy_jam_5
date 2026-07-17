@@ -242,7 +242,16 @@ impl CycleShape {
 	pub fn length(&self) -> f32 {
 		match self {
 			Self::Circle { radius, .. } => TAU * radius,
-			Self::Line { start, end } => start.distance(*end),
+			Self::Line { start, end } => start.distance(*end) * 2.0,
+		}
+	}
+
+	/// Whether the cycle cannot have a meaningfully defined
+	/// start and end
+	pub fn is_closed(&self) -> bool {
+		match self {
+			Self::Circle { .. } => true,
+			Self::Line { .. } => false,
 		}
 	}
 }
