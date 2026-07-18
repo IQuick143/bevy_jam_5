@@ -594,7 +594,7 @@ impl LevelBuilder {
 				vertex_to_cycle[vertex].push(id);
 			}
 
-			if let Some(CyclePlacement { shape }) = cycle.placement {
+			if let Some(shape) = cycle.placement {
 				let limit_metric = match shape {
 					CycleShape::Circle { center, radius } => center.length() + radius.abs(),
 					CycleShape::Line { start, end } => start.max(end).length(),
@@ -695,9 +695,7 @@ impl LevelBuilder {
 							// Use hints if possible
 							if let Some(hint_position) = self.vertices[vertex].hint_position {
 								match self.cycles[cycle].placement {
-									Some(CyclePlacement {
-										shape: CycleShape::Circle { center, radius },
-									}) => {
+									Some(CycleShape::Circle { center, radius }) => {
 										let distance_from_center = center.distance(hint_position);
 										if distance_from_center <= absolute_precision_limit {
 											errors.push(VertexSolverError::UnnecessaryHint(vertex));
@@ -716,9 +714,7 @@ impl LevelBuilder {
 											))
 										}
 									}
-									Some(CyclePlacement {
-										shape: CycleShape::Line { start, end },
-									}) => {
+									Some(CycleShape::Line { start, end }) => {
 										let (_, mut point) =
 											nearest_point_on_line(start, end, hint_position);
 										// Clamp to the ends of the line
@@ -960,7 +956,7 @@ impl LevelBuilder {
 			// This should not really happen
 			return;
 		};
-		match placement.shape {
+		match placement {
 			CycleShape::Circle { center, .. } => {
 				// Only go through the logic if there is an undecided vertex available.
 				if let Some(first_pair_index) =
@@ -1519,10 +1515,7 @@ impl LevelBuilder {
 		/// At +inf it would not matter at all to place vertices very tightly together
 		const REGULARISATION: f32 = 0.2_f32;
 		for &cycle in cycles_to_check.iter() {
-			if let Some(CyclePlacement {
-				shape: CycleShape::Circle { center, .. },
-			}) = cycles[cycle].placement
-			{
+			if let Some(CycleShape::Circle { center, .. }) = cycles[cycle].placement {
 				// Calculate disparity between inner and outer areas
 				let dir_a = Dir2::new(point_data.points[point_a] - center).unwrap_or(Dir2::X);
 				let dir_b = Dir2::new(point_data.points[point_b] - center).unwrap_or(Dir2::Y);
@@ -1604,9 +1597,7 @@ impl LevelBuilder {
 		cycles_to_check.dedup();
 		for &cycle in cycles_to_check.iter() {
 			match cycles[cycle].placement {
-				Some(CyclePlacement {
-					shape: CycleShape::Circle { center, .. },
-				}) => {
+				Some(CycleShape::Circle { center, .. }) => {
 					let mut constrained_inside = false;
 					let mut constrained_outside = false;
 
@@ -1631,9 +1622,7 @@ impl LevelBuilder {
 						}
 					}
 				}
-				Some(CyclePlacement {
-					shape: CycleShape::Line { start, end },
-				}) => {
+				Some(CycleShape::Line { start, end }) => {
 					for &point in &cycle_data.points_on_cycle[cycle] {
 						let p_a = point_data.points[point_a];
 						let p_b = point_data.points[point_b];
@@ -1675,7 +1664,7 @@ impl LevelBuilder {
 				// Collect and cast back into iterator so we can modify [`self.vertices`]
 				.collect::<Vec<_>>()
 				.into_iter();
-			match cycle_placement.shape {
+			match cycle_placement {
 				CycleShape::Circle { center, radius } => {
 					if let Some((first_fixed_vertex, first_fixed_pos)) = fixed_vertices.next() {
 						let first_relative_pos = first_fixed_pos - center;
@@ -1827,9 +1816,7 @@ impl LevelBuilder {
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
 			match cycle.placement {
 				None => {}
-				Some(CyclePlacement {
-					shape: CycleShape::Circle { center, .. },
-				}) => {
+				Some(CycleShape::Circle { center, .. }) => {
 					let positions = cycle
 						.vertex_indices
 						.iter()
@@ -1853,9 +1840,7 @@ impl LevelBuilder {
 						}
 					}
 				}
-				Some(CyclePlacement {
-					shape: CycleShape::Line { start, end },
-				}) => {
+				Some(CycleShape::Line { start, end }) => {
 					let positions = cycle
 						.vertex_indices
 						.iter()
@@ -1898,9 +1883,7 @@ impl LevelBuilder {
 			}
 
 			match placement {
-				CyclePlacement {
-					shape: CycleShape::Circle { center, .. },
-				} => {
+				CycleShape::Circle { center, .. } => {
 					for [(pos_1, vert_1), (pos_2, vert_2), (pos_3, vert_3)] in cycle
 						.vertex_indices
 						.iter()
@@ -1917,9 +1900,7 @@ impl LevelBuilder {
 						);
 					}
 				}
-				CyclePlacement {
-					shape: CycleShape::Line { start, end },
-				} => {
+				CycleShape::Line { start, end } => {
 					for (p_a, p_b) in cycle
 						.vertex_indices
 						.iter()
@@ -2002,13 +1983,13 @@ impl LevelBuilder {
 /// [`None`] if the cycles are near-identical
 /// so the intersection does not actually narrow them
 fn intersect_cycles(
-	placement_a: CyclePlacement,
-	placement_b: CyclePlacement,
+	placement_a: CycleShape,
+	placement_b: CycleShape,
 ) -> Option<IntersectionPointSet<Vec2>> {
 	use CycleShape::{Circle, Line};
 	use IntersectionPointSet::{Empty, Pair, Single};
 
-	match (placement_a.shape, placement_b.shape) {
+	match (placement_a, placement_b) {
 		(
 			Circle {
 				radius: radius_a,
@@ -2163,8 +2144,8 @@ fn point_lies_on_line_segment(start: Vec2, end: Vec2, point: Vec2) -> bool {
 	)
 }
 
-fn point_lies_on_cycle(cycle: CyclePlacement, point: Vec2) -> bool {
-	match cycle.shape {
+fn point_lies_on_cycle(cycle: CycleShape, point: Vec2) -> bool {
+	match cycle {
 		CycleShape::Circle { center, radius } => point_lies_on_circle(center, radius, point),
 		CycleShape::Line { start, end } => point_lies_on_line_segment(start, end, point),
 	}

@@ -6,7 +6,7 @@ pub struct CycleDoesNotContainVertexError {
 	/// Index of the affected cycle
 	pub cycle: usize,
 	/// Placement that was requested for the cycle
-	pub placement: CyclePlacement,
+	pub placement: CycleShape,
 	/// Index of the vertex with fixed position
 	/// that would not lie on the cycle as placed
 	pub vertex: usize,

@@ -71,8 +71,8 @@ pub struct VertexData {
 /// Description of a single cycle
 #[derive(Debug, Clone, Reflect)]
 pub struct CycleData {
-	/// Placement of the cycle
-	pub placement: CyclePlacement,
+	/// Shape of the cycle's perimeter
+	pub placement: CycleShape,
 	/// Settings of the cycle center sprite
 	pub center_sprite_appearence: CycleCenterSpriteAppearence,
 	/// Indices into [`LevelData::vertices`]
@@ -196,32 +196,8 @@ impl OneWayLinkData {
 	}
 }
 
-/// Computed placement of a cycle
-#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
-pub struct CyclePlacement {
-	/// Shape of the cycle's perimeter
-	pub shape: CycleShape,
-}
-
-impl CyclePlacement {
-	pub fn sample(&self, t: f32) -> Vec2 {
-		match self.shape {
-			CycleShape::Circle { center, radius } => center + radius * Vec2::from_angle(t * TAU),
-			CycleShape::Line { start, end } => {
-				let t = t.rem_euclid(1.0);
-				let u = match t {
-					..0.25 => 1.0 - 0.25 / t,
-					0.75.. => 0.25 / (1.0 - t),
-					_ => 2.0 * (t - 0.25),
-				};
-				end.lerp(start, u)
-			}
-		}
-	}
-}
-
 /// Description of the shape of a cycle's perimeter
-#[derive(Clone, Copy, PartialEq, Debug, Reflect)]
+#[derive(Component, Clone, Copy, PartialEq, Debug, Reflect)]
 pub enum CycleShape {
 	/// Circle defined by a radius, centered in the cycle's position
 	Circle { center: Vec2, radius: f32 },
@@ -230,6 +206,21 @@ pub enum CycleShape {
 }
 
 impl CycleShape {
+	pub fn sample(&self, t: f32) -> Vec2 {
+		match self {
+			Self::Circle { center, radius } => center + radius * Vec2::from_angle(t * TAU),
+			Self::Line { start, end } => {
+				let t = t.rem_euclid(1.0);
+				let u = match t {
+					..0.25 => 1.0 - 0.25 / t,
+					0.75.. => 0.25 / (1.0 - t),
+					_ => 2.0 * (t - 0.25),
+				};
+				end.lerp(*start, u)
+			}
+		}
+	}
+
 	/// Some center-point of the shape
 	pub fn center(&self) -> Vec2 {
 		match self {
@@ -413,16 +404,16 @@ impl LogicalColor {
 	}
 }
 
-impl std::fmt::Display for CyclePlacement {
+impl std::fmt::Display for CycleShape {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self.shape {
-			CycleShape::Circle {
+		match self {
+			Self::Circle {
 				center: Vec2 { x, y },
 				radius,
 			} => {
 				write!(f, "[x={x} y={y} r={radius}]")
 			}
-			CycleShape::Line {
+			Self::Line {
 				start: Vec2 { x: x1, y: y1 },
 				end: Vec2 { x: x2, y: y2 },
 			} => {

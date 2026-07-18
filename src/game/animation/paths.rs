@@ -7,7 +7,7 @@ use crate::{
 	AppSet,
 	game::{
 		components::*,
-		level::{CyclePlacement, LevelData, ThingData},
+		level::{CycleShape, LevelData, ThingData},
 		logic_relay::RotateCycleGroupWithResult,
 		prelude::*,
 	},
@@ -270,7 +270,7 @@ impl AnimationPathSegmentMeasurements {
 		}
 	}
 
-	fn sample(&self, placement: &CyclePlacement, progress: f32) -> Vec2 {
+	fn sample(&self, placement: &CycleShape, progress: f32) -> Vec2 {
 		placement.sample(self.sample_t(progress))
 	}
 
@@ -495,7 +495,7 @@ impl TurnCycleResult {
 					let bias = full_rotations as f32;
 					end_position - bias * rotate_by.signum() as f32
 				};
-				let cycle_length = cycle_data.placement.shape.length();
+				let cycle_length = cycle_data.placement.length();
 				let path_length = (start_position - adjusted_end_position).abs() * cycle_length;
 				let measurements = AnimationPathSegmentMeasurements {
 					start_pos: start_position,

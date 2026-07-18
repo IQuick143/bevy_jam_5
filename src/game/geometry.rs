@@ -12,21 +12,21 @@ impl CycleData {
 			return 0.0;
 		}
 
-		let is_closed = self.placement.shape.is_closed();
+		let is_closed = self.placement.is_closed();
 		if !is_closed && after_vertex_id == 0 {
 			// Before start of open cycle
 			let first_vertex = self
 				.vertex_positions
 				.first()
 				.expect("We just checked it is not empty");
-			first_vertex + EDGE_DETECTOR_MARGIN / self.placement.shape.length()
+			first_vertex + EDGE_DETECTOR_MARGIN / self.placement.length()
 		} else if !is_closed && after_vertex_id == self.vertex_indices.len() {
 			// After end of open cycle
 			let last_vertex = self
 				.vertex_positions
 				.last()
 				.expect("We just checked it is not empty");
-			last_vertex - EDGE_DETECTOR_MARGIN / self.placement.shape.length()
+			last_vertex - EDGE_DETECTOR_MARGIN / self.placement.length()
 		} else {
 			// If the detector is not at the end of an open cycle,
 			// interpolate between the two vertices

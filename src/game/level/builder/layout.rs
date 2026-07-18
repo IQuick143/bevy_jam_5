@@ -23,9 +23,7 @@ impl LevelBuilder {
 				radius,
 			));
 		}
-		self.cycles[target_cycle].placement = Some(CyclePlacement {
-			shape: CycleShape::Circle { center, radius },
-		});
+		self.cycles[target_cycle].placement = Some(CycleShape::Circle { center, radius });
 		Ok(())
 	}
 
@@ -48,9 +46,7 @@ impl LevelBuilder {
 				end,
 			));
 		}
-		self.cycles[target_cycle].placement = Some(CyclePlacement {
-			shape: CycleShape::Line { start, end },
-		});
+		self.cycles[target_cycle].placement = Some(CycleShape::Line { start, end });
 		Ok(())
 	}
 
@@ -168,9 +164,7 @@ impl LevelBuilder {
 				let Some(vertex_position) = vertex.position.get_fixed() else {
 					continue;
 				};
-				let Some(CyclePlacement {
-					shape: CycleShape::Circle { center, .. },
-				}) = self.cycles[p.owner_cycle].placement
+				let Some(CycleShape::Circle { center, .. }) = self.cycles[p.owner_cycle].placement
 				else {
 					warn!(
 						"Ignoring cycle-bound button labels on cycle {} which is not a circle",
@@ -244,7 +238,7 @@ impl LevelBuilder {
 				// If center sprite has not been explicitly positioned
 				// or disabled, put it in the cycle center
 				cycle_data.center_sprite_position =
-					IntermediateCycleCenterSpritePosition::Placed(placement.shape.center());
+					IntermediateCycleCenterSpritePosition::Placed(placement.center());
 			}
 		}
 	}
@@ -311,8 +305,8 @@ impl LevelBuilder {
 	}
 
 	/// Computes the bounding box for a given cycle shape
-	fn get_bounding_box_for_cycle(placement: CyclePlacement) -> Aabb2d {
-		match placement.shape {
+	fn get_bounding_box_for_cycle(placement: CycleShape) -> Aabb2d {
+		match placement {
 			CycleShape::Circle { center, radius } => Aabb2d::new(center, Vec2::splat(radius)),
 			CycleShape::Line { start, end } => Aabb2d {
 				min: start.min(end),
@@ -355,7 +349,7 @@ impl LevelBuilder {
 		}
 		for cycle in &mut self.cycles {
 			if let Some(p) = &mut cycle.placement {
-				match &mut p.shape {
+				match p {
 					CycleShape::Circle { center, radius } => {
 						*radius *= scale;
 						*center = (*center - bounds_center) * scale + viewport_center

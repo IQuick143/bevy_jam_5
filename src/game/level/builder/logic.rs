@@ -689,11 +689,9 @@ impl LevelBuilder {
 				false,
 				"Unplaced cycle in build phase, should have been detected earlier"
 			);
-			CyclePlacement {
-				shape: CycleShape::Circle {
-					center: Vec2::ZERO,
-					radius: 1.0,
-				},
+			CycleShape::Circle {
+				center: Vec2::ZERO,
+				radius: 1.0,
 			}
 		});
 		let center_sprite_position = match intermediate.center_sprite_position {
@@ -707,9 +705,8 @@ impl LevelBuilder {
 				None
 			}
 		};
-		let center_sprite_appearence = CycleCenterSpriteAppearence(
-			center_sprite_position.map(|p| p - placement.shape.center()),
-		);
+		let center_sprite_appearence =
+			CycleCenterSpriteAppearence(center_sprite_position.map(|p| p - placement.center()));
 		let (group, relative_direction) = match intermediate.linked_cycle {
 			IntermediateLinkStatus::Group(group, relative_direction) => (group, relative_direction),
 			_ => {
@@ -721,7 +718,7 @@ impl LevelBuilder {
 		let vertex_positions = intermediate
 			.vertex_indices
 			.iter()
-			.map(|i| match placement.shape {
+			.map(|i| match placement {
 				CycleShape::Circle { center, .. } => {
 					let relative_vertex_position = vertex_data[*i].position - center;
 					let angle = Vec2::X.angle_to(relative_vertex_position);
@@ -754,11 +751,9 @@ impl LevelBuilder {
 			if cycle.placement.is_none() {
 				errors.push(LevelBuilderError::UnplacedCycle(i));
 				// Fill in some placeholder value so we can return partial build
-				cycle.placement = Some(CyclePlacement {
-					shape: CycleShape::Circle {
-						center: Vec2::ZERO,
-						radius: 1.0,
-					},
+				cycle.placement = Some(CycleShape::Circle {
+					center: Vec2::ZERO,
+					radius: 1.0,
 				})
 			}
 		}

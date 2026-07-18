@@ -1083,11 +1083,9 @@ put_vertex(c; 1 0);",
 			LevelBuilderError::VertexSolverError(VertexSolverError::CycleDoesNotContainVertex(
 				CycleDoesNotContainVertexError {
 					cycle: 0,
-					placement: CyclePlacement {
-						shape: CycleShape::Circle {
-							center: Vec2::ZERO,
-							radius: 1.0
-						}
+					placement: CycleShape::Circle {
+						center: Vec2::ZERO,
+						radius: 1.0,
 					},
 					vertex: 0,
 					position: Vec2::new(0.0, 2.0)
@@ -1397,7 +1395,7 @@ line(cycle(_); -5, 1, 5, 1);
 ";
 		let level = expect_fully_ok!(parse(level));
 
-		let CycleShape::Line { start, end } = level.cycles[1].placement.shape else {
+		let CycleShape::Line { start, end } = level.cycles[1].placement else {
 			unreachable!();
 		};
 

@@ -96,7 +96,7 @@ struct IntermediateVertexData {
 #[derive(Clone, Debug)]
 struct IntermediateCycleData {
 	/// Placement of the cycle, if it has been placed yet
-	pub placement: Option<CyclePlacement>,
+	pub placement: Option<CycleShape>,
 	/// Position of the cycle's center indicator, if it has been placed yet
 	pub center_sprite_position: IntermediateCycleCenterSpritePosition,
 	/// Indices into [`LevelData::vertices`]

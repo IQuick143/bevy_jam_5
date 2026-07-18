@@ -1,8 +1,4 @@
-use super::{
-	level::{CyclePlacement, CycleShape},
-	logic_relay::*,
-	prelude::*,
-};
+use super::{level::CycleShape, logic_relay::*, prelude::*};
 use crate::{
 	AppSet,
 	camera::CameraHarness,
@@ -32,7 +28,7 @@ fn cycle_hover_system(
 	camera: Single<(&Camera, &GlobalTransform), With<CameraHarness>>,
 	mut cycles_q: Query<(
 		Entity,
-		&CyclePlacement,
+		&CycleShape,
 		&GlobalTransform,
 		&ComputedCycleTurnability,
 		&mut IsHovered,
@@ -50,7 +46,7 @@ fn cycle_hover_system(
 		.iter()
 		.filter_map(|(e, placement, transform, turnability, _)| {
 			let is_turnable = turnability.0;
-			match placement.shape {
+			match placement {
 				CycleShape::Circle { radius, .. } => {
 					let d_sq = transform.translation().xy().distance_squared(cursor_pos);
 					if d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {

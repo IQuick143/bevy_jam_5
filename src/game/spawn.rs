@@ -180,7 +180,7 @@ fn get_position_and_normal_for_detector(
 	let cycle = level.cycles.get(cycle_id)?;
 	let detector_position = cycle.detector_position_at(after_vertex_id);
 	let detector_placement = cycle.placement.sample(detector_position);
-	let normal_dir = cycle.placement.shape.normal(detector_placement);
+	let normal_dir = cycle.placement.normal(detector_placement);
 	Some((detector_placement, normal_dir))
 }
 
@@ -522,11 +522,9 @@ fn set_thing_transforms(
 	Ok(())
 }
 
-fn set_cycle_transforms(
-	mut query: Query<(&CyclePlacement, &mut Transform), Added<CyclePlacement>>,
-) {
-	for (placement, mut transform) in &mut query {
-		let center = placement.shape.center();
+fn set_cycle_transforms(mut query: Query<(&CycleShape, &mut Transform), Added<CycleShape>>) {
+	for (shape, mut transform) in &mut query {
+		let center = shape.center();
 		transform.translation.x = center.x;
 		transform.translation.y = center.y;
 	}
@@ -593,23 +591,23 @@ fn create_cycle_visuals(
 	query: Query<
 		(
 			Entity,
-			&CyclePlacement,
+			&CycleShape,
 			&CycleTurnability,
 			&CycleCenterSpriteAppearence,
 		),
-		Added<CyclePlacement>,
+		Added<CycleShape>,
 	>,
 	materials: Res<GameObjectMaterials>,
 	images: Res<HandleMap<ImageKey>>,
 	mut meshes: ResMut<Assets<Mesh>>,
 ) {
-	for (id, placement, turnability, center_sprite) in &query {
+	for (id, shape, turnability, center_sprite) in &query {
 		let mesh;
 		let outline_mesh;
 		let hitbox_mesh;
 		let rotation;
 
-		match placement.shape {
+		match *shape {
 			CycleShape::Circle { radius, .. } => {
 				let resolution = cycle_ring_mesh_resolution(radius);
 				mesh = Annulus::new(radius - RING_HALF_WIDTH, radius + RING_HALF_WIDTH)
@@ -807,7 +805,7 @@ fn get_link_endpoint(cycle_index: usize, level: &LevelData) -> Option<Vec2> {
 
 	if let Some(center_offset) = cycle.center_sprite_appearence.0 {
 		// Links are anchored at cycle center sprites
-		Some(cycle.placement.shape.center() + center_offset)
+		Some(cycle.placement.center() + center_offset)
 	} else {
 		// Links cannot be drawn if a cycle does not have center sprite
 		log::warn!("Visible link to a cycle with invisible center sprite");
