@@ -1,9 +1,13 @@
-use super::{level::CycleShape, logic_relay::*, prelude::*};
+use super::{
+	components::Cycle,
+	level::{CycleCenterSpriteAppearence, CycleShape},
+	logic_relay::*,
+	prelude::*,
+};
 use crate::{
 	AppSet,
 	camera::CameraHarness,
-	game::components::Cycle,
-	graphics::RING_SHADOW_BLEED,
+	graphics::{RING_SHADOW_BLEED, SPRITE_LENGTH},
 	input::*,
 	ui::{freeze::ui_not_frozen, hover::IsHovered},
 };
@@ -22,6 +26,8 @@ pub(super) fn plugin(app: &mut App) {
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq)]
 pub struct HoveredCycle(pub Option<Entity>);
 
+const CENTER_SPRITE_HITBOX_RADIUS: f32 = SPRITE_LENGTH / 2.0;
+
 fn cycle_hover_system(
 	mut hovered_cycle: ResMut<HoveredCycle>,
 	window: Single<&Window>,
@@ -29,7 +35,7 @@ fn cycle_hover_system(
 	mut cycles_q: Query<(
 		Entity,
 		&CycleShape,
-		&GlobalTransform,
+		&CycleCenterSpriteAppearence,
 		&ComputedCycleTurnability,
 		&mut IsHovered,
 	)>,
@@ -44,21 +50,32 @@ fn cycle_hover_system(
 
 	let (nearest_cycle, is_turnable) = cycles_q
 		.iter()
-		.filter_map(|(e, placement, transform, turnability, _)| {
+		.filter_map(|(e, placement, center, turnability, _)| {
 			let is_turnable = turnability.0;
+
+			// Distance to the center sprite, if it actually hit
+			let dc_sq = center.0.and_then(|center_offset| {
+				let dc_sq = cursor_pos.distance_squared(placement.center() + center_offset);
+				if dc_sq <= CENTER_SPRITE_HITBOX_RADIUS.powi(2) {
+					Some(dc_sq)
+				} else {
+					None
+				}
+			});
+
 			match placement {
-				CycleShape::Circle { radius, .. } => {
-					let d_sq = transform.translation().xy().distance_squared(cursor_pos);
-					if d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {
-						Some((e, d_sq, radius.powi(2), is_turnable))
+				CycleShape::Circle { center, radius } => {
+					let d_sq = center.distance_squared(cursor_pos);
+					if dc_sq.is_some() || d_sq <= (radius + RING_SHADOW_BLEED).powi(2) {
+						Some((e, d_sq, radius.powi(2), is_turnable, dc_sq))
 					} else {
 						None
 					}
 				}
 				CycleShape::Line { start, end } => {
 					let d = (end - start).normalize().perp_dot(cursor_pos - start);
-					if d.abs() <= RING_SHADOW_BLEED {
-						Some((e, d.powi(2), 0.0, is_turnable))
+					if dc_sq.is_some() || d.abs() <= RING_SHADOW_BLEED {
+						Some((e, d.powi(2), 0.0, is_turnable, dc_sq))
 					} else {
 						None
 					}
@@ -66,17 +83,21 @@ fn cycle_hover_system(
 			}
 		})
 		// Cannot just call min, because IEEE754
-		.reduce(|(e1, d_sq_1, r_sq_1, t1), (e2, d_sq_2, r_sq_2, t2)| {
-			// Sort by turnability first, because we want to select a turnable
-			// cycle if at all possible, even if it is overlapped by locked ones
-			// that would otherwise be a better match
-			if (!t1, r_sq_1, d_sq_1) > (!t2, r_sq_2, d_sq_2) {
-				(e2, d_sq_2, r_sq_2, t2)
-			} else {
-				(e1, d_sq_1, r_sq_1, t1)
-			}
-		})
-		.map(|(e, _, _, t)| (Some(e), t))
+		.reduce(
+			|(e1, d_sq_1, r_sq_1, t1, dc_sq_1), (e2, d_sq_2, r_sq_2, t2, dc_sq_2)| {
+				// Sort by turnability first, because we want to select a turnable
+				// cycle if at all possible, even if it is overlapped by locked ones
+				// that would otherwise be a better match
+				if (!t1, dc_sq_1.unwrap_or(f32::INFINITY), r_sq_1, d_sq_1)
+					> (!t2, dc_sq_2.unwrap_or(f32::INFINITY), r_sq_2, d_sq_2)
+				{
+					(e2, d_sq_2, r_sq_2, t2, dc_sq_2)
+				} else {
+					(e1, d_sq_1, r_sq_1, t1, dc_sq_1)
+				}
+			},
+		)
+		.map(|(e, _, _, t, _)| (Some(e), t))
 		.unwrap_or_default();
 
 	if is_turnable {
