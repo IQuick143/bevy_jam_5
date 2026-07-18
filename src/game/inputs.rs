@@ -42,7 +42,7 @@ fn cycle_hover_system(
 		return;
 	};
 
-	let (nearest_cycle, _, _, is_turnable) = cycles_q
+	let (nearest_cycle, is_turnable) = cycles_q
 		.iter()
 		.filter_map(|(e, placement, transform, turnability, _)| {
 			let is_turnable = turnability.0;
@@ -66,19 +66,18 @@ fn cycle_hover_system(
 			}
 		})
 		// Cannot just call min, because IEEE754
-		.fold(
-			(None, f32::INFINITY, -1.0, false),
-			|(e1, d_sq_1, r_sq_1, t1), (e2, d_sq_2, r_sq_2, t2)| {
-				// Sort by turnability first, because we want to select a turnable
-				// cycle if at all possible, even if it is overlapped by locked ones
-				// that would otherwise be a better match
-				if (!t1, r_sq_1 < d_sq_1, r_sq_1, d_sq_1) > (!t2, r_sq_2 < d_sq_2, r_sq_2, d_sq_2) {
-					(Some(e2), d_sq_2, r_sq_2, t2)
-				} else {
-					(e1, d_sq_1, r_sq_1, t1)
-				}
-			},
-		);
+		.reduce(|(e1, d_sq_1, r_sq_1, t1), (e2, d_sq_2, r_sq_2, t2)| {
+			// Sort by turnability first, because we want to select a turnable
+			// cycle if at all possible, even if it is overlapped by locked ones
+			// that would otherwise be a better match
+			if (!t1, r_sq_1, d_sq_1) > (!t2, r_sq_2, d_sq_2) {
+				(e2, d_sq_2, r_sq_2, t2)
+			} else {
+				(e1, d_sq_1, r_sq_1, t1)
+			}
+		})
+		.map(|(e, _, _, t)| (Some(e), t))
+		.unwrap_or_default();
 
 	if is_turnable {
 		hovered_cycle.set_if_neq(HoveredCycle(nearest_cycle));
