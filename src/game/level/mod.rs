@@ -206,18 +206,42 @@ pub enum CycleShape {
 }
 
 impl CycleShape {
+	/// Converts offset corrected for open cycles
+	/// to actual flat offset
+	pub fn offset_open_to_flat(t: f32) -> f32 {
+		let t = t.rem_euclid(1.0);
+		match t {
+			..0.25 => 1.0 - 0.25 / t,
+			0.75.. => 0.25 / (1.0 - t),
+			_ => 2.0 * (t - 0.25),
+		}
+	}
+
+	/// Converts flat offset to corrected for open cycles
+	pub fn offset_flat_to_open(t: f32) -> f32 {
+		match t {
+			..0.0 => 0.25 / (1.0 - t),
+			1.0.. => 1.0 - 0.25 / t,
+			_ => 0.25 + t / 2.0,
+		}
+	}
+
+	/// Sample the cycle at an offset [0, 1],
+	/// corrected for margins on an open cycle
 	pub fn sample(&self, t: f32) -> Vec2 {
+		if self.is_closed() {
+			self.closed_sample(t)
+		} else {
+			self.closed_sample(Self::offset_open_to_flat(t))
+		}
+	}
+
+	/// Sample the cycle at an offset [0, 1], anything out of range
+	/// will go to the margins on open cycles
+	pub fn closed_sample(&self, t: f32) -> Vec2 {
 		match self {
 			Self::Circle { center, radius } => center + radius * Vec2::from_angle(t * TAU),
-			Self::Line { start, end } => {
-				let t = t.rem_euclid(1.0);
-				let u = match t {
-					..0.25 => 1.0 - 0.25 / t,
-					0.75.. => 0.25 / (1.0 - t),
-					_ => 2.0 * (t - 0.25),
-				};
-				end.lerp(*start, u)
-			}
+			Self::Line { start, end } => end.lerp(*start, t),
 		}
 	}
 
@@ -229,11 +253,21 @@ impl CycleShape {
 		}
 	}
 
-	/// Length of the cycle's perimeter, in world units
+	/// Length of the cycle's perimeter, in world units,
+	/// corrected for margins on an open cycle
 	pub fn length(&self) -> f32 {
+		if self.is_closed() {
+			self.closed_length()
+		} else {
+			self.closed_length() * 2.0
+		}
+	}
+
+	/// Length of the cycle's perimeter, in world units
+	pub fn closed_length(&self) -> f32 {
 		match self {
 			Self::Circle { radius, .. } => TAU * radius,
-			Self::Line { start, end } => start.distance(*end) * 2.0,
+			Self::Line { start, end } => start.distance(*end),
 		}
 	}
 

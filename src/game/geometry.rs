@@ -1,7 +1,7 @@
 //! Geometry calculations for level definitions
 
 use super::level::CycleData;
-use crate::graphics::EDGE_DETECTOR_MARGIN;
+use crate::{game::level::CycleShape, graphics::EDGE_DETECTOR_MARGIN};
 
 impl CycleData {
 	/// Relative position of a detector located at a given index, [0, 1]
@@ -19,14 +19,18 @@ impl CycleData {
 				.vertex_positions
 				.first()
 				.expect("We just checked it is not empty");
-			first_vertex + EDGE_DETECTOR_MARGIN / self.placement.length()
+			let flat_pos = CycleShape::offset_open_to_flat(*first_vertex)
+				+ EDGE_DETECTOR_MARGIN / self.placement.closed_length();
+			CycleShape::offset_flat_to_open(flat_pos)
 		} else if !is_closed && after_vertex_id == self.vertex_indices.len() {
 			// After end of open cycle
 			let last_vertex = self
 				.vertex_positions
 				.last()
 				.expect("We just checked it is not empty");
-			last_vertex - EDGE_DETECTOR_MARGIN / self.placement.length()
+			let flat_pos = CycleShape::offset_open_to_flat(*last_vertex)
+				- EDGE_DETECTOR_MARGIN / self.placement.closed_length();
+			CycleShape::offset_flat_to_open(flat_pos)
 		} else {
 			// If the detector is not at the end of an open cycle,
 			// interpolate between the two vertices
