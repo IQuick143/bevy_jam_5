@@ -1467,4 +1467,193 @@ line(cycle(a b); -2, 0, 2, 0);
 			},)
 		);
 	}
+
+	#[test]
+	fn collision_on_point_by_hint() {
+		let level = r"
+a = vertex();
+b = vertex();
+circle(cycle(a b _ _); 0 0 2);
+circle(cycle(b a _ _); 0 2 2);
+
+# Hint to put both vertices at the same place
+hint_vertex(a; 1 1);
+hint_vertex(b; 1 1);
+";
+
+		assert_err_eq!(
+			parse(level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide {
+				vertex_a: 1,
+				vertex_b: 0
+			})
+		);
+	}
+
+	#[test]
+	fn collision_on_floating_vertex_by_hint() {
+		let level = r"
+a = vertex();
+b = vertex();
+c = vertex();
+circle(cycle(a b c); 0 0 1);
+circle(cycle(c); 1 0 0.01);
+
+# Hint to put both vertices at the same place
+hint_vertex(a; 0 1);
+hint_vertex(b; 0 1);
+";
+		assert_err_eq!(
+			parse(level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide {
+				vertex_a: 1,
+				vertex_b: 0
+			})
+		);
+	}
+
+	#[test]
+	fn collision_on_unconstrained_floating_vertex_by_hint() {
+		let level = "
+a = vertex();
+b = vertex();
+circle(cycle(a b _ _); 0 0 1);
+
+# Hint to put both vertices at the same place
+hint_vertex(a; 0 1);
+hint_vertex(b; 0 1);
+";
+		assert_err_eq!(
+			parse(level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide {
+				vertex_a: 1,
+				vertex_b: 0
+			})
+		);
+	}
+
+	#[test]
+	fn hint_vertices_in_wrong_order() {
+		let level = r"
+circle(cycle(a = vertex(), b = vertex(), c = vertex()); 0 0 1);
+hint_vertex(a; 0 1);
+hint_vertex(b; -1, 0);
+hint_vertex(c; 1 0);
+";
+		assert_err_eq!(
+			parse(level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::VerticesNotClockwise {
+				cycle: 0,
+				vertices: [0, 1, 2]
+			})
+		);
+	}
+
+	#[test]
+	fn put_vertices_in_same_place() {
+		let level = r"
+a = vertex();
+b = vertex();
+circle(cycle(a b); 0 0 1);
+
+# Force both vertices at the same place
+put_vertex(a; 0 1);
+put_vertex(b; 0 1);
+";
+		assert_err_eq!(
+			parse(level),
+			LevelBuilderError::VertexSolverError(VertexSolverError::TwoVerticesCollide {
+				vertex_a: 1,
+				vertex_b: 0
+			})
+		);
+	}
+
+	#[test]
+	fn double_slash() {
+		let a = ("a", -1, 1);
+		let b = ("b", 1, 1);
+		let c = ("c", 1, -1);
+		let d = ("d", -1, -1);
+
+		let permutations = [[a, b, c, d], [c, b, a, d], [a, d, c, b], [c, d, a, b]];
+
+		for [(a, ax, ay), (b, bx, by), (c, cx, cy), (d, dx, dy)] in permutations {
+			let level = format!(
+				r"
+a = vertex();
+b = vertex();
+c = vertex();
+d = vertex();
+e = vertex();
+
+circle(cycle(a b c d); 0 0 1);
+line(cycle({a} e {c}); {ax}, {ay}, {cx}, {cy});
+line(cycle({b} e {d}); {bx}, {by}, {dx}, {dy});
+"
+			);
+			expect_fully_ok!(parse(&level));
+		}
+	}
+
+	#[test]
+	fn fano_plane() {
+		let level = r"
+a = vertex();
+b = vertex();
+c = vertex();
+d = vertex();
+e = vertex();
+f = vertex();
+g = vertex();
+
+circle(cycle(b c f); 0 0 1);
+line(cycle(a d f); 0, 2, 0, -1);
+line(cycle(a c g); 0, 2, sqrt(3), -1);
+line(cycle(a b e); 0, 2, -sqrt(3), -1);
+line(cycle(e f g); -sqrt(3), -1, sqrt(3), -1);
+line(cycle(e d c); -sqrt(3), -1, sqrt(3), 1);
+line(cycle(b d g); -sqrt(3), 1, sqrt(3), -1);
+";
+		expect_fully_ok!(parse(level));
+	}
+
+	#[test]
+	fn triangle_with_circles() {
+		let level = r"
+A = vertex();
+B = vertex();
+C = vertex();
+a = vertex();
+b = vertex();
+c = vertex();
+
+circle(cycle(A B C); 0 0 2);
+circle(cycle(a b c); 0 0 1);
+line(cycle(A c B); 0, 2, sqrt(3), -1);
+line(cycle(B a C); sqrt(3), -1, -sqrt(3), -1);
+line(cycle(C b A); -sqrt(3), -1, 0, 2);
+";
+		expect_fully_ok!(parse(level));
+	}
+
+	#[test]
+	fn sierpinski() {
+		let level = r"
+A = vertex();
+B = vertex();
+C = vertex();
+a = vertex();
+b = vertex();
+c = vertex();
+
+line(cycle(A c B); 0 0 2 0);
+line(cycle(B a C); 2 0 0 2);
+line(cycle(C b A); 0 2 0 0);
+line(cycle(b a); 0 1 2 1);
+line(cycle(c b); 1 0 0 1);
+line(cycle(a c); 1 2 1 0);
+";
+		expect_fully_ok!(parse(level));
+	}
 }

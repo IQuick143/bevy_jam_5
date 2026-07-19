@@ -694,7 +694,7 @@ impl LevelBuilder {
 						IntersectionPointSet::Cycle(cycle) => {
 							// Use hints if possible
 							if let Some(hint_position) = self.vertices[vertex].hint_position {
-								match self.cycles[cycle].placement {
+								let hinted_placement = match self.cycles[cycle].placement {
 									Some(CycleShape::Circle { center, radius }) => {
 										let distance_from_center = center.distance(hint_position);
 										if distance_from_center <= absolute_precision_limit {
@@ -737,7 +737,15 @@ impl LevelBuilder {
 										debug_assert!(false, "Unplaced cycle");
 										IntersectionPointSet::Cycle(cycle)
 									}
+								};
+								// Write down its position on all relevant vertices
+								// Hints can only put it in a `Single` position
+								if let IntersectionPointSet::Single(point) = hinted_placement {
+									for &cycle in cycles.iter() {
+										points_on_cycle[cycle].push(point);
+									}
 								}
+								hinted_placement
 							} else {
 								IntersectionPointSet::Cycle(cycle)
 							}
@@ -1046,7 +1054,7 @@ impl LevelBuilder {
 			let p_a = point_data.points[point_a];
 			let p_b = point_data.points[point_b];
 			let before_point = if let Some(prev_single_ix) = prev_single_ix
-				&& prev_single_ix < current_vertex
+				&& prev_single_ix < current_vertex_ix
 			{
 				let prev_single = cycle_data.vertices[prev_single_ix].vertex;
 				let IntersectionPointSet::Single(point) = constraints[prev_single] else {
@@ -1060,7 +1068,7 @@ impl LevelBuilder {
 				start
 			};
 			let after_point = if let Some(next_single_ix) = next_single_ix
-				&& next_single_ix > current_vertex
+				&& next_single_ix > current_vertex_ix
 			{
 				let next_single = cycle_data.vertices[next_single_ix].vertex;
 				let IntersectionPointSet::Single(point) = constraints[next_single] else {
