@@ -20,7 +20,7 @@ impl CycleData {
 				.first()
 				.expect("We just checked it is not empty");
 			let flat_pos = CycleShape::offset_open_to_flat(*first_vertex)
-				+ EDGE_DETECTOR_MARGIN / self.placement.closed_length();
+				+ EDGE_DETECTOR_MARGIN / self.closed_length();
 			CycleShape::offset_flat_to_open(flat_pos)
 		} else if !is_closed && after_vertex_id == self.vertex_indices.len() {
 			// After end of open cycle
@@ -29,7 +29,7 @@ impl CycleData {
 				.last()
 				.expect("We just checked it is not empty");
 			let flat_pos = CycleShape::offset_open_to_flat(*last_vertex)
-				- EDGE_DETECTOR_MARGIN / self.placement.closed_length();
+				- EDGE_DETECTOR_MARGIN / self.closed_length();
 			CycleShape::offset_flat_to_open(flat_pos)
 		} else {
 			// If the detector is not at the end of an open cycle,
