@@ -4,14 +4,9 @@ use smallvec::SmallVec;
 
 use super::{TurnAnimationLength, animation_easing_function};
 use crate::{
-	AppSet,
-	game::{
-		components::*,
-		level::{CycleData, LevelData, ThingData},
-		logic_relay::RotateCycleGroupWithResult,
-		prelude::*,
-	},
-	screen::Screen,
+	AppSet, game::{
+		components::*, geometry::CycleView, level::{LevelData, ThingData}, logic_relay::RotateCycleGroupWithResult, prelude::*,
+	}, screen::Screen,
 };
 
 pub(super) fn plugin(app: &mut App) {
@@ -179,7 +174,9 @@ impl AnimationPathSegment {
 	}
 
 	fn sample(&self, progress: f32, level_data: &LevelData) -> Vec2 {
-		let cycle = &level_data.cycles[self.owner_cycle];
+		let Some(cycle) = level_data.cycle_view(self.owner_cycle) else {
+			return Vec2::ZERO;
+		};
 		self.measurements.sample(cycle, progress)
 	}
 
@@ -270,7 +267,7 @@ impl AnimationPathSegmentMeasurements {
 		}
 	}
 
-	fn sample(&self, cycle: &CycleData, progress: f32) -> Vec2 {
+	fn sample(&self, cycle: CycleView, progress: f32) -> Vec2 {
 		cycle.sample(self.sample_t(progress))
 	}
 
@@ -371,7 +368,7 @@ impl TurnCycleResult {
 				// No rotation, nothing to see here
 				continue;
 			}
-			let Some(cycle_data) = level_data.cycles.get(cycle_id) else {
+			let Some(cycle_data) = level_data.cycle_view(cycle_id) else {
 				continue;
 			};
 			if cycle_data.vertex_indices.is_empty() {

@@ -177,10 +177,10 @@ fn get_position_and_normal_for_detector(
 	cycle_id: usize,
 	after_vertex_id: usize,
 ) -> Option<(Vec2, Dir2)> {
-	let cycle = level.cycles.get(cycle_id)?;
+	let cycle = level.cycle_view(cycle_id)?;
 	let detector_position = cycle.detector_position_at(after_vertex_id);
 	let detector_placement = cycle.sample(detector_position);
-	let normal_dir = cycle.normal(detector_placement);
+	let normal_dir = cycle.normal(detector_position);
 	Some((detector_placement, normal_dir))
 }
 

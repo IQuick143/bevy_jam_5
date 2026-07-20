@@ -244,55 +244,6 @@ impl CycleShape {
 	}
 }
 
-impl CycleData {
-	/// Sample the cycle at an offset [0, 1],
-	/// corrected for margins on an open cycle
-	pub fn sample(&self, t: f32) -> Vec2 {
-		if self.placement.is_closed() {
-			self.closed_sample(t)
-		} else {
-			self.closed_sample(CycleShape::offset_open_to_flat(t))
-		}
-	}
-
-	/// Sample the cycle at an offset [0, 1], anything out of range
-	/// will go to the margins on open cycles
-	pub fn closed_sample(&self, t: f32) -> Vec2 {
-		match self.placement {
-			CycleShape::Circle { center, radius } => center + radius * Vec2::from_angle(t * TAU),
-			CycleShape::Line { start, end } => end.lerp(start, t),
-		}
-	}
-
-	/// Length of the cycle's perimeter, in world units,
-	/// corrected for margins on an open cycle
-	pub fn length(&self) -> f32 {
-		if self.placement.is_closed() {
-			self.closed_length()
-		} else {
-			self.closed_length() * 2.0
-		}
-	}
-
-	/// Length of the cycle's perimeter, in world units
-	pub fn closed_length(&self) -> f32 {
-		match self.placement {
-			CycleShape::Circle { radius, .. } => TAU * radius,
-			CycleShape::Line { start, end } => start.distance(end),
-		}
-	}
-
-	/// Get the normal to the cycle's perimeter at a given point
-	pub fn normal(&self, at: Vec2) -> Dir2 {
-		match self.placement {
-			CycleShape::Circle { center, .. } => Dir2::new(at - center).unwrap_or(Dir2::NEG_X),
-			CycleShape::Line { start, end } => {
-				Dir2::new((end - start).perp()).unwrap_or(Dir2::NEG_X)
-			}
-		}
-	}
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 pub enum ObjectType {
 	Box,
