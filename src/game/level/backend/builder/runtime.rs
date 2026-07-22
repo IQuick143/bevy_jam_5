@@ -56,6 +56,7 @@ impl InterpreterBackend for LevelBuilder {
 			"cycle" => self.call_cycle(args),
 			"circle" => self.call_circle(args),
 			"line" => self.call_line(args),
+			"freeform" => self.call_freeform(args),
 			"put_center" => self.call_put_center(args),
 			"put_vertex" => self.call_put_vertex(args),
 			"hint_vertex" => self.call_hint_vertex(args),
@@ -316,6 +317,35 @@ impl LevelBuilder {
 		};
 		args.read_end()?;
 		self.place_line(cycle_id, Vec2::new(x1, y1), Vec2::new(x2, y2))?;
+		if let Some(position) = center_position {
+			self.place_cycle_center(cycle_id, position)?;
+		}
+		Ok(ReturnValue::with_side_effect(CycleId(cycle_id).into()))
+	}
+
+	fn call_freeform(&mut self, mut args: ArgumentStream<DomainValue>) -> CallResult {
+		let CycleId(cycle_id) = args.read_as()?;
+		args.read_end_or_separator()?;
+		let endpoints;
+		if let Some(x1) = args.read_as_until_end_or_separator()? {
+			let y1 = args.read_as()?;
+			let x2 = args.read_as()?;
+			let y2 = args.read_as()?;
+			endpoints = Some((Vec2::new(x1, y1), Vec2::new(x2, y2)));
+		} else {
+			endpoints = None;
+		}
+		let center_position = if args.optional_separator() {
+			Some(Self::read_optional_vec2(&mut args)?)
+		} else {
+			None
+		};
+		args.read_end()?;
+		if let Some((start, end)) = endpoints {
+			self.place_open_freeform(cycle_id, start, end)?;
+		} else {
+			self.place_freeform(cycle_id)?;
+		}
 		if let Some(position) = center_position {
 			self.place_cycle_center(cycle_id, position)?;
 		}

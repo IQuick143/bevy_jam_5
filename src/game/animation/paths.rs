@@ -4,9 +4,15 @@ use smallvec::SmallVec;
 
 use super::{TurnAnimationLength, animation_easing_function};
 use crate::{
-	AppSet, game::{
-		components::*, geometry::CycleView, level::{LevelData, ThingData}, logic_relay::RotateCycleGroupWithResult, prelude::*,
-	}, screen::Screen,
+	AppSet,
+	game::{
+		components::*,
+		geometry::CycleView,
+		level::{LevelData, ThingData},
+		logic_relay::RotateCycleGroupWithResult,
+		prelude::*,
+	},
+	screen::Screen,
 };
 
 pub(super) fn plugin(app: &mut App) {

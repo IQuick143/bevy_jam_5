@@ -597,7 +597,10 @@ impl LevelBuilder {
 			if let Some(shape) = cycle.placement {
 				let limit_metric = match shape {
 					CycleShape::Circle { center, radius } => center.length() + radius.abs(),
-					CycleShape::Line { start, end } => start.max(end).length(),
+					CycleShape::Line { start, end } | CycleShape::OpenFreeform { start, end } => {
+						start.max(end).length()
+					}
+					CycleShape::ClosedFreeform => 0.0,
 				};
 				absolute_precision_limit = absolute_precision_limit.max(limit_metric);
 			}
@@ -732,9 +735,16 @@ impl LevelBuilder {
 											parent_cycle,
 										))
 									}
-									None => {
+									None
+									| Some(
+										CycleShape::ClosedFreeform
+										| CycleShape::OpenFreeform { .. },
+									) => {
 										// Should not be happening
-										debug_assert!(false, "Unplaced cycle");
+										debug_assert!(
+											false,
+											"IntersectionPointSet::Cycle cannot reference an unplaced or freeform cycle"
+										);
 										IntersectionPointSet::Cycle(cycle)
 									}
 								};
@@ -999,6 +1009,8 @@ impl LevelBuilder {
 			CycleShape::Line { start, end } => {
 				self.try_reduce_pairs_on_line(cycle_id, start, end, point_data, error_log);
 			}
+			// Freeform cycles do not constrain layout at all
+			CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => {}
 		}
 	}
 
@@ -1643,11 +1655,11 @@ impl LevelBuilder {
 						}
 					}
 				}
-				None => {
+				None | Some(CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. }) => {
 					// Technically unreachable, unplaced cycles are not involved in this
 					debug_assert!(
 						false,
-						"Unplaced cycle encountered when pinning unsaturated vertex"
+						"Unplaced or freeform cycle encountered when pinning unsaturated vertex"
 					);
 				}
 			}
@@ -1784,6 +1796,9 @@ impl LevelBuilder {
 						}
 					}
 				}
+				CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => {
+					// Freeform cycles do not constrain the layout
+				}
 			}
 		}
 	}
@@ -1823,7 +1838,7 @@ impl LevelBuilder {
 	) {
 		for (cycle_id, cycle) in self.cycles.iter().enumerate() {
 			match cycle.placement {
-				None => {}
+				None | Some(CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. }) => {}
 				Some(CycleShape::Circle { center, .. }) => {
 					let positions = cycle
 						.vertex_indices
@@ -1921,6 +1936,8 @@ impl LevelBuilder {
 						);
 					}
 				}
+				// Freeform cycles do not constrain layout
+				CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => {}
 			}
 		}
 	}
@@ -1975,8 +1992,8 @@ impl LevelBuilder {
 						.placement
 						// `None` is technically not possible here as the `None` branch
 						// does not assign the intersection points
-						.and_then(|cycle_b_placement| {
-							intersect_cycles(cycle_a_placement, cycle_b_placement)
+						.map(|cycle_b_placement| {
+							intersect_cycles(cycle, cycle_b, cycle_a_placement, cycle_b_placement)
 						})
 						.unwrap_or(IntersectionPointSet::Cycle(cycle))
 				}
@@ -1987,15 +2004,14 @@ impl LevelBuilder {
 }
 
 /// Calculate the intersection of two cycles as [`IntersectionPointSet`]
-///
-/// [`None`] if the cycles are near-identical
-/// so the intersection does not actually narrow them
 fn intersect_cycles(
+	cycle_a: usize,
+	cycle_b: usize,
 	placement_a: CycleShape,
 	placement_b: CycleShape,
-) -> Option<IntersectionPointSet<Vec2>> {
-	use CycleShape::{Circle, Line};
-	use IntersectionPointSet::{Empty, Pair, Single};
+) -> IntersectionPointSet<Vec2> {
+	use CycleShape::{Circle, ClosedFreeform, Line, OpenFreeform};
+	use IntersectionPointSet::{Empty, Pair, Single, Unconstrained};
 
 	match (placement_a, placement_b) {
 		(
@@ -2014,15 +2030,15 @@ fn intersect_cycles(
 			let offset_length = offset.length();
 			if offset_length <= tolerance {
 				if (radius_a - radius_b).abs() < tolerance {
-					None
+					IntersectionPointSet::Cycle(cycle_a)
 				} else {
-					Some(Empty)
+					Empty
 				}
 			} else {
 				match intersect_circles(position_a, position_b, radius_a, radius_b) {
-					Some(OneTwo::One(point)) => Some(Single(point)),
-					Some(OneTwo::Two(point_a, point_b)) => Some(Pair(point_a, point_b)),
-					None => Some(Empty),
+					Some(OneTwo::One(point)) => Single(point),
+					Some(OneTwo::Two(point_a, point_b)) => Pair(point_a, point_b),
+					None => Empty,
 				}
 			}
 		}
@@ -2048,16 +2064,16 @@ fn intersect_cycles(
 			let c = Vec2::new(a.dot(start_a), b.dot(start_b));
 			if m.determinant().abs() < tolerance {
 				// The lines are parallel
-				Some(Empty)
+				Empty
 			} else {
 				let intersection = m.inverse() * c;
 				if point_lies_on_line_segment(start_a, end_a, intersection)
 					&& point_lies_on_line_segment(start_b, end_b, intersection)
 				{
-					Some(Single(intersection))
+					Single(intersection)
 				} else {
 					// The lines intersect outside of the actual segments
-					Some(Empty)
+					Empty
 				}
 			}
 		}
@@ -2069,9 +2085,9 @@ fn intersect_cycles(
 			const TANGENTIAL_INTERSECTION_THRESHOLD: f32 = 0.001;
 			if normal_offset_sq.abs() < TANGENTIAL_INTERSECTION_THRESHOLD {
 				if point_lies_on_line_segment(start, end, midpoint) {
-					Some(Single(midpoint))
+					Single(midpoint)
 				} else {
-					Some(Empty)
+					Empty
 				}
 			} else if normal_offset_sq > 0.0 {
 				let normal_offset = normal_offset_sq.sqrt();
@@ -2083,14 +2099,23 @@ fn intersect_cycles(
 					point_lies_on_line_segment(start, end, p_a),
 					point_lies_on_line_segment(start, end, p_b),
 				) {
-					(true, true) => Some(Pair(p_a, p_b)),
-					(true, false) => Some(Single(p_a)),
-					(false, true) => Some(Single(p_b)),
-					(false, false) => Some(Empty),
+					(true, true) => Pair(p_a, p_b),
+					(true, false) => Single(p_a),
+					(false, true) => Single(p_b),
+					(false, false) => Empty,
 				}
 			} else {
-				Some(Empty)
+				Empty
 			}
+		}
+		(ClosedFreeform | OpenFreeform { .. }, Circle { .. } | Line { .. }) => {
+			IntersectionPointSet::Cycle(cycle_b)
+		}
+		(Circle { .. } | Line { .. }, ClosedFreeform | OpenFreeform { .. }) => {
+			IntersectionPointSet::Cycle(cycle_a)
+		}
+		(ClosedFreeform | OpenFreeform { .. }, ClosedFreeform | OpenFreeform { .. }) => {
+			Unconstrained
 		}
 	}
 }
@@ -2156,6 +2181,8 @@ fn point_lies_on_cycle(cycle: CycleShape, point: Vec2) -> bool {
 	match cycle {
 		CycleShape::Circle { center, radius } => point_lies_on_circle(center, radius, point),
 		CycleShape::Line { start, end } => point_lies_on_line_segment(start, end, point),
+		// Freeform cycles do not constrain layout
+		CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => true,
 	}
 }
 

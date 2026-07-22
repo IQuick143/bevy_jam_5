@@ -80,6 +80,13 @@ fn cycle_hover_system(
 						None
 					}
 				}
+				CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => {
+					if dc_sq.is_some() {
+						Some((e, f32::INFINITY, 0.0, is_turnable, dc_sq))
+					} else {
+						None
+					}
+				}
 			}
 		})
 		// Cannot just call min, because IEEE754

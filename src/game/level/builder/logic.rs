@@ -715,20 +715,68 @@ impl LevelBuilder {
 			}
 		};
 		// Calculate the relative positions of vertices along the cycle
-		let vertex_positions = intermediate
-			.vertex_indices
-			.iter()
-			.map(|i| match placement {
-				CycleShape::Circle { center, .. } => {
+		let vertex_positions = match placement {
+			CycleShape::Circle { center, .. } => intermediate
+				.vertex_indices
+				.iter()
+				.map(|i| {
 					let relative_vertex_position = vertex_data[*i].position - center;
 					let angle = Vec2::X.angle_to(relative_vertex_position);
 					(angle / TAU).rem_euclid(1.0)
-				}
-				CycleShape::Line { start, end } => CycleShape::offset_flat_to_open(
-					end.distance(vertex_data[*i].position) / end.distance(start),
-				),
-			})
-			.collect();
+				})
+				.collect(),
+			CycleShape::Line { start, end } => intermediate
+				.vertex_indices
+				.iter()
+				.map(|i| {
+					CycleShape::offset_flat_to_open(
+						end.distance(vertex_data[*i].position) / end.distance(start),
+					)
+				})
+				.collect(),
+			CycleShape::ClosedFreeform => {
+				let vertex_pos_pairs = intermediate
+					.vertex_indices
+					.iter()
+					.map(|i| vertex_data[*i].position)
+					.circular_tuple_windows();
+				let length = vertex_pos_pairs
+					.clone()
+					.map(|(a, b)| a.distance(b))
+					.sum::<f32>();
+				let mut length_left = length;
+				vertex_pos_pairs
+					.map(|(a, b)| {
+						let pos = length_left / length;
+						length_left -= a.distance(b);
+						pos
+					})
+					.collect()
+			}
+			CycleShape::OpenFreeform { start, end } => {
+				let vertex_pos_pairs = std::iter::once(start)
+					.chain(
+						intermediate
+							.vertex_indices
+							.iter()
+							.map(|i| vertex_data[*i].position),
+					)
+					.chain(std::iter::once(end))
+					.tuple_windows();
+				let length = vertex_pos_pairs
+					.clone()
+					.map(|(a, b)| a.distance(b))
+					.sum::<f32>();
+				let mut length_left = length;
+				vertex_pos_pairs
+					.take(intermediate.vertex_indices.len())
+					.map(|(a, b)| {
+						length_left -= a.distance(b);
+						CycleShape::offset_flat_to_open(length_left / length)
+					})
+					.collect()
+			}
+		};
 		CycleData {
 			placement,
 			center_sprite_appearence,

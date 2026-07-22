@@ -643,6 +643,7 @@ fn create_cycle_visuals(
 					.build();
 				rotation = Quat::from_rotation_arc_2d(Vec2::Y, (end - start).normalize());
 			}
+			CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => continue,
 		}
 
 		let ring = commands

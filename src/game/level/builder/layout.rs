@@ -50,6 +50,40 @@ impl LevelBuilder {
 		Ok(())
 	}
 
+	pub fn place_freeform(&mut self, target_cycle: usize) -> Result<(), LevelBuilderError> {
+		if target_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
+		}
+		if self.cycles[target_cycle].placement.is_some() {
+			return Err(LevelBuilderError::CycleAlreadyPlaced(target_cycle));
+		}
+		self.cycles[target_cycle].placement = Some(CycleShape::ClosedFreeform);
+		Ok(())
+	}
+
+	pub fn place_open_freeform(
+		&mut self,
+		target_cycle: usize,
+		start: Vec2,
+		end: Vec2,
+	) -> Result<(), LevelBuilderError> {
+		if target_cycle >= self.cycles.len() {
+			return Err(LevelBuilderError::CycleIndexOutOfRange(target_cycle));
+		}
+		if self.cycles[target_cycle].placement.is_some() {
+			return Err(LevelBuilderError::CycleAlreadyPlaced(target_cycle));
+		}
+		if !start.is_finite() || !start.is_finite() {
+			return Err(LevelBuilderError::CycleLengthNotPositive(
+				target_cycle,
+				start,
+				end,
+			));
+		}
+		self.cycles[target_cycle].placement = Some(CycleShape::OpenFreeform { start, end });
+		Ok(())
+	}
+
 	/// Explicitly sets the position of a cycle's center indicator
 	/// or makes it invisible
 	pub fn place_cycle_center(
@@ -251,8 +285,8 @@ impl LevelBuilder {
 			.map(|cycle| {
 				cycle
 					.placement
-					.map(|p| Self::get_bounding_box_for_cycle(p).min)
-					.unwrap_or(Vec2::INFINITY)
+					.and_then(Self::get_bounding_box_for_cycle)
+					.map_or(Vec2::INFINITY, |aabb| aabb.min)
 					.min(
 						cycle
 							.center_sprite_position
@@ -260,6 +294,11 @@ impl LevelBuilder {
 							.unwrap_or(Vec2::INFINITY),
 					)
 			})
+			.chain(
+				self.vertices
+					.iter()
+					.filter_map(|vertex| vertex.position.get_fixed()),
+			)
 			.fold(Vec2::INFINITY, Vec2::min);
 		let max = self
 			.cycles
@@ -267,8 +306,8 @@ impl LevelBuilder {
 			.map(|cycle| {
 				cycle
 					.placement
-					.map(|p| Self::get_bounding_box_for_cycle(p).max)
-					.unwrap_or(Vec2::NEG_INFINITY)
+					.and_then(Self::get_bounding_box_for_cycle)
+					.map_or(Vec2::NEG_INFINITY, |aabb| aabb.max)
 					.max(
 						cycle
 							.center_sprite_position
@@ -276,6 +315,11 @@ impl LevelBuilder {
 							.unwrap_or(Vec2::NEG_INFINITY),
 					)
 			})
+			.chain(
+				self.vertices
+					.iter()
+					.filter_map(|vertex| vertex.position.get_fixed()),
+			)
 			.fold(Vec2::NEG_INFINITY, Vec2::max);
 		Aabb2d { min, max }
 	}
@@ -305,13 +349,15 @@ impl LevelBuilder {
 	}
 
 	/// Computes the bounding box for a given cycle shape
-	fn get_bounding_box_for_cycle(placement: CycleShape) -> Aabb2d {
+	fn get_bounding_box_for_cycle(placement: CycleShape) -> Option<Aabb2d> {
 		match placement {
-			CycleShape::Circle { center, radius } => Aabb2d::new(center, Vec2::splat(radius)),
-			CycleShape::Line { start, end } => Aabb2d {
+			CycleShape::Circle { center, radius } => Some(Aabb2d::new(center, Vec2::splat(radius))),
+			CycleShape::Line { start, end } => Some(Aabb2d {
 				min: start.min(end),
 				max: start.max(end),
-			},
+			}),
+			CycleShape::ClosedFreeform => None,
+			CycleShape::OpenFreeform { .. } => None,
 		}
 	}
 
@@ -354,10 +400,11 @@ impl LevelBuilder {
 						*radius *= scale;
 						*center = (*center - bounds_center) * scale + viewport_center
 					}
-					CycleShape::Line { start, end } => {
+					CycleShape::Line { start, end } | CycleShape::OpenFreeform { start, end } => {
 						*start = (*start - bounds_center) * scale + viewport_center;
 						*end = (*end - bounds_center) * scale + viewport_center;
 					}
+					CycleShape::ClosedFreeform => {}
 				}
 			}
 			if let IntermediateCycleCenterSpritePosition::Placed(p) =

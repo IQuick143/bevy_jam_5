@@ -203,6 +203,10 @@ pub enum CycleShape {
 	Circle { center: Vec2, radius: f32 },
 	/// Line passing through two points, with all vertices on the segment in between
 	Line { start: Vec2, end: Vec2 },
+	/// Vertices in no particular shape that form a closed loop
+	ClosedFreeform,
+	/// Vertices in no particular shape that form a path between two points
+	OpenFreeform { start: Vec2, end: Vec2 },
 }
 
 impl CycleShape {
@@ -231,6 +235,8 @@ impl CycleShape {
 		match self {
 			Self::Circle { center, .. } => *center,
 			Self::Line { start, .. } => *start,
+			Self::ClosedFreeform => Vec2::ZERO,
+			Self::OpenFreeform { start, .. } => *start,
 		}
 	}
 
@@ -240,6 +246,8 @@ impl CycleShape {
 		match self {
 			Self::Circle { .. } => true,
 			Self::Line { .. } => false,
+			Self::ClosedFreeform => true,
+			Self::OpenFreeform { .. } => false,
 		}
 	}
 }
@@ -408,6 +416,11 @@ impl std::fmt::Display for CycleShape {
 			} => {
 				write!(f, "[x1={x1} y1={y1} x2={x2} y2={y2}]")
 			}
+			Self::ClosedFreeform => write!(f, "[..]"),
+			Self::OpenFreeform {
+				start: Vec2 { x: x1, y: y1 },
+				end: Vec2 { x: x2, y: y2 },
+			} => write!(f, "[{x1}, {y1} .. {x2} {y2}]"),
 		}
 	}
 }
