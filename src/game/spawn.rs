@@ -53,7 +53,8 @@ pub(super) fn plugin(app: &mut App) {
 					.after(SpawnPrimaryEntities),
 				(
 					create_vertex_visuals,
-					create_cycle_visuals,
+					create_cycle_ring_visuals,
+					create_cycle_center_visuals,
 					create_detector_and_wall_visuals,
 					create_hard_link_visuals,
 					create_one_way_link_visuals,
@@ -586,22 +587,13 @@ fn create_detector_and_wall_visuals(
 	}
 }
 
-fn create_cycle_visuals(
+fn create_cycle_ring_visuals(
 	mut commands: Commands,
-	query: Query<
-		(
-			Entity,
-			&CycleShape,
-			&CycleTurnability,
-			&CycleCenterSpriteAppearence,
-		),
-		Added<CycleShape>,
-	>,
+	query: Query<(Entity, &CycleShape, &CycleTurnability), Added<CycleShape>>,
 	materials: Res<GameObjectMaterials>,
-	images: Res<HandleMap<ImageKey>>,
 	mut meshes: ResMut<Assets<Mesh>>,
 ) {
-	for (id, shape, turnability, center_sprite) in &query {
+	for (id, shape, turnability) in &query {
 		let mesh;
 		let outline_mesh;
 		let hitbox_mesh;
@@ -643,6 +635,7 @@ fn create_cycle_visuals(
 					.build();
 				rotation = Quat::from_rotation_arc_2d(Vec2::Y, (end - start).normalize());
 			}
+			// Freeform cycles don't have a ring, for now
 			CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. } => continue,
 		}
 
@@ -681,7 +674,18 @@ fn create_cycle_visuals(
 				.insert(CycleHitboxVisualEntity(hitbox))
 				.add_child(hitbox);
 		}
+	}
+}
 
+fn create_cycle_center_visuals(
+	mut commands: Commands,
+	query: Query<
+		(Entity, &CycleTurnability, &CycleCenterSpriteAppearence),
+		Added<CycleCenterSpriteAppearence>,
+	>,
+	images: Res<HandleMap<ImageKey>>,
+) {
+	for (id, turnability, center_sprite) in &query {
 		if let Some(offset) = center_sprite.0 {
 			let sprite = commands
 				.spawn((
