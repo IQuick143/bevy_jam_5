@@ -1656,4 +1656,9 @@ line(cycle(a c); 1 2 1 0);
 ";
 		expect_fully_ok!(parse(level));
 	}
+
+	#[test]
+	fn null_cycle() {
+		expect_fully_ok!(parse("freeform(cycle());"));
+	}
 }

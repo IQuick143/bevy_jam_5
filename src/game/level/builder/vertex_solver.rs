@@ -1960,10 +1960,12 @@ impl LevelBuilder {
 					// whenever the intersection would become empty
 					return IntersectionPointSet::Empty;
 				}
-				(None, current_intersection) => {
+				(
+					None | Some(CycleShape::ClosedFreeform | CycleShape::OpenFreeform { .. }),
+					current_intersection,
+				) => {
 					// Unplaced cycles and cycles with loose geometries
 					// do not affect the intersection
-					// TODO: when new loose cycle shapes are added, they go to this branch
 					current_intersection
 				}
 				(_, IntersectionPointSet::Unconstrained) => IntersectionPointSet::Cycle(cycle),
