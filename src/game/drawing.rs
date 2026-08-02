@@ -403,9 +403,12 @@ fn cycle_blocked_marker_system(
 fn wall_blocked_marker_system(
 	event: On<RotateCycleGroupWithResult>,
 	mut markers: BlockMarkerFactory,
+	level: PlayingLevelData,
 	walls_q: Query<&Transform, With<Wall>>,
 	entity_index: Res<GameStateEcsIndex>,
 ) {
+	let level_data = level.get().ok();
+
 	for &(cycle, wall) in event.result.wall_hits.iter() {
 		let Some(vertex_transform) = entity_index
 			.walls
@@ -415,6 +418,31 @@ fn wall_blocked_marker_system(
 			log::warn!("Nonexistent wall!");
 			continue;
 		};
+
+		// Special case: If the cycle moved by one place
+		// and walls at both start and end were hit, only mark the near hit
+		if let Some(level) = level_data
+			&& let Some(c) = level.cycles.get(cycle)
+			&& let Some(cycle_turned_by) = event.result.cycle_turned_by(cycle, level)
+			&& cycle_turned_by.abs() == 1
+		{
+			let is_clockwise = cycle_turned_by > 0;
+			let skip_marker = if is_clockwise {
+				// Hit wall at start and there is a wall at end
+				c.wall_indices.get(wall).is_some_and(|i| *i == 0)
+					&& c.wall_indices.contains(&c.vertex_indices.len())
+			} else {
+				// Hit wall at end and there is a wall at start
+				c.wall_indices
+					.get(wall)
+					.is_some_and(|i| *i == c.vertex_indices.len())
+					&& c.wall_indices.contains(&0)
+			};
+			if skip_marker {
+				continue;
+			}
+		}
+
 		markers.spawn(vertex_transform.translation.xy(), hover::WALL_HIT_WARNING);
 	}
 }

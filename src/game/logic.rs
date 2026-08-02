@@ -387,6 +387,13 @@ impl TurnCycleResult {
 			.any(|rotate_by| *rotate_by != 0)
 	}
 
+	/// Queries the signed amount of steps that a cycle has turned by
+	pub fn cycle_turned_by(&self, cycle_id: usize, level: &LevelData) -> Option<i64> {
+		let cycle = level.cycles.get(cycle_id)?;
+		let turned_by = *self.groups_turned_by.get(cycle.group)?;
+		Some(turned_by)
+	}
+
 	/// Iterate the indices to cycles that turned with the amount they turned
 	///
 	/// Cycles that did not turn are not included
