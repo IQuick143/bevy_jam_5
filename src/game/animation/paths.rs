@@ -419,17 +419,16 @@ impl TurnCycleResult {
 					// If the object hit a wall, put the actual end position here explicitly
 					let mut early_end_position = None;
 					// Cut the path earlier if there is a wall to hit
-					let mut stopped_on_wall = false;
+					let mut full_rotation_cancelled = false;
 					for &wall_position in &wall_hits_by_cycle[cycle_id] {
 						let start_and_end_swapped =
 							(start_index > proposed_end_index) == is_clockwise;
 						let wall_after_start = (wall_position > start_index) == is_clockwise;
 						let wall_before_end = (wall_position <= proposed_end_index) == is_clockwise;
-						let wall_hit = !stopped_on_wall && full_rotations > 0 // The wall would be hit on a full rotation (only counts if we have not hit anything yet)
+						let wall_hit = !full_rotation_cancelled && full_rotations > 0 // The wall would be hit on a full rotation (only counts if we have not hit anything yet)
 							|| wall_after_start && wall_before_end // Or if the wall is between start and end
 							|| start_and_end_swapped && (wall_after_start || wall_before_end); // If the indices wrapped, also count it as "between"
 						if wall_hit {
-							stopped_on_wall = true;
 							// Cut the rotation at the wall
 							// Modulo it at one more vertex so we can
 							// tell wall before start from one after end
@@ -440,6 +439,12 @@ impl TurnCycleResult {
 								// One tile before the wall
 								proposed_end_index =
 									(wall_position + vertex_count) % (vertex_count + 1);
+							}
+							// Toggle the flag so walls past this one can no longer be hit
+							// Edge case: if the wall is just before the starting position,
+							// the end position will equal it; do not stop full rotation in that case
+							if proposed_end_index != start_index {
+								full_rotation_cancelled = true;
 							}
 							// Stop precisely at the wall
 							let mut wall_stop_position =
