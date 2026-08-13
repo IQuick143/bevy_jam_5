@@ -12,6 +12,7 @@ pub mod explorer;
 mod game;
 mod graphics;
 mod input;
+mod mechanics_overview;
 mod persistent;
 #[cfg(feature = "playtest")]
 mod playtest;
@@ -26,8 +27,8 @@ use bevy::{
 	ecs::error::warn,
 	prelude::*,
 };
-
 use explorer::{StateExplorerOptions, run_state_explorer};
+use mechanics_overview::MechanicsOverview;
 
 pub struct AppPlugin;
 
@@ -169,15 +170,43 @@ fn explore_state_space(level_file: &str, options: StateExplorerOptions) -> AppEx
 	}
 }
 
-fn parse_command_line(
-	argv: impl IntoIterator<Item = String>,
-) -> Result<(String, StateExplorerOptions), &'static str> {
+fn print_mechanics_overview() -> AppExit {
+	match MechanicsOverview::load() {
+		Ok(overview) => {
+			println!("{overview}");
+			AppExit::Success
+		}
+		Err(err) => {
+			eprintln!("{err}");
+			AppExit::error()
+		}
+	}
+}
+
+/// Enumerates possible subcommands of the app
+enum CommandLine {
+	/// Launches a normal game session
+	StartGame,
+	/// Explores the state space of a level
+	/// and prints the results to stdout
+	ExploreStates {
+		level_file: String,
+		options: StateExplorerOptions,
+	},
+	/// Compiles an overview of what mechanics are present
+	/// in each level in the current bundle
+	MechanicsOverview,
+}
+
+fn parse_command_line(argv: impl IntoIterator<Item = String>) -> Result<CommandLine, &'static str> {
 	let mut argv = argv.into_iter();
 	let mut level_file = None;
 	let mut options = StateExplorerOptions::default();
+	let mut has_mechanics_flag = false;
 
 	while let Some(arg) = argv.next() {
 		match arg.as_str() {
+			"" => continue,
 			"--max-nodes" => {
 				let Some(next_arg) = argv.next() else {
 					return Err("expected argument after --max-nodes");
@@ -199,6 +228,9 @@ fn parse_command_line(
 			"--reduce" => {
 				options.reduce = true;
 			}
+			"--mechanics" => {
+				has_mechanics_flag = true;
+			}
 			_ => {
 				if level_file.is_some() {
 					return Err("duplicate argument for input level file");
@@ -208,24 +240,29 @@ fn parse_command_line(
 		}
 	}
 
-	let Some(level_file) = level_file else {
-		return Err("missing input level file");
-	};
-
-	Ok((level_file, options))
+	if let Some(level_file) = level_file {
+		Ok(CommandLine::ExploreStates {
+			level_file,
+			options,
+		})
+	} else if has_mechanics_flag {
+		Ok(CommandLine::MechanicsOverview)
+	} else {
+		Ok(CommandLine::StartGame)
+	}
 }
 
 fn main() -> AppExit {
-	// This is to work around a bug with hot reloading
-	let argv: Vec<String> = std::env::args().filter(|arg| !arg.is_empty()).collect();
-	match argv.len() {
-		0..=1 => start_game(),
-		2.. => match parse_command_line(argv.into_iter().skip(1)) {
-			Ok((level_file, options)) => explore_state_space(&level_file, options),
-			Err(err) => {
-				eprintln!("Error: {err}");
-				AppExit::error()
-			}
-		},
+	match parse_command_line(std::env::args().skip(1)) {
+		Ok(CommandLine::StartGame) => start_game(),
+		Ok(CommandLine::ExploreStates {
+			level_file,
+			options,
+		}) => explore_state_space(&level_file, options),
+		Ok(CommandLine::MechanicsOverview) => print_mechanics_overview(),
+		Err(err) => {
+			eprintln!("Error: {err}");
+			AppExit::error()
+		}
 	}
 }
